@@ -150,6 +150,7 @@ Switching to `showcase`/`nostr_only` requires proven Nostr inbox readiness. Exis
 ## Security posture
 
 - Relay-target egress screening: discovered/inbox relay targets are DNS-resolved and non-global ranges (private, loopback, link-local, multicast, reserved, metadata incl. `169.254.169.254`, CGNAT) rejected at validate, connect, and reconnect — IPv4 and IPv6
+- Bounded relay churn: inbox sessions re-open under per-(merchant, relay) exponential backoff (30 s → 15 min, reset on EOSE); a relay that repeatedly rejects NIP-42 auth is disabled after 10 rejections and flagged `auth-failed` on the relay-health surface (retryable via `POST /merchants/{id}/relay-auth/retry/{relay_url}`); when no enabled inbox relay is usable the merchant admin shows an urgent "inbox unreachable" warning
 - The extension **never** invokes outgoing-payment APIs — paid-relay invoices are surfaced for external payment only
 - Encrypted at rest: NIP-17 payloads and buyer identifiers are stored encrypted; rejected intake is auditable
 - OS/container egress policy remains an operator responsibility when claiming Release-B conformance (see `PINS.md` §8 and spec decision 30)

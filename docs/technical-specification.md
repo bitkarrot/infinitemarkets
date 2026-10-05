@@ -436,7 +436,10 @@ attempt_no). NIP-17 recipient and sender copies have different event ids. Positi
 ### 4.11 `relay_configs`, `peer_relays`, and `relay_cursors`
 
 `relay_configs`: `id` PK, `merchant_id` FK (NULL = server-wide default), `relay_url`,
-`direction` (`public|inbox|both`), `enabled`, timestamps. The kind-10050 discovered inbox
+`direction` (`public|inbox|both`), `enabled`, timestamps, plus the per-relay auth
+surface `auth_state`, `auth_note`, `paid_invoice`, `auth_updated_at` — a bounded
+vocabulary: `auth-required → auth-sent → authenticated`, `auth-failed` (terminal,
+operator-retryable), `payment-required`. The kind-10050 discovered inbox
 relays of *buyers* are cached in `peer_relays` (`pubkey_hash`, `pubkey_enc`, `relay_url`,
 `fetched_at`, `expires_at`). Buyer keys/order ids are encrypted at rest; keyed HMAC
 indexes permit lookup without deterministic encryption.
@@ -572,7 +575,7 @@ database-rate-limited (§15).
 
 ```text
 POST   /merchants                          create merchant (generates or imports key)
-GET    /merchants/current                  current user's merchant + relay health summary
+GET    /merchants/current                  current user's merchant + relay health summary + operational warnings (incl. unreachable inbox)
 PATCH  /merchants/{id}                     profile, payment_preference, wallet_id, toggles
 POST   /merchants/{id}/keys/import         body: {nsec} — over TLS only; see §11; request-body logging disabled
 POST   /merchants/{id}/publish             enqueue republication of all aggregates
@@ -1375,6 +1378,16 @@ has been handled and all events delivered before EOSE are durably admitted. A cr
 before EOSE leaves the prior cursor intact. The cursor is session time—not event time—
 and event-id dedup absorbs overlap.
 
+**Reopen policy:** a session whose REQ is CLOSED or whose open fails re-opens on a
+per-(merchant, relay) exponential backoff (30 s doubling, 15 min cap), reset only on
+EOSE — the first evidence a session works. A relay that keeps answering our NIP-42 AUTH
+with CLOSED `auth-required` is disabled after 10 rejections for the process lifetime and
+its `relay_configs` row is flagged `auth-failed`; other enabled inbox relays keep
+serving. `POST /merchants/{id}/relay-auth/retry/{relay_url}` re-enables the session
+in-process. When `inbox_state='active'` but no enabled inbox-direction relay is usable
+(all `auth-failed`, or none configured), `GET /merchants/current` surfaces an urgent
+"inbox unreachable" warning — the buyer contact path is dead and must not fail silently.
+
 ### 9.3 Peer inbox relays (kind 10050)
 
 Before sending a buyer copy, resolve the buyer's latest valid kind 10050 from multiple
@@ -1398,6 +1411,10 @@ are labeled degraded because they expose recipient metadata and amplify anonymou
 If a relay requires AUTH, authenticate with the merchant key via key store signing;
 auth challenges are untrusted, bounded to 1 KiB, and signed only when the relay URL
 exactly matches the active connection. AUTH never authorizes a different origin.
+CLOSED reason classification strips transport-level prefixes (`ERROR:`, `NOTICE:`) —
+real relays phrase auth demands several ways (e.g. `ERROR: auth-required: ...`) — and
+the reason text is logged bounded (≤160 chars; never the challenge itself). Repeated
+rejection does not retry forever — see §9.2 reopen policy.
 
 ### 9.5 Relay URL and egress security
 
@@ -1450,7 +1467,9 @@ A lease-protected loop acquires/renews `task_leases` with database time and a fe
 token; loss of lease stops work immediately. Every loop has bounded batches, structured
 logs (ids/states only), and per-unit exception isolation. `create_permanent_task`
 restarts the loop after uncaught failure, but durable rows—not memory queues—provide
-recovery.
+recovery. The transport's relay pool is bounded (`MAX_RELAYS` = 32): relays pooled
+ad-hoc for a single send or fetch are released after the operation, and subscription
+sessions re-open under the §9.2 backoff rather than on the 5s reconcile cadence.
 
 ---
 
