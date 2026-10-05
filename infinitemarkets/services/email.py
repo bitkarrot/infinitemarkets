@@ -36,6 +36,7 @@ BACKOFF_BASE_S = 30
 BACKOFF_CAP_S = 4 * 3600
 CUSTOMER_HOURLY_CAP = 8
 MERCHANT_HOURLY_CAP = 60
+ACCOUNT_HOURLY_CAP = 8
 
 _EVENT_LABELS = {
     "order_received": "new order received",
@@ -47,6 +48,7 @@ _EVENT_LABELS = {
     "expired": "order expired",
     "on_hold": "order on hold",
     "refund_requested": "refund requested",
+    "signin_link": "your sign-in link",
 }
 
 
@@ -156,6 +158,8 @@ async def _suppression_reason(
     ) else {}
     if row["event_type"] in events and not events[row["event_type"]]:
         return "event-disabled"
+    # ``channel == 'account'`` rows (magic links) skip the consent check by
+    # construction — the mailbox itself is the credential being proven.
     if row["channel"] == "customer":
         if order is None or not order["email_opt_in"]:
             return "consent-revoked"
@@ -198,6 +202,19 @@ def _render_body(
         "This is a transactional order notification."
     )
     return "\n".join(lines)
+
+
+def _render_signin_body(merchant: dict, link: str) -> str:
+    """Magic-link body — the fragment-bearing URL is the only secret;
+    the bare token and the recipient address never appear anywhere."""
+    name = (merchant.get("display_name") or "Infinitemarkets").strip()
+    return "\n".join(
+        [
+            f"Use this link to sign in to {name}: {link}",
+            "The link expires in 15 minutes and works once.",
+            "If you didn't request it, you can ignore this email.",
+        ]
+    )
 
 
 async def _status_link(
@@ -292,7 +309,16 @@ async def worker_tick(
                 return "suppressed"
 
             # §8.8 step 6: per-recipient rate limit before the SMTP call.
-            if row["channel"] == "customer":
+            # ``channel == 'account'`` needs its own explicit branch —
+            # scoped on the recipient hash; the else-branch would silently
+            # bucket account rows under ``email-merchant``.
+            if row["channel"] == "account":
+                ok = await _rate_bucket_ok(
+                    tx, scope=row["recipient_hash"],
+                    bucket="email-account", cap=ACCOUNT_HOURLY_CAP,
+                    now=now,
+                )
+            elif row["channel"] == "customer":
                 ok = await _rate_bucket_ok(
                     tx, scope=row["recipient_hash"],
                     bucket="email-customer", cap=CUSTOMER_HOURLY_CAP,
@@ -326,11 +352,38 @@ async def worker_tick(
             table="email_queue",
             column="recipient_enc", key_version=ver,
         ).decode()
-        link = await _status_link(order, settings)
-        subject = _subject(merchant or {}, row["event_type"])
-        body = _render_body(
-            row, order, items, merchant or {}, link, delivery
-        )
+        if (
+            row["channel"] == "account"
+            and row["event_type"] == "signin_link"
+        ):
+            # Magic-link render: the token lives only in ``payload_enc``
+            # until this point; the link carries it in the URL fragment
+            # (§5.4 contract — never path/query/subject/logs).
+            pver = crypto.envelope_version(row["payload_enc"])
+            token = json.loads(
+                crypto.decrypt(
+                    row["payload_enc"], settings.master_keys[pver],
+                    record_id=row["id"], table="email_queue",
+                    column="payload_enc", key_version=pver,
+                )
+            )["token"]
+            shop_q = (
+                f"?shop={merchant['pubkey']}"
+                if merchant and merchant.get("pubkey")
+                else ""
+            )
+            link = (
+                f"{settings.public_base_url}/infinitemarkets/auth/email"
+                f"{shop_q}#{token}"
+            )
+            subject = _subject(merchant or {}, row["event_type"])
+            body = _render_signin_body(merchant or {}, link)
+        else:
+            link = await _status_link(order, settings)
+            subject = _subject(merchant or {}, row["event_type"])
+            body = _render_body(
+                row, order, items, merchant or {}, link, delivery
+            )
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             return "lost_claim"
@@ -352,8 +405,12 @@ async def worker_tick(
             sent = False
         async with DomainTransaction(database) as tx:
             if sent:
+                # Sent rows retain no bearer material: recipient_enc AND
+                # any payload_enc (magic-link token) are wiped together.
                 await _leased_write(
-                    tx, row, "state = 'sent', sent_at = :t, recipient_enc = :empty",
+                    tx, row,
+                    "state = 'sent', sent_at = :t, recipient_enc = :empty,"
+                    " payload_enc = :empty",
                     {"t": now, "empty": b""},
                 )
                 return "sent"
@@ -433,4 +490,50 @@ async def enqueue_test_send(
             {"i": row_id, "m": merchant_id, "re": enc, "rh": digest,
              "n": now},
         )
+    return row_id
+
+
+async def enqueue_magic_link(
+    tx: DomainTransaction, *, merchant_id: str, recipient: str,
+    token: str, now: int,
+) -> str:
+    """Enqueue one orderless sign-in link — ``channel='account'`` /
+    ``event_type='signin_link'`` (D-07).
+
+    Called INSIDE the caller's ``DomainTransaction`` so the
+    ``email_signin_tokens`` row and this queue row commit atomically.
+    The raw token persists ONLY inside ``payload_enc`` (AEAD'd like the
+    ``orders.public_token_enc`` custody posture) and is decrypted at send
+    time to render the fragment link; ``email_queue`` rows with NULL
+    ``order_id`` never dedupe — the request-side per-email/IP caps are
+    the only volume bound.
+    """
+    settings = ext_settings()
+    ver = settings.active_key_version
+    key = settings.master_keys[ver]
+    row_id = uuid.uuid4().hex
+    enc = crypto.encrypt(
+        recipient.encode(), key,
+        record_id=merchant_id, table="email_queue",
+        column="recipient_enc", key_version=ver,
+    )
+    digest = crypto.hmac_index(
+        settings.privacy_key, crypto.PURPOSE_EMAIL_RECIPIENT,
+        merchant_id, crypto.normalize(recipient),
+    )
+    payload = crypto.encrypt(
+        json.dumps({"token": token}).encode(), key,
+        record_id=row_id, table="email_queue",
+        column="payload_enc", key_version=ver,
+    )
+    await tx.execute(
+        f"INSERT INTO {tx.table('email_queue')} "
+        "(id, merchant_id, order_id, channel, event_type,"
+        " recipient_enc, recipient_hash, payload_enc, state, attempts,"
+        " next_attempt_at, claim_token, created_at) "
+        "VALUES (:i, :m, NULL, 'account', 'signin_link', :re, :rh, :pe,"
+        " 'pending', 0, :n, 0, :n)",
+        {"i": row_id, "m": merchant_id, "re": enc, "rh": digest,
+         "pe": payload, "n": now},
+    )
     return row_id
