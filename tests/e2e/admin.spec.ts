@@ -237,6 +237,59 @@ test('catalog surface lists products with editor CTAs', async ({page}) => {
   await expect(catalog.getByText('e2e poster').first()).toBeVisible()
 })
 
+test('catalogs tab: create, rename, and delete guards', async ({page}) => {
+  const base = `Seasonal ${Date.now()}`
+  const renamed = `${base} drop`
+  await page.goto('/infinitemarkets/')
+  await page.locator('[data-gm-nav="catalog"]').click()
+  const catalog = page.locator('[data-gm-surface="catalog"]')
+  await expect(catalog.getByRole('button', {name: 'New catalog'})).toBeVisible({
+    timeout: 15_000
+  })
+
+  // create a second catalog in-pane (no dialog)
+  await catalog.getByRole('button', {name: 'New catalog'}).click()
+  const editor = catalog.locator('[data-gm-catalog-editor="catalog"]')
+  await expect(editor).toBeVisible()
+  await editor.getByLabel('Name').fill(base)
+  await editor.getByRole('button', {name: 'Create catalog'}).click()
+  const table = catalog.locator('[data-gm-table="catalogs"]')
+  await expect(table.getByText(base)).toBeVisible({timeout: 15_000})
+
+  // it is selectable when creating a product
+  await catalog.getByRole('button', {name: 'New product'}).click()
+  await catalog.locator('[data-gm-catalog-editor="product"] .q-select').first().click()
+  await expect(page.getByRole('option', {name: base})).toBeVisible()
+  await page.keyboard.press('Escape')
+  await catalog.getByRole('button', {name: 'Cancel'}).click()
+
+  // rename
+  await catalog.getByRole('tab', {name: 'Catalogs'}).click()
+  const row = table.locator('tr', {hasText: base})
+  await row.getByRole('button', {name: 'Edit catalog'}).click()
+  await editor.getByLabel('Name').fill(renamed)
+  await editor.getByRole('button', {name: 'Save catalog'}).click()
+  await expect(table.getByText(renamed)).toBeVisible({timeout: 15_000})
+
+  // a catalog that still holds products cannot be deleted
+  const main = table.locator('tr', {hasText: 'main', hasNotText: 'Seasonal'})
+  await main.getByRole('button', {name: 'Delete catalog'}).click()
+  const dialog = page.locator('.q-dialog')
+  await dialog.getByRole('button', {name: 'Delete', exact: true}).click()
+  await expect(dialog).toContainText('product(s)')
+  await expect(
+    dialog.getByRole('button', {name: 'Delete and strip references'})
+  ).toHaveCount(0)
+  await dialog.getByRole('button', {name: 'Keep'}).click()
+
+  // an empty one can
+  await row.getByRole('button', {name: 'Delete catalog'}).click()
+  await dialog.getByRole('button', {name: 'Delete', exact: true}).click()
+  await expect(table.getByText(renamed)).toHaveCount(0, {
+    timeout: 15_000
+  })
+})
+
 test('catalog editors stay in-pane and bulk tools update selected products', async ({page}) => {
   await page.goto('/infinitemarkets/')
   await page.locator('[data-gm-nav="catalog"]').click()

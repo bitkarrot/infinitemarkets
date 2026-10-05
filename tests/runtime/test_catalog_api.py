@@ -102,6 +102,59 @@ async def test_catalog_crud(runtime_env):
     assert resp.json()["name"] == "renamed"
 
 
+async def test_catalog_delete_guards(runtime_env):
+    main = await _catalog(runtime_env)
+    client = runtime_env["client"]
+    headers = await _cookie(runtime_env)
+
+    resp = await client.post(
+        f"{API}/catalogs", json={"name": "second"}, headers=headers
+    )
+    assert resp.status_code == 201
+    second = resp.json()["id"]
+
+    prod = await client.post(
+        f"{API}/products",
+        json={"catalog_id": second, "title": "pinned", "format": "digital",
+              "amount_minor": 5, "currency": "SAT", "draft": True},
+        headers=headers,
+    )
+    assert prod.status_code == 201, prod.text
+
+    # live product -> refused, nothing orphaned
+    resp = await client.delete(f"{API}/catalogs/{second}", headers=headers)
+    assert resp.status_code == 409
+    assert resp.json()["type"].endswith("catalog-not-empty")
+
+    # once emptied the delete lands and the row leaves the list
+    resp = await client.delete(
+        f"{API}/products/{prod.json()['id']}", headers=headers
+    )
+    assert resp.status_code == 200
+    resp = await client.delete(f"{API}/catalogs/{second}", headers=headers)
+    assert resp.status_code == 200
+    listed = await client.get(f"{API}/catalogs", headers={"Origin": ORIGIN})
+    assert second not in [c["id"] for c in listed.json()]
+
+    # a deleted catalog cannot take new products
+    resp = await client.post(
+        f"{API}/products",
+        json={"catalog_id": second, "title": "x", "format": "digital",
+              "amount_minor": 1, "currency": "SAT", "draft": True},
+        headers=headers,
+    )
+    assert resp.status_code == 404
+
+    # the shop's last remaining catalog cannot be deleted
+    others = [c["id"] for c in listed.json() if c["id"] != main]
+    for cid in others:
+        r = await client.delete(f"{API}/catalogs/{cid}", headers=headers)
+        assert r.status_code in (200, 409)
+    resp = await client.delete(f"{API}/catalogs/{main}", headers=headers)
+    assert resp.status_code in (409,)
+    assert resp.json()["type"].endswith(("last-catalog", "catalog-not-empty"))
+
+
 async def test_product_validation_bounds(runtime_env):
     cid = await _catalog(runtime_env)
     client = runtime_env["client"]

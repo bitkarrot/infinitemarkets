@@ -21,6 +21,12 @@
     { name: "state", label: "State", field: "nip99_status", align: "left", style: "width: 100px" },
     { name: "actions", label: "Actions", field: "id", align: "left", style: "width: 140px" }
   ];
+  var CATALOG_COLUMNS = [
+    { name: "name", label: "Name", field: "name", align: "left", sortable: true, style: "width: 240px" },
+    { name: "products", label: "Products", field: "_products", align: "left", style: "width: 100px" },
+    { name: "description", label: "Description", field: "description", align: "left", style: "width: 280px" },
+    { name: "actions", label: "Actions", field: "id", align: "left", style: "width: 120px" }
+  ];
   var COLLECTION_COLUMNS = [
     { name: "title", label: "Title", field: "title", align: "left", sortable: true, style: "width: 280px" },
     { name: "id", label: "ID", field: "d_tag", align: "left", style: "width: 220px" },
@@ -59,6 +65,7 @@
           collections: [],
           shipping: [],
           productColumns: PRODUCT_COLUMNS,
+          catalogColumns: CATALOG_COLUMNS,
           collectionColumns: COLLECTION_COLUMNS,
           shippingColumns: SHIPPING_COLUMNS,
           selectedProducts: [],
@@ -80,6 +87,10 @@
             show: false, saving: false, error: null, isNew: true,
             form: {}
           },
+          catalogEditor: {
+            show: false, saving: false, error: null, isNew: true,
+            form: {}
+          },
           collectionEditor: {
             show: false, saving: false, error: null, isNew: true,
             form: {}
@@ -97,6 +108,15 @@
       };
     },
     computed: {
+      gmCatalogRows: function () {
+        var counts = {};
+        this.gmCatalog.products.forEach(function (p) {
+          counts[p.catalog_id] = (counts[p.catalog_id] || 0) + 1;
+        });
+        return this.gmCatalog.catalogs.map(function (c) {
+          return Object.assign({}, c, { _products: counts[c.id] || 0 });
+        });
+      },
       gmProductRows: function () {
         return this.gmCatalog.products.map(function (p) {
           var stock =
@@ -378,6 +398,49 @@
         ed.saving = false;
       },
 
+      /* --- catalogs ------------------------------------------------------ */
+      gmNewCatalog: function () {
+        this.gmCatalog.tab = "catalogs";
+        this.gmCatalog.catalogEditor = {
+          show: true, saving: false, error: null, isNew: true,
+          form: { name: "", description: "" }
+        };
+      },
+      gmEditCatalog: function (row) {
+        this.gmCatalog.tab = "catalogs";
+        this.gmCatalog.catalogEditor = {
+          show: true, saving: false, error: null, isNew: false,
+          form: {
+            id: row.id, name: row.name || "",
+            description: row.description || ""
+          }
+        };
+      },
+      gmSaveCatalog: async function () {
+        var self = this;
+        var ed = self.gmCatalog.catalogEditor;
+        ed.saving = true;
+        ed.error = null;
+        var f = ed.form;
+        var body = {
+          name: f.name,
+          description: f.description || undefined
+        };
+        try {
+          if (ed.isNew) {
+            await self.gmApi("POST", "/catalogs", body);
+          } else {
+            await self.gmApi("PATCH", "/catalogs/" + f.id, body);
+          }
+          ed.show = false;
+          self.gmCatalog.notice = ed.isNew ? "Catalog created." : "Catalog saved.";
+          await self.gmLoadCatalog();
+        } catch (e) {
+          ed.error = self.gmProblemCopy(e.problem);
+        }
+        ed.saving = false;
+      },
+
       /* --- shipping -------------------------------------------------------- */
       gmNewShipping: function () {
         this.gmCatalog.tab = "shipping";
@@ -458,7 +521,7 @@
       gmAskDelete: function (kind, row) {
         this.gmCatalog.deleteDialog = {
           show: true, kind: kind, id: row.id,
-          title: row.title || row.d_tag, refs: null, busy: false
+          title: row.title || row.name || row.d_tag, refs: null, busy: false
         };
       },
       gmDeleteConfirm: async function (strip) {
@@ -471,7 +534,9 @@
             ? "collections"
             : dlg.kind === "shipping"
               ? "shipping"
-              : "products") +
+              : dlg.kind === "catalog"
+                ? "catalogs"
+                : "products") +
           "/" +
           dlg.id +
           (strip ? "?strip=true" : "");

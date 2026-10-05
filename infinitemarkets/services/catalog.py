@@ -489,13 +489,36 @@ async def patch_catalog(merchant_id: str, user, catalog_id: str,
 
 
 async def delete_catalog(merchant_id: str, user, catalog_id: str) -> dict:
-    """Soft delete — products under the catalog are NOT cascade-deleted
-    (they hold their own tombstones); the catalog row is retained."""
+    """Soft delete — the catalog row is retained. Refused while live
+    products still sit in it (they would be orphaned) and for the shop's
+    last remaining catalog (new products need somewhere to live)."""
     await _merchant_owned(merchant_id, user)
     row = await _fetch("catalogs", catalog_id, merchant_id)
     if row["deleted_at"] is not None:
         raise not_found("catalog not found")
     async with DomainTransaction() as tx:
+        live = await tx.fetch_one(
+            f"SELECT COUNT(*) AS n FROM {tx.table('products')} "
+            "WHERE catalog_id = :i AND deleted_at IS NULL",
+            {"i": catalog_id},
+        )
+        if live["n"]:
+            raise conflict(
+                "catalog-not-empty",
+                "Catalog still has products",
+                f"{live['n']} product(s) — move or delete them first",
+            )
+        others = await tx.fetch_one(
+            f"SELECT COUNT(*) AS n FROM {tx.table('catalogs')} "
+            "WHERE merchant_id = :m AND id != :i AND deleted_at IS NULL",
+            {"m": merchant_id, "i": catalog_id},
+        )
+        if not others["n"]:
+            raise conflict(
+                "last-catalog",
+                "Cannot delete the last catalog",
+                "create another catalog first",
+            )
         await tx.execute(
             f"UPDATE {tx.table('catalogs')} SET deleted_at = :t,"
             " updated_at = :t WHERE id = :i",

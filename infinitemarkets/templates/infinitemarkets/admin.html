@@ -480,6 +480,8 @@
           <h1 class="text-h6 q-my-none col">Catalog</h1>
           <q-btn unelevated color="primary" label="New product"
                  @click="gmNewProduct"></q-btn>
+          <q-btn outline color="primary" label="New catalog"
+                 @click="gmNewCatalog"></q-btn>
           <q-btn outline color="primary" label="New collection"
                  @click="gmNewCollection"></q-btn>
           <q-btn outline color="primary" label="New shipping option"
@@ -500,6 +502,7 @@
         </q-banner>
         <q-tabs v-model="gmCatalog.tab" dense class="q-mb-md">
           <q-tab name="products" label="Products"></q-tab>
+          <q-tab name="catalogs" label="Catalogs"></q-tab>
           <q-tab name="collections" label="Collections"></q-tab>
           <q-tab name="shipping" label="Shipping"></q-tab>
         </q-tabs>
@@ -686,6 +689,73 @@
                       <q-btn flat dense round color="negative" icon="delete"
                              aria-label="Delete product"
                              @click="gmAskDelete('product', props.row)">
+                        <q-tooltip>Delete</q-tooltip>
+                      </q-btn>
+                    </q-td>
+                  </q-tr>
+                </template>
+              </q-table>
+            </template>
+          </q-tab-panel>
+
+          <q-tab-panel name="catalogs" class="q-pa-none">
+            <q-card v-if="gmCatalog.catalogEditor.show" flat bordered
+                    class="gm-catalog-editor" data-gm-catalog-editor="catalog">
+              <q-card-section class="row items-center q-gutter-sm">
+                <div class="col">
+                  <div class="text-h6">
+                    {{ gmCatalog.catalogEditor.isNew ? 'New catalog' : 'Edit catalog' }}
+                  </div>
+                  <div class="text-caption text-grey-7">
+                    A catalog groups products for your own organisation. Every product lives in exactly one catalog.
+                  </div>
+                </div>
+                <q-btn flat label="Cancel"
+                       @click="gmCatalog.catalogEditor.show = false"></q-btn>
+                <q-btn unelevated color="primary"
+                       :label="gmCatalog.catalogEditor.isNew ? 'Create catalog' : 'Save catalog'"
+                       :loading="gmCatalog.catalogEditor.saving"
+                       @click="gmSaveCatalog"></q-btn>
+              </q-card-section>
+              <q-separator></q-separator>
+              <q-card-section class="gm-editor-grid">
+                <q-input v-model="gmCatalog.catalogEditor.form.name" dense
+                         outlined class="gm-editor-wide" label="Name"></q-input>
+                <q-input v-model="gmCatalog.catalogEditor.form.description" dense
+                         outlined type="textarea" class="gm-editor-wide"
+                         label="Description (optional)"></q-input>
+                <q-banner v-if="gmCatalog.catalogEditor.error"
+                          class="bg-negative text-white gm-editor-wide">
+                  {{ gmCatalog.catalogEditor.error }}
+                </q-banner>
+              </q-card-section>
+            </q-card>
+
+            <template v-else>
+              <q-table dense flat bordered class="gm-catalog-table"
+                       data-gm-table="catalogs" :rows="gmCatalogRows"
+                       :columns="gmCatalog.catalogColumns" row-key="id"
+                       :pagination="{ rowsPerPage: 20 }"
+                       :table-style="{ tableLayout: 'fixed', minWidth: '620px' }">
+                <template v-slot:body="props">
+                  <q-tr :props="props">
+                    <q-td key="name" :props="props" data-col="name">
+                      {{ props.row.name }}
+                    </q-td>
+                    <q-td key="products" :props="props" data-col="products">
+                      {{ props.row._products }}
+                    </q-td>
+                    <q-td key="description" :props="props" data-col="description">
+                      {{ props.row.description || '—' }}
+                    </q-td>
+                    <q-td key="actions" :props="props" data-col="actions">
+                      <q-btn flat dense round icon="edit" aria-label="Edit catalog"
+                             @click="gmEditCatalog(props.row)">
+                        <q-tooltip>Edit</q-tooltip>
+                      </q-btn>
+                      <q-btn flat dense round color="negative" icon="delete"
+                             aria-label="Delete catalog"
+                             @click="gmAskDelete('catalog', props.row)">
                         <q-tooltip>Delete</q-tooltip>
                       </q-btn>
                     </q-td>
@@ -1775,16 +1845,25 @@
         <div class="text-h6">Delete {{ gmCatalog.deleteDialog.title }}</div>
       </q-card-section>
       <q-card-section>
-        {{ gmCatalog.deleteDisclosure }}
+        <template v-if="gmCatalog.deleteDialog.kind === 'catalog'">
+          Deleting a catalog removes it from your shop. A catalog can only be
+          deleted when it has no products, and you always keep at least one.
+          Nothing is published to relays.
+        </template>
+        <template v-else>{{ gmCatalog.deleteDisclosure }}</template>
         <q-banner v-if="gmCatalog.deleteDialog.refs"
                   class="bg-warning text-dark q-mt-sm">
-          Still referenced: {{ gmCatalog.deleteDialog.refs }}
+          <template v-if="gmCatalog.deleteDialog.kind === 'catalog'">
+            {{ gmCatalog.deleteDialog.refs }}
+          </template>
+          <template v-else>Still referenced: {{ gmCatalog.deleteDialog.refs }}</template>
         </q-banner>
       </q-card-section>
       <q-card-actions align="right">
         <q-btn flat label="Keep"
                @click="gmCatalog.deleteDialog.show = false"></q-btn>
-        <q-btn v-if="gmCatalog.deleteDialog.refs" outline color="warning"
+        <q-btn v-if="gmCatalog.deleteDialog.refs && gmCatalog.deleteDialog.kind !== 'catalog'"
+               outline color="warning"
                label="Delete and strip references"
                :loading="gmCatalog.deleteDialog.busy"
                @click="gmDeleteConfirm(true)"></q-btn>
