@@ -207,11 +207,22 @@ async def claim_batch(now: int, worker_id: str,
 
 
 async def _deps_published(tx, intent_id: str) -> bool:
+    """The edge is met once ANY revision of the depended-on aggregate is
+    published — a superseded dep intent does not wedge dependents
+    forever (the aggregate's newer revision is what actually landed).
+    No published revision at all (pending, superseded-only, failed)
+    still blocks — ordering cannot be guaranteed without one."""
     row = await tx.fetch_one(
         f"SELECT COUNT(*) AS n FROM {tx.table('outbox_dependencies')} d "
         f"JOIN {tx.table('outbox_events')} e "
         "ON e.id = d.depends_on_outbox_event_id "
-        "WHERE d.outbox_event_id = :i AND e.state != 'published'",
+        "WHERE d.outbox_event_id = :i "
+        "AND NOT EXISTS ("
+        f"  SELECT 1 FROM {tx.table('outbox_events')} p "
+        "  WHERE p.aggregate_type = e.aggregate_type"
+        "    AND p.aggregate_id = e.aggregate_id"
+        "    AND p.state = 'published'"
+        ")",
         {"i": intent_id},
     )
     return row["n"] == 0

@@ -463,6 +463,45 @@ async def test_dependency_gate_blocks_until_published(worker_env):
         assert accepting.received_events == []
 
 
+async def test_dependency_met_when_aggregate_has_published_revision(worker_env):
+    """A superseded dep intent does not wedge the child once ANY revision
+    of the dep aggregate is published — the newer revision is what landed
+    (production wedge: products stuck behind superseded collection revs)."""
+    from harness import relay as relay_module
+
+    async with relay_module.LocalRelay(
+        mode=relay_module.RelayMode.ACCEPTING
+    ) as accepting:
+        mid = await _merchant(worker_env)
+        await _relay_config(worker_env["db"], mid, accepting.url)
+        from infinitemarkets.db import DomainTransaction, table
+        from infinitemarkets.services.outbox import enqueue_intent
+
+        cid = uuid.uuid4().hex
+        async with DomainTransaction() as tx:
+            # An older revision of the collection already landed.
+            old = await enqueue_intent(tx, mid, "collections", cid, 30405)
+        async with worker_env["db"].connect() as conn:
+            await conn.execute(
+                f"UPDATE {table('outbox_events')} SET state = 'published'"
+                " WHERE id = :i",
+                {"i": old},
+            )
+        async with DomainTransaction() as tx:
+            # The dep edge binds to THIS newer intent, which the worker
+            # will supersede (no collection row exists to render).
+            await enqueue_intent(tx, mid, "collections", cid, 30405)
+            child = await enqueue_intent(
+                tx, mid, "merchant_profile", mid, 0,
+                depends_on=[("collections", cid)],
+            )
+        await worker_env["transport"].start([accepting.url])
+        await worker_env["outbox"].worker_tick("w-test")
+        state = await _state(worker_env["db"], child)
+        assert state["row"]["state"] == "published"
+        assert len(accepting.received_events) == 1
+
+
 async def test_retry_intent_resets_failed_and_skips_accepted(worker_env):
     """Admin retry: failed/partial -> pending, attempts reset, accepted
     targets still never resent."""
