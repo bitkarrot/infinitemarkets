@@ -331,16 +331,13 @@ test('sign-in without a signer extension shows friendly guidance', async ({
 }) => {
   await page.goto(seed.digital_url)
   await page.locator('[data-gm="signin"]').click()
-  await expect(page.locator('#gm-nostr-modal')).toBeVisible()
-  await expect(page.locator('#gm-nostr-modal')).toContainText('NIP-07')
-  // The chip only opens the method picker — the buyer chooses Nostr.
-  await page.locator('#gm-nostr-modal-signin').click()
-  await expect(page.locator('#gm-nostr-modal')).toContainText(
+  await page.waitForURL('**/infinitemarkets/signin**')
+  await expect(page.locator('#gm-signin-body')).toContainText('NIP-07')
+  // The chip navigates to the sign-in page — the buyer chooses Nostr.
+  await page.locator('#gm-signin-nostr-btn').click()
+  await expect(page.locator('#gm-signin-body')).toContainText(
     'No Nostr signer found'
   )
-  // Escape dismisses the dialog.
-  await page.keyboard.press('Escape')
-  await expect(page.locator('#gm-nostr-modal')).toBeHidden()
 })
 
 test('NIP-07 sign-in, claim, order history, sign out', async ({
@@ -368,16 +365,16 @@ test('NIP-07 sign-in, claim, order history, sign out', async ({
 
   await installNostrStub(page)
   await page.goto(seed.digital_url)
-  // The chip opens the method picker; the Nostr button starts the
-  // signer challenge round-trip.
+  // The chip navigates to the sign-in page; the Nostr button starts the
+  // signer challenge round-trip and lands on the orders page.
   await page.locator('[data-gm="signin"]').click()
-  await expect(page.locator('#gm-nostr-modal')).toBeVisible()
-  await page.locator('#gm-nostr-modal-signin').click()
+  await page.waitForURL('**/infinitemarkets/signin**')
+  await page.locator('#gm-signin-nostr-btn').click()
+  await page.waitForURL('**/infinitemarkets/orders**', {timeout: 20_000})
   // Signed-in state collapses to a header account chip — npub shown.
   await expect(page.locator('#gm-nostr-signin')).toContainText('npub1', {
     timeout: 20_000
   })
-  await expect(page.locator('#gm-nostr-modal')).toBeHidden()
   // The chip opens the account dropdown with the account links.
   await page.locator('#gm-nostr-signin').click()
   await expect(page.locator('#gm-nostr-menu')).toBeVisible()
@@ -559,13 +556,13 @@ test('email magic-link sign-in binds past orders', async ({
   try {
     await page.goto(seed.digital_url)
     await page.locator('[data-gm="signin"]').click()
-    await expect(page.locator('#gm-nostr-modal')).toBeVisible()
+    await page.waitForURL('**/infinitemarkets/signin**')
     await page
       .locator('[data-gm="email-input"]')
       .fill('e2e-buyer@example.com')
     await page.locator('#gm-email-btn').click()
     // Uniform no-oracle copy — identical for every outcome.
-    await expect(page.locator('#gm-nostr-modal')).toContainText(
+    await expect(page.locator('#gm-signin-body')).toContainText(
       'Check your email'
     )
 
@@ -601,7 +598,7 @@ test('email magic-link sign-in binds past orders', async ({
   }
 })
 
-test('modal offers both methods with honest availability', async ({
+test('sign-in page offers both methods with honest availability', async ({
   browser
 }) => {
   const ctx = await browser.newContext({ignoreHTTPSErrors: true})
@@ -609,15 +606,16 @@ test('modal offers both methods with honest availability', async ({
   try {
     await page.goto(seed.digital_url)
     await page.locator('[data-gm="signin"]').click()
-    const modal = page.locator('#gm-nostr-modal')
-    await expect(modal).toBeVisible()
+    await page.waitForURL('**/infinitemarkets/signin**')
+    const body = page.locator('#gm-signin-body')
+    await expect(body).toBeVisible()
     // Both method affordances render — Nostr button + email form.
-    await expect(modal.locator('#gm-nostr-modal-signin')).toBeVisible()
-    await expect(modal.locator('[data-gm="email-input"]')).toBeVisible()
-    await expect(modal.locator('#gm-email-btn')).toBeVisible()
+    await expect(body.locator('#gm-signin-nostr-btn')).toBeVisible()
+    await expect(body.locator('[data-gm="email-input"]')).toBeVisible()
+    await expect(body.locator('#gm-email-btn')).toBeVisible()
     // The e2e host has (dummy) SMTP configured: the email method is
     // enabled even with no window.nostr present.
-    await expect(modal.locator('[data-gm="email-input"]')).toBeEnabled()
+    await expect(body.locator('[data-gm="email-input"]')).toBeEnabled()
   } finally {
     await ctx.close()
   }
@@ -638,10 +636,11 @@ test('unconfigured email shows the honest hint, not a dead form', async ({
     })
     await page.goto(seed.digital_url)
     await page.locator('[data-gm="signin"]').click()
-    const modal = page.locator('#gm-nostr-modal')
-    await expect(modal.locator('[data-gm="email-input"]')).toBeDisabled()
-    await expect(modal.locator('#gm-email-btn')).toBeDisabled()
-    await expect(modal).toContainText(
+    await page.waitForURL('**/infinitemarkets/signin**')
+    const body = page.locator('#gm-signin-body')
+    await expect(body.locator('[data-gm="email-input"]')).toBeDisabled()
+    await expect(body.locator('#gm-email-btn')).toBeDisabled()
+    await expect(body).toContainText(
       "Email sign-in isn't configured on this host"
     )
   } finally {
@@ -659,7 +658,7 @@ test('nostr account links an email from the profile page', async ({
     await installNostrStub(page)
     await page.goto(seed.digital_url)
     await page.locator('[data-gm="signin"]').click()
-    await page.locator('#gm-nostr-modal-signin').click()
+    await page.locator('#gm-signin-nostr-btn').click()
     await expect(page.locator('#gm-nostr-signin')).toContainText(
       'npub1',
       {timeout: 20_000}
@@ -719,7 +718,7 @@ test('email account links a Nostr key from the profile page', async ({
       .locator('[data-gm="email-input"]')
       .fill('e2e-linker@example.com')
     await page.locator('#gm-email-btn').click()
-    await expect(page.locator('#gm-nostr-modal')).toContainText(
+    await expect(page.locator('#gm-signin-body')).toContainText(
       'Check your email'
     )
     const link = await mailboxLink(request, 'e2e-linker@example.com')

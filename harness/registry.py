@@ -240,6 +240,7 @@ HTTP_ROUTES: tuple[str, ...] = (
     "GET /profile",
     "GET /public/nostr/profile",
     "POST /public/nostr/profile",
+    "GET /signin",
     "GET /auth/email",
     "POST /public/nostr/email/request",
     "POST /public/nostr/email/verify",

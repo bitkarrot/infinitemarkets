@@ -660,6 +660,7 @@ GET   /orders                                       signed-in buyer order-histor
 GET   /profile                                      signed-in buyer kind-0 profile editor page
 GET   /public/nostr/profile                         session identity + buyer kind-0 from merchant public relays
 POST  /public/nostr/profile                         publish a session-authored, signed kind-0 to merchant public relays
+GET   /signin                                     dedicated buyer sign-in page (NIP-07 + email methods in-page)
 GET   /auth/email                                   email sign-in landing page; token is URL fragment only
 POST  /public/nostr/email/request                   no-oracle magic-link request; uniform body for every outcome
 POST  /public/nostr/email/verify                    fragment-token verify; mints session cookie or links identity

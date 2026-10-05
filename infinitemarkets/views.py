@@ -490,6 +490,19 @@ async def profile_page(request: Request):
     return _public_response(request, "public_profile.html", ctx)
 
 
+@infinitemarkets_generic_router.get("/signin", response_class=HTMLResponse)
+async def signin_page(request: Request):
+    """Dedicated buyer sign-in page — the header chip navigates here
+    when signed out. In-page methods (no modal): Nostr NIP-07 and the
+    email magic link each carry their own busy state."""
+    limited = await _public_guard(request)
+    if limited is not None:
+        return limited
+    ctx = await _shop_ctx(request)
+    ctx.setdefault("nav_active", "signin")
+    return _public_response(request, "public_signin.html", ctx)
+
+
 @infinitemarkets_generic_router.get("/auth/email", response_class=HTMLResponse)
 async def auth_email_page(request: Request):
     """§5.4 email sign-in landing shell — the magic-link token arrives

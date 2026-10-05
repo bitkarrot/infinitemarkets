@@ -1473,42 +1473,19 @@
 .gm-public .nostr-nsec { padding: 0 10px 8px; }
 .gm-public .nostr-nsec .nostr-claim-input { margin-bottom: 6px; }
 .gm-public .nostr-nsec .btn-secondary { width: 100%; }
-/* Sign-in modal — a centered card, not a cramped header dropdown. */
-.gm-public .nostr-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 12vh var(--space-md) var(--space-md);
-  background: rgba(30, 20, 10, 0.45);
-}
-/* [hidden] must beat display:flex — gate the layout on it. */
-.gm-public .nostr-modal-backdrop:not([hidden]) { display: flex; }
-.gm-public .nostr-modal {
-  position: relative;
-  width: 100%;
-  max-width: 380px;
-  padding: var(--space-lg);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
-  outline: none;
-}
-.gm-public .nostr-modal h2 {
-  font-family: var(--font-display);
-  font-size: 22px;
-  margin: 0 0 var(--space-sm);
-}
-.gm-public .nostr-modal .btn-primary {
+/* Sign-in page (D-13): two method cards in-page — a labelled divider
+   separates the Nostr and email methods; unavailable methods carry a
+   hint, never a dead control. Per-method busy means neither method can
+   wedge the other. */
+.gm-public #gm-signin-body .nostr-box { margin-top: var(--space-md); }
+.gm-public #gm-signin-body .btn-primary {
   width: 100%;
   margin-top: var(--space-md);
 }
-.gm-public .nostr-modal .nostr-nsec { padding: var(--space-sm) 0 0; }
-.gm-public .nostr-modal .nostr-modal-notice { margin-top: var(--space-sm); }
-/* Two-method modal (D-13): a labelled divider separates the Nostr and
-   email methods; unavailable methods carry a hint, never a dead control. */
+.gm-public #gm-signin-body .nostr-nsec { padding: var(--space-sm) 0 0; }
+.gm-public #gm-signin-body .nostr-signin-notice { margin-top: var(--space-sm); }
+.gm-public #gm-signin-body .nostr-method .nostr-claim-label { margin-top: 0; }
+.gm-public #gm-signin-body .nostr-method-hint { margin-top: var(--space-sm); }
 .gm-public .nostr-method-divider {
   display: flex;
   align-items: center;
@@ -1523,23 +1500,6 @@
   flex: 1;
   border-top: 1px solid var(--color-border);
 }
-.gm-public .nostr-modal .nostr-method .nostr-claim-label { margin-top: 0; }
-.gm-public .nostr-modal .nostr-method-hint { margin-top: var(--space-sm); }
-.gm-public .nostr-modal-close {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 32px;
-  height: 32px;
-  border: 0;
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--color-text-muted);
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-}
-.gm-public .nostr-modal-close:hover { background: var(--color-surface-alt); }
 .gm-public .nostr-nsec-toggle {
   border: 0;
   padding: 0;

@@ -1,7 +1,7 @@
 /* public_nostr.js — buyer sign-in (Nostr NIP-07 or email magic link),
    account menu, orders + profile.
 
-   Flow: the sign-in modal offers BOTH methods (D-13) — "Sign in with
+   Flow: the dedicated sign-in PAGE offers BOTH methods (D-13) — "Sign in with
    Nostr" (GET /nostr/challenge -> window.nostr.signEvent kind 22242 ->
    POST /nostr/verify) and "Email me a sign-in link" (POST
    /nostr/email/request -> the mailed fragment link lands on
@@ -24,12 +24,11 @@
   var account = document.getElementById("gm-nostr-account");
   var btn = document.getElementById("gm-nostr-signin");
   var menu = document.getElementById("gm-nostr-menu");
-  var backdrop = document.getElementById("gm-nostr-backdrop");
-  var modal = document.getElementById("gm-nostr-modal");
-  if (!account || !btn || !menu || !backdrop || !modal) return;
+  if (!account || !btn || !menu) return;
 
   var ordersBody = document.getElementById("gm-orders-body");
   var profileBody = document.getElementById("gm-profile-body");
+  var signinBody = document.getElementById("gm-signin-body");
 
   var state = {
     signedIn: false,
@@ -39,8 +38,12 @@
     profile: null,
     orders: [],
     busy: false,
+    /* Per-method busy — a hung signer or a stuck email request must
+       never brick the OTHER method (the shared-busy bug that made
+       'Sign in with Nostr' silently no-op). */
+    nostrBusy: false,
+    emailBusy: false,
     menuOpen: false,
-    modalOpen: false,
     notice: "",
     nsecSignin: false,
     flagFetched: false,
@@ -176,7 +179,7 @@
   }
 
   function renderMenu() {
-    /* The dropdown is signed-in only — signed-out opens the modal. */
+    /* The dropdown is signed-in only — signed-out navigates to /signin. */
     GM.clear(menu);
     menu.appendChild(
       GM.h("div", { class: "nostr-menu-head" }, [
@@ -216,33 +219,43 @@
     menu.appendChild(out);
   }
 
-  /* --- sign-in modal ------------------------------------------------------ */
+  /* --- sign-in page (/infinitemarkets/signin) ------------------------------- */
 
-  function renderModal() {
+  /* The methods render in-page — no modal, no backdrop, no shared busy.
+     A hung signer or a stuck email request affects only its own method. */
+  function renderSigninPage() {
+    if (!signinBody) return;
     /* Re-renders (capability-flag probe, busy flips) rebuild the DOM —
        keep what the buyer already typed instead of wiping it. */
     var keepEmail = "";
     var keepNsec = "";
     var curEmail = document.getElementById("gm-email-input");
     var curNsec = document.getElementById("gm-nsec-input");
-    if (curEmail && modal.contains(curEmail)) keepEmail = curEmail.value;
-    if (curNsec && modal.contains(curNsec)) keepNsec = curNsec.value;
-    GM.clear(modal);
-    var close = GM.h("button", {
-      type: "button",
-      class: "nostr-modal-close",
-      "aria-label": "Close",
-      text: "×"
-    });
-    close.addEventListener("click", closeModal);
-    modal.appendChild(close);
-    modal.appendChild(
-      GM.h("h2", { id: "gm-nostr-modal-title", text: "Sign in" })
-    );
-    /* Method 1 — Nostr (NIP-07). The method always renders; when the
-       shop's inbox is off the challenge flag renders an honest hint
-       (show-with-hint, never a dead control). */
-    var nostrMethod = GM.h("div", { class: "nostr-method" });
+    if (curEmail && signinBody.contains(curEmail)) keepEmail = curEmail.value;
+    if (curNsec && signinBody.contains(curNsec)) keepNsec = curNsec.value;
+    GM.clear(signinBody);
+    if (state.signedIn) {
+      var done = GM.h("div", { class: "nostr-box" });
+      done.appendChild(
+        GM.h("p", {
+          class: "nostr-lead",
+          text: "You're signed in as " + displayName() + "."
+        })
+      );
+      done.appendChild(
+        GM.h("a", {
+          class: "btn-primary",
+          href: pageUrl("/orders"),
+          text: "My orders"
+        })
+      );
+      signinBody.appendChild(done);
+      return;
+    }
+    /* Method 1 — Nostr (NIP-07). Always renders; when the shop's inbox
+       is off the challenge flag renders an honest hint (show-with-hint,
+       never a dead control). */
+    var nostrMethod = GM.h("div", { class: "nostr-box nostr-method" });
     nostrMethod.appendChild(
       note(
         "A browser signer (NIP-07) proves your key — no password," +
@@ -252,8 +265,8 @@
     var signin = GM.h("button", {
       type: "button",
       class: "btn-primary",
-      id: "gm-nostr-modal-signin",
-      text: state.busy ? "Waiting for signer…" : "Sign in with Nostr"
+      id: "gm-signin-nostr-btn",
+      text: state.nostrBusy ? "Waiting for signer…" : "Sign in with Nostr"
     });
     signin.addEventListener("click", doSignIn);
     nostrMethod.appendChild(signin);
@@ -298,7 +311,7 @@
         });
         toggle.addEventListener("click", function () {
           state.nsecOpen = true;
-          renderModal();
+          renderSigninPage();
           var el = document.getElementById("gm-nsec-input");
           if (el) el.focus();
         });
@@ -306,18 +319,21 @@
       }
       nostrMethod.appendChild(nsecRow);
     }
-    modal.appendChild(nostrMethod);
+    signinBody.appendChild(nostrMethod);
+    if (state.notice) {
+      signinBody.appendChild(note(state.notice, "nostr-signin-notice"));
+    }
 
-    /* Method 2 — email magic link (D-13). Always rendered; the input
-       + button disable with an honest hint when the host can't send
-       (the emailed link lands on /auth/email and verifies there). */
-    modal.appendChild(
+    signinBody.appendChild(
       GM.h("div", { class: "nostr-method-divider" }, [
         GM.h("span", { text: "or" })
       ])
     );
+    /* Method 2 — email magic link. Always rendered; the input + button
+       disable with an honest hint when the host can't send (the emailed
+       link lands on /auth/email and verifies there). */
     var emailMethod = GM.h("div", {
-      class: "nostr-method",
+      class: "nostr-box nostr-method",
       "data-gm": "email-method"
     });
     if (state.emailSent) {
@@ -345,7 +361,7 @@
         type: "button",
         class: "btn-primary",
         id: "gm-email-btn",
-        text: state.busy ? "Sending…" : "Email me a sign-in link"
+        text: state.emailBusy ? "Sending…" : "Email me a sign-in link"
       });
       emailBtn.addEventListener("click", doEmailRequest);
       if (keepEmail) emailInput.value = keepEmail;
@@ -365,46 +381,29 @@
         );
       }
     }
-    modal.appendChild(emailMethod);
-    if (state.notice) {
-      modal.appendChild(note(state.notice, "nostr-modal-notice"));
-    }
+    signinBody.appendChild(emailMethod);
   }
 
-  function openModal() {
-    state.modalOpen = true;
-    backdrop.hidden = false;
-    renderModal();
-    modal.focus();
-    if (!state.flagFetched) {
-      state.flagFetched = true;
-      /* Learn which methods this deployment can serve (challenge
-         response capability flags) — re-render the open modal when
-         they arrive. Flags absent -> the optimistic-true defaults
-         keep the Nostr path exactly as before. */
-      api("/nostr/challenge" + shopQuery()).then(function (res) {
-        if (res.status === 200 && res.body) {
-          state.nsecSignin = !!res.body.nsec_signin;
-          if (res.body.email_signin !== undefined) {
-            state.emailAvailable = !!res.body.email_signin;
-          }
-          if (res.body.nostr_signin !== undefined) {
-            state.nostrAvailable = !!res.body.nostr_signin;
-          }
-          if (state.modalOpen && !state.signedIn && !state.nsecOpen) {
-            renderModal();
-          }
+  /* Capability-flag probe — which methods this deployment can serve
+     (challenge response flags). Flags absent -> the optimistic-true
+     defaults keep the Nostr path exactly as before. */
+  function fetchMethodFlags() {
+    if (state.flagFetched) return;
+    state.flagFetched = true;
+    api("/nostr/challenge" + shopQuery()).then(function (res) {
+      if (res.status === 200 && res.body) {
+        state.nsecSignin = !!res.body.nsec_signin;
+        if (res.body.email_signin !== undefined) {
+          state.emailAvailable = !!res.body.email_signin;
         }
-      });
-    }
-  }
-
-  function closeModal() {
-    state.modalOpen = false;
-    backdrop.hidden = true;
-    state.notice = "";
-    state.emailSent = false;
-    state.emailNotice = "";
+        if (res.body.nostr_signin !== undefined) {
+          state.nostrAvailable = !!res.body.nostr_signin;
+        }
+        if (!state.signedIn && !state.nsecOpen) {
+          renderSigninPage();
+        }
+      }
+    });
   }
 
   function setMenu(open) {
@@ -428,12 +427,7 @@
     if (!inside) setMenu(false);
   });
   document.addEventListener("keydown", function (e) {
-    if (e.key !== "Escape") return;
-    if (state.modalOpen) closeModal();
-    else if (state.menuOpen) setMenu(false);
-  });
-  backdrop.addEventListener("click", function (e) {
-    if (e.target === backdrop) closeModal();
+    if (e.key === "Escape" && state.menuOpen) setMenu(false);
   });
 
   /* --- orders page -------------------------------------------------------- */
@@ -489,7 +483,9 @@
       class: "btn-primary",
       text: "Sign in"
     });
-    go.addEventListener("click", openModal);
+    go.addEventListener("click", function () {
+      window.location.href = pageUrl("/signin");
+    });
     box.appendChild(go);
     return box;
   }
@@ -1059,20 +1055,18 @@
   }
 
   function doSignIn() {
-    if (state.busy) return;
+    if (state.nostrBusy) return;
     /* Extension-absent is a friendly state, never a crash. */
     if (!window.nostr || typeof window.nostr.signEvent !== "function") {
       state.notice =
         "No Nostr signer found. Install a NIP-07 extension" +
         " (for example Alby or nos2x), then try again.";
-      if (!state.modalOpen) openModal();
-      else renderModal();
+      renderSigninPage();
       return;
     }
-    state.busy = true;
+    state.nostrBusy = true;
     state.notice = "";
-    if (!state.modalOpen) openModal();
-    else renderModal();
+    renderSigninPage();
     api("/nostr/challenge" + shopQuery())
       .then(function (res) {
         if (res.status !== 200 || !res.body.challenge) {
@@ -1108,17 +1102,16 @@
       .then(function (res) {
         if (!res) return;
         if (res.status === 200) {
-          state.notice = "";
-          closeModal();
-          return loadIdentity().then(function () {
-            loadOrders();
-          });
+          /* Session cookie is already set — a real navigation lands the
+             buyer on their orders with fresh identity state. */
+          window.location.href = pageUrl("/orders");
+          return;
         }
         if (res.status !== undefined) {
           state.notice =
             "Sign-in could not be verified. Try again — your signer may" +
             " have declined or the request expired.";
-          renderModal();
+          renderSigninPage();
         }
       })
       .catch(function (err) {
@@ -1127,23 +1120,23 @@
             ? "Your signer didn't respond — check the extension's" +
               " popup or approval list, then try again."
             : "Sign-in was cancelled or failed. Try again when you're ready.";
-        if (state.modalOpen) renderModal();
+        renderSigninPage();
       })
       .finally(function () {
-        state.busy = false;
+        state.nostrBusy = false;
       });
   }
 
   function doNsecSignin() {
     var input = document.getElementById("gm-nsec-input");
-    if (!input || state.busy) return;
+    if (!input || state.nostrBusy) return;
     var nsec = input.value.trim();
     if (!nsec) {
       state.notice = "Paste your nsec first.";
-      renderModal();
+      renderSigninPage();
       return;
     }
-    state.busy = true;
+    state.nostrBusy = true;
     state.notice = "";
     api("/nostr/verify" + shopQuery(), {
       method: "POST",
@@ -1153,43 +1146,41 @@
         if (!res) return;
         if (res.status === 200) {
           state.nsecOpen = false;
-          closeModal();
-          return loadIdentity().then(function () {
-            loadOrders();
-          });
+          window.location.href = pageUrl("/orders");
+          return;
         }
         state.notice = "That key could not sign you in — check it and try again.";
-        renderModal();
+        renderSigninPage();
       })
       .catch(function () {
         state.notice = "Sign-in failed. Try again when you're ready.";
-        if (state.modalOpen) renderModal();
+        renderSigninPage();
       })
       .finally(function () {
-        state.busy = false;
+        state.nostrBusy = false;
         input.value = "";
       });
   }
 
   function doEmailRequest() {
-    if (state.busy || !state.emailAvailable || state.emailSent) return;
+    if (state.emailBusy || !state.emailAvailable || state.emailSent) return;
     var input = document.getElementById("gm-email-input");
     if (!input) return;
     var email = input.value.trim();
     if (!email || email.indexOf("@") < 0) {
       state.notice = "Enter your email address.";
-      renderModal();
+      renderSigninPage();
       return;
     }
-    state.busy = true;
+    state.emailBusy = true;
     state.notice = "";
-    renderModal();
+    renderSigninPage();
     api("/nostr/email/request" + shopQuery(), {
       method: "POST",
       body: JSON.stringify({ email: email })
     })
       .then(function (res) {
-        /* Uniform no-oracle copy for EVERY outcome — the modal never
+        /* Uniform no-oracle copy for EVERY outcome — the page never
            distinguishes known/unknown/capped addresses (the single
            EMAIL_SENT_COPY literal). Request-level failures (Origin,
            rate-limit) only append a retry tail. */
@@ -1202,8 +1193,8 @@
         state.emailNotice = EMAIL_SENT_COPY + " Try again shortly.";
       })
       .finally(function () {
-        state.busy = false;
-        if (state.modalOpen) renderModal();
+        state.emailBusy = false;
+        renderSigninPage();
       });
   }
 
@@ -1268,16 +1259,21 @@
       setMenu(!state.menuOpen);
       return;
     }
-    /* The chip ONLY opens the method picker — firing the Nostr flow
-       on click would land an email-only shop on a 'No Nostr signer'
-       error against its working email method. */
-    openModal();
+    /* Signed-out: the dedicated sign-in PAGE carries the methods —
+       no modal, no shared busy, a real navigation clears any stuck
+       in-flight state. */
+    window.location.href = pageUrl("/signin");
   });
 
   /* Signed-in detection probes the session once per page view — a 401 is
      the normal signed-out signal (no cookie is readable from JS). The
      profile probe also returns kind-0 name/avatar for the chip. */
+  if (signinBody) {
+    fetchMethodFlags();
+    renderSigninPage();
+  }
   loadIdentity().then(function (signedIn) {
+    renderSigninPage();
     if (!ordersBody) return;
     if (signedIn) loadOrders();
     else renderOrdersPage();
