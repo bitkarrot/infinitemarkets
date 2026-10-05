@@ -627,6 +627,10 @@ POST  /public/order-email-opt-out                   token via X-Order-Token; set
 GET   /p/{naddr}                                    NIP-89 handler for kind-30402 naddr
 GET   /p/{merchant_pubkey}/{d_tag}                  canonical buyer-facing HTML product page
 GET   /order                                        buyer order page; token is URL fragment only
+GET   /orders                                       signed-in buyer order-history page (NIP-07 session)
+GET   /profile                                      signed-in buyer kind-0 profile editor page
+GET   /public/nostr/profile                         session identity + buyer kind-0 from merchant public relays
+POST  /public/nostr/profile                         publish a session-authored, signed kind-0 to merchant public relays
 ```
 
 The `naddr` handler decodes bech32, requires kind `30402`, a local merchant pubkey, and

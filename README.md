@@ -27,7 +27,7 @@ An [LNbits](https://github.com/lnbits/lnbits) extension that gives a merchant on
 - **Dual-copy protocol**: independent sender and recipient copies routed only to each party's declared relays
 - **Durable inbox**: verified/deduplicated outer-seal-rumor identity, encrypted history, resumable cursors, overload shedding before decrypt
 - **NIP-42 relay authentication** and paid-relay support (`payment-required` surfaces the invoice for external payment — the extension never spends)
-- **NIP-07 sign-in** for buyers: order history, retroactive order claiming via private links, token-equivalent access to digital delivery
+- **NIP-07 sign-in** for buyers: header account chip with kind-0 name/avatar, dedicated order-history page with retroactive order claiming via private links, token-equivalent access to digital delivery, and a kind-0 profile editor (signed buyer-side, published to the merchant's public relays)
 - **Storefront modes**: `full`, `showcase`, `browse_only`, `nostr_only` — private order links and in-flight invoices keep working in every mode
 - **Admin Messages workspace**: customer/unknown folders, unread markers, thread reply/compose, per-relay delivery evidence, retry, rejected-intake review with mute
 
