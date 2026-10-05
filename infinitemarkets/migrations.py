@@ -19,7 +19,13 @@ through ``db.execute`` (auto-commit is legal outside domain transactions).
 
 from __future__ import annotations
 
+import json
+import uuid
+
 from lnbits.db import Connection
+from loguru import logger
+
+from . import crypto
 
 
 async def m001_initial(db: Connection):
@@ -947,4 +953,279 @@ async def m007_nostr_signin(db: Connection):
     await db.execute(
         f"CREATE INDEX ix_buyer_sessions_pubkey "
         f"ON {s}buyer_sessions(merchant_id, buyer_pubkey_hash)"
+    )
+
+
+async def _backfill_buyer_email_hashes(db: Connection, *, settings=None) -> int:
+    """Populate ``orders.buyer_email_hash`` from ``contact_enc`` (D-03).
+
+    Hash equality drives the ``/nostr/orders`` union lookup, so the same
+    ``PURPOSE_BUYER_EMAIL`` + ``crypto.normalize`` domain as
+    ``buyer_accounts.email_hash`` applies — never ``PURPOSE_EMAIL_RECIPIENT``.
+    Rows whose ``contact_enc`` fails decrypt/``json.loads`` or carries a
+    falsy/non-string ``email`` are skipped without aborting the migration.
+    ``ext_settings`` resolves lazily — only when a row actually needs
+    decrypting — so env-less migration runs (``keystore_env``) stay clean.
+    Returns the number of rows updated; re-runnable.
+    """
+    from .settings import ext_settings
+
+    s = db.references_schema
+    rows = await db.fetchall(
+        f"SELECT id, merchant_id, contact_enc FROM {s}orders"
+        " WHERE contact_enc IS NOT NULL AND buyer_email_hash IS NULL"
+    )
+    updated = 0
+    for row in rows:
+        if settings is None:
+            settings = ext_settings()
+        try:
+            ver = crypto.envelope_version(row["contact_enc"])
+            contact = json.loads(
+                crypto.decrypt(
+                    row["contact_enc"], settings.master_keys[ver],
+                    record_id=row["id"], table="orders",
+                    column="contact_enc", key_version=ver,
+                )
+            )
+        except Exception:  # noqa: BLE001 — malformed rows skip, never abort
+            continue
+        email = contact.get("email") if isinstance(contact, dict) else None
+        if not isinstance(email, str) or not crypto.normalize(email):
+            continue
+        await db.execute(
+            f"UPDATE {s}orders SET buyer_email_hash = :h WHERE id = :i",
+            {
+                "h": crypto.hmac_index(
+                    settings.privacy_key, crypto.PURPOSE_BUYER_EMAIL,
+                    row["merchant_id"], crypto.normalize(email),
+                ),
+                "i": row["id"],
+            },
+        )
+        updated += 1
+    logger.info("m008.orders_backfilled={}", updated)
+    return updated
+
+
+async def _backfill_session_accounts(db: Connection, *, settings=None) -> int:
+    """Create one ``buyer_accounts`` row per distinct
+    ``(merchant_id, buyer_pubkey_hash)`` present in the pre-rebuild
+    ``buyer_sessions`` table (D-02 compat).
+
+    ``pubkey_enc`` is AAD record-bound — the group's first decryptable
+    session ciphertext is re-encrypted under the new account id, never
+    transplanted. A group whose ciphertexts all fail decrypt produces NO
+    account: those sessions keep resolving on the legacy
+    ``account_id IS NULL`` path rather than breaking. ``ext_settings``
+    resolves lazily (same ``keystore_env`` posture as the orders
+    backfill). Returns the number of accounts created; re-runnable.
+    """
+    from .settings import ext_settings
+
+    s = db.references_schema
+    rows = await db.fetchall(
+        f"SELECT id, merchant_id, buyer_pubkey_enc, buyer_pubkey_hash,"
+        f" created_at FROM {s}buyer_sessions"
+        " WHERE buyer_pubkey_hash IS NOT NULL ORDER BY created_at"
+    )
+    groups: dict[tuple[str, str], list[dict]] = {}
+    for row in rows:
+        groups.setdefault(
+            (row["merchant_id"], row["buyer_pubkey_hash"]), []
+        ).append(row)
+    created = 0
+    for (merchant_id, pubkey_hash), group in groups.items():
+        exists = await db.fetchone(
+            f"SELECT id FROM {s}buyer_accounts"
+            " WHERE merchant_id = :m AND pubkey_hash = :h",
+            {"m": merchant_id, "h": pubkey_hash},
+        )
+        if exists:
+            continue
+        if settings is None:
+            settings = ext_settings()
+        account_id = uuid.uuid4().hex
+        pubkey_enc = None
+        for member in group:
+            if member["buyer_pubkey_enc"] is None:
+                continue
+            try:
+                enc_ver = crypto.envelope_version(member["buyer_pubkey_enc"])
+                plaintext = crypto.decrypt(
+                    member["buyer_pubkey_enc"], settings.master_keys[enc_ver],
+                    record_id=member["id"], table="buyer_sessions",
+                    column="buyer_pubkey_enc", key_version=enc_ver,
+                )
+            except Exception:  # noqa: BLE001 — try the next session row
+                continue
+            ver = settings.active_key_version
+            pubkey_enc = crypto.encrypt(
+                plaintext, settings.master_keys[ver],
+                record_id=account_id, table="buyer_accounts",
+                column="pubkey_enc", key_version=ver,
+            )
+            break
+        if pubkey_enc is None:
+            # No decryptable pubkey ciphertext — leave these sessions on
+            # the legacy read path instead of minting an account whose
+            # pubkey_hash the secret can no longer back.
+            continue
+        created_at = group[0]["created_at"]
+        await db.execute(
+            f"INSERT INTO {s}buyer_accounts (id, merchant_id, pubkey_enc,"
+            " pubkey_hash, created_at, updated_at)"
+            " VALUES (:i, :m, :pe, :ph, :n, :n)",
+            {
+                "i": account_id, "m": merchant_id,
+                "pe": pubkey_enc, "ph": pubkey_hash, "n": created_at,
+            },
+        )
+        created += 1
+    logger.info("m008.session_accounts_created={}", created)
+    return created
+
+
+async def m008_buyer_accounts(db: Connection):
+    """Plan 03.1-01 — buyer account foundation (D-01..D-04).
+
+    ``buyer_accounts``: one row per (merchant, account) — nullable
+    ``email_hash``/``pubkey_hash`` HMAC identity columns, each
+    unique-when-present and merchant-scoped, plus AEAD ``*_enc`` copies
+    bound to the account id; retired accounts carry ``retired_at``
+    (never a hard delete).
+
+    ``email_signin_tokens``: hash-only single-use magic-link tokens
+    (``token_lookup_hash`` posture) for the plan-02 sign-in/link flows.
+
+    ``buyer_sessions`` is REBUILT — SQLite cannot relax the ``NOT NULL``
+    on ``buyer_pubkey_hash`` — gaining ``account_id``; rows whose pubkey
+    hash found no account keep ``account_id IS NULL`` and resolve on the
+    unchanged legacy path.
+
+    ``orders.buyer_email_hash`` is the ``PURPOSE_BUYER_EMAIL`` HMAC index
+    shared with ``buyer_accounts.email_hash`` (hash only — the plaintext
+    already lives in ``contact_enc``); existing orders are backfilled by
+    decrypting ``contact_enc`` in place. ``email_queue.payload_enc`` and
+    the ``nostr_challenges`` ``purpose``/``account_id`` link columns are
+    the plan-02 surface (D-05/D-07/D-10 schema).
+
+    Order matters: accounts + the orders column before backfills, the
+    account backfill before the sessions rebuild (its JOIN consumes the
+    populated accounts), challenge/queue columns last.
+    """
+    s = db.references_schema
+    int_t = db.big_int
+    blob_t = db.blob
+
+    # --- D-01: buyer_accounts ------------------------------------------------
+    await db.execute(
+        f"""
+        CREATE TABLE {s}buyer_accounts (
+            id TEXT PRIMARY KEY,
+            merchant_id TEXT NOT NULL
+                REFERENCES {s}merchants(id) ON DELETE RESTRICT,
+            email_enc {blob_t},
+            email_hash TEXT,
+            pubkey_enc {blob_t},
+            pubkey_hash TEXT,
+            retired_at {int_t},
+            created_at {int_t} NOT NULL DEFAULT 0,
+            updated_at {int_t} NOT NULL DEFAULT 0
+        )
+        """
+    )
+    await db.execute(
+        f"CREATE UNIQUE INDEX ux_buyer_accounts_email "
+        f"ON {s}buyer_accounts(merchant_id, email_hash) "
+        f"WHERE email_hash IS NOT NULL"
+    )
+    await db.execute(
+        f"CREATE UNIQUE INDEX ux_buyer_accounts_pubkey "
+        f"ON {s}buyer_accounts(merchant_id, pubkey_hash) "
+        f"WHERE pubkey_hash IS NOT NULL"
+    )
+
+    # --- D-05/D-10: email_signin_tokens (consumed by plan 02) ----------------
+    await db.execute(
+        f"""
+        CREATE TABLE {s}email_signin_tokens (
+            id TEXT PRIMARY KEY,
+            merchant_id TEXT NOT NULL
+                REFERENCES {s}merchants(id) ON DELETE RESTRICT,
+            token_hash TEXT NOT NULL UNIQUE,
+            email_hash TEXT NOT NULL,
+            purpose TEXT NOT NULL,
+            account_id TEXT REFERENCES {s}buyer_accounts(id),
+            expires_at {int_t} NOT NULL,
+            used_at {int_t},
+            created_at {int_t} NOT NULL DEFAULT 0
+        )
+        """
+    )
+
+    # --- D-03: orders.buyer_email_hash ----------------------------------------
+    await db.execute(
+        f"ALTER TABLE {s}orders ADD COLUMN buyer_email_hash TEXT"
+    )
+    await db.execute(
+        f"CREATE INDEX ix_orders_buyer_email "
+        f"ON {s}orders(merchant_id, buyer_email_hash)"
+    )
+
+    # --- backfills (need the new column + buyer_accounts, old sessions) ------
+    await _backfill_buyer_email_hashes(db)
+    await _backfill_session_accounts(db)
+
+    # --- D-02: rebuild buyer_sessions (SQLite cannot relax NOT NULL) ----------
+    await db.execute(
+        f"""
+        CREATE TABLE {s}buyer_sessions_new (
+            id TEXT PRIMARY KEY,
+            merchant_id TEXT NOT NULL
+                REFERENCES {s}merchants(id) ON DELETE RESTRICT,
+            token_hash TEXT NOT NULL UNIQUE,
+            buyer_pubkey_enc {blob_t},
+            buyer_pubkey_hash TEXT,
+            account_id TEXT REFERENCES {s}buyer_accounts(id),
+            expires_at {int_t} NOT NULL,
+            revoked_at {int_t},
+            created_at {int_t} NOT NULL DEFAULT 0
+        )
+        """
+    )
+    await db.execute(
+        f"INSERT INTO {s}buyer_sessions_new (id, merchant_id, token_hash,"
+        f" buyer_pubkey_enc, buyer_pubkey_hash, account_id, expires_at,"
+        f" revoked_at, created_at)"
+        f" SELECT s2.id, s2.merchant_id, s2.token_hash, s2.buyer_pubkey_enc,"
+        f" s2.buyer_pubkey_hash, a.id, s2.expires_at, s2.revoked_at,"
+        f" s2.created_at"
+        f" FROM {s}buyer_sessions s2"
+        f" LEFT JOIN {s}buyer_accounts a"
+        f" ON a.merchant_id = s2.merchant_id"
+        f" AND a.pubkey_hash = s2.buyer_pubkey_hash"
+    )
+    await db.execute(f"DROP TABLE {s}buyer_sessions")
+    await db.execute(
+        f"ALTER TABLE {s}buyer_sessions_new RENAME TO buyer_sessions"
+    )
+    await db.execute(
+        f"CREATE INDEX ix_buyer_sessions_pubkey "
+        f"ON {s}buyer_sessions(merchant_id, buyer_pubkey_hash)"
+    )
+
+    # --- D-07: email_queue.payload_enc (rendered at send time) -----------------
+    await db.execute(
+        f"ALTER TABLE {s}email_queue ADD COLUMN payload_enc {blob_t}"
+    )
+
+    # --- D-10: nostr_challenges link-challenge columns -------------------------
+    await db.execute(
+        f"ALTER TABLE {s}nostr_challenges ADD COLUMN purpose TEXT"
+        " NOT NULL DEFAULT 'signin'"
+    )
+    await db.execute(
+        f"ALTER TABLE {s}nostr_challenges ADD COLUMN account_id TEXT"
+        f" REFERENCES {s}buyer_accounts(id)"
     )

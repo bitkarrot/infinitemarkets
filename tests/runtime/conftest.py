@@ -267,6 +267,7 @@ async def keystore_env(tmp_path_factory):
             m005_order_archiving,
             m006_gamma_inbox,
             m007_nostr_signin,
+            m008_buyer_accounts,
         )
 
         async with gdb.db.connect() as conn:
@@ -277,6 +278,7 @@ async def keystore_env(tmp_path_factory):
             await m005_order_archiving(conn)
             await m006_gamma_inbox(conn)
             await m007_nostr_signin(conn)
+            await m008_buyer_accounts(conn)
         yield {
             "db": gdb.db,
             "keystore": keystore,

@@ -31,6 +31,7 @@ VERSION_LEN = 4  # key-version field width in the envelope
 
 #: Section 11.3 equality-index purposes — one HMAC domain each.
 PURPOSE_BUYER_PUBKEY = "buyer-pubkey"
+PURPOSE_BUYER_EMAIL = "buyer-email"
 PURPOSE_ORDER_ID = "order-id"
 PURPOSE_WALLET_ID = "wallet-id"
 PURPOSE_SOURCE_WALLET_ID = "source-wallet-id"
