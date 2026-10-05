@@ -1629,3 +1629,30 @@
   font-size: 13px;
   color: var(--color-text-muted);
 }
+/* Profile account surface (D-12): sign-in method rows + link cards
+   reuse the nostr-box/status-pill tokens — no new palette. */
+.gm-public .nostr-account-card { margin-bottom: var(--space-md); }
+.gm-public .nostr-methods {
+  list-style: none;
+  margin: var(--space-sm) 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.gm-public .nostr-method-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  font-size: 14px;
+}
+.gm-public .nostr-state-pill {
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.gm-public .nostr-account-card .btn-primary { margin-top: var(--space-sm); }

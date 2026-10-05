@@ -565,6 +565,156 @@
       return;
     }
     var p = state.profile || {};
+
+    /* Account card (D-12) — the sign-in methods this account holds,
+       each marked linked. Order prefs are display-only: per-order
+       email opt-in is unchanged (deferred scope — no new preference
+       storage, and unlink has no UI affordance or API yet). */
+    var accountCard = GM.h("div", {
+      class: "nostr-box nostr-account-card",
+      "data-gm": "account-card"
+    });
+    accountCard.appendChild(
+      GM.h("p", { class: "nostr-lead", text: "Sign-in methods" })
+    );
+    var methods = GM.h("ul", { class: "nostr-methods" });
+    if (state.email) {
+      methods.appendChild(
+        GM.h("li", { class: "nostr-method-row" }, [
+          GM.h("span", {
+            text: "Email · " + truncMiddle(state.email, 40)
+          }),
+          GM.h("span", {
+            class: "status-pill nostr-state-pill", text: "linked"
+          })
+        ])
+      );
+    }
+    if (state.npub) {
+      methods.appendChild(
+        GM.h("li", { class: "nostr-method-row" }, [
+          GM.h("span", { text: "Nostr key · " + npubShort(state.npub) }),
+          GM.h("span", {
+            class: "status-pill nostr-state-pill", text: "linked"
+          })
+        ])
+      );
+    }
+    accountCard.appendChild(methods);
+    accountCard.appendChild(
+      note("Order emails still follow the per-order opt-in — unchanged.")
+    );
+    profileBody.appendChild(accountCard);
+
+    /* Link a Nostr key (email-only accounts — D-10): the same
+       challenge -> signEvent -> verify round-trip as sign-in, bound
+       to this account; on success the identity reloads and the kind-0
+       editor unlocks. */
+    if (state.email && !state.npub) {
+      var linkBox = GM.h("div", {
+        class: "nostr-box nostr-account-card",
+        "data-gm": "link-nostr-card"
+      });
+      linkBox.appendChild(
+        GM.h("p", { class: "nostr-lead", text: "Link a Nostr key" })
+      );
+      linkBox.appendChild(
+        note(
+          "Prove your key to link it to this account —" +
+            " orders and history merge."
+        )
+      );
+      var linkBtn = GM.h("button", {
+        type: "button",
+        class: "btn-primary",
+        id: "gm-link-nostr-btn",
+        text: state.busy ? "Waiting for signer…" : "Link a Nostr key"
+      });
+      linkBtn.addEventListener("click", doLinkNostr);
+      linkBox.appendChild(linkBtn);
+      linkBox.appendChild(
+        GM.h("p", {
+          class: "nostr-claim-msg",
+          id: "gm-link-nostr-msg",
+          "aria-live": "polite"
+        })
+      );
+      profileBody.appendChild(linkBox);
+    }
+
+    /* Link an email (nostr accounts — D-10): mails a purpose='link'
+       token; the click verifies through the same /auth/email landing
+       (prove, don't sign-in — no new cookie). */
+    if (state.npub && !state.email) {
+      var emailBox = GM.h("div", {
+        class: "nostr-box nostr-account-card",
+        "data-gm": "link-email-card"
+      });
+      emailBox.appendChild(
+        GM.h("p", { class: "nostr-lead", text: "Link an email" })
+      );
+      emailBox.appendChild(
+        note(
+          "Verify an email address to also sign in by link —" +
+            " your Nostr key stays your key."
+        )
+      );
+      emailBox.appendChild(
+        GM.h("label", {
+          for: "gm-link-email-input",
+          class: "nostr-claim-label",
+          text: "Email address"
+        })
+      );
+      emailBox.appendChild(
+        GM.h("input", {
+          type: "email",
+          id: "gm-link-email-input",
+          "data-gm": "link-email-input",
+          class: "nostr-claim-input",
+          autocomplete: "email",
+          maxlength: "254",
+          placeholder: "you@example.com"
+        })
+      );
+      var linkEmailBtn = GM.h("button", {
+        type: "button",
+        class: "btn-primary",
+        id: "gm-link-email-btn",
+        text: state.busy ? "Sending…" : "Email me a verification link"
+      });
+      linkEmailBtn.addEventListener("click", doLinkEmail);
+      emailBox.appendChild(linkEmailBtn);
+      emailBox.appendChild(
+        GM.h("p", {
+          class: "nostr-claim-msg",
+          id: "gm-link-email-msg",
+          "aria-live": "polite"
+        })
+      );
+      profileBody.appendChild(emailBox);
+    }
+
+    /* Kind-0 gating (D-12): the editor needs a real key to sign and
+       author — email-only accounts get a locked state naming the fix,
+       never a dead form. */
+    if (!state.npub) {
+      var locked = GM.h("div", {
+        class: "nostr-box nostr-account-card",
+        "data-gm": "profile-locked"
+      });
+      locked.appendChild(
+        GM.h("p", { class: "nostr-lead", text: "Public profile" })
+      );
+      locked.appendChild(
+        note(
+          "Profile editing needs a linked Nostr key — link one above" +
+            " to publish a kind-0 profile."
+        )
+      );
+      profileBody.appendChild(locked);
+      return;
+    }
     var form = GM.h("form", {
       class: "nostr-box nostr-form",
       id: "gm-profile-form",
@@ -687,6 +837,132 @@
         state.busy = false;
         var save = document.getElementById("gm-profile-save");
         if (save) save.textContent = "Save profile";
+      });
+  }
+
+  function setProfileMsg(id, text) {
+    /* Re-resolve the node — a re-render may have replaced it while a
+       flow was in flight. */
+    var el = document.getElementById(id);
+    if (el) el.textContent = text;
+  }
+
+  function doLinkNostr() {
+    var msg = document.getElementById("gm-link-nostr-msg");
+    if (state.busy || !msg) return;
+    /* Extension-absent is a friendly state, never a crash. */
+    if (!window.nostr || typeof window.nostr.signEvent !== "function") {
+      msg.textContent =
+        "No Nostr signer found. Install a NIP-07 extension" +
+        " (for example Alby or nos2x), then try again.";
+      return;
+    }
+    state.busy = true;
+    msg.textContent = "Waiting for your signer…";
+    api("/nostr/link/challenge" + shopQuery())
+      .then(function (res) {
+        if (res.status !== 200 || !res.body.challenge) {
+          throw new Error("challenge failed");
+        }
+        var challenge = res.body.challenge;
+        return window.nostr
+          .signEvent({
+            kind: KIND_SIGNIN,
+            created_at: Math.floor(Date.now() / 1000),
+            content: challenge,
+            tags: [["challenge", challenge]]
+          })
+          .then(function (signed) {
+            return api("/nostr/link/verify" + shopQuery(), {
+              method: "POST",
+              body: JSON.stringify({ event: JSON.stringify(signed) })
+            });
+          });
+      })
+      .then(function (res) {
+        if (!res) return;
+        if (res.status === 200 && res.body) {
+          /* Linked (or union-merged) — reload the identity so the
+             npub row + editor render from server truth, then leave
+             the honest confirmation at the top of the page. */
+          var merged = !!res.body.merged;
+          return loadIdentity().then(function () {
+            if (profileBody) {
+              profileBody.insertBefore(
+                note(
+                  merged
+                    ? "Nostr key linked — accounts merged."
+                    : "Nostr key linked — your orders are merged."
+                ),
+                profileBody.firstChild
+              );
+            }
+          });
+        }
+        if (res.status === 409) {
+          setProfileMsg(
+            "gm-link-nostr-msg",
+            "That key is already linked to a different account —" +
+              " sign in with it there instead."
+          );
+          return;
+        }
+        setProfileMsg(
+          "gm-link-nostr-msg",
+          "The link could not be verified. Try again — your signer" +
+            " may have declined or the request expired."
+        );
+      })
+      .catch(function () {
+        setProfileMsg(
+          "gm-link-nostr-msg",
+          "Signing was cancelled or failed — nothing linked."
+        );
+      })
+      .finally(function () {
+        state.busy = false;
+        var b = document.getElementById("gm-link-nostr-btn");
+        if (b) b.textContent = "Link a Nostr key";
+      });
+  }
+
+  function doLinkEmail() {
+    var input = document.getElementById("gm-link-email-input");
+    var msg = document.getElementById("gm-link-email-msg");
+    if (!input || !msg || state.busy) return;
+    var email = input.value.trim();
+    if (!email || email.indexOf("@") < 0) {
+      msg.textContent = "Enter your email address.";
+      return;
+    }
+    state.busy = true;
+    msg.textContent = "";
+    api("/nostr/link/email" + shopQuery(), {
+      method: "POST",
+      body: JSON.stringify({ email: email })
+    })
+      .then(function (res) {
+        /* Same no-oracle posture as the sign-in request; a 409 is
+           the early honest refusal (the account already holds a
+           verified email), never an oracle. */
+        if (res && res.status === 409) {
+          msg.textContent =
+            "This account already has a verified email —" +
+            " sign-in links already go there.";
+          return;
+        }
+        msg.textContent =
+          "Check your email — a link to verify it is on its way." +
+          (res && res.status === 200 ? "" : " Try again shortly.");
+        if (res && res.status === 200) input.value = "";
+      })
+      .catch(function () {
+        msg.textContent =
+          "Check your email — a link to verify it is on its way." +
+          " Try again shortly.";
+      })
+      .finally(function () {
+        state.busy = false;
       });
   }
 
