@@ -18,7 +18,9 @@
   var account = document.getElementById("gm-nostr-account");
   var btn = document.getElementById("gm-nostr-signin");
   var menu = document.getElementById("gm-nostr-menu");
-  if (!account || !btn || !menu) return;
+  var backdrop = document.getElementById("gm-nostr-backdrop");
+  var modal = document.getElementById("gm-nostr-modal");
+  if (!account || !btn || !menu || !backdrop || !modal) return;
 
   var ordersBody = document.getElementById("gm-orders-body");
   var profileBody = document.getElementById("gm-profile-body");
@@ -31,6 +33,7 @@
     orders: [],
     busy: false,
     menuOpen: false,
+    modalOpen: false,
     notice: "",
     nsecSignin: false,
     flagFetched: false,
@@ -141,124 +144,144 @@
   }
 
   function renderMenu() {
+    /* The dropdown is signed-in only — signed-out opens the modal. */
     GM.clear(menu);
-    if (state.signedIn) {
-      menu.appendChild(
-        GM.h("div", { class: "nostr-menu-head" }, [
-          avatarEl("lg"),
-          GM.h("div", { class: "nostr-menu-id" }, [
-            GM.h("strong", { text: displayName() }),
-            GM.h("span", { class: "nostr-menu-npub", text: npubShort(state.npub) })
-          ])
+    menu.appendChild(
+      GM.h("div", { class: "nostr-menu-head" }, [
+        avatarEl("lg"),
+        GM.h("div", { class: "nostr-menu-id" }, [
+          GM.h("strong", { text: displayName() }),
+          GM.h("span", { class: "nostr-menu-npub", text: npubShort(state.npub) })
         ])
-      );
-      menu.appendChild(
-        menuItem(GM.h("a", {
-          class: "nostr-menu-item",
-          href: pageUrl("/orders"),
-          text: "My orders"
-        }))
-      );
-      menu.appendChild(
-        menuItem(GM.h("a", {
-          class: "nostr-menu-item",
-          href: pageUrl("/profile"),
-          text: "Profile"
-        }))
-      );
-      var out = menuItem(GM.h("button", {
-        type: "button",
-        class: "nostr-menu-item nostr-menu-signout",
-        id: "gm-nostr-signout",
-        text: "Sign out"
-      }));
-      out.addEventListener("click", doSignOut);
-      menu.appendChild(out);
-    } else {
-      menu.appendChild(
-        GM.h("div", { class: "nostr-menu-head" }, [
-          GM.h("p", {
-            class: "nostr-lead",
-            text: "Sign in with your Nostr key to see your orders from this shop."
-          }),
-          note(
-            "You need a Nostr signing extension (NIP-07) in this browser —" +
-              " for example Alby or nos2x. Nothing is shared with the shop" +
-              " beyond a signature that proves your key."
-          )
-        ])
-      );
-      var signin = menuItem(GM.h("button", {
-        type: "button",
-        class: "btn-primary nostr-menu-signin",
-        id: "gm-nostr-menu-signin",
-        text: state.busy ? "Waiting for signer…" : "Sign in with Nostr"
-      }));
-      signin.addEventListener("click", doSignIn);
-      menu.appendChild(signin);
-      /* Dev/e2e path — rendered only when the deployment enables
-         INFINITEMARKETS_NSEC_SIGNIN (challenge response flag). */
-      if (state.nsecSignin) {
-        var nsecRow = GM.h("div", { class: "nostr-nsec" });
-        if (state.nsecOpen) {
-          nsecRow.appendChild(GM.h("input", {
-            type: "password",
-            id: "gm-nsec-input",
-            class: "nostr-claim-input",
-            placeholder: "nsec1…",
-            autocomplete: "off",
-            "aria-label": "Secret key (nsec)"
-          }));
-          var go = GM.h("button", {
-            type: "button",
-            class: "btn-secondary",
-            id: "gm-nsec-btn",
-            text: "Sign in with key"
-          });
-          go.addEventListener("click", doNsecSignin);
-          nsecRow.appendChild(go);
-        } else {
-          var toggle = menuItem(GM.h("button", {
-            type: "button",
-            class: "nostr-menu-item",
-            id: "gm-nsec-toggle",
-            text: "Sign in with a key (nsec)"
-          }));
-          toggle.addEventListener("click", function () {
-            state.nsecOpen = true;
-            renderMenu();
-            var input = document.getElementById("gm-nsec-input");
-            if (input) input.focus();
-          });
-          nsecRow.appendChild(toggle);
-        }
-        menu.appendChild(nsecRow);
+      ])
+    );
+    menu.appendChild(
+      menuItem(GM.h("a", {
+        class: "nostr-menu-item",
+        href: pageUrl("/orders"),
+        text: "My orders"
+      }))
+    );
+    menu.appendChild(
+      menuItem(GM.h("a", {
+        class: "nostr-menu-item",
+        href: pageUrl("/profile"),
+        text: "Profile"
+      }))
+    );
+    var out = menuItem(GM.h("button", {
+      type: "button",
+      class: "nostr-menu-item nostr-menu-signout",
+      id: "gm-nostr-signout",
+      text: "Sign out"
+    }));
+    out.addEventListener("click", doSignOut);
+    menu.appendChild(out);
+  }
+
+  /* --- sign-in modal ------------------------------------------------------ */
+
+  function renderModal() {
+    GM.clear(modal);
+    var close = GM.h("button", {
+      type: "button",
+      class: "nostr-modal-close",
+      "aria-label": "Close",
+      text: "×"
+    });
+    close.addEventListener("click", closeModal);
+    modal.appendChild(close);
+    modal.appendChild(
+      GM.h("h2", { id: "gm-nostr-modal-title", text: "Sign in" })
+    );
+    modal.appendChild(
+      note(
+        "A browser signer (NIP-07) proves your key — no password," +
+          " nothing shared with the shop."
+      )
+    );
+    var signin = GM.h("button", {
+      type: "button",
+      class: "btn-primary",
+      id: "gm-nostr-modal-signin",
+      text: state.busy ? "Waiting for signer…" : "Sign in with Nostr"
+    });
+    signin.addEventListener("click", doSignIn);
+    modal.appendChild(signin);
+    /* Dev/e2e path — rendered only when the deployment enables
+       INFINITEMARKETS_NSEC_SIGNIN (challenge response flag). */
+    if (state.nsecSignin) {
+      var nsecRow = GM.h("div", { class: "nostr-nsec" });
+      if (state.nsecOpen) {
+        var input = GM.h("input", {
+          type: "password",
+          id: "gm-nsec-input",
+          class: "nostr-claim-input",
+          placeholder: "nsec1…",
+          autocomplete: "off",
+          "aria-label": "Secret key (nsec)"
+        });
+        var go = GM.h("button", {
+          type: "button",
+          class: "btn-secondary",
+          id: "gm-nsec-btn",
+          text: "Sign in with key"
+        });
+        go.addEventListener("click", doNsecSignin);
+        nsecRow.appendChild(input);
+        nsecRow.appendChild(go);
+      } else {
+        var toggle = GM.h("button", {
+          type: "button",
+          class: "nostr-nsec-toggle",
+          id: "gm-nsec-toggle",
+          text: "Use a key instead"
+        });
+        toggle.addEventListener("click", function () {
+          state.nsecOpen = true;
+          renderModal();
+          var el = document.getElementById("gm-nsec-input");
+          if (el) el.focus();
+        });
+        nsecRow.appendChild(toggle);
       }
-      if (state.notice) {
-        menu.appendChild(note(state.notice));
-      }
+      modal.appendChild(nsecRow);
     }
+    if (state.notice) {
+      modal.appendChild(note(state.notice, "nostr-modal-notice"));
+    }
+  }
+
+  function openModal() {
+    state.modalOpen = true;
+    backdrop.hidden = false;
+    renderModal();
+    modal.focus();
+    if (!state.flagFetched) {
+      state.flagFetched = true;
+      /* Learn whether nsec sign-in is enabled (challenge response
+         flag) — re-render the open modal when it arrives. */
+      api("/nostr/challenge" + shopQuery()).then(function (res) {
+        if (res.status === 200 && res.body) {
+          state.nsecSignin = !!res.body.nsec_signin;
+          if (state.modalOpen && !state.signedIn && !state.nsecOpen) {
+            renderModal();
+          }
+        }
+      });
+    }
+  }
+
+  function closeModal() {
+    state.modalOpen = false;
+    backdrop.hidden = true;
+    state.notice = "";
   }
 
   function setMenu(open) {
     state.menuOpen = open;
     menu.hidden = !open;
-    if (open) {
-      renderMenu();
-      if (!state.signedIn && !state.flagFetched) {
-        state.flagFetched = true;
-        /* Learn whether nsec sign-in is enabled (challenge response
-           flag) — re-render the open menu when it arrives. */
-        api("/nostr/challenge" + shopQuery()).then(function (res) {
-          if (res.status === 200 && res.body) {
-            state.nsecSignin = !!res.body.nsec_signin;
-            if (state.menuOpen && !state.signedIn && !state.nsecOpen) {
-              renderMenu();
-            }
-          }
-        });
-      }
-    }
+    if (open) renderMenu();
     /* NOT renderChip() — re-rendering the chip here would detach the
        clicked avatar mid-event, making the outside-click handler treat
        it as a click outside and immediately re-close the menu. */
@@ -276,7 +299,12 @@
     if (!inside) setMenu(false);
   });
   document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && state.menuOpen) setMenu(false);
+    if (e.key !== "Escape") return;
+    if (state.modalOpen) closeModal();
+    else if (state.menuOpen) setMenu(false);
+  });
+  backdrop.addEventListener("click", function (e) {
+    if (e.target === backdrop) closeModal();
   });
 
   /* --- orders page -------------------------------------------------------- */
@@ -332,10 +360,7 @@
       class: "btn-primary",
       text: "Sign in with Nostr"
     });
-    go.addEventListener("click", function () {
-      setMenu(true);
-      doSignIn();
-    });
+    go.addEventListener("click", openModal);
     box.appendChild(go);
     return box;
   }
@@ -574,13 +599,14 @@
       state.notice =
         "No Nostr signer found. Install a NIP-07 extension" +
         " (for example Alby or nos2x), then try again.";
-      if (!state.menuOpen) setMenu(true);
-      else renderMenu();
+      if (!state.modalOpen) openModal();
+      else renderModal();
       return;
     }
     state.busy = true;
     state.notice = "";
-    setMenu(true);
+    if (!state.modalOpen) openModal();
+    else renderModal();
     api("/nostr/challenge" + shopQuery())
       .then(function (res) {
         if (res.status !== 200 || !res.body.challenge) {
@@ -605,6 +631,7 @@
         if (!res) return;
         if (res.status === 200) {
           state.notice = "";
+          closeModal();
           return loadIdentity().then(function () {
             loadOrders();
           });
@@ -613,13 +640,13 @@
           state.notice =
             "Sign-in could not be verified. Try again — your signer may" +
             " have declined or the request expired.";
-          renderMenu();
+          renderModal();
         }
       })
       .catch(function () {
         state.notice =
           "Sign-in was cancelled or failed. Try again when you're ready.";
-        renderMenu();
+        if (state.modalOpen) renderModal();
       })
       .finally(function () {
         state.busy = false;
@@ -632,7 +659,7 @@
     var nsec = input.value.trim();
     if (!nsec) {
       state.notice = "Paste your nsec first.";
-      renderMenu();
+      renderModal();
       return;
     }
     state.busy = true;
@@ -645,16 +672,17 @@
         if (!res) return;
         if (res.status === 200) {
           state.nsecOpen = false;
+          closeModal();
           return loadIdentity().then(function () {
             loadOrders();
           });
         }
         state.notice = "That key could not sign you in — check it and try again.";
-        renderMenu();
+        renderModal();
       })
       .catch(function () {
         state.notice = "Sign-in failed. Try again when you're ready.";
-        renderMenu();
+        if (state.modalOpen) renderModal();
       })
       .finally(function () {
         state.busy = false;
@@ -722,7 +750,7 @@
       setMenu(!state.menuOpen);
       return;
     }
-    setMenu(true);
+    openModal();
     doSignIn();
   });
 
