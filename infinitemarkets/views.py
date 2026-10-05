@@ -479,6 +479,20 @@ async def profile_page(request: Request):
     return _public_response(request, "public_profile.html", ctx)
 
 
+@infinitemarkets_generic_router.get("/auth/email", response_class=HTMLResponse)
+async def auth_email_page(request: Request):
+    """§5.4 email sign-in landing shell — the magic-link token arrives
+    ONLY as a URL fragment (never sent to the server); page JS reads the
+    storefront-captured fragment and POSTs it to ``/nostr/email/verify``
+    which mints the identical session cookie (D-08)."""
+    limited = await _public_guard(request)
+    if limited is not None:
+        return limited
+    ctx = await _shop_ctx(request)
+    ctx.setdefault("nav_active", "track")
+    return _public_response(request, "public_auth_email.html", ctx)
+
+
 @infinitemarkets_generic_router.get("/order", response_class=HTMLResponse)
 async def order_page(request: Request):
     """A3 order-status document shell — the bearer token arrives only as a

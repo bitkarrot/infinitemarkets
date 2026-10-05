@@ -342,6 +342,22 @@ class NostrProfileBody(_Strict):
     event: str = Field(min_length=1, max_length=nostr_auth.SIGNIN_EVENT_MAX_BYTES)
 
 
+class EmailRequestBody(_Strict):
+    email: str = Field(min_length=3, max_length=254)
+
+
+class EmailVerifyBody(_Strict):
+    token: str = Field(min_length=1, max_length=128)
+
+
+class LinkEmailBody(_Strict):
+    email: str = Field(min_length=3, max_length=254)
+
+
+class LinkVerifyBody(_Strict):
+    event: str = Field(min_length=1, max_length=nostr_auth.SIGNIN_EVENT_MAX_BYTES)
+
+
 async def _merchant_for_signin(request: Request) -> dict:
     """The merchant this sign-in scopes to — ``?shop=<pubkey>`` or the
     single merchant row (single-merchant deployments)."""
@@ -384,7 +400,16 @@ async def nostr_challenge(request: Request, response: Response):
     result = await nostr_auth.issue_challenge(
         merchant["id"], _client_scope(request)
     )
+    from lnbits.settings import settings as host_settings
+
     result["nsec_signin"] = ext_settings().nsec_signin
+    # Host-capability disclosure (not a per-account oracle): which sign-in
+    # methods the deployment can actually serve right now.
+    result["email_signin"] = bool(
+        ext_settings().email_enabled
+        and host_settings.is_email_notifications_configured()
+    )
+    result["nostr_signin"] = merchant["inbox_state"] == "active"
     return result
 
 
@@ -432,6 +457,73 @@ async def nostr_verify(
         "signed_in": True,
         "pubkey": result["npub"],
         "expires_at": result["expires_at"],
+    }
+
+
+@infinitemarkets_public_api_router.post("/nostr/email/request")
+@public_boundary
+async def nostr_email_request(
+    request: Request, response: Response, body: EmailRequestBody
+):
+    """D-05/D-06 no-oracle magic-link request.
+
+    The SAME body answers every outcome — unknown email, known email,
+    per-email cap reached (the send is silently skipped; the per-IP
+    bucket stays an honest 429). Exact-Origin applies: the minted token
+    is a credential, and mailbox-triggered sends must not be cross-site
+    fireable."""
+    await _guard(request, response)
+    await nip89.check_public_rate_limit(
+        request, bucket="nostr-email-req", limit=10, window_s=60
+    )
+    nostr_auth.require_origin(request)
+    merchant = await _merchant_for_signin(request)
+    await nostr_auth.request_email_signin(merchant["id"], body.email)
+    return {"sent": True, "detail": "check your email for a sign-in link"}
+
+
+@infinitemarkets_public_api_router.post("/nostr/email/verify")
+@public_boundary
+async def nostr_email_verify(
+    request: Request, response: Response, body: EmailVerifyBody
+):
+    """D-08 fragment-token verify → identical session cookie (signin) or
+    identity link (link). Every failure class is the identical 401 —
+    malformed, unknown, used, expired, and wrong-shop tokens are
+    indistinguishable. Exact-Origin is the login-CSRF gate — never
+    relaxed for the fragment flow."""
+    await _guard(request, response)
+    await nip89.check_public_rate_limit(
+        request, bucket="nostr-email-verify", limit=30, window_s=60
+    )
+    nostr_auth.require_origin(request)
+    merchant = await _merchant_for_signin(request)
+    result = await nostr_auth.verify_email_token(
+        merchant["id"], body.token
+    )
+    if result["purpose"] == "link":
+        # Prove, don't sign-in — no cookie is minted for link tokens.
+        return {
+            "linked": result["linked"],
+            "merged": result["merged"],
+            "bound_orders": result["bound_orders"],
+            "redirect": "/infinitemarkets/profile",
+        }
+    response.set_cookie(
+        nostr_auth.SESSION_COOKIE,
+        result["session"]["token"],
+        max_age=nostr_auth.NOSTR_SESSION_TTL_S,
+        httponly=True,
+        secure=True,
+        samesite="strict",
+        path=nostr_auth.SESSION_COOKIE_PATH,
+    )
+    return {
+        "signed_in": True,
+        "pubkey": result["session"]["npub"],
+        "email": result["email"],
+        "bound_orders": result["bound_orders"],
+        "redirect": "/infinitemarkets/orders",
     }
 
 

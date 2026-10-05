@@ -1,0 +1,18 @@
+{% extends "templates/infinitemarkets/public_base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block content %}
+<div class="email-auth" id="gm-email-auth">
+  {#- The sign-in token arrives as a URL fragment only (spec §5.4):
+      public_storefront.js already captured it into GM.orderToken() and
+      stripped it with history.replaceState before any network call;
+      public_auth_email.js POSTs it to /nostr/email/verify. -#}
+  <p class="eyebrow">Your account</p>
+  <h1 class="order-title">Signing you in</h1>
+  <section class="order-card" id="gm-email-auth-card">
+    <p class="order-state" data-gm="email-auth-status" aria-live="polite">Checking your sign-in link…</p>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/infinitemarkets/static/infinitemarkets/js/public_auth_email.js?v={{ asset_revision }}" defer></script>
+{% endblock %}

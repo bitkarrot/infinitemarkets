@@ -244,14 +244,23 @@ async def _web_order(env: dict, product_d: str, *, email=None) -> dict:
     return dict(row)
 
 
-async def _account_rows(env: dict, since: int = 0) -> list[dict]:
-    """``channel='account'`` queue rows for the module merchant."""
+async def _account_rows(env: dict, *, email: str | None = None) -> list[dict]:
+    """``channel='account'`` queue rows for the module merchant — when
+    ``email`` is given, only rows for that recipient hash."""
+    sql = (
+        "SELECT * FROM infinitemarkets.email_queue"
+        " WHERE merchant_id = :m AND channel = 'account'"
+    )
+    params = {"m": env["merchant_id"]}
+    if email is not None:
+        sql += " AND recipient_hash = :rh"
+        params["rh"] = _crypto().hmac_index(
+            _settings().privacy_key, _crypto().PURPOSE_EMAIL_RECIPIENT,
+            env["merchant_id"], _crypto().normalize(email),
+        )
     async with env["ext_module"].db.connect() as conn:
         rows = await conn.fetchall(
-            "SELECT * FROM infinitemarkets.email_queue"
-            " WHERE merchant_id = :m AND channel = 'account'"
-            " AND created_at >= :s ORDER BY created_at, id",
-            {"m": env["merchant_id"], "s": since},
+            sql + " ORDER BY created_at, id", params
         )
     return [dict(r) for r in rows]
 
@@ -502,3 +511,290 @@ async def test_account_channel_uses_email_account_bucket(runtime_env, monkeypatc
     account_buckets = [dict(b) for b in buckets if b["bucket"] == "email-account"]
     assert account_buckets and account_buckets[0]["count"] >= cap
     assert not [b for b in buckets if b["bucket"] == "email-merchant"]
+
+
+# --- Task 2: request/verify vertical (D-05, D-06, D-08, D-09) -------------------
+
+
+async def test_request_uniform_body_no_oracle(runtime_env):
+    """D-05 — identical body+status for unknown vs known emails; the
+    only server-side trace is one ``signin_link`` queue row per request
+    plus a hash-only token row (raw token never persisted)."""
+    env = runtime_env
+    await _reset_buckets(env)
+    client = env["client"]
+
+    known = "known-buyer@example.com"
+    # Seed history: a prior web checkout under that address.
+    product = await env["make_product"](f"pre-{uuid.uuid4().hex[:6]}", 5)
+    await _web_order(env, product["d_tag"], email=known)
+
+    bodies = []
+    for email in (known, "never-seen@example.com", known):
+        resp = await _request_email(client, email)
+        assert resp.status_code == 200, resp.text
+        bodies.append((resp.status_code, resp.json()))
+    assert all(b == bodies[0] for b in bodies), bodies
+    assert bodies[0][1]["sent"] is True
+
+    rows = (
+        await _account_rows(env, email=known)
+        + await _account_rows(env, email="never-seen@example.com")
+    )
+    assert len(rows) == 3
+    assert all(r["event_type"] == "signin_link" for r in rows)
+    assert all(r["order_id"] is None for r in rows)
+    assert all(r["payload_enc"] for r in rows)
+
+    tokens = await _token_rows(env)
+    assert len(tokens) == 3
+    raw = _payload_token(env, rows[0])
+    assert all(raw != t["token_hash"] for t in tokens)
+    assert all(t["purpose"] == "signin" for t in tokens)
+    assert all(t["used_at"] is None for t in tokens)
+    assert all(t["expires_at"] - int(time.time()) <= 900 for t in tokens)
+    # The sign-in request already resolved the identity's account.
+    async with env["ext_module"].db.connect() as conn:
+        acct = await conn.fetchone(
+            "SELECT * FROM infinitemarkets.buyer_accounts"
+            " WHERE merchant_id = :m AND email_hash = :h",
+            {"m": env["merchant_id"], "h": _email_hash(env, known)},
+        )
+    assert acct is not None
+    assert acct["email_enc"]
+
+
+async def test_request_per_ip_bucket_is_honest_429(runtime_env):
+    """D-06 — the per-IP bucket (10/min) is an honest 429."""
+    env = runtime_env
+    await _reset_buckets(env)
+    client = env["client"]
+    last = None
+    for i in range(11):
+        last = await _request_email(client, f"ip-{i}@example.com")
+        if last.status_code == 429:
+            break
+    assert last is not None and last.status_code == 429, last.text
+    assert last.json()["type"].endswith("rate-limited")
+
+
+async def test_request_per_email_cap_silently_skips(runtime_env):
+    """D-05/D-06 — the 4th request for the same address still answers the
+    uniform 200 but mints+enqueues nothing (the per-email bucket is
+    never a 429 oracle)."""
+    env = runtime_env
+    await _reset_buckets(env)
+    client = env["client"]
+    email = "capped@example.com"
+    bodies = []
+    for _ in range(4):
+        resp = await _request_email(client, email)
+        assert resp.status_code == 200, resp.text
+        bodies.append((resp.status_code, resp.json()))
+    assert all(b == bodies[0] for b in bodies)
+    rows = await _account_rows(env, email=email)
+    assert len(rows) == 3  # capped at 3/hr — request 4 minted nothing
+    tokens = [
+        t for t in await _token_rows(env)
+        if t["email_hash"] == _email_hash(env, email)
+    ]
+    assert len(tokens) == 3
+
+
+async def _signin_via_email(env: dict, client, email: str) -> dict:
+    """Full request -> payload-token read-back -> verify; returns the
+    verify response body."""
+    resp = await _request_email(client, email)
+    assert resp.status_code == 200, resp.text
+    rows = await _account_rows(env, email=email)
+    token = _payload_token(env, rows[-1])
+    resp = await _verify_email(client, token)
+    assert resp.status_code == 200, resp.text
+    return resp.json()
+
+
+async def test_verify_signin_cookie_contract_and_bound_orders(runtime_env):
+    """D-08/D-09 — verify mints the IDENTICAL gm_nostr_session cookie
+    (HttpOnly/Secure/SameSite=Strict/path/7d) and bound_orders counts
+    orders placed with that email BEFORE sign-in (union history)."""
+    env = runtime_env
+    await _reset_buckets(env)
+    email = "early-buyer@example.com"
+    product = await env["make_product"](f"early-{uuid.uuid4().hex[:6]}", 5)
+    order = await _web_order(env, product["d_tag"], email=email)
+    assert order["buyer_email_hash"] == _email_hash(env, email)
+
+    import httpx
+
+    transport = httpx.ASGITransport(app=env["app"])
+    async with httpx.AsyncClient(
+        transport=transport, base_url=ORIGIN
+    ) as fresh:
+        resp = await _request_email(fresh, email)
+        assert resp.status_code == 200, resp.text
+        rows = await _account_rows(env, email=email)
+        token = _payload_token(env, rows[-1])
+        resp = await _verify_email(fresh, token)
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["signed_in"] is True
+        assert body["bound_orders"] >= 1
+        assert body["email"] == email
+        assert body["pubkey"] is None  # email-only account
+        assert body["redirect"] == "/infinitemarkets/orders"
+
+        set_cookie = resp.headers.get("set-cookie", "")
+        assert "gm_nostr_session=" in set_cookie
+        for attr in ("httponly", "secure", "samesite=strict",
+                     "path=/infinitemarkets", "max-age"):
+            assert attr in set_cookie.lower(), set_cookie
+
+        # The session serves the union history — the pre-signin order
+        # placed with this email is there (D-09).
+        resp = await fresh.get(f"{PUB}/nostr/orders")
+        assert resp.status_code == 200, resp.text
+        ids = {o["order_id"] for o in resp.json()["orders"]}
+        assert order["id"] in ids
+
+        # Single-use CAS — the same token fails identically.
+        resp = await _verify_email(fresh, token)
+        assert resp.status_code == 401, resp.text
+
+
+async def test_verify_failures_share_identical_401(runtime_env):
+    """Malformed, unknown, wrong-shop, expired and used tokens all
+    produce the same 401 problem body (no oracle, T-312-01)."""
+    env = runtime_env
+    await _reset_buckets(env)
+    import httpx
+
+    # A second merchant gives ?shop= a real "wrong shop" target — one
+    # merchant per user is enforced, so the row is seeded directly.
+    from infinitemarkets.db import DomainTransaction
+
+    other_pubkey = "cd" * 32
+    async with DomainTransaction() as tx:
+        await tx.execute(
+            "INSERT INTO merchants (id, user_id, pubkey, key_ref,"
+            " wallet_id_enc, wallet_id_hash, state, created_at)"
+            " VALUES ('other-m', 'u-other', :p, 'kr-other', :w, 'wh',"
+            " 'active', :n)",
+            # Later created_at — the no-shop fallback resolves the
+            # earliest merchant row (the module's seeded shop).
+            {"p": other_pubkey, "w": b"w" * 40, "n": 9999999999},
+        )
+
+    transport = httpx.ASGITransport(app=env["app"])
+    async with httpx.AsyncClient(
+        transport=transport, base_url=ORIGIN
+    ) as fresh:
+        resp = await _request_email(fresh, "victim@example.com")
+        assert resp.status_code == 200
+        rows = await _account_rows(env, email="victim@example.com")
+        token = _payload_token(env, rows[-1])
+
+        outcomes = []
+        variants = [
+            ("not-a-token", None),
+            (_crypto().generate_public_token(), None),  # well-formed, unknown
+            (token, other_pubkey),                      # wrong shop
+        ]
+        for candidate, shop in variants:
+            q = f"?shop={shop}" if shop else ""
+            resp = await fresh.post(
+                f"{PUB}/nostr/email/verify{q}",
+                json={"token": candidate},
+                headers={"Origin": ORIGIN},
+            )
+            assert resp.status_code == 401, (candidate[:10], resp.text)
+            outcomes.append(resp.json())
+
+        # Expired row — identical outcome.
+        from infinitemarkets.db import DomainTransaction
+
+        async with DomainTransaction() as tx:
+            await tx.execute(
+                "UPDATE email_signin_tokens SET expires_at = 1"
+                " WHERE merchant_id = :m",
+                {"m": env["merchant_id"]},
+            )
+        resp = await _verify_email(fresh, token)
+        assert resp.status_code == 401
+        outcomes.append(resp.json())
+
+        first = outcomes[0]
+        for body in outcomes:
+            assert body["type"] == first["type"]
+            assert body["title"] == first["title"]
+            assert body["status"] == 401
+
+
+async def test_verify_requires_exact_origin(runtime_env):
+    """Login-CSRF posture — the verify POST enforces exact-Origin and is
+    never relaxed for the fragment flow (T-312-04)."""
+    env = runtime_env
+    await _reset_buckets(env)
+    import httpx
+
+    transport = httpx.ASGITransport(app=env["app"])
+    async with httpx.AsyncClient(
+        transport=transport, base_url=ORIGIN
+    ) as fresh:
+        await _request_email(fresh, "origin@example.com")
+        rows = await _account_rows(env, email="origin@example.com")
+        token = _payload_token(env, rows[-1])
+        resp = await _verify_email(fresh, token, origin=None)
+        assert resp.status_code == 403, resp.text
+        resp = await _verify_email(fresh, token, origin="https://evil.example")
+        assert resp.status_code == 403, resp.text
+
+
+async def test_auth_email_page_serves_shell(runtime_env):
+    """GET /auth/email renders the fragment landing shell — the token
+    never reaches the server (D-08)."""
+    env = runtime_env
+    merchant = await _merchant(env)
+    resp = await env["client"].get(
+        f"/infinitemarkets/auth/email?shop={merchant['pubkey']}"
+    )
+    assert resp.status_code == 200, resp.text
+    assert "public_auth_email.js" in resp.text
+    assert "gm-email-auth" in resp.text
+    assert resp.headers["referrer-policy"] == "no-referrer"
+
+
+async def test_challenge_capability_flags(runtime_env):
+    """/nostr/challenge discloses host capabilities (email_signin,
+    nostr_signin) alongside nsec_signin — never a per-account oracle."""
+    env = runtime_env
+    resp = await env["client"].get(f"{PUB}/nostr/challenge")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "email_signin" in body
+    assert "nostr_signin" in body
+    assert "nsec_signin" in body
+    assert body["nostr_signin"] is True  # seeded inbox_state='active'
+
+
+async def test_public_auth_email_js_safety(runtime_env):
+    """The landing JS sources the token ONLY from GM.orderToken() (the
+    storefront module owns the §5.4 fragment strip), defines its own
+    api/shopQuery path, and never touches innerHTML."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    src = (
+        root / "infinitemarkets/static/infinitemarkets/js"
+        / "public_auth_email.js"
+    ).read_text()
+    assert "GM.orderToken()" in src
+    assert "GM.h" in src
+    assert ".innerHTML" not in src
+    assert "location.hash.slice" not in src
+    # Self-contained call path — GM.api alone would hit the wrong URL.
+    assert '"/infinitemarkets/api/v1/public"' in src
+    template = (
+        root / "infinitemarkets/templates/infinitemarkets"
+        / "public_auth_email.html"
+    ).read_text()
+    assert "defer" in template
