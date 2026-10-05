@@ -41,13 +41,14 @@
           Track order
         </a>
         {% if nostr_signin %}
-        <button type="button" class="nav-signin" id="gm-nostr-signin" data-gm="signin">Sign in with Nostr</button>
+        <div class="nostr-account" id="gm-nostr-account">
+          <button type="button" class="nav-signin" id="gm-nostr-signin" data-gm="signin"
+                  aria-haspopup="menu" aria-expanded="false">Sign in with Nostr</button>
+          <div class="nostr-menu" id="gm-nostr-menu" role="menu" hidden></div>
+        </div>
         {% endif %}
       </nav>
     </div>
-    {% if nostr_signin %}
-    <section class="nostr-panel" id="gm-nostr-panel" data-gm="nostr-panel" hidden></section>
-    {% endif %}
   </header>
   <main class="gm-main" id="gm-main">
     {% block content %}{% endblock %}

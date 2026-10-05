@@ -18,7 +18,12 @@ from pydantic import BaseModel, Field
 
 from . import crypto
 from .db import db, table
-from .security import ProblemError, not_found, problem_for
+from .security import (
+    ProblemError,
+    not_found,
+    problem_for,
+    unprocessable,
+)
 from .services import checkout as checkout_service
 from .services import nip89, nostr_auth, readiness
 from .settings import ext_settings
@@ -331,6 +336,10 @@ class NostrClaimBody(_Strict):
     token: str = Field(min_length=1, max_length=4096)
 
 
+class NostrProfileBody(_Strict):
+    event: str = Field(min_length=1, max_length=nostr_auth.SIGNIN_EVENT_MAX_BYTES)
+
+
 async def _merchant_for_signin(request: Request) -> dict:
     """The merchant this sign-in scopes to — ``?shop=<pubkey>`` or the
     single merchant row (single-merchant deployments)."""
@@ -542,6 +551,169 @@ async def nostr_orders(request: Request, response: Response):
             entry["status_url"] = status_url
             out.append(entry)
     return {"orders": out}
+
+
+# --- buyer kind-0 profile (read + publish via merchant public relays) ----
+#
+# The header account chip needs a display name/avatar and the profile page
+# edits standard kind-0 fields. Reads fetch the session pubkey's latest
+# kind-0 from the session merchant's public relays (short process-local
+# cache — the chip probes every page). Writes accept a signed kind-0
+# authored by the session key and publish it on the same public set.
+
+#: Kind-0 fields the profile editor manages/display the chip uses.
+PROFILE_FIELDS = (
+    "name", "display_name", "picture", "banner", "about",
+    "nip05", "lud16", "website",
+)
+PROFILE_EVENT_MAX_AGE_S = nostr_auth.SIGNIN_EVENT_MAX_AGE_S
+_PROFILE_CACHE_TTL_S = 300
+_PROFILE_CACHE_MAX = 256
+_profile_cache: dict[str, tuple[float, dict | None]] = {}
+
+
+async def _fetch_kind0(merchant_id: str, pubkey_hex: str):
+    """Latest kind-0 for ``pubkey_hex`` on the merchant's public relays —
+    returns the field projection dict or None."""
+    from nostr_sdk import Filter, Kind, PublicKey
+
+    from .services import relay as relay_service
+    from .services.transport import transport
+
+    now = time.monotonic()
+    cached = _profile_cache.get(pubkey_hex)
+    if cached and cached[0] > now:
+        return cached[1]
+    urls = await relay_service.relay_targets(merchant_id, "public")
+    profile = None
+    if urls:
+        try:
+            events = await transport().fetch_from(
+                urls,
+                Filter().kinds([Kind(0)]).author(
+                    PublicKey.parse(pubkey_hex)
+                ),
+                timeout_s=8,
+            )
+        except Exception:  # noqa: BLE001 — relay outage is a null profile
+            events = []
+        events = [
+            e for e in events
+            if e.kind().as_u16() == 0
+            and e.author().to_hex() == pubkey_hex
+        ]
+        if events:
+            latest = max(
+                events, key=lambda e: e.created_at().as_secs()
+            )
+            try:
+                content = json.loads(latest.content() or "{}")
+            except (json.JSONDecodeError, TypeError):
+                content = {}
+            if isinstance(content, dict):
+                profile = {
+                    k: content[k]
+                    for k in PROFILE_FIELDS
+                    if isinstance(content.get(k), str) and content[k]
+                }
+    if len(_profile_cache) >= _PROFILE_CACHE_MAX:
+        _profile_cache.clear()
+    _profile_cache[pubkey_hex] = (now + _PROFILE_CACHE_TTL_S, profile)
+    return profile
+
+
+@infinitemarkets_public_api_router.get("/nostr/profile")
+@public_boundary
+async def nostr_profile(request: Request, response: Response):
+    """Session identity + the buyer's relay kind-0 metadata — drives the
+    account chip (name/avatar) and prefills the profile editor."""
+    await _guard(request, response)
+    await nip89.check_public_rate_limit(
+        request, bucket="nostr-profile", limit=60, window_s=60
+    )
+    session = await _buyer_session(request)
+    from nostr_sdk import PublicKey
+
+    profile = await _fetch_kind0(
+        session["merchant_id"], session["buyer_pubkey"]
+    )
+    return {
+        "pubkey": session["buyer_pubkey"],
+        "npub": PublicKey.parse(session["buyer_pubkey"]).to_bech32(),
+        "profile": profile,
+    }
+
+
+@infinitemarkets_public_api_router.post("/nostr/profile")
+@public_boundary
+async def nostr_profile_publish(
+    request: Request, response: Response, body: NostrProfileBody
+):
+    """Publish a buyer-signed kind-0 to the session merchant's public
+    relays. The event must verify, be authored by the session key, be
+    fresh, and carry a JSON-object profile document."""
+    await _guard(request, response)
+    await nip89.check_public_rate_limit(
+        request, bucket="nostr-profile-post", limit=10, window_s=60
+    )
+    nostr_auth.require_origin(request)
+    session = await _buyer_session(request)
+    from nostr_sdk import Event
+
+    try:
+        event = Event.from_json(body.event)
+    except Exception:
+        raise unprocessable("invalid-event", "Event is not valid JSON")
+    if event.kind().as_u16() != 0:
+        raise unprocessable(
+            "invalid-event", "Profile publish requires a kind-0 event"
+        )
+    if event.author().to_hex() != session["buyer_pubkey"]:
+        raise unprocessable(
+            "invalid-event",
+            "Event must be authored by the signed-in key",
+        )
+    try:
+        if not event.verify():
+            raise unprocessable("invalid-event", "Invalid signature")
+    except ProblemError:
+        raise
+    except Exception:
+        raise unprocessable("invalid-event", "Invalid signature")
+    if (
+        abs(int(time.time()) - event.created_at().as_secs())
+        > PROFILE_EVENT_MAX_AGE_S
+    ):
+        raise unprocessable("stale-event", "Event is not fresh")
+    try:
+        content = json.loads(event.content() or "{}")
+    except (json.JSONDecodeError, TypeError):
+        raise unprocessable(
+            "invalid-event", "Profile content must be a JSON object"
+        ) from None
+    if not isinstance(content, dict):
+        raise unprocessable(
+            "invalid-event", "Profile content must be a JSON object"
+        )
+    from .services import relay as relay_service
+    from .services.transport import transport
+
+    urls = await relay_service.relay_targets(
+        session["merchant_id"], "public"
+    )
+    if not urls:
+        raise unprocessable(
+            "no-relay-targets", "No public relays are configured"
+        )
+    output = await transport().send_to(urls, event)
+    accepted = sorted(str(u) for u in output.success)
+    failed = {str(u): str(m) for u, m in output.failed.items()}
+    _profile_cache.pop(session["buyer_pubkey"], None)
+    return {
+        "published": bool(accepted),
+        "accepted": accepted,
+        "failed": failed,
+    }
 
 
 @infinitemarkets_public_api_router.post("/nostr/claim")

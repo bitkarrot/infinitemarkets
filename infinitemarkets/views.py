@@ -425,6 +425,60 @@ async def merchant_page(request: Request, pubkey: str):
     )
 
 
+async def _shop_ctx(request: Request) -> dict:
+    """Store chrome for account pages — ``?shop=<pubkey>`` like the order
+    page, falling back to the single merchant row so direct navigation to
+    /orders and /profile still renders branded chrome + the sign-in chip."""
+    shop = request.query_params.get("shop", "")
+    merchant = None
+    if _PUBKEY_RE.fullmatch(shop):
+        merchant = await nip89.merchant_by_pubkey(shop)
+    if merchant is None and not shop:
+        from .db import db, table
+
+        async with db.connect() as conn:
+            row = await conn.fetchone(
+                f"SELECT * FROM {table('merchants')} ORDER BY created_at"
+                " LIMIT 1"
+            )
+        merchant = dict(row) if row else None
+    if (
+        not merchant
+        or merchant["state"] in ("deactivating", "inactive")
+    ):
+        return {}
+    from .services import themes as theme_service
+
+    theme = await theme_service.get_theme(merchant["id"])
+    return {
+        "theme_css": theme_service.emit_css(theme),
+        **await _store_ctx(merchant, theme),
+    }
+
+
+@infinitemarkets_generic_router.get("/orders", response_class=HTMLResponse)
+async def orders_page(request: Request):
+    """Signed-in buyer order history — the account menu's 'My orders'."""
+    limited = await _public_guard(request)
+    if limited is not None:
+        return limited
+    ctx = await _shop_ctx(request)
+    ctx.setdefault("nav_active", "orders")
+    return _public_response(request, "public_orders.html", ctx)
+
+
+@infinitemarkets_generic_router.get("/profile", response_class=HTMLResponse)
+async def profile_page(request: Request):
+    """Signed-in buyer kind-0 profile editor — the account menu's
+    'Profile'."""
+    limited = await _public_guard(request)
+    if limited is not None:
+        return limited
+    ctx = await _shop_ctx(request)
+    ctx.setdefault("nav_active", "profile")
+    return _public_response(request, "public_profile.html", ctx)
+
+
 @infinitemarkets_generic_router.get("/order", response_class=HTMLResponse)
 async def order_page(request: Request):
     """A3 order-status document shell — the bearer token arrives only as a
