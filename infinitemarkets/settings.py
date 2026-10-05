@@ -148,6 +148,7 @@ class ExtSettings:
     checkout_rate_limit_hourly: int = 100  # per hour per IP (section 15)
     email_enabled: bool = True
     email_max_attempts: int = 5
+    nsec_signin: bool = False
     spec_revision: str = "5dc79c5"
     extra: dict = field(default_factory=dict)
 
@@ -186,6 +187,11 @@ def ext_settings() -> ExtSettings:
         ),
         email_enabled=_bool_env("INFINITEMARKETS_EMAIL_ENABLED", True),
         email_max_attempts=_int_env("INFINITEMARKETS_EMAIL_MAX_ATTEMPTS", 5),
+        # Dev/e2e affordance: POST /nostr/verify accepts a raw nsec and
+        # mints the same session a signed challenge would. OFF by
+        # default — a public nsec field trains users to hand keys to
+        # storefronts, so only enable on test/self-hosted deploys.
+        nsec_signin=_bool_env("INFINITEMARKETS_NSEC_SIGNIN", False),
         spec_revision=os.environ.get(
             "INFINITEMARKETS_SPEC_REVISION", "5dc79c5"
         ).strip()

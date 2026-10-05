@@ -327,9 +327,11 @@ class _Strict(BaseModel):
 
 
 class NostrVerifyBody(_Strict):
-    event: str = Field(
-        min_length=1, max_length=nostr_auth.SIGNIN_EVENT_MAX_BYTES
+    event: str | None = Field(
+        default=None, min_length=1,
+        max_length=nostr_auth.SIGNIN_EVENT_MAX_BYTES,
     )
+    nsec: str | None = Field(default=None, min_length=1, max_length=128)
 
 
 class NostrClaimBody(_Strict):
@@ -379,9 +381,11 @@ async def nostr_challenge(request: Request, response: Response):
         request, bucket="nostr-challenge", limit=30, window_s=60
     )
     merchant = await _merchant_for_signin(request)
-    return await nostr_auth.issue_challenge(
+    result = await nostr_auth.issue_challenge(
         merchant["id"], _client_scope(request)
     )
+    result["nsec_signin"] = ext_settings().nsec_signin
+    return result
 
 
 @infinitemarkets_public_api_router.post("/nostr/verify")
@@ -394,16 +398,27 @@ async def nostr_verify(
     Exact-Origin applies unconditionally here: verifying a foreign-origin
     request would otherwise let a cross-site page fixate a session
     cookie on the victim's browser (login CSRF).
-    """
+
+    ``nsec`` is a dev/e2e path gated by ``INFINITEMARKETS_NSEC_SIGNIN`` —
+    when off it fails with the identical 401 as a bad signature."""
     await _guard(request, response)
     await nip89.check_public_rate_limit(
         request, bucket="nostr-verify", limit=30, window_s=60
     )
     nostr_auth.require_origin(request)
     merchant = await _merchant_for_signin(request)
-    result = await nostr_auth.verify_signin(
-        merchant["id"], body.event, _client_scope(request)
-    )
+    if body.nsec:
+        if not ext_settings().nsec_signin:
+            raise nostr_auth.SIGNIN_INVALID
+        result = await nostr_auth.signin_nsec(
+            merchant["id"], body.nsec
+        )
+    elif body.event:
+        result = await nostr_auth.verify_signin(
+            merchant["id"], body.event, _client_scope(request)
+        )
+    else:
+        raise nostr_auth.SIGNIN_INVALID
     response.set_cookie(
         nostr_auth.SESSION_COOKIE,
         result["token"],

@@ -328,9 +328,8 @@ test('sign-in without a signer extension shows friendly guidance', async ({
 }) => {
   await page.goto(seed.digital_url)
   await page.locator('[data-gm="signin"]').click()
-  await expect(page.locator('[data-gm="nostr-panel"]')).toContainText(
-    'NIP-07'
-  )
+  await expect(page.locator('#gm-nostr-menu')).toBeVisible()
+  await expect(page.locator('#gm-nostr-menu')).toContainText('NIP-07')
 })
 
 test('NIP-07 sign-in, claim, order history, sign out', async ({
@@ -359,12 +358,19 @@ test('NIP-07 sign-in, claim, order history, sign out', async ({
   await installNostrStub(page)
   await page.goto(seed.digital_url)
   await page.locator('[data-gm="signin"]').click()
-  await expect(
-    page.locator('[data-gm="nostr-signed-in"]')
-  ).toBeVisible({timeout: 20_000})
-  await expect(page.locator('.nostr-lead')).toContainText(
-    'Signed in as npub1'
-  )
+  await page.locator('#gm-nostr-menu-signin').click()
+  // Signed-in state collapses to a header account chip — npub shown.
+  await expect(page.locator('#gm-nostr-signin')).toContainText('npub1', {
+    timeout: 20_000
+  })
+  // The menu stays open after sign-in and carries the account links.
+  await expect(page.locator('#gm-nostr-menu')).toBeVisible()
+  await expect(page.locator('#gm-nostr-menu')).toContainText('My orders')
+
+  // Orders live on their own page — reached via the account menu.
+  await page.locator('#gm-nostr-menu').getByText('My orders').click()
+  await page.waitForURL('**/infinitemarkets/orders**')
+  await expect(page.locator('#gm-orders-body')).toBeVisible()
 
   // Claim the private link — the order joins the signed-in history.
   await page.locator('[data-gm="claim-input"]').fill(orderLink)
@@ -383,10 +389,19 @@ test('NIP-07 sign-in, claim, order history, sign out', async ({
     orderRow.first().locator('a.nostr-order-link')
   ).toHaveAttribute('href', /\/infinitemarkets\/order/)
 
-  await page.locator('#gm-nostr-signout').click()
-  await expect(
-    page.locator('[data-gm="nostr-signed-in"]')
-  ).toHaveCount(0)
+  // The profile editor is the account menu's second destination.
+  await page.locator('#gm-nostr-signin').click()
+  await page.locator('#gm-nostr-menu').getByText('Profile').click()
+  await page.waitForURL('**/infinitemarkets/profile**')
+  await expect(page.locator('#gm-profile-form')).toBeVisible()
+  await expect(page.locator('#gm-profile-name')).toBeVisible()
+
+  // Sign out from the menu — the chip returns to the signed-out CTA.
+  await page.locator('#gm-nostr-signin').click()
+  await page.locator('#gm-nostr-menu').getByText('Sign out').click()
+  await expect(page.locator('#gm-nostr-signin')).toContainText(
+    'Sign in with Nostr'
+  )
 })
 
 test('showcase mode swaps the checkout card for Nostr guidance', async ({

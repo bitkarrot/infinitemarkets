@@ -1470,6 +1470,9 @@
 }
 .gm-public .nostr-menu-item:hover { background: var(--color-surface-alt); }
 .gm-public .nostr-menu .nostr-note { padding: 0 10px 6px; }
+.gm-public .nostr-nsec { padding: 0 10px 8px; }
+.gm-public .nostr-nsec .nostr-claim-input { margin-bottom: 6px; }
+.gm-public .nostr-nsec .btn-secondary { width: 100%; }
 .gm-public .nostr-menu .nostr-menu-signin {
   width: calc(100% - 20px);
   margin: 4px 10px 8px;

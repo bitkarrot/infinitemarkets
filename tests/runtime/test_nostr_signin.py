@@ -863,3 +863,41 @@ async def _set_relays(env: dict, mid: str, configs: list[dict]):
         },
     )
     assert resp.status_code == 200, resp.text
+
+
+async def test_nsec_signin_gated_and_mints_session(runtime_env, monkeypatch):
+    """The nsec dev path is OFF by default — identical 401 to a bad
+    signature — and mints a normal session when the flag is on."""
+    import httpx
+
+    keys = _buyer_keys("e2e-nsec")
+    nsec = keys.secret_key().to_bech32()
+    transport = httpx.ASGITransport(app=runtime_env["app"])
+    async with httpx.AsyncClient(
+        transport=transport, base_url=ORIGIN
+    ) as fresh:
+        monkeypatch.delenv("INFINITEMARKETS_NSEC_SIGNIN", raising=False)
+        resp = await fresh.post(
+            f"{PUB}/nostr/verify",
+            json={"nsec": nsec},
+            headers={"Origin": ORIGIN},
+        )
+        assert resp.status_code == 401, resp.text
+        monkeypatch.setenv("INFINITEMARKETS_NSEC_SIGNIN", "1")
+        resp = await fresh.post(
+            f"{PUB}/nostr/verify",
+            json={"nsec": nsec},
+            headers={"Origin": ORIGIN},
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["pubkey"].startswith("npub1")
+        # The minted cookie serves the session endpoints.
+        resp = await fresh.get(f"{PUB}/nostr/orders")
+        assert resp.status_code == 200, resp.text
+        # Garbage nsec is the identical invalid outcome.
+        resp = await fresh.post(
+            f"{PUB}/nostr/verify",
+            json={"nsec": "nsec1bogus"},
+            headers={"Origin": ORIGIN},
+        )
+        assert resp.status_code == 401, resp.text

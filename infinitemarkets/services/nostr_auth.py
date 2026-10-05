@@ -290,9 +290,7 @@ async def verify_signin(
     Returns the raw session token exactly once (alongside the buyer
     pubkey) — only ``token_lookup_hash(token)`` persists.
     """
-    import uuid
-
-    from nostr_sdk import Event, PublicKey
+    from nostr_sdk import Event
 
     from ..settings import ext_settings
 
@@ -320,11 +318,7 @@ async def verify_signin(
         raise SIGNIN_INVALID
 
     scope = _scope_hash(settings, merchant_id, client_ip)
-    token = crypto.generate_public_token()
-    session_id = uuid.uuid4().hex
     pubkey_hex = event.author().to_hex()
-    ver = settings.active_key_version
-    key = settings.master_keys[ver]
     async with DomainTransaction() as tx:
         matched = None
         for candidate in _candidate_challenges(event):
@@ -355,34 +349,80 @@ async def verify_signin(
         )
         if rc != 1:
             raise SIGNIN_INVALID
-        await tx.execute(
-            f"INSERT INTO {tx.table('buyer_sessions')} "
-            "(id, merchant_id, token_hash, buyer_pubkey_enc,"
-            " buyer_pubkey_hash, expires_at, created_at) "
-            "VALUES (:i, :m, :th, :pe, :ph, :e, :n)",
-            {
-                "i": session_id,
-                "m": merchant_id,
-                "th": crypto.token_lookup_hash(token).hex(),
-                "pe": crypto.encrypt(
-                    pubkey_hex.encode(), key, record_id=session_id,
-                    table="buyer_sessions", column="buyer_pubkey_enc",
-                    key_version=ver,
-                ),
-                "ph": crypto.hmac_index(
-                    settings.privacy_key, crypto.PURPOSE_BUYER_PUBKEY,
-                    merchant_id, crypto.normalize(pubkey_hex),
-                ),
-                "e": now + NOSTR_SESSION_TTL_S,
-                "n": now,
-            },
-        )
+        return await _mint_session(tx, merchant_id, pubkey_hex, settings, now)
+
+
+async def _mint_session(tx, merchant_id: str, pubkey_hex: str,
+                        settings, now: int) -> dict:
+    """Insert the buyer_sessions row — returns the raw token exactly
+    once (only ``token_lookup_hash(token)`` persists)."""
+    import uuid
+
+    from nostr_sdk import PublicKey
+
+    token = crypto.generate_public_token()
+    session_id = uuid.uuid4().hex
+    ver = settings.active_key_version
+    key = settings.master_keys[ver]
+    await tx.execute(
+        f"INSERT INTO {tx.table('buyer_sessions')} "
+        "(id, merchant_id, token_hash, buyer_pubkey_enc,"
+        " buyer_pubkey_hash, expires_at, created_at) "
+        "VALUES (:i, :m, :th, :pe, :ph, :e, :n)",
+        {
+            "i": session_id,
+            "m": merchant_id,
+            "th": crypto.token_lookup_hash(token).hex(),
+            "pe": crypto.encrypt(
+                pubkey_hex.encode(), key, record_id=session_id,
+                table="buyer_sessions", column="buyer_pubkey_enc",
+                key_version=ver,
+            ),
+            "ph": crypto.hmac_index(
+                settings.privacy_key, crypto.PURPOSE_BUYER_PUBKEY,
+                merchant_id, crypto.normalize(pubkey_hex),
+            ),
+            "e": now + NOSTR_SESSION_TTL_S,
+            "n": now,
+        },
+    )
     return {
         "token": token,
         "pubkey": pubkey_hex,
         "npub": PublicKey.parse(pubkey_hex).to_bech32(),
         "expires_at": now + NOSTR_SESSION_TTL_S,
     }
+
+
+async def signin_nsec(
+    merchant_id: str,
+    nsec: str,
+    *,
+    settings=None,
+    now: int | None = None,
+) -> dict:
+    """nsec sign-in — a dev/e2e affordance gated by
+    ``INFINITEMARKETS_NSEC_SIGNIN`` at the route layer: possession of the
+    secret key proves ownership, so no challenge round-trip is needed.
+    Mints the identical ``buyer_sessions`` row as ``verify_signin``."""
+    from nostr_sdk import Keys
+
+    from ..settings import ext_settings
+
+    settings = settings or ext_settings()
+    now = _now() if now is None else now
+    if (
+        not isinstance(nsec, str)
+        or not nsec.startswith("nsec1")
+        or len(nsec) > 128
+    ):
+        raise SIGNIN_INVALID
+    try:
+        pubkey_hex = Keys.parse(nsec.strip()).public_key().to_hex()
+    except Exception:
+        raise SIGNIN_INVALID from None
+    async with DomainTransaction() as tx:
+        return await _mint_session(tx, merchant_id, pubkey_hex, settings, now)
 
 
 async def session_from_cookie(

@@ -31,7 +31,10 @@
     orders: [],
     busy: false,
     menuOpen: false,
-    notice: ""
+    notice: "",
+    nsecSignin: false,
+    flagFetched: false,
+    nsecOpen: false
   };
 
   /*: Kind-0 fields the profile editor manages. */
@@ -193,6 +196,44 @@
       }));
       signin.addEventListener("click", doSignIn);
       menu.appendChild(signin);
+      /* Dev/e2e path — rendered only when the deployment enables
+         INFINITEMARKETS_NSEC_SIGNIN (challenge response flag). */
+      if (state.nsecSignin) {
+        var nsecRow = GM.h("div", { class: "nostr-nsec" });
+        if (state.nsecOpen) {
+          nsecRow.appendChild(GM.h("input", {
+            type: "password",
+            id: "gm-nsec-input",
+            class: "nostr-claim-input",
+            placeholder: "nsec1…",
+            autocomplete: "off",
+            "aria-label": "Secret key (nsec)"
+          }));
+          var go = GM.h("button", {
+            type: "button",
+            class: "btn-secondary",
+            id: "gm-nsec-btn",
+            text: "Sign in with key"
+          });
+          go.addEventListener("click", doNsecSignin);
+          nsecRow.appendChild(go);
+        } else {
+          var toggle = menuItem(GM.h("button", {
+            type: "button",
+            class: "nostr-menu-item",
+            id: "gm-nsec-toggle",
+            text: "Sign in with a key (nsec)"
+          }));
+          toggle.addEventListener("click", function () {
+            state.nsecOpen = true;
+            renderMenu();
+            var input = document.getElementById("gm-nsec-input");
+            if (input) input.focus();
+          });
+          nsecRow.appendChild(toggle);
+        }
+        menu.appendChild(nsecRow);
+      }
       if (state.notice) {
         menu.appendChild(note(state.notice));
       }
@@ -202,12 +243,37 @@
   function setMenu(open) {
     state.menuOpen = open;
     menu.hidden = !open;
-    if (open) renderMenu();
-    renderChip();
+    if (open) {
+      renderMenu();
+      if (!state.signedIn && !state.flagFetched) {
+        state.flagFetched = true;
+        /* Learn whether nsec sign-in is enabled (challenge response
+           flag) — re-render the open menu when it arrives. */
+        api("/nostr/challenge" + shopQuery()).then(function (res) {
+          if (res.status === 200 && res.body) {
+            state.nsecSignin = !!res.body.nsec_signin;
+            if (state.menuOpen && !state.signedIn && !state.nsecOpen) {
+              renderMenu();
+            }
+          }
+        });
+      }
+    }
+    /* NOT renderChip() — re-rendering the chip here would detach the
+       clicked avatar mid-event, making the outside-click handler treat
+       it as a click outside and immediately re-close the menu. */
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
   }
 
   document.addEventListener("click", function (e) {
-    if (state.menuOpen && !account.contains(e.target)) setMenu(false);
+    if (!state.menuOpen) return;
+    /* composedPath captures the DOM path AT DISPATCH TIME — in-menu
+       controls that re-render (and detach) their own target mid-event
+       are still recognised as inside clicks. */
+    var inside = e.composedPath
+      ? e.composedPath().indexOf(account) >= 0
+      : account.contains(e.target);
+    if (!inside) setMenu(false);
   });
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && state.menuOpen) setMenu(false);
@@ -466,7 +532,13 @@
       if (res.status === 200) {
         state.orders = (res.body && res.body.orders) || [];
       } else {
+        /* A 401 mid-page means the session is gone — drop to the
+           signed-out prompt rather than a silently empty list. */
         state.orders = [];
+        if (res.status === 401) {
+          state.signedIn = false;
+          renderChip();
+        }
       }
       renderOrdersPage();
     });
@@ -487,7 +559,9 @@
       }
       renderChip();
       if (state.menuOpen) renderMenu();
-      renderOrdersPage();
+      /* Orders page renders via loadOrders() (signed-in) or the boot
+         fallback (signed-out) — rendering here AND from loadOrders
+         would detach a claim input the user already filled. */
       renderProfilePage();
       return state.signedIn;
     });
@@ -552,6 +626,42 @@
       });
   }
 
+  function doNsecSignin() {
+    var input = document.getElementById("gm-nsec-input");
+    if (!input || state.busy) return;
+    var nsec = input.value.trim();
+    if (!nsec) {
+      state.notice = "Paste your nsec first.";
+      renderMenu();
+      return;
+    }
+    state.busy = true;
+    state.notice = "";
+    api("/nostr/verify" + shopQuery(), {
+      method: "POST",
+      body: JSON.stringify({ nsec: nsec })
+    })
+      .then(function (res) {
+        if (!res) return;
+        if (res.status === 200) {
+          state.nsecOpen = false;
+          return loadIdentity().then(function () {
+            loadOrders();
+          });
+        }
+        state.notice = "That key could not sign you in — check it and try again.";
+        renderMenu();
+      })
+      .catch(function () {
+        state.notice = "Sign-in failed. Try again when you're ready.";
+        renderMenu();
+      })
+      .finally(function () {
+        state.busy = false;
+        input.value = "";
+      });
+  }
+
   function doSignOut() {
     api("/nostr/logout", { method: "POST" }).finally(function () {
       state.signedIn = false;
@@ -560,6 +670,7 @@
       state.profile = null;
       state.orders = [];
       setMenu(false);
+      renderChip();
       renderOrdersPage();
       renderProfilePage();
     });
@@ -619,7 +730,8 @@
      the normal signed-out signal (no cookie is readable from JS). The
      profile probe also returns kind-0 name/avatar for the chip. */
   loadIdentity().then(function (signedIn) {
-    if (signedIn && ordersBody) loadOrders();
-    else if (ordersBody) renderOrdersPage();
+    if (!ordersBody) return;
+    if (signedIn) loadOrders();
+    else renderOrdersPage();
   });
 })();
