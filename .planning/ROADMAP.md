@@ -128,12 +128,17 @@ Plans:
 4. Both identity-link directions work; owned-elsewhere identities union-merge atomically (sessions re-point, loser retires) or reject honestly when unrepresentable.
 5. Sign-in affordance offers both methods with honest availability; profile shows linked identities and gates kind-0 on a real key; orders page acknowledges found history once.
 
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
+
+- [x] 03.1-01-PLAN.md
+- [ ] 03.1-02-PLAN.md
+- [ ] 03.1-03-PLAN.md
+
 **Wave 1**
 
-- [ ] 03.1-01: m008 schema (buyer_accounts, email_signin_tokens, buyer_sessions rebuild, orders.buyer_email_hash, email_queue.payload_enc) + backfill + account-scoped sessions + union history/claim/attribution
+- [x] 03.1-01: m008 schema (buyer_accounts, email_signin_tokens, buyer_sessions rebuild, orders.buyer_email_hash, email_queue.payload_enc) + backfill + account-scoped sessions + union history/claim/attribution
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -172,5 +177,5 @@ Plans:
 | 1. Conformance Profile | 3/3 | Complete    | 2026-09-20 |
 | 2. Release A — Safe Web Commerce | 4/4 | Complete    | 2026-09-27 |
 | 3. Release B — Gamma NIP-17 Orders | 4/4 | Executed    | - |
-| 03.1. Buyer accounts (INSERTED) | 0/3 | Not started | - |
+| 03.1. Buyer accounts (INSERTED) | 1/3 | In Progress|  |
 | 4. Release C — Migration and Cutover | 0/3 | Not started | - |

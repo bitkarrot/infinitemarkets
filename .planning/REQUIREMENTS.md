@@ -60,8 +60,8 @@
 
 ### Buyer Accounts
 
-- [ ] **ACC-01**: Buyer can hold a unified per-merchant account (`buyer_accounts`) keyed by a verified email and/or Nostr pubkey — each identity nullable, unique-when-present, merchant-scoped HMAC + AEAD — with sessions minted against the account and pre-existing NIP-07 sessions preserved through the schema migration.
-- [ ] **ACC-02**: Buyer's order history is the union of pubkey-hash and email-hash bindings: `orders.buyer_email_hash` is written at web and gamma checkout when an email is present, backfilled for existing orders, binds via verified session identity (never the unverified form email), and claims attach whichever identities the account offers with identical no-oracle outcomes.
+- [x] **ACC-01**: Buyer can hold a unified per-merchant account (`buyer_accounts`) keyed by a verified email and/or Nostr pubkey — each identity nullable, unique-when-present, merchant-scoped HMAC + AEAD — with sessions minted against the account and pre-existing NIP-07 sessions preserved through the schema migration.
+- [x] **ACC-02**: Buyer's order history is the union of pubkey-hash and email-hash bindings: `orders.buyer_email_hash` is written at web and gamma checkout when an email is present, backfilled for existing orders, binds via verified session identity (never the unverified form email), and claims attach whichever identities the account offers with identical no-oracle outcomes.
 - [ ] **ACC-03**: Buyer without a Nostr signer can sign in via email magic link — no-oracle request, single-use ~15-minute hash-only token delivered URL-fragment-only through the durable email queue with honest unconfigured degradation, dual per-email/per-IP rate limits, and the identical HttpOnly/Secure/SameSite=Strict session cookie contract.
 - [ ] **ACC-04**: Signed-in buyer can link the other identity by proving it (email verify link or NIP-07 link challenge); a verified identity already owned by another account triggers an atomic union merge — identities move, sessions and tokens re-point, the loser retires — while unrepresentable unions reject honestly without partial state.
 - [ ] **ACC-05**: Buyer surfaces offer both sign-in methods with honest per-method availability on any shop configuration: two-method modal, email-aware account chip, verified-email/link cards and kind-0 gating on the profile page, and a one-time 'found past orders' note on the orders page.
@@ -147,8 +147,8 @@ A requirement is complete only when implementation (or Phase 0 probe/model), aut
 | GAM-03 | Phase 3 | Pending |
 | GAM-04 | Phase 3 | Pending |
 | GAM-05 | Phase 3 | Pending |
-| ACC-01 | Phase 03.1 | Pending |
-| ACC-02 | Phase 03.1 | Pending |
+| ACC-01 | Phase 03.1 | Complete |
+| ACC-02 | Phase 03.1 | Complete |
 | ACC-03 | Phase 03.1 | Pending |
 | ACC-04 | Phase 03.1 | Pending |
 | ACC-05 | Phase 03.1 | Pending |
