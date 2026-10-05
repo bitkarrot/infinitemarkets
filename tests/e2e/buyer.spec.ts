@@ -319,7 +319,7 @@ test('sign-in affordance renders once the inbox is active', async ({
   await page.goto(seed.digital_url)
   await expect(page.locator('[data-gm="signin"]')).toBeVisible()
   await expect(page.locator('[data-gm="signin"]')).toContainText(
-    'Sign in with Nostr'
+    'Sign in'
   )
 })
 
@@ -330,6 +330,8 @@ test('sign-in without a signer extension shows friendly guidance', async ({
   await page.locator('[data-gm="signin"]').click()
   await expect(page.locator('#gm-nostr-modal')).toBeVisible()
   await expect(page.locator('#gm-nostr-modal')).toContainText('NIP-07')
+  // The chip only opens the method picker — the buyer chooses Nostr.
+  await page.locator('#gm-nostr-modal-signin').click()
   await expect(page.locator('#gm-nostr-modal')).toContainText(
     'No Nostr signer found'
   )
@@ -363,8 +365,11 @@ test('NIP-07 sign-in, claim, order history, sign out', async ({
 
   await installNostrStub(page)
   await page.goto(seed.digital_url)
-  // One click opens the sign-in dialog AND kicks off the signer flow.
+  // The chip opens the method picker; the Nostr button starts the
+  // signer challenge round-trip.
   await page.locator('[data-gm="signin"]').click()
+  await expect(page.locator('#gm-nostr-modal')).toBeVisible()
+  await page.locator('#gm-nostr-modal-signin').click()
   // Signed-in state collapses to a header account chip — npub shown.
   await expect(page.locator('#gm-nostr-signin')).toContainText('npub1', {
     timeout: 20_000
@@ -408,7 +413,7 @@ test('NIP-07 sign-in, claim, order history, sign out', async ({
   await page.locator('#gm-nostr-signin').click()
   await page.locator('#gm-nostr-menu').getByText('Sign out').click()
   await expect(page.locator('#gm-nostr-signin')).toContainText(
-    'Sign in with Nostr'
+    'Sign in'
   )
 })
 

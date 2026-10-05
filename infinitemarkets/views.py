@@ -122,7 +122,10 @@ async def _nav_collections(merchant_id: str) -> list[dict]:
 
 async def _store_ctx(merchant: dict, theme: dict | None) -> dict:
     """Everything the shared store chrome (header nav + footer) needs."""
+    from lnbits.settings import settings as host_settings
+
     from .services import storefront_mode as mode_service
+    from .settings import ext_settings
 
     collections = await _nav_collections(merchant["id"])
     nostr = await _nostr_ctx(merchant)
@@ -130,9 +133,17 @@ async def _store_ctx(merchant: dict, theme: dict | None) -> dict:
         **_brand_ctx(merchant, theme),
         "nav_collections": collections[:NAV_COLLECTIONS_MAX],
         "all_collections": collections,
-        # D-06: the NIP-07 sign-in affordance renders only while the
-        # merchant's inbox profile is live (kind-10050 published).
-        "nostr_signin": merchant.get("inbox_state") == "active",
+        # D-06 + 03.1-D13: the buyer sign-in affordance renders while
+        # EITHER method can work — a live inbox profile (NIP-07) OR a
+        # configured host email path (magic link). The key name stays
+        # ``nostr_signin``; it now means "buyer sign-in affordance" and
+        # still gates BOTH the chip markup and the public_nostr.js
+        # script tag. Per-method availability inside the modal comes
+        # from the /nostr/challenge capability flags.
+        "nostr_signin": merchant.get("inbox_state") == "active" or (
+            ext_settings().email_enabled
+            and host_settings.is_email_notifications_configured()
+        ),
         # D-07: the four-state storefront mode drives buy controls and
         # browse depth server-side.
         "storefront_mode": await mode_service.get_mode(merchant["id"]),

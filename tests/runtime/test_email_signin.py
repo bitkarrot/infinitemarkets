@@ -1260,3 +1260,49 @@ async def test_link_endpoints_require_session_and_origin(runtime_env):
             json={"event": "{}"},
         )
         assert resp.status_code == 403
+
+
+# --- 03.1-03 Task 1: widened sign-in render gate -----------------------
+
+
+async def _set_inbox_state(env: dict, state: str) -> None:
+    from infinitemarkets.db import DomainTransaction
+
+    async with DomainTransaction() as tx:
+        await tx.execute(
+            "UPDATE merchants SET inbox_state = :s WHERE id = :m",
+            {"s": state, "m": env["merchant_id"]},
+        )
+
+
+async def test_signin_affordance_follows_either_method(
+    runtime_env, monkeypatch
+):
+    """03.1 render rule — the affordance gates on EITHER method: an
+    inactive inbox + configured host email still renders the chip +
+    script tag (email-only shops are reachable); BOTH off hides them
+    (a fully-disabled sign-in button would be a dead control)."""
+    from lnbits.settings import settings as host_settings
+
+    env = runtime_env
+    merchant = await _merchant(env)
+    url = f"/infinitemarkets/order?shop={merchant['pubkey']}"
+    await _set_inbox_state(env, "off")
+    try:
+        monkeypatch.setattr(
+            type(host_settings), "is_email_notifications_configured",
+            lambda self: True,
+        )
+        resp = await env["client"].get(url)
+        assert 'id="gm-nostr-signin"' in resp.text
+        assert "public_nostr.js" in resp.text
+
+        monkeypatch.setattr(
+            type(host_settings), "is_email_notifications_configured",
+            lambda self: False,
+        )
+        resp = await env["client"].get(url)
+        assert 'id="gm-nostr-signin"' not in resp.text
+        assert "public_nostr.js" not in resp.text
+    finally:
+        await _set_inbox_state(env, "active")

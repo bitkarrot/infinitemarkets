@@ -1,12 +1,18 @@
-/* public_nostr.js — NIP-07 buyer sign-in, account menu, orders + profile.
+/* public_nostr.js — buyer sign-in (Nostr NIP-07 or email magic link),
+   account menu, orders + profile.
 
-   Flow: "Sign in with Nostr" (rendered only when the shop's inbox is
-   active, D-06) -> GET /nostr/challenge -> window.nostr.signEvent
-   (kind 22242, challenge in content + tag) -> POST /nostr/verify ->
-   HttpOnly session cookie. Signed-in state collapses to a header
-   account chip (avatar + name from the buyer's kind-0) with a menu:
-   My orders (/infinitemarkets/orders), Profile (/infinitemarkets/profile),
-   Sign out. The session token never touches JS — the cookie is HttpOnly.
+   Flow: the sign-in modal offers BOTH methods (D-13) — "Sign in with
+   Nostr" (GET /nostr/challenge -> window.nostr.signEvent kind 22242 ->
+   POST /nostr/verify) and "Email me a sign-in link" (POST
+   /nostr/email/request -> the mailed fragment link lands on
+   /auth/email). Both end at the same HttpOnly session cookie. The
+   chip renders whenever EITHER method can work (the server-side
+   nostr_signin ctx flag); per-method availability arrives via the
+   /nostr/challenge capability flags — an unavailable method renders
+   an honest hint, never a dead control. Signed-in state collapses to
+   a header account chip (avatar + name from the buyer's kind-0, else
+   the verified email) with a menu: My orders, Profile, Sign out. The
+   session token never touches JS — the cookie is HttpOnly.
    All DOM builds go through GM.h (no innerHTML with API values). */
 (function () {
   "use strict";
@@ -29,6 +35,7 @@
     signedIn: false,
     npub: "",
     pubkey: "",
+    email: "",
     profile: null,
     orders: [],
     busy: false,
@@ -37,7 +44,14 @@
     notice: "",
     nsecSignin: false,
     flagFetched: false,
-    nsecOpen: false
+    nsecOpen: false,
+    /* Per-method availability from the /nostr/challenge capability
+       flags — optimistic-true until the first probe so the Nostr path
+       is never regressed when the flags are absent. */
+    nostrAvailable: true,
+    emailAvailable: true,
+    emailSent: false,
+    emailNotice: ""
   };
 
   /*: Kind-0 fields the profile editor manages. */
@@ -76,6 +90,13 @@
     });
   }
 
+  /* Uniform no-oracle copy for the email request — ONE literal for
+     every outcome (known/unknown/capped addresses are
+     indistinguishable). Request-level failures append a retry tail. */
+  var EMAIL_SENT_COPY =
+    "Check your email — if that address can sign in here," +
+    " a link is on its way.";
+
   function note(text, cls) {
     return GM.h("p", { class: "nostr-note " + (cls || ""), text: text });
   }
@@ -84,9 +105,20 @@
     return GM.trunc(npub || "", 12, 6);
   }
 
+  function truncMiddle(s, max) {
+    s = String(s || "");
+    if (s.length <= max) return s;
+    var head = Math.ceil((max - 1) / 2);
+    var tail = max - 1 - head;
+    return s.slice(0, head) + "…" + s.slice(s.length - tail);
+  }
+
   function displayName() {
     var p = state.profile || {};
-    return p.display_name || p.name || npubShort(state.npub);
+    return (
+      p.display_name || p.name || npubShort(state.npub) ||
+      truncMiddle(state.email, 28)
+    );
   }
 
   function avatarEl(size) {
@@ -133,7 +165,7 @@
         GM.h("span", { class: "nostr-chip-caret", "aria-hidden": "true", text: "▾" })
       );
     } else {
-      btn.textContent = "Sign in with Nostr";
+      btn.textContent = "Sign in";
     }
     btn.setAttribute("aria-expanded", state.menuOpen ? "true" : "false");
   }
@@ -151,7 +183,12 @@
         avatarEl("lg"),
         GM.h("div", { class: "nostr-menu-id" }, [
           GM.h("strong", { text: displayName() }),
-          GM.h("span", { class: "nostr-menu-npub", text: npubShort(state.npub) })
+          GM.h("span", {
+            class: "nostr-menu-npub",
+            text: state.npub
+              ? npubShort(state.npub)
+              : truncMiddle(state.email, 40)
+          })
         ])
       ])
     );
@@ -194,7 +231,11 @@
     modal.appendChild(
       GM.h("h2", { id: "gm-nostr-modal-title", text: "Sign in" })
     );
-    modal.appendChild(
+    /* Method 1 — Nostr (NIP-07). The method always renders; when the
+       shop's inbox is off the challenge flag renders an honest hint
+       (show-with-hint, never a dead control). */
+    var nostrMethod = GM.h("div", { class: "nostr-method" });
+    nostrMethod.appendChild(
       note(
         "A browser signer (NIP-07) proves your key — no password," +
           " nothing shared with the shop."
@@ -207,7 +248,16 @@
       text: state.busy ? "Waiting for signer…" : "Sign in with Nostr"
     });
     signin.addEventListener("click", doSignIn);
-    modal.appendChild(signin);
+    nostrMethod.appendChild(signin);
+    if (!state.nostrAvailable) {
+      nostrMethod.appendChild(
+        note(
+          "Nostr sign-in isn't available on this shop —" +
+            " use email below.",
+          "nostr-method-hint"
+        )
+      );
+    }
     /* Dev/e2e path — rendered only when the deployment enables
        INFINITEMARKETS_NSEC_SIGNIN (challenge response flag). */
     if (state.nsecSignin) {
@@ -245,8 +295,67 @@
         });
         nsecRow.appendChild(toggle);
       }
-      modal.appendChild(nsecRow);
+      nostrMethod.appendChild(nsecRow);
     }
+    modal.appendChild(nostrMethod);
+
+    /* Method 2 — email magic link (D-13). Always rendered; the input
+       + button disable with an honest hint when the host can't send
+       (the emailed link lands on /auth/email and verifies there). */
+    modal.appendChild(
+      GM.h("div", { class: "nostr-method-divider" }, [
+        GM.h("span", { text: "or" })
+      ])
+    );
+    var emailMethod = GM.h("div", {
+      class: "nostr-method",
+      "data-gm": "email-method"
+    });
+    if (state.emailSent) {
+      emailMethod.appendChild(
+        note(state.emailNotice || EMAIL_SENT_COPY)
+      );
+    } else {
+      emailMethod.appendChild(
+        GM.h("label", {
+          for: "gm-email-input",
+          class: "nostr-claim-label",
+          text: "Sign in with email"
+        })
+      );
+      var emailInput = GM.h("input", {
+        type: "email",
+        id: "gm-email-input",
+        "data-gm": "email-input",
+        class: "nostr-claim-input",
+        autocomplete: "email",
+        maxlength: "254",
+        placeholder: "you@example.com"
+      });
+      var emailBtn = GM.h("button", {
+        type: "button",
+        class: "btn-primary",
+        id: "gm-email-btn",
+        text: state.busy ? "Sending…" : "Email me a sign-in link"
+      });
+      emailBtn.addEventListener("click", doEmailRequest);
+      if (!state.emailAvailable) {
+        emailInput.disabled = true;
+        emailBtn.disabled = true;
+      }
+      emailMethod.appendChild(emailInput);
+      emailMethod.appendChild(emailBtn);
+      if (!state.emailAvailable) {
+        emailMethod.appendChild(
+          note(
+            "Email sign-in isn't configured on this host —" +
+              " use Nostr above or contact the shop.",
+            "nostr-method-hint"
+          )
+        );
+      }
+    }
+    modal.appendChild(emailMethod);
     if (state.notice) {
       modal.appendChild(note(state.notice, "nostr-modal-notice"));
     }
@@ -259,11 +368,19 @@
     modal.focus();
     if (!state.flagFetched) {
       state.flagFetched = true;
-      /* Learn whether nsec sign-in is enabled (challenge response
-         flag) — re-render the open modal when it arrives. */
+      /* Learn which methods this deployment can serve (challenge
+         response capability flags) — re-render the open modal when
+         they arrive. Flags absent -> the optimistic-true defaults
+         keep the Nostr path exactly as before. */
       api("/nostr/challenge" + shopQuery()).then(function (res) {
         if (res.status === 200 && res.body) {
           state.nsecSignin = !!res.body.nsec_signin;
+          if (res.body.email_signin !== undefined) {
+            state.emailAvailable = !!res.body.email_signin;
+          }
+          if (res.body.nostr_signin !== undefined) {
+            state.nostrAvailable = !!res.body.nostr_signin;
+          }
           if (state.modalOpen && !state.signedIn && !state.nsecOpen) {
             renderModal();
           }
@@ -276,6 +393,8 @@
     state.modalOpen = false;
     backdrop.hidden = true;
     state.notice = "";
+    state.emailSent = false;
+    state.emailNotice = "";
   }
 
   function setMenu(open) {
@@ -351,14 +470,14 @@
     var box = GM.h("div", { class: "nostr-box", "data-gm": "nostr-signed-out" }, [
       GM.h("p", { class: "nostr-lead", text: text }),
       note(
-        "Use the “Sign in with Nostr” button in the top bar — a NIP-07" +
-          " extension (Alby, nos2x) signs a proof; nothing else is shared."
+        "Use the “Sign in” button in the top bar — a Nostr signer or" +
+          " a sign-in email gets you in; no password."
       )
     ]);
     var go = GM.h("button", {
       type: "button",
       class: "btn-primary",
-      text: "Sign in with Nostr"
+      text: "Sign in"
     });
     go.addEventListener("click", openModal);
     box.appendChild(go);
@@ -370,11 +489,31 @@
     GM.clear(ordersBody);
     if (!state.signedIn) {
       ordersBody.appendChild(
-        signInPrompt("Sign in with your Nostr key to see your orders.")
+        signInPrompt("Sign in to see your orders.")
       );
       return;
     }
     var box = GM.h("div", { class: "nostr-box", "data-gm": "nostr-signed-in" });
+    /* D-09 — the email-auth landing stashed bound_orders; acknowledge
+       the merge once (honest UX, not silent magic), then clear. */
+    var bound = 0;
+    try {
+      bound =
+        parseInt(sessionStorage.getItem("gm_bound_orders") || "0", 10) ||
+        0;
+      if (bound > 0) sessionStorage.removeItem("gm_bound_orders");
+    } catch (e) {
+      bound = 0;
+    }
+    if (bound > 0) {
+      box.appendChild(
+        note(
+          "We found " + bound + " past order" + (bound === 1 ? "" : "s") +
+            " linked to your account.",
+          "nostr-bound-note"
+        )
+      );
+    }
     if (!state.orders.length) {
       box.appendChild(note("No orders yet — your orders will appear here."));
     } else {
@@ -384,12 +523,13 @@
       });
       box.appendChild(list);
     }
-    /* Claim: paste a private order link to bind it to this key (D-05). */
+    /* Claim: paste a private order link to bind it to this account
+       (D-05) — method-neutral: email accounts claim too. */
     var claimBox = GM.h("div", { class: "nostr-claim" }, [
       GM.h("label", {
         for: "gm-claim-input",
         class: "nostr-claim-label",
-        text: "Have a private order link? Paste it to link the order to this key."
+        text: "Have a private order link? Paste it to link the order to your account."
       }),
       GM.h("input", {
         type: "text",
@@ -402,7 +542,7 @@
         type: "button",
         class: "btn-secondary",
         id: "gm-claim-btn",
-        text: "Link this order to my Nostr key"
+        text: "Link this order to my account"
       }),
       GM.h("p", { class: "nostr-claim-msg", id: "gm-claim-msg" })
     ]);
@@ -420,7 +560,7 @@
     GM.clear(profileBody);
     if (!state.signedIn) {
       profileBody.appendChild(
-        signInPrompt("Sign in with your Nostr key to edit your profile.")
+        signInPrompt("Sign in to edit your profile.")
       );
       return;
     }
@@ -575,11 +715,13 @@
         state.signedIn = true;
         state.pubkey = res.body.pubkey || "";
         state.npub = res.body.npub || "";
+        state.email = res.body.email || "";
         state.profile = res.body.profile || null;
       } else {
         state.signedIn = false;
         state.pubkey = "";
         state.npub = "";
+        state.email = "";
         state.profile = null;
       }
       renderChip();
@@ -690,11 +832,48 @@
       });
   }
 
+  function doEmailRequest() {
+    if (state.busy || !state.emailAvailable || state.emailSent) return;
+    var input = document.getElementById("gm-email-input");
+    if (!input) return;
+    var email = input.value.trim();
+    if (!email || email.indexOf("@") < 0) {
+      state.notice = "Enter your email address.";
+      renderModal();
+      return;
+    }
+    state.busy = true;
+    state.notice = "";
+    renderModal();
+    api("/nostr/email/request" + shopQuery(), {
+      method: "POST",
+      body: JSON.stringify({ email: email })
+    })
+      .then(function (res) {
+        /* Uniform no-oracle copy for EVERY outcome — the modal never
+           distinguishes known/unknown/capped addresses (the single
+           EMAIL_SENT_COPY literal). Request-level failures (Origin,
+           rate-limit) only append a retry tail. */
+        state.emailSent = true;
+        state.emailNotice = EMAIL_SENT_COPY +
+          (res && res.status === 200 ? "" : " Try again shortly.");
+      })
+      .catch(function () {
+        state.emailSent = true;
+        state.emailNotice = EMAIL_SENT_COPY + " Try again shortly.";
+      })
+      .finally(function () {
+        state.busy = false;
+        if (state.modalOpen) renderModal();
+      });
+  }
+
   function doSignOut() {
     api("/nostr/logout", { method: "POST" }).finally(function () {
       state.signedIn = false;
       state.npub = "";
       state.pubkey = "";
+      state.email = "";
       state.profile = null;
       state.orders = [];
       setMenu(false);
@@ -750,8 +929,10 @@
       setMenu(!state.menuOpen);
       return;
     }
+    /* The chip ONLY opens the method picker — firing the Nostr flow
+       on click would land an email-only shop on a 'No Nostr signer'
+       error against its working email method. */
     openModal();
-    doSignIn();
   });
 
   /* Signed-in detection probes the session once per page view — a 401 is

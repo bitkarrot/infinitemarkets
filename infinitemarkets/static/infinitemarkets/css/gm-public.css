@@ -1507,6 +1507,24 @@
 }
 .gm-public .nostr-modal .nostr-nsec { padding: var(--space-sm) 0 0; }
 .gm-public .nostr-modal .nostr-modal-notice { margin-top: var(--space-sm); }
+/* Two-method modal (D-13): a labelled divider separates the Nostr and
+   email methods; unavailable methods carry a hint, never a dead control. */
+.gm-public .nostr-method-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: var(--space-md) 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+.gm-public .nostr-method-divider::before,
+.gm-public .nostr-method-divider::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--color-border);
+}
+.gm-public .nostr-modal .nostr-method .nostr-claim-label { margin-top: 0; }
+.gm-public .nostr-modal .nostr-method-hint { margin-top: var(--space-sm); }
 .gm-public .nostr-modal-close {
   position: absolute;
   top: 10px;
