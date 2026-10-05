@@ -662,12 +662,17 @@ async def checkout(
             return body
         raise not_found("checkout response expired")
     claim_token = record["claim_token"]
-    buyer_pubkey = (
-        buyer_session["buyer_pubkey"]
-        if buyer_session
+    # D-03/D-04: the session account's resolved identities attribute the
+    # order — pubkey binds buyer_pubkey_*, the verified email binds
+    # buyer_email_hash (the unverified form email never wins over it).
+    buyer_pubkey = None
+    buyer_email = None
+    if (
+        buyer_session
         and buyer_session.get("merchant_id") == merchant["id"]
-        else None
-    )
+    ):
+        buyer_pubkey = buyer_session["buyer_pubkey"]
+        buyer_email = buyer_session.get("email")
     try:
         if "_resume_order_id" in record:
             response = await _resume_order(record, now=now)
@@ -676,7 +681,7 @@ async def checkout(
             body = await _run_checkout(
                 merchant=merchant, payload=payload, client_scope=client_scope,
                 settings=settings, now=now, scope=scope, claim_token=claim_token,
-                buyer_pubkey=buyer_pubkey,
+                buyer_pubkey=buyer_pubkey, buyer_email=buyer_email,
             )
             response, order_id = body["response"], body["_order_id"]
     except Exception:
@@ -699,6 +704,7 @@ async def _run_checkout(
     settings: ExtSettings,
     now: int,
     buyer_pubkey: str | None = None,
+    buyer_email: str | None = None,
 ) -> dict:
     """Intake -> totals -> tx1 order -> saga -> response."""
     # Open-order cap (§15): ≤10 unpaid web orders per IP scope.
@@ -758,7 +764,7 @@ async def _run_checkout(
             max(0, int(payload["buyer_amount"]))
             if payload.get("buyer_amount") is not None else None
         ),
-        buyer_pubkey=buyer_pubkey,
+        buyer_pubkey=buyer_pubkey, buyer_email=buyer_email,
         client_scope=client_scope, settings=settings, now=now, scope=scope,
         claim_token=claim_token,
     )
@@ -822,6 +828,7 @@ async def _insert_order_intake(
     settings: ExtSettings,
     now: int,
     buyer_pubkey: str | None = None,
+    buyer_email: str | None = None,
 ) -> None:
     """§8.1 step 8: orders(received) + items + fx + audit + token, one tx."""
     key = settings.master_keys[settings.active_key_version]
@@ -835,6 +842,18 @@ async def _insert_order_intake(
 
     contact = json.dumps(
         {"email": email, "phone": phone}, separators=(",", ":")
+    )
+    # D-03: buyer_email_hash binds the order to the session account's
+    # VERIFIED email when the checkout is attributed; the unverified
+    # form email seeds the auto-bind only for anonymous checkouts.
+    # The plaintext email still lands in contact_enc unchanged
+    # (notification opt-in semantics unchanged).
+    bind_email = (
+        buyer_email
+        if isinstance(buyer_email, str) and crypto.normalize(buyer_email)
+        else email
+        if isinstance(email, str) and crypto.normalize(email)
+        else None
     )
     token_enc = _enc(token.encode(), "public_token_enc")
     scope_hash = crypto.hmac_index(
@@ -909,6 +928,21 @@ async def _insert_order_intake(
                     "bh": crypto.hmac_index(
                         settings.privacy_key, crypto.PURPOSE_BUYER_PUBKEY,
                         merchant["id"], crypto.normalize(buyer_pubkey),
+                    ),
+                    "o": order_id,
+                },
+            )
+        if bind_email is not None:
+            # D-03: hash-only binding — PURPOSE_BUYER_EMAIL is the same
+            # domain as buyer_accounts.email_hash so hash equality drives
+            # the /nostr/orders union.
+            await tx.execute(
+                f"UPDATE {tx.table('orders')} SET buyer_email_hash = :eh"
+                " WHERE id = :o",
+                {
+                    "eh": crypto.hmac_index(
+                        settings.privacy_key, crypto.PURPOSE_BUYER_EMAIL,
+                        merchant["id"], crypto.normalize(bind_email),
                     ),
                     "o": order_id,
                 },
@@ -1554,6 +1588,16 @@ async def _insert_gamma_order_intake(
         {"email": email, "phone": phone, "npub": npub},
         separators=(",", ":"),
     )
+    # D-03: a non-empty payload email binds the order by hash too —
+    # same PURPOSE_BUYER_EMAIL domain as web intake and the m008 backfill.
+    buyer_email_hash = (
+        crypto.hmac_index(
+            settings.privacy_key, crypto.PURPOSE_BUYER_EMAIL,
+            merchant_id, crypto.normalize(email),
+        )
+        if isinstance(email, str) and crypto.normalize(email)
+        else None
+    )
     shipping_state = (
         "pending" if shipping_option is not None else "not_required"
     )
@@ -1575,12 +1619,12 @@ async def _insert_gamma_order_intake(
         inserted = await tx.execute(
             f"INSERT INTO {tx.table('orders')} "
             "(id, merchant_id, protocol, buyer_pubkey_enc, buyer_pubkey_hash,"
-            " external_id_enc, external_id_hash, request_hash,"
+            " buyer_email_hash, external_id_enc, external_id_hash, request_hash,"
             " source_event_id, currency, subtotal_sat, shipping_sat,"
             " total_sat, buyer_amount_sat, state, shipping_state,"
             " contact_enc, address_enc, shipping_option_id,"
             " email_opt_in, created_at, updated_at) "
-            "VALUES (:i, :m, 'gamma', :bpe, :bph, :eie, :eih, :rh, :sei,"
+            "VALUES (:i, :m, 'gamma', :bpe, :bph, :beh, :eie, :eih, :rh, :sei,"
             " 'SAT', :ss, :shs, :ts, :ba, 'received', :shst, :ce, :ae,"
             " :so, FALSE, :n, :n) ON CONFLICT DO NOTHING",
             {
@@ -1588,6 +1632,7 @@ async def _insert_gamma_order_intake(
                 "m": merchant_id,
                 "bpe": _enc(buyer_pubkey.encode(), "buyer_pubkey_enc"),
                 "bph": buyer_pubkey_hash,
+                "beh": buyer_email_hash,
                 "eie": _enc(external_id.encode(), "external_id_enc"),
                 "eih": crypto.hmac_index(
                     settings.privacy_key, crypto.PURPOSE_ORDER_ID,

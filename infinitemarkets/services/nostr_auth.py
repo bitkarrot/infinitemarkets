@@ -349,13 +349,142 @@ async def verify_signin(
         )
         if rc != 1:
             raise SIGNIN_INVALID
-        return await _mint_session(tx, merchant_id, pubkey_hex, settings, now)
+        account = await _get_or_create_account(
+            tx, merchant_id, pubkey=pubkey_hex, settings=settings, now=now
+        )
+        return await _mint_session(tx, merchant_id, account, settings, now)
 
 
-async def _mint_session(tx, merchant_id: str, pubkey_hex: str,
+async def _account_by_hash(
+    tx, merchant_id: str, *, pubkey_hash=None, email_hash=None
+) -> dict | None:
+    """The non-retired ``buyer_accounts`` row for one identity hash."""
+    if pubkey_hash is not None:
+        return await tx.fetch_one(
+            f"SELECT * FROM {tx.table('buyer_accounts')}"
+            " WHERE merchant_id = :m AND pubkey_hash = :h"
+            " AND retired_at IS NULL",
+            {"m": merchant_id, "h": pubkey_hash},
+        )
+    if email_hash is not None:
+        return await tx.fetch_one(
+            f"SELECT * FROM {tx.table('buyer_accounts')}"
+            " WHERE merchant_id = :m AND email_hash = :h"
+            " AND retired_at IS NULL",
+            {"m": merchant_id, "h": email_hash},
+        )
+    return None
+
+
+def _decrypt_account_field(
+    account: dict, column: str, settings
+) -> str | None:
+    """Best-effort decrypt of ``email_enc``/``pubkey_enc`` — AAD binds the
+    ciphertext to the account row (``record_id`` = account id). A corrupt
+    or unreadable ciphertext degrades the field to ``None``, never a
+    crash (``_customer_email`` posture)."""
+    enc = account.get(column)
+    if enc is None:
+        return None
+    try:
+        ver = crypto.envelope_version(enc)
+        return crypto.decrypt(
+            enc, settings.master_keys[ver], record_id=account["id"],
+            table="buyer_accounts", column=column, key_version=ver,
+        ).decode()
+    except Exception:  # noqa: BLE001 — corrupt field is data, not a crash
+        return None
+
+
+async def _get_or_create_account(
+    tx, merchant_id: str, *, pubkey=None, email=None, settings, now: int
+) -> dict:
+    """Resolve or create the ``buyer_accounts`` row for a verified
+    identity (D-01).
+
+    The caller supplies the verified plaintext — ``pubkey`` from the
+    signed kind-22242 event / nsec, ``email`` from a verified sign-in
+    token. Returns the row plus ``pubkey``/``email`` plaintext keys:
+    caller-supplied for the proven identity, decrypted from ``*_enc`` for
+    any other identity the account already holds."""
+    import uuid
+
+    pubkey_hash = (
+        crypto.hmac_index(
+            settings.privacy_key, crypto.PURPOSE_BUYER_PUBKEY,
+            merchant_id, crypto.normalize(pubkey),
+        )
+        if pubkey
+        else None
+    )
+    email_hash = (
+        crypto.hmac_index(
+            settings.privacy_key, crypto.PURPOSE_BUYER_EMAIL,
+            merchant_id, crypto.normalize(email),
+        )
+        if email
+        else None
+    )
+    row = await _account_by_hash(tx, merchant_id, pubkey_hash=pubkey_hash)
+    if row is None:
+        row = await _account_by_hash(tx, merchant_id, email_hash=email_hash)
+    if row is None:
+        account_id = uuid.uuid4().hex
+        ver = settings.active_key_version
+        key = settings.master_keys[ver]
+
+        def _enc(plaintext: str | None, column: str):
+            if plaintext is None:
+                return None
+            return crypto.encrypt(
+                plaintext.encode(), key, record_id=account_id,
+                table="buyer_accounts", column=column, key_version=ver,
+            )
+
+        row = {
+            "id": account_id,
+            "merchant_id": merchant_id,
+            "email_enc": _enc(email, "email_enc"),
+            "email_hash": email_hash,
+            "pubkey_enc": _enc(pubkey, "pubkey_enc"),
+            "pubkey_hash": pubkey_hash,
+            "retired_at": None,
+            "created_at": now,
+            "updated_at": now,
+        }
+        await tx.execute(
+            f"INSERT INTO {tx.table('buyer_accounts')} (id, merchant_id,"
+            " email_enc, email_hash, pubkey_enc, pubkey_hash,"
+            " created_at, updated_at) "
+            "VALUES (:i, :m, :ee, :eh, :pe, :ph, :n, :n)",
+            {
+                "i": row["id"],
+                "m": merchant_id,
+                "ee": row["email_enc"],
+                "eh": row["email_hash"],
+                "pe": row["pubkey_enc"],
+                "ph": row["pubkey_hash"],
+                "n": now,
+            },
+        )
+    account = dict(row)
+    account["pubkey"] = pubkey or _decrypt_account_field(
+        account, "pubkey_enc", settings
+    )
+    account["email"] = email or _decrypt_account_field(
+        account, "email_enc", settings
+    )
+    return account
+
+
+async def _mint_session(tx, merchant_id: str, account: dict,
                         settings, now: int) -> dict:
-    """Insert the buyer_sessions row — returns the raw token exactly
-    once (only ``token_lookup_hash(token)`` persists)."""
+    """Insert the account-scoped buyer_sessions row (D-02) — returns the
+    raw token exactly once (only ``token_lookup_hash(token)`` persists).
+
+    ``buyer_pubkey_enc``/``buyer_pubkey_hash`` stay populated for pubkey
+    accounts — cheap compat: legacy readers resolve the pubkey without a
+    join — and stay NULL for email-only accounts."""
     import uuid
 
     from nostr_sdk import PublicKey
@@ -364,32 +493,39 @@ async def _mint_session(tx, merchant_id: str, pubkey_hex: str,
     session_id = uuid.uuid4().hex
     ver = settings.active_key_version
     key = settings.master_keys[ver]
+    buyer_pubkey = account.get("pubkey")
     await tx.execute(
         f"INSERT INTO {tx.table('buyer_sessions')} "
         "(id, merchant_id, token_hash, buyer_pubkey_enc,"
-        " buyer_pubkey_hash, expires_at, created_at) "
-        "VALUES (:i, :m, :th, :pe, :ph, :e, :n)",
+        " buyer_pubkey_hash, account_id, expires_at, created_at) "
+        "VALUES (:i, :m, :th, :pe, :ph, :a, :e, :n)",
         {
             "i": session_id,
             "m": merchant_id,
             "th": crypto.token_lookup_hash(token).hex(),
-            "pe": crypto.encrypt(
-                pubkey_hex.encode(), key, record_id=session_id,
-                table="buyer_sessions", column="buyer_pubkey_enc",
-                key_version=ver,
+            "pe": (
+                crypto.encrypt(
+                    buyer_pubkey.encode(), key, record_id=session_id,
+                    table="buyer_sessions", column="buyer_pubkey_enc",
+                    key_version=ver,
+                )
+                if buyer_pubkey
+                else None
             ),
-            "ph": crypto.hmac_index(
-                settings.privacy_key, crypto.PURPOSE_BUYER_PUBKEY,
-                merchant_id, crypto.normalize(pubkey_hex),
-            ),
+            "ph": account.get("pubkey_hash"),
+            "a": account["id"],
             "e": now + NOSTR_SESSION_TTL_S,
             "n": now,
         },
     )
     return {
         "token": token,
-        "pubkey": pubkey_hex,
-        "npub": PublicKey.parse(pubkey_hex).to_bech32(),
+        "pubkey": buyer_pubkey,
+        "npub": (
+            PublicKey.parse(buyer_pubkey).to_bech32()
+            if buyer_pubkey
+            else None
+        ),
         "expires_at": now + NOSTR_SESSION_TTL_S,
     }
 
@@ -422,14 +558,26 @@ async def signin_nsec(
     except Exception:
         raise SIGNIN_INVALID from None
     async with DomainTransaction() as tx:
-        return await _mint_session(tx, merchant_id, pubkey_hex, settings, now)
+        account = await _get_or_create_account(
+            tx, merchant_id, pubkey=pubkey_hex, settings=settings, now=now
+        )
+        return await _mint_session(tx, merchant_id, account, settings, now)
 
 
 async def session_from_cookie(
     token: str | None, *, settings=None, now: int | None = None
 ) -> dict | None:
     """Strict token lookup — every failure class returns ``None``
-    (malformed, unknown, expired, revoked are indistinguishable)."""
+    (malformed, unknown, expired, revoked, retired-account are
+    indistinguishable).
+
+    Post-m008 sessions resolve identities through the ``buyer_accounts``
+    row (authoritative — merges re-point identities); pre-m008 rows with
+    ``account_id IS NULL`` resolve on the unchanged legacy pubkey path.
+    Returns ``{id, merchant_id, account_id, buyer_pubkey, email,
+    pubkey_hash, email_hash, expires_at}`` — ``buyer_pubkey``/``email``
+    are legitimately ``None`` for identities the account does not hold
+    (an email-only session is data, not a failure)."""
     from ..settings import ext_settings
 
     if not token:
@@ -445,26 +593,55 @@ async def session_from_cookie(
             f"SELECT * FROM {table('buyer_sessions')} WHERE token_hash = :h",
             {"h": digest},
         )
+        account = None
+        if row and row["account_id"]:
+            account = await conn.fetchone(
+                f"SELECT * FROM {table('buyer_accounts')}"
+                " WHERE id = :a AND merchant_id = :m"
+                " AND retired_at IS NULL",
+                {"a": row["account_id"], "m": row["merchant_id"]},
+            )
     if not row or row["revoked_at"] is not None or row["expires_at"] <= now:
         return None
-    buyer_pubkey = None
-    if row["buyer_pubkey_enc"] is not None:
-        try:
-            ver = crypto.envelope_version(row["buyer_pubkey_enc"])
-            buyer_pubkey = crypto.decrypt(
-                row["buyer_pubkey_enc"], settings.master_keys[ver],
-                record_id=row["id"], table="buyer_sessions",
-                column="buyer_pubkey_enc", key_version=ver,
-            ).decode()
-        except crypto.CryptoError:
-            buyer_pubkey = None
-    if not buyer_pubkey:
+    if row["account_id"] is None:
+        # Legacy pre-m008 row — identical resolution to before the rebuild.
+        buyer_pubkey = None
+        if row["buyer_pubkey_enc"] is not None:
+            try:
+                ver = crypto.envelope_version(row["buyer_pubkey_enc"])
+                buyer_pubkey = crypto.decrypt(
+                    row["buyer_pubkey_enc"], settings.master_keys[ver],
+                    record_id=row["id"], table="buyer_sessions",
+                    column="buyer_pubkey_enc", key_version=ver,
+                ).decode()
+            except crypto.CryptoError:
+                buyer_pubkey = None
+        if not buyer_pubkey:
+            return None
+        return {
+            "id": row["id"],
+            "merchant_id": row["merchant_id"],
+            "account_id": None,
+            "buyer_pubkey": buyer_pubkey,
+            "email": None,
+            "pubkey_hash": row["buyer_pubkey_hash"],
+            "email_hash": None,
+            "expires_at": row["expires_at"],
+        }
+    if account is None:
+        # Session points at a missing/retired account — an anomaly (merge
+        # re-points sessions inside the merge tx), so fail closed.
         return None
     return {
         "id": row["id"],
         "merchant_id": row["merchant_id"],
-        "buyer_pubkey": buyer_pubkey,
-        "buyer_pubkey_hash": row["buyer_pubkey_hash"],
+        "account_id": account["id"],
+        "buyer_pubkey": _decrypt_account_field(
+            account, "pubkey_enc", settings
+        ),
+        "email": _decrypt_account_field(account, "email_enc", settings),
+        "pubkey_hash": account["pubkey_hash"],
+        "email_hash": account["email_hash"],
         "expires_at": row["expires_at"],
     }
 
@@ -514,49 +691,83 @@ CLAIM_INVALID = ProblemError(
 async def claim_order(
     session: dict, order: dict, *, settings=None, now: int | None = None
 ) -> dict:
-    """Bind the session's buyer pubkey to a token-resolved order (D-05).
+    """Bind the session account's offered identities to a token-resolved
+    order (D-04, D-05).
 
-    Idempotent: a repeat claim against the same pubkey is a success
-    no-op. An order already bound to a DIFFERENT pubkey rejects with the
-    identical no-oracle outcome — claim never reveals ownership state.
-    Binds and audits inside one ``DomainTransaction``; the CAS guard on
-    ``buyer_pubkey_hash IS NULL`` keeps racing claims single-writer.
+    Identity-symmetric: whichever of ``pubkey_hash``/``email_hash`` the
+    account holds must be unbound on the order or already bound to the
+    same value — a bound-column mismatch is the identical no-oracle
+    ``CLAIM_INVALID`` (a foreign-bound column is never distinguishable).
+    Idempotent: a repeat claim whose offered identities are all bound to
+    the same values is a success no-op. Per-column CAS guards keep racing
+    claims single-writer; ``buyer_email_hash`` is hash-only (the
+    plaintext already lives in ``contact_enc``) and ``buyer_pubkey_enc``
+    is written as before when the pubkey side binds. Binds and audits
+    inside one ``DomainTransaction``.
     """
     from ..settings import ext_settings
 
     settings = settings or ext_settings()
     now = _now() if now is None else now
-    buyer_hash = session["buyer_pubkey_hash"]
-    existing = order.get("buyer_pubkey_hash")
-    if existing:
-        if hmac.compare_digest(existing, buyer_hash):
-            return {
-                "claimed": True,
-                "order_id": order["id"],
-                "already_linked": True,
-            }
+    offered = {}
+    if session.get("pubkey_hash"):
+        offered["buyer_pubkey_hash"] = session["pubkey_hash"]
+    if session.get("email_hash"):
+        offered["buyer_email_hash"] = session["email_hash"]
+    if not offered:
         raise CLAIM_INVALID
-    ver = settings.active_key_version
-    key = settings.master_keys[ver]
-    enc = crypto.encrypt(
-        session["buyer_pubkey"].encode(), key, record_id=order["id"],
-        table="orders", column="buyer_pubkey_enc", key_version=ver,
-    )
+    for column, bound in offered.items():
+        existing = order.get(column)
+        if existing and not hmac.compare_digest(existing, bound):
+            raise CLAIM_INVALID
+    if all(order.get(column) for column in offered):
+        return {
+            "claimed": True,
+            "order_id": order["id"],
+            "already_linked": True,
+        }
+    sets = ["updated_at = :n"]
+    wheres = ["id = :i"]
+    params: dict = {"i": order["id"], "n": now}
+    if "buyer_pubkey_hash" in offered:
+        wheres.append(
+            "(buyer_pubkey_hash IS NULL OR buyer_pubkey_hash = :bph)"
+        )
+        params["bph"] = offered["buyer_pubkey_hash"]
+        if not order.get("buyer_pubkey_hash"):
+            sets.append("buyer_pubkey_hash = :bph")
+            if session.get("buyer_pubkey"):
+                ver = settings.active_key_version
+                sets.append("buyer_pubkey_enc = :bpe")
+                params["bpe"] = crypto.encrypt(
+                    session["buyer_pubkey"].encode(),
+                    settings.master_keys[ver], record_id=order["id"],
+                    table="orders", column="buyer_pubkey_enc",
+                    key_version=ver,
+                )
+    if "buyer_email_hash" in offered:
+        wheres.append(
+            "(buyer_email_hash IS NULL OR buyer_email_hash = :beh)"
+        )
+        params["beh"] = offered["buyer_email_hash"]
+        if not order.get("buyer_email_hash"):
+            sets.append("buyer_email_hash = :beh")
     async with DomainTransaction() as tx:
         rc = await tx.execute(
-            f"UPDATE {tx.table('orders')} SET buyer_pubkey_enc = :e,"
-            " buyer_pubkey_hash = :h, updated_at = :n"
-            " WHERE id = :i AND buyer_pubkey_hash IS NULL",
-            {"e": enc, "h": buyer_hash, "n": now, "i": order["id"]},
+            f"UPDATE {tx.table('orders')} SET {', '.join(sets)}"
+            f" WHERE {' AND '.join(wheres)}",
+            params,
         )
         if rc != 1:
             row = await tx.fetch_one(
-                f"SELECT buyer_pubkey_hash FROM {tx.table('orders')}"
+                f"SELECT {', '.join(offered)} FROM {tx.table('orders')}"
                 " WHERE id = :i",
                 {"i": order["id"]},
             )
-            if row and row["buyer_pubkey_hash"] and hmac.compare_digest(
-                row["buyer_pubkey_hash"], buyer_hash
+            if row and all(
+                row[column]
+                and hmac.compare_digest(row[column], bound)
+                for column, bound in offered.items()
             ):
                 return {
                     "claimed": True,

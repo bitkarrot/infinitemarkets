@@ -500,8 +500,10 @@ async def _order_payment_bolt11(order: dict, payment: dict | None):
 @infinitemarkets_public_api_router.get("/nostr/orders")
 @public_boundary
 async def nostr_orders(request: Request, response: Response):
-    """The signed-in buyer's own order history — ``buyer_pubkey_hash``
-    scope only, same field set + delivery gating as ``order-status``."""
+    """The signed-in buyer's own order history — the union of the session
+    account's ``pubkey_hash`` and ``email_hash`` bindings (D-03/D-09; a
+    NULL parameter collapses its side), same field set + delivery gating
+    as ``order-status``."""
     await _guard(request, response)
     session = await _buyer_session(request)
     settings = ext_settings()
@@ -513,11 +515,12 @@ async def nostr_orders(request: Request, response: Response):
         )
         rows = await conn.fetchall(
             f"SELECT * FROM {table('orders')} WHERE merchant_id = :m"
-            " AND buyer_pubkey_hash = :h ORDER BY created_at DESC"
-            " LIMIT 100",
+            " AND (buyer_pubkey_hash = :ph OR buyer_email_hash = :eh)"
+            " ORDER BY created_at DESC LIMIT 100",
             {
                 "m": session["merchant_id"],
-                "h": session["buyer_pubkey_hash"],
+                "ph": session["pubkey_hash"],
+                "eh": session["email_hash"],
             },
         )
         from .services.orders import digital_delivery
@@ -640,21 +643,28 @@ async def _fetch_kind0(merchant_id: str, pubkey_hex: str):
 @infinitemarkets_public_api_router.get("/nostr/profile")
 @public_boundary
 async def nostr_profile(request: Request, response: Response):
-    """Session identity + the buyer's relay kind-0 metadata — drives the
-    account chip (name/avatar) and prefills the profile editor."""
+    """Session account identity + the buyer's relay kind-0 metadata —
+    drives the account chip (name/avatar) and prefills the profile
+    editor. Email-only accounts return null ``pubkey``/``npub``/
+    ``profile`` plus their verified ``email`` (session-owner-only
+    disclosure — not an oracle to anyone else)."""
     await _guard(request, response)
     await nip89.check_public_rate_limit(
         request, bucket="nostr-profile", limit=60, window_s=60
     )
     session = await _buyer_session(request)
-    from nostr_sdk import PublicKey
+    buyer_pubkey = session["buyer_pubkey"]
+    npub = None
+    profile = None
+    if buyer_pubkey:
+        from nostr_sdk import PublicKey
 
-    profile = await _fetch_kind0(
-        session["merchant_id"], session["buyer_pubkey"]
-    )
+        npub = PublicKey.parse(buyer_pubkey).to_bech32()
+        profile = await _fetch_kind0(session["merchant_id"], buyer_pubkey)
     return {
-        "pubkey": session["buyer_pubkey"],
-        "npub": PublicKey.parse(session["buyer_pubkey"]).to_bech32(),
+        "pubkey": buyer_pubkey,
+        "npub": npub,
+        "email": session["email"],
         "profile": profile,
     }
 
@@ -673,6 +683,14 @@ async def nostr_profile_publish(
     )
     nostr_auth.require_origin(request)
     session = await _buyer_session(request)
+    if not session["buyer_pubkey"]:
+        # Kind-0 needs a key to verify/author — an email-only session can
+        # never satisfy the author check, so refuse honestly up front
+        # instead of failing the comparison (or crashing) later.
+        raise unprocessable(
+            "nostr-identity-required",
+            "Link a Nostr key to manage a public profile",
+        )
     from nostr_sdk import Event
 
     try:
