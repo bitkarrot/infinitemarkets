@@ -212,6 +212,8 @@ HTTP_ROUTES: tuple[str, ...] = (
     "GET /shipping/{id}",
     "GET /products/{id}/events",
     # 5.3 admin — orders
+    # GET /orders is dual use: the admin list route AND the §5.4 signed-in
+    # buyer order-history page declare the same string — one row covers both.
     "GET /orders",
     "POST /orders/bulk",
     "GET /orders/{id}",
@@ -232,6 +234,18 @@ HTTP_ROUTES: tuple[str, ...] = (
     "GET /p/{naddr}",
     "GET /p/{merchant_pubkey}/{d_tag}",
     "GET /order",
+    # 5.4 public — buyer sign-in + identity linking (03-03/03.1-02)
+    # GET /profile + /public/nostr/profile* were spec-declared in 03-03
+    # without registry rows — drift reconciled here.
+    "GET /profile",
+    "GET /public/nostr/profile",
+    "POST /public/nostr/profile",
+    "GET /auth/email",
+    "POST /public/nostr/email/request",
+    "POST /public/nostr/email/verify",
+    "POST /public/nostr/link/email",
+    "GET /public/nostr/link/challenge",
+    "POST /public/nostr/link/verify",
     # 5.5 migration
     "POST /import/nostrmarket/preview",
     "POST /import/nostrmarket/execute",
@@ -392,6 +406,9 @@ TABLE_CLASSIFICATION: dict[str, str] = {
     # Buyer-session tables (plan 03-03, D-01 — not spec §4 literals)
     "nostr_challenges": TABLE_NOT_MODELED,
     "buyer_sessions": TABLE_NOT_MODELED,
+    # Buyer-account tables (plan 03.1, §4.23)
+    "buyer_accounts": TABLE_NOT_MODELED,
+    "email_signin_tokens": TABLE_NOT_MODELED,
     "inbox_blocklist": TABLE_NOT_MODELED,
 }
 

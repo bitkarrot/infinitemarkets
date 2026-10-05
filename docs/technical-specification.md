@@ -341,6 +341,7 @@ publishing it MUST fail validation rather than silently charging zero.
 | id PK | internal UUID |
 | merchant_id FK | |
 | buyer_pubkey_enc / buyer_pubkey_hash | encrypted reversible pubkey + domain-separated keyed lookup; NULL for web |
+| buyer_email_hash | merchant-scoped HMAC of the buyer contact/verified email (same PURPOSE_BUYER_EMAIL domain as `buyer_accounts.email_hash`); NULL when absent |
 | protocol | `gamma`/`nip15`/`web` |
 | external_id_enc / external_id_hash / request_hash | encrypted reversible id + keyed lookup; canonical immutable request hash |
 | source_event_id | outer 1059 or kind-4 event id that created the order; NULL for web |
@@ -499,9 +500,10 @@ apply across workers. Raw IP addresses are never stored.
 
 ### 4.18 `email_queue`
 
-`id` PK, `merchant_id` FK, `order_id` FK NULL, `channel` (`merchant|customer`),
+`id` PK, `merchant_id` FK, `order_id` FK NULL, `channel` (`merchant|customer|account`),
 `event_type` (`order_received|confirmed|processing|shipped|delivered|cancelled|
-expired|on_hold|refund_requested`), `recipient_enc` BLOB, `recipient_hash` TEXT,
+expired|on_hold|refund_requested|signin_link`), `recipient_enc` BLOB, `recipient_hash` TEXT,
+`payload_enc` BLOB NULL,
 `state` (`pending|claimed|sent|suppressed|failed`), `attempts`, `next_attempt_at`,
 `claimed_by`, `claimed_at`, `claimed_until`, monotonically increasing `claim_token`,
 `last_error` (bounded code only), `created_at`, `sent_at`.
@@ -511,6 +513,9 @@ The body is rendered at send time from a fixed template and current order state�
 rendered message or decrypted address is retained. Queue uniqueness does not guarantee
 exactly-once SMTP delivery: a crash after SMTP acceptance but before commit may deliver
 a duplicate. Sent rows keep metadata only and are pruned with §11.3 retention.
+Orderless `account` rows (`signin_link`) carry the AEAD'd magic-link payload in
+`payload_enc`, are exempt from the customer-consent suppression, and still honor
+`email-disabled`, `host-email-unconfigured`, and `merchant-inactive`.
 
 ### 4.19 Indexes (minimum)
 
@@ -539,10 +544,14 @@ sender identity only.
 ### 4.21 `nostr_challenges`
 
 `id` PK, `merchant_id` FK, `challenge_hash` UNIQUE, `scope_hash`,
-`expires_at`, `used_at`, `created_at`. Raw challenges are 256-bit
+`expires_at`, `used_at`, `created_at`, `purpose` (`signin|link`),
+`account_id` FK NULL. Raw challenges are 256-bit
 base64url strings returned once to the client; only their SHA-256 lookup
 digest persists. `scope_hash` binds the challenge to merchant + client
-scope; the row is one-use (`used_at`) with a five-minute TTL.
+scope; the row is one-use (`used_at`) with a five-minute TTL. `purpose`
+separates sign-in from identity-link challenges: `link` rows bind the
+requesting `account_id` and never mint sessions, while `signin` rows
+never link.
 
 ### 4.22 `buyer_sessions`
 
@@ -553,6 +562,26 @@ Set-Cookie header; at rest it is SHA-256 lookup-hashed. `buyer_pubkey_enc` is
 envelope-encrypted per §6.2; `buyer_pubkey_hash` is the
 PURPOSE_BUYER_PUBKEY HMAC equality index — `ix_buyer_sessions_pubkey
 (merchant_id, buyer_pubkey_hash)` serves order-history lookups.
+Post-m008 sessions carry `account_id` as a nullable FK to `buyer_accounts`;
+legacy NULL rows resolve on the unchanged pubkey path.
+
+### 4.23 `buyer_accounts` and `email_signin_tokens`
+
+`buyer_accounts` (`id` PK, `merchant_id` FK, `email_enc` BLOB, `email_hash`,
+`pubkey_enc` BLOB, `pubkey_hash`, `retired_at`, `created_at`, `updated_at`) —
+one row per buyer account within a merchant. Each identity column is nullable
+and unique-when-present within the merchant scope (partial unique indexes);
+`retired_at` marks an account folded into a survivor by an identity merge —
+never a hard delete. `email_enc`/`pubkey_enc` carry the verified plaintext
+under account-id AAD.
+
+`email_signin_tokens` (`id` PK, `merchant_id` FK, `token_hash` UNIQUE,
+`email_hash`, `purpose` `signin|link`, `account_id` FK NULL, `expires_at`,
+`used_at`, `created_at`) — magic-link rows are hash-only at rest
+(`token_lookup_hash` posture, same as `nostr_challenges`), single-use via the
+`used_at` CAS with a ~15-minute TTL. `purpose` separates sign-in tokens from
+link tokens; `account_id` binds a link token to the requesting account and is
+re-pointed to the merge survivor.
 
 ---
 
@@ -631,6 +660,12 @@ GET   /orders                                       signed-in buyer order-histor
 GET   /profile                                      signed-in buyer kind-0 profile editor page
 GET   /public/nostr/profile                         session identity + buyer kind-0 from merchant public relays
 POST  /public/nostr/profile                         publish a session-authored, signed kind-0 to merchant public relays
+GET   /auth/email                                   email sign-in landing page; token is URL fragment only
+POST  /public/nostr/email/request                   no-oracle magic-link request; uniform body for every outcome
+POST  /public/nostr/email/verify                    fragment-token verify; mints session cookie or links identity
+POST  /public/nostr/link/email                      session-bound link request for an email identity
+GET   /public/nostr/link/challenge                  session-bound link challenge (purpose=link, never mints a session)
+POST  /public/nostr/link/verify                     signed link event; attaches or union-merges the proven identity
 ```
 
 The `naddr` handler decodes bech32, requires kind `30402`, a local merchant pubkey, and

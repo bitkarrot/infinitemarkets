@@ -527,6 +527,75 @@ async def nostr_email_verify(
     }
 
 
+# --- identity linking (D-10/D-11) ---------------------------------------------
+#
+# Prove-and-attach flows for a signed-in account. Email direction: mail a
+# ``purpose='link'`` token bound to the session account — the click proves
+# inbox ownership without needing a session. Nostr direction: a
+# ``purpose='link'`` challenge + signed kind-22242 round-trip. A verified
+# identity already owned elsewhere merges by union; unrepresentable
+# unions reject with an honest 409 (the prover owns the identity — never
+# an oracle).
+
+
+@infinitemarkets_public_api_router.post("/nostr/link/email")
+@public_boundary
+async def nostr_link_email(
+    request: Request, response: Response, body: LinkEmailBody
+):
+    """Send a link-verification token to ``email`` for the session
+    account. Same uniform body as the sign-in request; an account that
+    already holds a verified email gets an early honest 409."""
+    await _guard(request, response)
+    await nip89.check_public_rate_limit(
+        request, bucket="nostr-link", limit=10, window_s=60
+    )
+    nostr_auth.require_origin(request)
+    session = await _buyer_session(request)
+    await nostr_auth.request_email_link(session, body.email)
+    return {"sent": True, "detail": "check your email for a sign-in link"}
+
+
+@infinitemarkets_public_api_router.get("/nostr/link/challenge")
+@public_boundary
+async def nostr_link_challenge(request: Request, response: Response):
+    """Issue a ``purpose='link'`` challenge bound to the session account
+    (D-10) — it can prove a pubkey but never mint a session."""
+    await _guard(request, response)
+    await nip89.check_public_rate_limit(
+        request, bucket="nostr-link", limit=10, window_s=60
+    )
+    session = await _buyer_session(request)
+    return await nostr_auth.issue_link_challenge(
+        session["merchant_id"], session, _client_scope(request)
+    )
+
+
+@infinitemarkets_public_api_router.post("/nostr/link/verify")
+@public_boundary
+async def nostr_link_verify(
+    request: Request, response: Response, body: LinkVerifyBody
+):
+    """Verify the signed link event → attach/merge the proven pubkey
+    onto the session account (D-10/D-11)."""
+    await _guard(request, response)
+    await nip89.check_public_rate_limit(
+        request, bucket="nostr-link", limit=10, window_s=60
+    )
+    nostr_auth.require_origin(request)
+    session = await _buyer_session(request)
+    result = await nostr_auth.verify_link_event(
+        session["merchant_id"], body.event, _client_scope(request),
+        session=session,
+    )
+    return {
+        "linked": result["linked"],
+        "merged": result["merged"],
+        "bound_orders": result["bound_orders"],
+        "redirect": "/infinitemarkets/profile",
+    }
+
+
 @infinitemarkets_public_api_router.post("/nostr/logout")
 @public_boundary
 async def nostr_logout(request: Request, response: Response):

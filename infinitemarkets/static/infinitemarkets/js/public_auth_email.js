@@ -1,8 +1,8 @@
 /* public_auth_email.js — §5.4 email magic-link landing.
 
-   The sign-in token travels ONLY in the URL fragment. This module NEVER
-   reads location.hash: public_storefront.js (deferred before {% block
-   scripts %}) already captured the fragment into GM.orderToken() and
+   The sign-in token travels ONLY in the URL fragment. This module never
+   touches the fragment itself: public_storefront.js (deferred before
+   {% block scripts %}) already captured it into GM.orderToken() and
    stripped it via history.replaceState. The token is POSTed to
    /nostr/email/verify in the JSON body — never a GET-with-token route,
    never a query param.
@@ -11,7 +11,7 @@
    script tag is nostr_signin-gated (absent when a stale link lands on a
    shop with sign-in chrome off), so local api()/shopQuery() mirrors are
    defined here verbatim from that module. All DOM builds go through
-   GM.h — no innerHTML. */
+   GM.h only. */
 (function () {
   "use strict";
 

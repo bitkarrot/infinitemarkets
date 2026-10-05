@@ -195,10 +195,11 @@ SIGNIN_INVALID = ProblemError(
     401, "unauthorized", "Sign-in failed",
     "the sign-in could not be verified",
 )
-#: Identical failure for session-cookie lookups (no oracle).
+#: Identical failure for session-cookie lookups (no oracle) — method-
+#: neutral: email sessions hit this constant too.
 SESSION_INVALID = ProblemError(
     401, "unauthorized", "Sign-in required",
-    "a valid Nostr sign-in is required",
+    "a valid sign-in is required",
 )
 
 
@@ -327,6 +328,7 @@ async def verify_signin(
             row = await tx.fetch_one(
                 f"SELECT * FROM {tx.table('nostr_challenges')} "
                 "WHERE challenge_hash = :h AND merchant_id = :m"
+                " AND purpose = 'signin'"
                 " AND used_at IS NULL AND expires_at > :n",
                 {
                     "h": _challenge_digest(candidate),
@@ -873,6 +875,15 @@ async def _merge_accounts(
             )
         else:
             sets.append(f"{ecol} = NULL")
+    # The loser retires FIRST — releasing its partial-unique slots before
+    # the survivor write lands the moved hashes (ordering inside the tx
+    # is still atomic: a MERGE_CONFLICT rollback restores everything).
+    await tx.execute(
+        f"UPDATE {tx.table('buyer_accounts')} SET email_enc = NULL,"
+        " email_hash = NULL, pubkey_enc = NULL, pubkey_hash = NULL,"
+        " retired_at = :n, updated_at = :n WHERE id = :l",
+        params,
+    )
     rc = await tx.execute(
         f"UPDATE {tx.table('buyer_accounts')} SET {', '.join(sets)}"
         f" WHERE {' AND '.join(wheres)}",
@@ -893,14 +904,6 @@ async def _merge_accounts(
     await tx.execute(
         f"UPDATE {tx.table('nostr_challenges')} SET account_id = :t"
         " WHERE account_id = :l",
-        params,
-    )
-    # The loser retires identity-free — its unique indexes release for
-    # any future account holding the moved hashes.
-    await tx.execute(
-        f"UPDATE {tx.table('buyer_accounts')} SET email_enc = NULL,"
-        " email_hash = NULL, pubkey_enc = NULL, pubkey_hash = NULL,"
-        " retired_at = :n, updated_at = :n WHERE id = :l",
         params,
     )
     merged = dict(target)
@@ -1014,6 +1017,211 @@ async def resolve_verified_pubkey(
         plaintext=pubkey, target_account_id=target_account_id,
         settings=settings, now=now,
     )
+
+
+async def _materialize_account(
+    tx, merchant_id: str, session: dict, *, settings, now: int
+) -> dict:
+    """Resolve the session's ``buyer_accounts`` row INSIDE the link tx.
+
+    Legacy pre-m008 sessions (``account_id IS NULL``) lazily materialize
+    the account here — ``_get_or_create_account`` on the session pubkey
+    plus a stamping UPDATE on the session row — so every downstream
+    read sees a consistent account. A session with no resolvable
+    identity is the honest refusal (``SESSION_INVALID``)."""
+    from ..settings import ext_settings
+
+    settings = settings or ext_settings()
+    now = _now() if now is None else now
+    if session.get("account_id"):
+        row = await tx.fetch_one(
+            f"SELECT * FROM {tx.table('buyer_accounts')} "
+            "WHERE id = :a AND merchant_id = :m AND retired_at IS NULL",
+            {"a": session["account_id"], "m": merchant_id},
+        )
+        if row is None:
+            raise SESSION_INVALID
+        return row
+    pubkey = session.get("buyer_pubkey")
+    if not pubkey:
+        raise SESSION_INVALID
+    account = await _get_or_create_account(
+        tx, merchant_id, pubkey=pubkey, settings=settings, now=now
+    )
+    await tx.execute(
+        f"UPDATE {tx.table('buyer_sessions')} SET account_id = :a"
+        " WHERE id = :s AND account_id IS NULL",
+        {"a": account["id"], "s": session["id"]},
+    )
+    return account
+
+
+async def issue_link_challenge(
+    merchant_id: str, session: dict, client_ip: str, *,
+    settings=None, now: int | None = None,
+) -> dict:
+    """A ``purpose='link'`` challenge bound to the session account (D-10)
+    — it can never mint a session and a sign-in challenge can never
+    link."""
+    import uuid
+
+    from ..settings import ext_settings
+
+    settings = settings or ext_settings()
+    now = _now() if now is None else now
+    challenge = crypto.generate_public_token()
+    scope = _scope_hash(settings, merchant_id, client_ip)
+    async with DomainTransaction() as tx:
+        account = await _materialize_account(
+            tx, merchant_id, session, settings=settings, now=now
+        )
+        for _ in range(3):
+            rc = await tx.execute(
+                f"INSERT INTO {tx.table('nostr_challenges')} "
+                "(id, merchant_id, challenge_hash, scope_hash,"
+                " expires_at, created_at, purpose, account_id) "
+                "VALUES (:i, :m, :h, :s, :e, :n, 'link', :a)"
+                " ON CONFLICT (challenge_hash) DO NOTHING",
+                {
+                    "i": uuid.uuid4().hex,
+                    "m": merchant_id,
+                    "h": _challenge_digest(challenge),
+                    "s": scope,
+                    "e": now + CHALLENGE_TTL_S,
+                    "n": now,
+                    "a": account["id"],
+                },
+            )
+            if rc == 1:
+                break
+            challenge = crypto.generate_public_token()
+    return {
+        "challenge": challenge,
+        "ttl": CHALLENGE_TTL_S,
+        "expires_at": now + CHALLENGE_TTL_S,
+    }
+
+
+async def request_email_link(
+    session: dict, email: str, *, settings=None, now: int | None = None
+) -> dict | None:
+    """D-10 — mail a ``purpose='link'`` token bound to the session
+    account (prove, don't sign-in). Same uniform body upstream; the
+    early 409 when the account already holds an email saves the
+    round-trip honestly. The identity's owner account is resolved
+    here too — ``email_enc`` survives the queue-side send wipe."""
+    from ..settings import ext_settings
+    from .email import enqueue_magic_link
+
+    settings = settings or ext_settings()
+    now = _now() if now is None else now
+    if _email_malformed(email):
+        return None
+    merchant_id = session["merchant_id"]
+    email_hash = _email_identity_hash(settings, merchant_id, email)
+    async with DomainTransaction() as tx:
+        account = await _materialize_account(
+            tx, merchant_id, session, settings=settings, now=now
+        )
+        if account["email_hash"] is not None:
+            raise ALREADY_LINKED
+        # Resolve/create the identity's account while the plaintext is
+        # in hand — verify time only sees the hash.
+        await _get_or_create_account(
+            tx, merchant_id, email=email, settings=settings, now=now
+        )
+        if not await _email_request_bucket_ok(tx, email_hash, now):
+            return None
+        token_id, token = await _insert_email_token(
+            tx, merchant_id, email_hash=email_hash, purpose="link",
+            account_id=account["id"], now=now,
+        )
+        await enqueue_magic_link(
+            tx, merchant_id=merchant_id, recipient=email, token=token,
+            now=now,
+        )
+    return {"id": token_id, "token": token}
+
+
+def _parse_signin_event(signed_event_json: str, now: int):
+    """The parse/verify/kind/freshness chain shared by sign-in and link
+    verify — every failure class is the identical ``SIGNIN_INVALID``."""
+    from nostr_sdk import Event
+
+    if (
+        not isinstance(signed_event_json, str)
+        or len(signed_event_json.encode()) > SIGNIN_EVENT_MAX_BYTES
+    ):
+        raise SIGNIN_INVALID
+    try:
+        event = Event.from_json(signed_event_json)
+    except Exception:
+        raise SIGNIN_INVALID from None
+    try:
+        if not event.verify():
+            raise SIGNIN_INVALID
+    except ProblemError:
+        raise
+    except Exception:
+        raise SIGNIN_INVALID from None
+    if event.kind().as_u16() != SIGNIN_EVENT_KIND:
+        raise SIGNIN_INVALID
+    if abs(now - event.created_at().as_secs()) > SIGNIN_EVENT_MAX_AGE_S:
+        raise SIGNIN_INVALID
+    return event
+
+
+async def verify_link_event(
+    merchant_id: str, signed_event_json: str, client_ip: str, *,
+    session: dict, settings=None, now: int | None = None,
+) -> dict:
+    """Consume a ``purpose='link'`` challenge bound to the session
+    account and attach/merge the proven pubkey (D-10/D-11). Never mints
+    a session — every failure class is the identical ``SIGNIN_INVALID``."""
+    from ..settings import ext_settings
+
+    settings = settings or ext_settings()
+    now = _now() if now is None else now
+    event = _parse_signin_event(signed_event_json, now)
+    scope = _scope_hash(settings, merchant_id, client_ip)
+    pubkey_hex = event.author().to_hex()
+    async with DomainTransaction() as tx:
+        account = await _materialize_account(
+            tx, merchant_id, session, settings=settings, now=now
+        )
+        matched = None
+        for candidate in _candidate_challenges(event):
+            if not isinstance(candidate, str) or len(candidate) != 43:
+                continue
+            row = await tx.fetch_one(
+                f"SELECT * FROM {tx.table('nostr_challenges')} "
+                "WHERE challenge_hash = :h AND merchant_id = :m"
+                " AND purpose = 'link' AND account_id = :a"
+                " AND used_at IS NULL AND expires_at > :n",
+                {
+                    "h": _challenge_digest(candidate),
+                    "m": merchant_id,
+                    "a": account["id"],
+                    "n": now,
+                },
+            )
+            if row is not None and hmac.compare_digest(
+                row["scope_hash"], scope
+            ):
+                matched = row
+                break
+        if matched is None:
+            raise SIGNIN_INVALID
+        rc = await tx.execute(
+            f"UPDATE {tx.table('nostr_challenges')} SET used_at = :n"
+            " WHERE id = :i AND used_at IS NULL AND expires_at > :n",
+            {"n": now, "i": matched["id"]},
+        )
+        if rc != 1:
+            raise SIGNIN_INVALID
+        return await resolve_verified_pubkey(
+            tx, merchant_id, pubkey_hex, account["id"], settings, now
+        )
 
 
 async def session_from_cookie(
