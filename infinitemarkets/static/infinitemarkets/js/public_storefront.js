@@ -19,7 +19,12 @@
         else if (k.slice(0, 5) === "data-" || k === "role" ||
                  k === "aria-live" || k === "aria-label" || k === "type" ||
                  k === "href" || k === "readonly" || k === "id" ||
-                 k === "colspan" || k === "for") {
+                 k === "colspan" || k === "for" || k === "src" ||
+                 k === "alt" || k === "referrerpolicy" || k === "loading" ||
+                 k === "value" || k === "maxlength" || k === "placeholder" ||
+                 k === "autocomplete" || k === "rows" || k === "novalidate" ||
+                 k === "aria-expanded" || k === "aria-haspopup" ||
+                 k === "aria-current") {
           el.setAttribute(k, attrs[k]);
         }
       });

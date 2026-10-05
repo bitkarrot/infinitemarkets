@@ -40,14 +40,14 @@
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 7l9-4 9 4v10l-9 4-9-4V7zm9 2.2L5 6.3v9.4l7 3.1V9.2zm2 9.6l5-2.2V6.3l-5 2.2v10.3z" fill="currentColor"/></svg>
           Track order
         </a>
-        {% if nostr_signin %}
-        <div class="nostr-account" id="gm-nostr-account">
-          <button type="button" class="nav-signin" id="gm-nostr-signin" data-gm="signin"
-                  aria-haspopup="menu" aria-expanded="false">Sign in with Nostr</button>
-          <div class="nostr-menu" id="gm-nostr-menu" role="menu" hidden></div>
-        </div>
-        {% endif %}
       </nav>
+      {% if nostr_signin %}
+      <div class="nostr-account" id="gm-nostr-account">
+        <button type="button" class="nav-signin" id="gm-nostr-signin" data-gm="signin"
+                aria-haspopup="menu" aria-expanded="false">Sign in with Nostr</button>
+        <div class="nostr-menu" id="gm-nostr-menu" role="menu" hidden></div>
+      </div>
+      {% endif %}
     </div>
   </header>
   <main class="gm-main" id="gm-main">

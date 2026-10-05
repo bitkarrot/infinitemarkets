@@ -104,6 +104,7 @@
   align-items: center;
   gap: 4px;
   min-width: 0;
+  margin-left: auto;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -140,6 +141,7 @@
   }
   .gm-public .store-nav { margin: 0 calc(-1 * var(--space-md)); padding: 0 var(--space-md) 4px; }
   .gm-public .store-nav .nav-track { margin-left: auto; }
+  .gm-public .nostr-account { align-self: flex-end; }
 }
 
 /* Store footer — the same trust promise and routes on every page. */
