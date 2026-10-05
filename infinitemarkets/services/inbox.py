@@ -55,6 +55,13 @@ KIND_GIFT_WRAP = 1059
 REOPEN_BACKOFF_BASE_S = 30
 REOPEN_BACKOFF_MAX_S = 15 * 60
 
+#: A relay that keeps answering our NIP-42 AUTH with CLOSED
+#: 'auth-required' is not retrying its way to health — after
+#: AUTH_REJECT_MAX closes the (merchant, relay) session is disabled for
+#: the process lifetime and the config row is flagged 'auth-failed' for
+#: the admin surface (retry via retry_relay_auth re-enables it).
+AUTH_REJECT_MAX = 10
+
 # §15 admission bounds
 RUMOR_CONTENT_MAX_BYTES = 8 * 1024
 RUMOR_TAGS_MAX = 128
@@ -701,6 +708,10 @@ class InboxRuntime:
         # Per-key reopen backoff — see REOPEN_BACKOFF_* above.
         self._failures: dict[tuple[str, str], int] = {}
         self._retry_at: dict[tuple[str, str], int] = {}
+        # Per-key AUTH rejection count; a key lands in _disabled at
+        # AUTH_REJECT_MAX — see _handle_closed.
+        self._auth_rejects: dict[tuple[str, str], int] = {}
+        self._disabled: set[tuple[str, str]] = set()
 
     async def ensure_started(self) -> None:
         from .transport import transport
@@ -749,6 +760,8 @@ class InboxRuntime:
         for (mid, url), pubkey in desired.items():
             key = (mid, url)
             if key in self._sessions:
+                continue
+            if key in self._disabled:
                 continue
             if now < self._retry_at.get(key, 0):
                 continue
@@ -926,10 +939,13 @@ class InboxRuntime:
                 },
             )
         session.eose_seen = True
-        # EOSE is the first evidence a session works — clear its backoff.
+        # EOSE is the first evidence a session works — clear its backoff
+        # and any accrued AUTH rejections.
         key = (session.merchant_id, session.relay_url)
         self._failures.pop(key, None)
         self._retry_at.pop(key, None)
+        self._auth_rejects.pop(key, None)
+        self._disabled.discard(key)
         # A REQ served after an AUTH answer is the strongest authentication
         # evidence the relay provides — fold it into the D-26 surface.
         async with DomainTransaction() as tx:
@@ -1019,14 +1035,36 @@ class InboxRuntime:
         session = self._by_sub.get(subscription_id)
         state = nostr_auth.classify_closed(message)
         if session is not None:
-            if state:
+            key = (session.merchant_id, session.relay_url)
+            if state == "auth-required":
+                rejects = self._auth_rejects.get(key, 0) + 1
+                self._auth_rejects[key] = rejects
+                if rejects >= AUTH_REJECT_MAX:
+                    # Relay won't take our AUTH — stop dialing it and flag
+                    # the row 'auth-failed' so the admin surface shows a
+                    # retryable terminal state instead of an endless flap.
+                    self._disabled.add(key)
+                    await nostr_auth.update_relay_auth_state(
+                        session.merchant_id, session.relay_url,
+                        "auth-failed",
+                        note=f"auth rejected {rejects} times; disabled",
+                    )
+                    logger.warning(
+                        "event=infinitemarkets.inbox.auth_disabled"
+                        " merchant={} relay={} rejects={}",
+                        session.merchant_id, relay_url, rejects,
+                    )
+                else:
+                    await nostr_auth.update_relay_auth_state(
+                        session.merchant_id, session.relay_url, state
+                    )
+            elif state:
                 await nostr_auth.update_relay_auth_state(
                     session.merchant_id, session.relay_url, state
                 )
             # A CLOSED subscription is dead — drop the session so the
             # reconcile cadence re-opens it (e.g. after AUTH lands), under
             # the per-key backoff so a repeat-closer doesn't churn.
-            key = (session.merchant_id, session.relay_url)
             self._note_failure(key)
             await self._close(key)
         logger.info(
@@ -1034,6 +1072,15 @@ class InboxRuntime:
             " msg={}",
             relay_url, state, (message or "")[:160],
         )
+
+    def clear_backoff(self, merchant_id: str, relay_url: str) -> None:
+        """Drop all retry state for one key — the admin 'retry auth'
+        action must take effect in-process, not only after a restart."""
+        key = (merchant_id, relay_url)
+        self._failures.pop(key, None)
+        self._retry_at.pop(key, None)
+        self._auth_rejects.pop(key, None)
+        self._disabled.discard(key)
 
     async def close(self) -> None:
         task, self._handler_task = self._handler_task, None
@@ -1044,6 +1091,8 @@ class InboxRuntime:
         self._pending_auth.clear()
         self._failures.clear()
         self._retry_at.clear()
+        self._auth_rejects.clear()
+        self._disabled.clear()
 
 
 _runtime: InboxRuntime | None = None

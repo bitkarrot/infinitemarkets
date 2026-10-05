@@ -293,6 +293,12 @@ async def retry_relay_auth(merchant_id: str, relay_url: str) -> dict:
             " WHERE merchant_id = :m AND relay_url = :r",
             {"t": _now(), "m": merchant_id, "r": relay_url},
         )
+    try:
+        from .inbox import inbox_runtime
+
+        inbox_runtime().clear_backoff(merchant_id, relay_url)
+    except Exception:  # noqa: BLE001 — runtime may not be started
+        pass
     return {"relay_url": relay_url, "auth_state": "auth-required"}
 
 

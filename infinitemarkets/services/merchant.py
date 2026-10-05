@@ -214,6 +214,21 @@ async def current_merchant(user, settings: ExtSettings | None = None) -> dict:
 
     merchant["relay_health"] = await relay_service.relay_health(row["id"])
     merchant["warnings"] = audit_capture_warnings()
+    if merchant["inbox_state"] == "active":
+        inbox_relays = [
+            r for r in merchant["relay_health"]["relays"]
+            if r["enabled"] and r["direction"] in ("inbox", "both")
+        ]
+        # Zero usable inbox relays = the buyer contact path is dead —
+        # the merchant must configure an alternative relay urgently.
+        if not inbox_relays or all(
+            r["auth_state"] == "auth-failed" for r in inbox_relays
+        ):
+            merchant["warnings"].append(
+                "infinitemarkets: inbox unreachable — every enabled inbox "
+                "relay rejected authentication; configure an alternative "
+                "relay that accepts NIP-42 auth (urgent)"
+            )
     ok, reason = topology_supported()
     if not ok:
         merchant["warnings"].append(f"infinitemarkets: {reason}")
