@@ -41,8 +41,14 @@ AUTH_STATES = frozenset(
 
 def classify_closed(message: str) -> str | None:
     """A relay CLOSED our REQ — map its reason prefix to the
-    ``relay_configs.auth_state`` vocabulary (D-26..D-28)."""
+    ``relay_configs.auth_state`` vocabulary (D-26..D-28). Some relays
+    wrap the reason in a transport-level prefix (e.g. damus/strfry's
+    ``ERROR: auth-required: ...``) — strip it before matching."""
     reason = (message or "").strip().lower()
+    for prefix in ("error:", "notice:"):
+        if reason.startswith(prefix):
+            reason = reason[len(prefix):].strip()
+            break
     if reason.startswith("auth-required"):
         return "auth-required"
     if reason.startswith("payment-required"):

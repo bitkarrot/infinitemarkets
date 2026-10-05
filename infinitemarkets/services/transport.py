@@ -149,23 +149,55 @@ class RelayTransport:
             await self._client.remove_relay(RelayUrl.parse(url))
         self._targets = validated
 
+    async def _connect_target(self, target) -> bool:
+        """Pool-add + connect one validated target; returns True when the
+        relay was newly pooled by this call (caller may release it).
+        Ad-hoc additions beyond ``MAX_RELAYS`` are refused — the pool must
+        stay bounded (§9.5)."""
+        known = await self._client.relays()
+        if target in known:
+            await self._client.connect_relay(target)
+            return False
+        if len(known) >= MAX_RELAYS:
+            return False
+        await self._client.add_relay(target)
+        await self._client.connect_relay(target)
+        return True
+
+    async def _release_adhoc(self, added: list) -> None:
+        """Drop relays a single op pooled ad-hoc. A relay carrying live
+        subscriptions (an inbox session converged onto it mid-op) is
+        left in place — its owner tears it down."""
+        for target in added:
+            try:
+                if await (await self._client.relay(target)).subscriptions():
+                    continue
+            except Exception:  # noqa: BLE001 — already gone
+                continue
+            try:
+                await self._client.remove_relay(target)
+            except Exception:  # noqa: BLE001 — best-effort teardown
+                pass
+
     async def send_to(self, urls: list[str], event):
         """Send an already-signed event to an explicit validated subset.
 
         OQ6 finding: ``send_event_to`` does not connect on demand — a
         target the client never connected lands in ``failed`` as 'relay is
         initialized but not ready'. Ensure every target is connected first.
+        Ad-hoc targets (peer relays) are released after the send — pooling
+        them permanently grew the connection set without bound.
         """
         if self._client is None:
             raise RuntimeError("transport not started")
         if not relay_io_enabled():
             raise RuntimeError("relay io disabled")
         targets = [RelayUrl.parse(validate_relay_target(u)) for u in urls]
-        for target in targets:
-            if target not in await self._client.relays():
-                await self._client.add_relay(target)
-            await self._client.connect_relay(target)
-        return await self._client.send_event_to(targets, event)
+        added = [t for t in targets if await self._connect_target(t)]
+        try:
+            return await self._client.send_event_to(targets, event)
+        finally:
+            await self._release_adhoc(added)
 
     async def connected_urls(self) -> list[str]:
         if self._client is None:
@@ -183,14 +215,14 @@ class RelayTransport:
         if self._client is None or not relay_io_enabled():
             return []
         targets = [RelayUrl.parse(validate_relay_target(u)) for u in urls]
-        for target in targets:
-            if target not in await self._client.relays():
-                await self._client.add_relay(target)
-            await self._client.connect_relay(target)
-        events = await self._client.fetch_events_from(
-            targets, nostr_filter, datetime.timedelta(seconds=timeout_s)
-        )
-        return events.to_vec()
+        added = [t for t in targets if await self._connect_target(t)]
+        try:
+            events = await self._client.fetch_events_from(
+                targets, nostr_filter, datetime.timedelta(seconds=timeout_s)
+            )
+            return events.to_vec()
+        finally:
+            await self._release_adhoc(added)
 
     async def subscribe_to(self, urls: list[str], nostr_filter):
         """Long-lived subscription on explicit validated targets (§9.2
@@ -202,9 +234,7 @@ class RelayTransport:
             raise RuntimeError("relay io disabled")
         targets = [RelayUrl.parse(validate_relay_target(u)) for u in urls]
         for target in targets:
-            if target not in await self._client.relays():
-                await self._client.add_relay(target)
-            await self._client.connect_relay(target)
+            await self._connect_target(target)
         return await self._client.subscribe_to(targets, nostr_filter)
 
     async def handle_notifications(self, handler) -> None:

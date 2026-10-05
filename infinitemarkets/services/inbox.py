@@ -47,6 +47,14 @@ FIRST_SESSION_BACKTRACK_S = 30 * 86400
 RESYNC_OVERLAP_S = 3 * 86400
 KIND_GIFT_WRAP = 1059
 
+#: Session reopen backoff: a relay that keeps CLOSED-ing the REQ (or an
+#: _open that throws) used to be retried on the next 5s reconcile tick —
+#: an unbounded connect/subscribe/teardown churn that leaked sockets
+#: upstream. Exponential per-key backoff, reset only on EOSE (the first
+#: evidence a session actually works).
+REOPEN_BACKOFF_BASE_S = 30
+REOPEN_BACKOFF_MAX_S = 15 * 60
+
 # §15 admission bounds
 RUMOR_CONTENT_MAX_BYTES = 8 * 1024
 RUMOR_TAGS_MAX = 128
@@ -690,6 +698,9 @@ class InboxRuntime:
         # AUTH challenges can arrive between connect_relay() and session
         # registration — stash per relay and answer once a session exists.
         self._pending_auth: dict[str, str] = {}
+        # Per-key reopen backoff — see REOPEN_BACKOFF_* above.
+        self._failures: dict[tuple[str, str], int] = {}
+        self._retry_at: dict[tuple[str, str], int] = {}
 
     async def ensure_started(self) -> None:
         from .transport import transport
@@ -734,9 +745,12 @@ class InboxRuntime:
         for key in list(self._sessions):
             if key not in desired:
                 await self._close(key)
+        now = _now()
         for (mid, url), pubkey in desired.items():
             key = (mid, url)
             if key in self._sessions:
+                continue
+            if now < self._retry_at.get(key, 0):
                 continue
             try:
                 await validate_peer_relay_target(url)
@@ -749,7 +763,8 @@ class InboxRuntime:
                 continue
             try:
                 await self._open(mid, pubkey, url)
-            except Exception as exc:  # noqa: BLE001 — next tick retries
+            except Exception as exc:  # noqa: BLE001 — backoff, then retry
+                self._note_failure(key)
                 logger.warning(
                     "event=infinitemarkets.inbox.session_open_failed"
                     " merchant={} relay={} err={}",
@@ -787,24 +802,40 @@ class InboxRuntime:
         self._sessions[(merchant_id, relay_url)] = session
         target = RelayUrl.parse(relay_url)
         client = tport.client
-        if target not in await client.relays():
-            await client.add_relay(target)
-        await client.connect_relay(target)
-        # Settle briefly: a connect-time AUTH challenge dispatches to
-        # _handle_auth on the pump task — give it a slice so the answer
-        # lands on the wire BEFORE the REQ (relays demanding NIP-42 close
-        # an unauthenticated REQ on sight). Stashed challenges answer now.
-        await asyncio.sleep(0.05)
-        pending = self._pending_auth.pop(relay_url, None)
-        if pending is not None:
-            await self._handle_auth(relay_url, pending)
-        session.filter = sub_filter(merchant_pubkey, since)
-        out = await client.subscribe_to(
-            [target], session.filter
-        )
-        session.subscription_id = str(out.id)
-        self._by_sub[str(out.id)] = session
-        await self._maybe_resubscribe(session)
+        try:
+            if target not in await client.relays():
+                await client.add_relay(target)
+            await client.connect_relay(target)
+            # Settle briefly: a connect-time AUTH challenge dispatches to
+            # _handle_auth on the pump task — give it a slice so the answer
+            # lands on the wire BEFORE the REQ (relays demanding NIP-42 close
+            # an unauthenticated REQ on sight). Stashed challenges answer now.
+            await asyncio.sleep(0.05)
+            pending = self._pending_auth.pop(relay_url, None)
+            if pending is not None:
+                await self._handle_auth(relay_url, pending)
+            session.filter = sub_filter(merchant_pubkey, since)
+            out = await client.subscribe_to(
+                [target], session.filter
+            )
+            session.subscription_id = str(out.id)
+            self._by_sub[str(out.id)] = session
+            await self._maybe_resubscribe(session)
+        except Exception:
+            # A half-open session must not stay registered: reconcile skips
+            # keys in _sessions, so it would never retry and never close —
+            # the merchant's inbox would be dead until restart.
+            key = (merchant_id, relay_url)
+            self._sessions.pop(key, None)
+            if session.subscription_id:
+                self._by_sub.pop(session.subscription_id, None)
+            if not any(s.relay_url == relay_url
+                       for s in self._sessions.values()):
+                try:
+                    await tport.remove_relay(relay_url)
+                except Exception:  # noqa: BLE001 — best-effort teardown
+                    pass
+            raise
         logger.info(
             "event=infinitemarkets.inbox.session_open merchant={}"
             " relay={} since={}",
@@ -895,6 +926,10 @@ class InboxRuntime:
                 },
             )
         session.eose_seen = True
+        # EOSE is the first evidence a session works — clear its backoff.
+        key = (session.merchant_id, session.relay_url)
+        self._failures.pop(key, None)
+        self._retry_at.pop(key, None)
         # A REQ served after an AUTH answer is the strongest authentication
         # evidence the relay provides — fold it into the D-26 surface.
         async with DomainTransaction() as tx:
@@ -968,6 +1003,15 @@ class InboxRuntime:
         self._by_sub.pop(old_id, None)
         self._by_sub[session.subscription_id] = session
 
+    def _note_failure(self, key: tuple[str, str]) -> None:
+        """Exponential reopen backoff — unclassified CLOSEDs and open
+        failures used to retry every 5s forever."""
+        n = self._failures.get(key, 0) + 1
+        self._failures[key] = n
+        self._retry_at[key] = _now() + min(
+            REOPEN_BACKOFF_BASE_S * (2 ** (n - 1)), REOPEN_BACKOFF_MAX_S
+        )
+
     async def _handle_closed(self, relay_url: str, subscription_id: str,
                              message: str) -> None:
         from . import nostr_auth
@@ -980,11 +1024,15 @@ class InboxRuntime:
                     session.merchant_id, session.relay_url, state
                 )
             # A CLOSED subscription is dead — drop the session so the
-            # reconcile cadence re-opens it (e.g. after AUTH lands).
-            await self._close((session.merchant_id, session.relay_url))
+            # reconcile cadence re-opens it (e.g. after AUTH lands), under
+            # the per-key backoff so a repeat-closer doesn't churn.
+            key = (session.merchant_id, session.relay_url)
+            self._note_failure(key)
+            await self._close(key)
         logger.info(
-            "event=infinitemarkets.inbox.req_closed relay={} state={}",
-            relay_url, state,
+            "event=infinitemarkets.inbox.req_closed relay={} state={}"
+            " msg={}",
+            relay_url, state, (message or "")[:160],
         )
 
     async def close(self) -> None:
@@ -994,6 +1042,8 @@ class InboxRuntime:
         self._sessions.clear()
         self._by_sub.clear()
         self._pending_auth.clear()
+        self._failures.clear()
+        self._retry_at.clear()
 
 
 _runtime: InboxRuntime | None = None
