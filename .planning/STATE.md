@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 3
-current_phase_name: Release B — Gamma NIP-17 Orders
-status: verifying
-stopped_at: Phase 3 execution complete — all 4 plans landed; phase verification pending (manual live plebeian.market smoke outstanding)
-last_updated: "2026-10-05T07:37:36.733Z"
-last_activity: 2026-09-27
-last_activity_desc: Phase 2 complete, transitioned to Phase 3
+current_phase: 03.1
+current_phase_name: Buyer accounts — email magic-link sign-in and Nostr identity linking
+status: executing
+stopped_at: 03.1-02 complete — email magic-link vertical + identity linking landed; 03.1-03 frontend pending
+last_updated: "2026-10-07T00:00:00.000Z"
+last_activity: 2026-10-07
+last_activity_desc: 03.1-02 executed — magic-link transport, sign-in vertical, link/merge, spec+registry reconciliation
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 14
-  completed_plans: 12
+  total_plans: 17
+  completed_plans: 14
   percent: 60
 ---
 
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-09-20)
 
 ## Current Position
 
-Phase: 3 (Release B — Gamma NIP-17 Orders) — READY TO EXECUTE
-Plan: 03-04 complete (all 4 plans landed)
-Status: Execution complete — awaiting phase verification gate
-Last activity: 2026-09-27 — Phase 2 complete, transitioned to Phase 3
+Phase: 03.1 (Buyer accounts — email magic-link sign-in and Nostr identity linking) — EXECUTING
+Plan: 03.1-02 complete (03.1-01 foundation + 03.1-02 magic-link/link/merge landed)
+Status: Executing — 03.1-03 (frontend) is the remaining wave
+Last activity: 2026-10-07 — 03.1-02 executed (transport, sign-in vertical, linking + union merge, spec/registry)
 
 Progress: [█████░░░░░] 50% of roadmap phases; Phases 1 and 2 are formally complete
 
@@ -118,6 +118,6 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 ## Session Continuity
 
-Last session: 2026-10-05T07:37:36.726Z
-Stopped at: Phase 3 paused by operator — live smoke gate item and Phase 4 on hold; working on other task
-Resume file: .planning/phases/03-release-b-gamma-nip-17-orders/03-VERIFICATION.md
+Last session: 2026-10-07T00:00:00.000Z
+Stopped at: 03.1-02 complete — magic-link sign-in + identity linking/merge landed; next is 03.1-03 frontend
+Resume file: .planning/phases/03.1-buyer-accounts-email-magic-link-sign-in-and-nostr-identity-l/03.1-03-PLAN.md
