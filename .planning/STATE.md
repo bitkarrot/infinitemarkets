@@ -1,19 +1,20 @@
 ---
-gsd_state_version: "1.0"
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
 current_phase: 3
 current_phase_name: Release B — Gamma NIP-17 Orders
 status: verifying
 stopped_at: Phase 3 execution complete — all 4 plans landed; phase verification pending (manual live plebeian.market smoke outstanding)
-last_updated: "2026-09-29T19:09:13.848923+00:00"
+last_updated: "2026-10-05T05:21:25.370Z"
 last_activity: 2026-09-27
 last_activity_desc: Phase 2 complete, transitioned to Phase 3
-state_head: 4c5429a8695e196eab97418ee8517821684972f1
 progress:
-  total_phases: 4
-  completed_phases: 2
+  total_phases: 5
+  completed_phases: 3
   total_plans: 11
   completed_plans: 11
-  percent: 50
+  percent: 60
 ---
 
 # Project State
@@ -101,6 +102,11 @@ Decisions are logged in PROJECT.md and the normative specification.
 - The new demo uses a fresh disposable database rather than migrating old demo orders and the previously hand-added images. If those records must remain visible, the old database requires a separate recovery plan.
 - Release B cannot claim production readiness without deployed egress controls and external-client evidence.
 - Release C requires a live scarce-stock payable-invoice cutover rehearsal.
+
+### Roadmap Evolution
+
+- Phase 03.1 inserted after Phase 3: Buyer accounts — email magic-link sign-in and Nostr identity linking
+- Phase 4 edited: scope amended to import-only: LEG-01/LEG-02 (NIP-15 projections + NIP-04 legacy messaging) dropped; Phase 4 renamed Release C — Migration and Cutover
 
 ## Deferred Items
 

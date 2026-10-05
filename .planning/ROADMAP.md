@@ -114,35 +114,63 @@ Plans:
 
 - [x] 03-04: nostrrelay gated-inbox env, security drills, Plebeian conformance matrix, §21 spec amendment
 
-### Phase 4: Release C — Legacy Interop and Cutover
+### Phase 03.1: Buyer accounts — email magic-link sign-in and Nostr identity linking (INSERTED)
 
-**Goal:** Existing NIP-15 merchants/clients can interoperate and migrate without turning legacy payable invoices into duplicate stock allocation.
+**Goal:** Buyers without a Nostr signer register/sign in via email magic link while Nostr buyers keep NIP-07 sign-in — both are identities on a unified per-shop account that sees order history (new + auto-bound by verified email), claims private links, and links the other identity by union merge.
 **Mode:** mvp
 **Depends on:** Phase 3
-**Requirements:** LEG-01, LEG-02, LEG-03, LEG-04, LEG-05
+**Requirements:** ACC-01, ACC-02, ACC-03, ACC-04, ACC-05
 **Success Criteria** (what must be TRUE):
 
-1. Literal NIP-15 catalog and NIP-04 message fixtures round-trip through an external client with documented lossy mappings and physical-order restrictions.
-2. Legacy orders use the canonical order/inventory/payment services and reject unsupported opaque-address physical checkout before reservation.
-3. Merchant can preview, validate, dry-run, execute, and audit import without arbitrary fetch/database access or secret leakage.
-4. Cutover freezes old intake and records/reconciles/partitions every still-payable legacy inventory liability regardless of key strategy.
-5. A scarce-stock rehearsal with an old unpaid invoice proves that old and new systems cannot allocate the same physical unit twice.
+1. `buyer_accounts` holds email/pubkey identities (nullable, unique-when-present, merchant-scoped HMAC + AEAD); sessions mint against `account_id` and pre-migration NIP-07 sessions keep working.
+2. `orders.buyer_email_hash` is written at checkout and backfilled; order history is the pubkey+email union; claims bind whichever identities the account offers.
+3. Magic-link sign-in is no-oracle end to end — single-use hash-only fragment-delivered tokens, dual rate limits, email_queue transport with honest unconfigured degradation, identical cookie contract.
+4. Both identity-link directions work; owned-elsewhere identities union-merge atomically (sessions re-point, loser retires) or reject honestly when unrepresentable.
+5. Sign-in affordance offers both methods with honest availability; profile shows linked identities and gates kind-0 on a real key; orders page acknowledges found history once.
+
+**Plans:** 3 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 03.1-01: m008 schema (buyer_accounts, email_signin_tokens, buyer_sessions rebuild, orders.buyer_email_hash, email_queue.payload_enc) + backfill + account-scoped sessions + union history/claim/attribution
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 03.1-02: magic-link transport + no-oracle request/verify + fragment landing + identity linking/union merge + spec amendment + runtime suite
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 03.1-03: two-method modal + widened render gate + profile link cards + orders note + /_e2e/mailbox harness + buyer e2e flows
+
+### Phase 4: Release C — Migration and Cutover
+
+**Goal:** Merchants can import existing catalogs and migrate onto the canonical commerce model without turning legacy payable invoices into duplicate stock allocation — live legacy-protocol interop is out of scope.
+**Mode:** mvp
+**Depends on:** Phase 3
+**Requirements:** LEG-03, LEG-04, LEG-05
+**Success Criteria** (what must be TRUE):
+
+1. Merchant can preview, validate, dry-run, execute, and audit import without arbitrary fetch/database access or secret leakage.
+2. Cutover freezes old intake and records/reconciles/partitions every still-payable legacy inventory liability regardless of key strategy.
+3. A scarce-stock rehearsal with an old unpaid invoice proves that old and new systems cannot allocate the same physical unit twice.
 
 **Plans:** 3 plans
 
 Plans:
 
-- [ ] 04-01: Literal NIP-15 catalog/message adapters and compatibility fixtures
-- [ ] 04-02: Migration preview/import/dry-run and signed liability manifest — nostrmarket JSON/Nostr events plus e-commerce CSV upload (Shopify format first, column-mapping extensible to WooCommerce); rows map onto the product DTOs and flow through the normal create/validate/publish path
-- [ ] 04-03: Single-writer cutover rehearsal, external client verification, and Release-C gate
+- [ ] 04-01: Migration preview/import/dry-run and signed liability manifest — nostrmarket JSON/Nostr events plus e-commerce CSV upload (Shopify format first, column-mapping extensible to WooCommerce); rows map onto the product DTOs and flow through the normal create/validate/publish path
+- [ ] 04-02: Cutover freeze and still-payable `legacy_liability_qty` reconcile/wait/partition before imported stock is sellable
+- [ ] 04-03: Single-writer cutover rehearsal and Release-C gate
 
 ## Progress
 
-**Execution Order:** Phase 1 → Phase 2 → Phase 3 → Phase 4
+**Execution Order:** Phase 1 → Phase 2 → Phase 3 → Phase 03.1 → Phase 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Conformance Profile | 3/3 | Complete    | 2026-09-20 |
 | 2. Release A — Safe Web Commerce | 4/4 | Complete    | 2026-09-27 |
-| 3. Release B — Gamma NIP-17 Orders | 0/4 | Not started | - |
-| 4. Release C — Legacy Interop and Cutover | 0/3 | Not started | - |
+| 3. Release B — Gamma NIP-17 Orders | 4/4 | Executed    | - |
+| 03.1. Buyer accounts (INSERTED) | 0/3 | Not started | - |
+| 4. Release C — Migration and Cutover | 0/3 | Not started | - |

@@ -58,13 +58,21 @@
 - [ ] **GAM-04**: Durable inbox processing verifies and deduplicates outer/seal/rumor identity, preserves encrypted history, resumes completed-session cursors, and routes each copy only to that party's declared relays.
 - [ ] **GAM-05**: Release B passes deployed relay SSRF/egress, recipient-gated relay, NIP-42, overload, and independent external Gamma-client conformance gates.
 
+### Buyer Accounts
+
+- [ ] **ACC-01**: Buyer can hold a unified per-merchant account (`buyer_accounts`) keyed by a verified email and/or Nostr pubkey — each identity nullable, unique-when-present, merchant-scoped HMAC + AEAD — with sessions minted against the account and pre-existing NIP-07 sessions preserved through the schema migration.
+- [ ] **ACC-02**: Buyer's order history is the union of pubkey-hash and email-hash bindings: `orders.buyer_email_hash` is written at web and gamma checkout when an email is present, backfilled for existing orders, binds via verified session identity (never the unverified form email), and claims attach whichever identities the account offers with identical no-oracle outcomes.
+- [ ] **ACC-03**: Buyer without a Nostr signer can sign in via email magic link — no-oracle request, single-use ~15-minute hash-only token delivered URL-fragment-only through the durable email queue with honest unconfigured degradation, dual per-email/per-IP rate limits, and the identical HttpOnly/Secure/SameSite=Strict session cookie contract.
+- [ ] **ACC-04**: Signed-in buyer can link the other identity by proving it (email verify link or NIP-07 link challenge); a verified identity already owned by another account triggers an atomic union merge — identities move, sessions and tokens re-point, the loser retires — while unrepresentable unions reject honestly without partial state.
+- [ ] **ACC-05**: Buyer surfaces offer both sign-in methods with honest per-method availability on any shop configuration: two-method modal, email-aware account chip, verified-email/link cards and kind-0 gating on the profile page, and a one-time 'found past orders' note on the orders page.
+
 ### Release C — NIP-15 and Migration
 
-- [ ] **LEG-01**: Merchant can publish literal NIP-15 `30017`/`30018` projections with pair-array specs, integer-or-null quantity, stable mapped identifiers, and explicit lossy-preview warnings.
-- [ ] **LEG-02**: Legacy buyer can exchange literal top-level type 0/1/2 NIP-04 messages against the canonical order model; unsupported opaque-address physical orders are rejected before reservation.
+- [x] ~~**LEG-01**: Merchant can publish literal NIP-15 `30017`/`30018` projections~~ — **Dropped** (Phase-4 scope amendment: import-only, no live legacy interop).
+- [x] ~~**LEG-02**: Legacy buyer literal NIP-04 type 0/1/2 message exchange~~ — **Dropped** (Phase-4 scope amendment).
 - [ ] **LEG-03**: Merchant can preview, validate, dry-run, execute, and audit JSON/Nostr legacy catalog import without arbitrary path/URL/database access or private-key leakage. Import sources include nostrmarket JSON/Nostr events AND e-commerce CSV exports (Shopify first; column-mapping extensible to WooCommerce) — file upload only, never URL fetch.
 - [ ] **LEG-04**: Merchant can freeze old order intake and reconcile, wait, or partition every still-payable `legacy_liability_qty` before imported stock is sellable, independent of key strategy.
-- [ ] **LEG-05**: Release C passes literal NIP-15 client fixtures and a scarce-stock cutover rehearsal in which an old unpaid invoice and a new catalog can never allocate the same unit twice.
+- [ ] **LEG-05**: Release C passes a scarce-stock cutover rehearsal in which an old unpaid invoice and a new catalog can never allocate the same unit twice. *(NIP-15 fixture criterion removed — LEG-01/02 dropped in the Phase-4 scope amendment.)*
 
 ## v2 Requirements
 
@@ -139,18 +147,23 @@ A requirement is complete only when implementation (or Phase 0 probe/model), aut
 | GAM-03 | Phase 3 | Pending |
 | GAM-04 | Phase 3 | Pending |
 | GAM-05 | Phase 3 | Pending |
-| LEG-01 | Phase 4 | Pending |
-| LEG-02 | Phase 4 | Pending |
+| ACC-01 | Phase 03.1 | Pending |
+| ACC-02 | Phase 03.1 | Pending |
+| ACC-03 | Phase 03.1 | Pending |
+| ACC-04 | Phase 03.1 | Pending |
+| ACC-05 | Phase 03.1 | Pending |
+| LEG-01 | Phase 4 | Dropped — Phase-4 scope amendment |
+| LEG-02 | Phase 4 | Dropped — Phase-4 scope amendment |
 | LEG-03 | Phase 4 | Pending |
 | LEG-04 | Phase 4 | Pending |
 | LEG-05 | Phase 4 | Pending |
 
 **Coverage:**
 
-- v1 requirements: 40 total
-- Mapped to phases: 40
+- v1 requirements: 45 total
+- Mapped to phases: 45
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-09-20*
-*Last updated: 2026-09-27 after Phase 2 Release-A verification and completion*
+*Last updated: 2026-10-05 — ACC-01..05 minted for Phase 03.1 Buyer Accounts*
