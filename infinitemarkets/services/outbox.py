@@ -265,8 +265,14 @@ async def _accepted_targets(tx, intent_id: str,
 
 async def _cas_state(tx, row: dict, state: str, now: int,
                      next_attempt_at: int | None = None,
-                     last_error: str | None = None) -> bool:
-    """Every leased write compares the active claim_token (§4.10)."""
+                     last_error: str | None = None,
+                     bump_attempts: bool = True) -> bool:
+    """Every leased write compares the active claim_token (§4.10).
+
+    ``bump_attempts=False`` for waits that are not failures — a
+    dependency-blocked requeue must not burn the attempt budget (rows
+    that hit OUTBOX_MAX_ATTEMPTS while ``pending`` become permanently
+    unclaimable and invisible)."""
     n = await tx.execute(
         f"UPDATE {tx.table('outbox_events')} "
         "SET state = :s, attempts = :a, next_attempt_at = :na,"
@@ -275,7 +281,7 @@ async def _cas_state(tx, row: dict, state: str, now: int,
         " AND claimed_by = :w AND claimed_until > :db_now",
         {
             "s": state,
-            "a": row["attempts"] + 1,
+            "a": row["attempts"] + (1 if bump_attempts else 0),
             "na": next_attempt_at if next_attempt_at is not None else 0,
             "e": last_error,
             "now": now,
@@ -607,7 +613,10 @@ async def publish_intent(row: dict, *, transport, keystore, relay_targets,
         now = await tx.now()
         # step 2 — dependencies must be published first
         if not await _deps_published(tx, intent_id):
-            await _cas_state(tx, row, "pending", now, next_attempt_at=now)
+            await _cas_state(
+                tx, row, "pending", now, next_attempt_at=now,
+                bump_attempts=False,
+            )
             return "blocked"
 
         if await _newer_live_exists(tx, row):
@@ -845,7 +854,10 @@ async def _publish_order_msg(row: dict, *, transport, keystore,
         tx, row = claimed
         now = await tx.now()
         if not await _deps_published(tx, intent_id):
-            await _cas_state(tx, row, "pending", now, next_attempt_at=now)
+            await _cas_state(
+                tx, row, "pending", now, next_attempt_at=now,
+                bump_attempts=False,
+            )
             return "blocked"
         if descriptor is None:
             await _cas_state(tx, row, "failed", now,

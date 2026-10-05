@@ -459,6 +459,10 @@ async def test_dependency_gate_blocks_until_published(worker_env):
         await worker_env["outbox"].worker_tick("w-test")
         state = await _state(worker_env["db"], child)
         assert state["row"]["state"] == "pending"
+        # a dep-blocked wait is not a failure — the attempt budget is
+        # untouched (attempts >= OUTBOX_MAX_ATTEMPTS would make the row
+        # permanently unclaimable while still 'pending').
+        assert state["row"]["attempts"] == 0
         assert state["pubs"] == []
         assert accepting.received_events == []
 
