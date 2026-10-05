@@ -26,7 +26,7 @@ from ..db import db, table
 from ..security import unprocessable
 
 PRESETS = ("warm-market", "clean-minimal", "high-contrast")
-LAYOUTS = ("editorial", "guided", "compact")
+LAYOUTS = ("editorial", "guided", "compact", "gallery")
 FONT_STACKS = ("system", "serif", "mono")
 CORNERS = ("sharp", "rounded", "soft")
 

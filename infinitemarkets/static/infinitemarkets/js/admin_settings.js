@@ -15,7 +15,8 @@
   var LAYOUTS = [
     { value: "editorial", label: "Editorial" },
     { value: "guided", label: "Guided" },
-    { value: "compact", label: "Compact" }
+    { value: "compact", label: "Compact" },
+    { value: "gallery", label: "Gallery" }
   ];
   /* Verbatim contract copy — kept on one line each so the strings are
      greppable (UI-SPEC asserts them literally). */

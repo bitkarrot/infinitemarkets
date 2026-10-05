@@ -384,6 +384,35 @@ test('catalog editors stay in-pane and bulk tools update selected products', asy
   )).toBe(1)
 })
 
+test('gallery layout is selectable and keeps the editorial checkout flow', async ({page}) => {
+  await page.goto('/infinitemarkets/')
+  await page.locator('[data-gm-nav="settings"]').click()
+  await page.getByRole('tab', {name: 'Appearance'}).click()
+  const layouts = page.getByRole('radiogroup', {name: 'Layout preset'})
+  await expect(layouts.getByRole('radio', {name: 'Gallery'})).toBeVisible({
+    timeout: 15_000
+  })
+
+  const cookies = await page.context().cookies()
+  const csrf = cookies.find(cookie => cookie.name === 'gm_csrf')?.value || ''
+  const headers = {Origin: seed.base_url, 'X-CSRF-Token': csrf}
+  const url = `/infinitemarkets/api/v1/merchants/${seed.merchant_id}`
+  const set = (layout: string) =>
+    page.request.patch(url, {headers, data: {theme: {layout}}})
+  try {
+    expect((await set('gallery')).status()).toBe(200)
+    await page.goto(seed.digital_url)
+    await expect(page.locator('.gm-public')).toHaveAttribute('data-layout', 'gallery')
+    // gallery is a visual language only: checkout behaves as editorial
+    await expect(page.locator('#gm-checkout-card')).toHaveAttribute('data-mode', 'editorial')
+    // chrome pages carry the layout too
+    await page.goto(`/infinitemarkets/signin?shop=${seed.pubkey}`)
+    await expect(page.locator('.gm-public')).toHaveAttribute('data-layout', 'gallery')
+  } finally {
+    expect((await set('editorial')).status()).toBe(200)
+  }
+})
+
 test('publications surface shows relay health + evidence copy', async ({
   page
 }) => {

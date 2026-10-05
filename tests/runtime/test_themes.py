@@ -69,6 +69,41 @@ async def test_invalid_preset_and_layout_rejected(runtime_env):
         assert resp.status_code == 422, (theme, resp.status_code)
 
 
+async def test_gallery_layout_is_opt_in_and_reaches_every_page(runtime_env):
+    client = runtime_env["client"]
+    resp, merchant = await _patch_theme(
+        runtime_env, {"preset": "warm-market", "layout": "gallery"}
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["theme"]["layout"] == "gallery"
+    shop = merchant["pubkey"]
+
+    # chrome pages carry the merchant's layout, not just the product page
+    for path in (
+        f"/infinitemarkets/signin?shop={shop}",
+        f"/infinitemarkets/order?shop={shop}",
+    ):
+        page = await client.get(path)
+        assert page.status_code == 200, path
+        assert 'data-layout="gallery"' in page.text, path
+
+    css = await client.get(
+        "/infinitemarkets/static/infinitemarkets/css/gm-public.css"
+    )
+    # every gallery selector is scoped under .gm-public (never leaks)
+    gallery = [
+        l for l in css.text.splitlines()
+        if 'data-layout="gallery"' in l and not l.lstrip().startswith("/*")
+    ]
+    assert gallery and all(
+        '.gm-public[data-layout="gallery"]' in l for l in gallery
+    )
+
+    # restore the default so later tests see the editorial baseline
+    resp, _ = await _patch_theme(runtime_env, {"layout": "editorial"})
+    assert resp.status_code == 200
+
+
 async def test_brand_basics_bounds(runtime_env):
     # initials >3 chars rejected
     resp, _ = await _patch_theme(

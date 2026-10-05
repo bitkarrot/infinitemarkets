@@ -2,7 +2,7 @@
 
    The checkout card is embedded in the A1 product document (there is no
    standalone checkout route in §5.4). Layout presets are merchant-chosen
-   (editorial | guided | compact via data-layout); ≤560px forces compact.
+   (editorial | guided | compact | gallery via data-layout); ≤560px forces compact.
    The field set, summary, validation, payment states, and security copy
    are invariant across presets and themes. */
 (function () {
@@ -24,6 +24,9 @@
     : { matches: false };
   function effectiveLayout() {
     var preset = card.getAttribute("data-layout") || "editorial";
+    /* "gallery" is a visual language (CSS-only) on top of the editorial
+       flow — checkout behaviour is identical to editorial. */
+    if (preset === "gallery") preset = "editorial";
     return mqNarrow.matches ? "compact" : preset;
   }
 

@@ -1616,3 +1616,220 @@
   font-weight: 700;
 }
 .gm-public .nostr-account-card .btn-primary { margin-top: var(--space-sm); }
+
+/* ==========================================================================
+   Gallery layout (opt-in, layout = "gallery") — gallery-led, image-first
+   storefront language (see .devin/skills/yns-design-language). Structure,
+   proportion, weight and elevation only: every colour stays a merchant
+   theme token, and checkout behaviour is the editorial flow (public_checkout
+   maps gallery -> editorial). Scoped so no other layout is affected; the
+   <=560px compact fallback rules above keep winning on small screens.
+   ========================================================================== */
+.gm-public[data-layout="gallery"] {
+  --gallery-max: 1280px;
+  --gallery-gutter: 16px;
+}
+@media (min-width: 640px) { .gm-public[data-layout="gallery"] { --gallery-gutter: 24px; } }
+@media (min-width: 1024px) { .gm-public[data-layout="gallery"] { --gallery-gutter: 32px; } }
+
+/* Container + rhythm: wider canvas, calmer vertical spacing. */
+.gm-public[data-layout="gallery"] .store-header-inner,
+.gm-public[data-layout="gallery"] .store-footer-inner,
+.gm-public[data-layout="gallery"] .gm-main {
+  max-width: var(--gallery-max);
+  padding-left: var(--gallery-gutter);
+  padding-right: var(--gallery-gutter);
+}
+.gm-public[data-layout="gallery"] .gm-main {
+  padding-top: clamp(32px, 5vw, 64px);
+  padding-bottom: clamp(48px, 8vw, 96px);
+}
+.gm-public[data-layout="gallery"] .store-header-inner { padding-top: 14px; padding-bottom: 14px; }
+.gm-public[data-layout="gallery"] .store-footer { margin-top: 0; background: transparent; }
+.gm-public[data-layout="gallery"] .store-footer-inner {
+  padding-top: clamp(32px, 5vw, 56px);
+  padding-bottom: clamp(32px, 5vw, 56px);
+}
+
+/* Header: translucent over content, opaque where blur is unsupported. */
+@supports (backdrop-filter: blur(1px)) {
+  .gm-public[data-layout="gallery"] .store-header {
+    background: color-mix(in srgb, var(--color-bg) 82%, transparent);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+}
+.gm-public[data-layout="gallery"] .store-header { box-shadow: none; }
+
+/* Type: medium weight + tight tracking carries the hierarchy. */
+.gm-public[data-layout="gallery"] .merchant-title,
+.gm-public[data-layout="gallery"] .collection-title,
+.gm-public[data-layout="gallery"] .product-title,
+.gm-public[data-layout="gallery"] .order-title,
+.gm-public[data-layout="gallery"] .section-head h2 {
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+.gm-public[data-layout="gallery"] .merchant-title,
+.gm-public[data-layout="gallery"] .collection-title { font-size: clamp(2rem, 4.5vw, 3rem); line-height: 1.05; }
+.gm-public[data-layout="gallery"] .product-title { font-size: clamp(2rem, 4.5vw, 3rem); line-height: 1.08; }
+.gm-public[data-layout="gallery"] .section-head h2 { font-size: clamp(1.5rem, 3vw, 1.875rem); }
+.gm-public[data-layout="gallery"] .eyebrow {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.gm-public[data-layout="gallery"] .product-price {
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+}
+.gm-public[data-layout="gallery"] .product-summary { line-height: 1.65; }
+
+/* Merchant hero: a quiet tinted band, not a heavy header. */
+.gm-public[data-layout="gallery"] .merchant-hero {
+  align-items: center;
+  padding: clamp(20px, 3.5vw, 36px) clamp(20px, 4vw, 48px);
+  margin-bottom: clamp(24px, 4vw, 48px);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface-alt) 45%, transparent);
+}
+.gm-public[data-layout="gallery"] .merchant-picture { box-shadow: none; border-radius: var(--radius-full); }
+.gm-public[data-layout="gallery"] .collection-nav { margin: 0 0 clamp(24px, 4vw, 40px); }
+.gm-public[data-layout="gallery"] .collection-link { border-color: transparent; background: var(--color-surface-alt); }
+.gm-public[data-layout="gallery"] .collection-link:hover { border-color: var(--color-text); }
+
+/* Section head: title + muted count, no rule. */
+.gm-public[data-layout="gallery"] .section-head {
+  border-bottom: 0;
+  padding-bottom: 0;
+  margin: 0 0 clamp(24px, 4vw, 40px);
+}
+
+/* Product grid + card: borderless, shadowless, image-first. */
+.gm-public[data-layout="gallery"] .card-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 32px;
+}
+@media (min-width: 640px) {
+  .gm-public[data-layout="gallery"] .card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1024px) {
+  .gm-public[data-layout="gallery"] .card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.gm-public[data-layout="gallery"] .product-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+.gm-public[data-layout="gallery"] .product-card:hover { box-shadow: none; }
+.gm-public[data-layout="gallery"] .card-art {
+  aspect-ratio: 1;
+  margin-bottom: 16px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--color-surface-alt);
+  overflow: hidden;
+}
+.gm-public[data-layout="gallery"] .card-art img { transition: transform 0.5s ease, opacity 0.5s ease; }
+.gm-public[data-layout="gallery"] .product-card:hover .card-art img { transform: scale(1.03); }
+.gm-public[data-layout="gallery"] .card-body { padding: 0; }
+.gm-public[data-layout="gallery"] .card-title { font-size: 16px; font-weight: 500; margin: 0 0 2px; }
+.gm-public[data-layout="gallery"] .card-meta { font-size: 14px; margin: 0 0 4px; }
+.gm-public[data-layout="gallery"] .card-price { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Product page: sticky gallery column, square main, thumbs row below. */
+@media (min-width: 861px) {
+  .gm-public[data-layout="gallery"] .product-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: clamp(32px, 5vw, 64px);
+  }
+  .gm-public[data-layout="gallery"] .product-gallery {
+    position: sticky;
+    top: 96px;
+    align-self: start;
+  }
+}
+.gm-public[data-layout="gallery"] .gallery {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "main" "thumbs";
+  gap: 16px;
+}
+.gm-public[data-layout="gallery"] .gallery-main { grid-area: main; }
+.gm-public[data-layout="gallery"] .gallery-main img {
+  aspect-ratio: 1;
+  object-fit: cover;
+  border: 0;
+  border-radius: 16px;
+  background: var(--color-surface-alt);
+  box-shadow: none;
+}
+.gm-public[data-layout="gallery"] .gallery-placeholder {
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 16px;
+  background: var(--color-surface-alt);
+}
+.gm-public[data-layout="gallery"] .thumbs {
+  grid-area: thumbs;
+  display: flex;
+  gap: 12px;
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 6px;
+  margin: -6px;
+  order: 0;
+}
+.gm-public[data-layout="gallery"] .thumb {
+  flex: 0 0 80px;
+  width: 80px;
+  border: 0;
+  border-radius: var(--radius-md);
+  box-shadow: none;
+  opacity: 0.6;
+  transition: opacity 0.2s ease, box-shadow 0.2s ease;
+}
+.gm-public[data-layout="gallery"] .thumb:hover { opacity: 1; transform: none; }
+.gm-public[data-layout="gallery"] .thumb.active {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-text);
+}
+
+/* Trust list -> quiet 3-up strip. */
+.gm-public[data-layout="gallery"] .trust-list {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+  padding: 16px;
+  border: 0;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-surface-alt) 50%, transparent);
+  font-size: 12px;
+}
+.gm-public[data-layout="gallery"] .trust-list li {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+}
+.gm-public[data-layout="gallery"] .trust-list svg { width: 20px; height: 20px; margin-top: 0; color: var(--color-text-muted); }
+
+/* Buttons: pill CTA, no drop shadow. */
+.gm-public[data-layout="gallery"] .btn-primary {
+  border-radius: var(--radius-full);
+  box-shadow: none;
+  font-weight: 600;
+}
+.gm-public[data-layout="gallery"] .btn-secondary { border-radius: var(--radius-full); }
+
+@media (prefers-reduced-motion: reduce) {
+  .gm-public[data-layout="gallery"] .card-art img,
+  .gm-public[data-layout="gallery"] .thumb { transition: none; }
+  .gm-public[data-layout="gallery"] .product-card:hover .card-art img { transform: none; }
+}
