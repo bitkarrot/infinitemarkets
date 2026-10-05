@@ -125,9 +125,8 @@ async def _store_ctx(merchant: dict, theme: dict | None) -> dict:
     from lnbits.settings import settings as host_settings
 
     from .services import storefront_mode as mode_service
-    from .settings import ext_settings
-
     from .services import themes as theme_service
+    from .settings import ext_settings
 
     collections = await _nav_collections(merchant["id"])
     nostr = await _nostr_ctx(merchant)

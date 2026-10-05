@@ -10,6 +10,7 @@ payment hashes, or complete BOLT11 strings in any admin-side response."""
 from __future__ import annotations
 
 import asyncio
+import time
 import uuid
 
 import pytest
@@ -214,6 +215,10 @@ async def test_checkout_rate_limits(runtime_env, monkeypatch):
         "items": [{"d_tag": runtime_env["product"]["d_tag"],
                    "quantity": 1}],
     }
+    # The limiter is a fixed 60s window: four requests straddling a
+    # minute boundary would land in two buckets and never trip the cap.
+    if time.time() % 60 > 50:
+        await asyncio.sleep(61 - time.time() % 60)
     results = []
     for _ in range(4):
         resp = await anon.post(

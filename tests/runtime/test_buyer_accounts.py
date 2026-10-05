@@ -379,6 +379,26 @@ async def scratch_db(tmp_path_factory):
     await database.engine.dispose()
 
 
+async def _scratch_path(conn, database) -> None:
+    """The scratch tests issue unqualified table names: SQLite resolves
+    them across the attached schema, PostgreSQL needs the schema on the
+    connection's search_path."""
+    from lnbits.db import POSTGRES
+
+    if database.type == POSTGRES:
+        await conn.execute(f"SET search_path TO {database.schema}, public")
+
+
+async def _expect_violation(conn, sql: str) -> None:
+    """Run a statement that must fail, then clear the aborted transaction
+    — PostgreSQL refuses further statements after a constraint error,
+    SQLite does not. Earlier statements are already committed (the host
+    wrapper commits per execute), so only the failed one is discarded."""
+    with pytest.raises(Exception):
+        await conn.execute(sql)
+    await conn.conn.rollback()
+
+
 async def _run_migrations(conn, names):
     from infinitemarkets import migrations
 
@@ -480,6 +500,7 @@ async def test_m008_schema_shape(scratch_db):
     pubkey hash), orders.buyer_email_hash, email_queue.payload_enc,
     nostr_challenges.purpose/account_id."""
     async with scratch_db.connect() as conn:
+        await _scratch_path(conn, scratch_db)
         await _run_migrations(conn, _MIGRATIONS_PRE_008 + ("m008_buyer_accounts",))
         await conn.execute(
             "INSERT INTO merchants (id, user_id, pubkey, key_ref,"
@@ -492,11 +513,11 @@ async def test_m008_schema_shape(scratch_db):
             "INSERT INTO buyer_accounts (id, merchant_id, email_hash)"
             " VALUES ('a1', 'm1', 'eh1')"
         )
-        with pytest.raises(Exception):
-            await conn.execute(
-                "INSERT INTO buyer_accounts (id, merchant_id, email_hash)"
-                " VALUES ('a2', 'm1', 'eh1')"
-            )
+        await _expect_violation(
+            conn,
+            "INSERT INTO buyer_accounts (id, merchant_id, email_hash)"
+            " VALUES ('a2', 'm1', 'eh1')",
+        )
         await conn.execute(
             "INSERT INTO buyer_accounts (id, merchant_id)"
             " VALUES ('a3', 'm1')"
@@ -521,11 +542,11 @@ async def test_m008_schema_shape(scratch_db):
             "INSERT INTO buyer_accounts (id, merchant_id, pubkey_hash)"
             " VALUES ('a6', 'm2', 'ph-dup')"
         )
-        with pytest.raises(Exception):
-            await conn.execute(
-                "INSERT INTO buyer_accounts (id, merchant_id, pubkey_hash)"
-                " VALUES ('a7', 'm2', 'ph-dup')"
-            )
+        await _expect_violation(
+            conn,
+            "INSERT INTO buyer_accounts (id, merchant_id, pubkey_hash)"
+            " VALUES ('a7', 'm2', 'ph-dup')",
+        )
         await conn.execute(
             "INSERT INTO buyer_accounts (id, merchant_id, pubkey_hash)"
             " VALUES ('a8', 'm1', 'ph-dup')"
@@ -569,6 +590,7 @@ async def test_m008_rebuild_preserves_and_backfills(scratch_db):
     crypto = _crypto()
     st = _scratch_settings()
     async with scratch_db.connect() as conn:
+        await _scratch_path(conn, scratch_db)
         await _run_migrations(conn, _MIGRATIONS_PRE_008)
         await _scratch_seed(conn)
         before = await conn.fetchone(

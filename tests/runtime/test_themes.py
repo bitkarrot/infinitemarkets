@@ -92,11 +92,11 @@ async def test_gallery_layout_is_opt_in_and_reaches_every_page(runtime_env):
     )
     # every gallery selector is scoped under .gm-public (never leaks)
     gallery = [
-        l for l in css.text.splitlines()
-        if 'data-layout="gallery"' in l and not l.lstrip().startswith("/*")
+        line for line in css.text.splitlines()
+        if 'data-layout="gallery"' in line and not line.lstrip().startswith("/*")
     ]
     assert gallery and all(
-        '.gm-public[data-layout="gallery"]' in l for l in gallery
+        '.gm-public[data-layout="gallery"]' in line for line in gallery
     )
 
     # restore the default so later tests see the editorial baseline
