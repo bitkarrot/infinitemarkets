@@ -810,12 +810,21 @@
     });
     state.busy = true;
     msg.textContent = "Waiting for your signer…";
-    window.nostr
-      .signEvent({
-        kind: 0,
-        created_at: Math.floor(Date.now() / 1000),
-        content: JSON.stringify(content),
-        tags: []
+    var keyReq =
+      typeof window.nostr.getPublicKey === "function"
+        ? window.nostr.getPublicKey()
+        : Promise.resolve(null);
+    signerTimeout(keyReq)
+      .then(function (pk) {
+        return signerTimeout(
+          window.nostr.signEvent({
+            kind: 0,
+            created_at: Math.floor(Date.now() / 1000),
+            content: JSON.stringify(content),
+            tags: [],
+            pubkey: pk || undefined
+          })
+        );
       })
       .then(function (signed) {
         return api("/nostr/profile", {
@@ -840,8 +849,12 @@
         }
         msg.textContent = "Profile could not be saved. Try again.";
       })
-      .catch(function () {
-        msg.textContent = "Signing was cancelled or failed — nothing saved.";
+      .catch(function (err) {
+        msg.textContent =
+          err && err.message === "signer-timeout"
+            ? "Your signer didn't respond — check the extension's" +
+              " popup, then try again."
+            : "Signing was cancelled or failed — nothing saved.";
       })
       .finally(function () {
         state.busy = false;
@@ -875,12 +888,21 @@
           throw new Error("challenge failed");
         }
         var challenge = res.body.challenge;
-        return window.nostr
-          .signEvent({
-            kind: KIND_SIGNIN,
-            created_at: Math.floor(Date.now() / 1000),
-            content: challenge,
-            tags: [["challenge", challenge]]
+        var keyReq =
+          typeof window.nostr.getPublicKey === "function"
+            ? window.nostr.getPublicKey()
+            : Promise.resolve(null);
+        return signerTimeout(keyReq)
+          .then(function (pk) {
+            return signerTimeout(
+              window.nostr.signEvent({
+                kind: KIND_SIGNIN,
+                created_at: Math.floor(Date.now() / 1000),
+                content: challenge,
+                tags: [["challenge", challenge]],
+                pubkey: pk || undefined
+              })
+            );
           })
           .then(function (signed) {
             return api("/nostr/link/verify" + shopQuery(), {
@@ -923,10 +945,13 @@
             " may have declined or the request expired."
         );
       })
-      .catch(function () {
+      .catch(function (err) {
         setProfileMsg(
           "gm-link-nostr-msg",
-          "Signing was cancelled or failed — nothing linked."
+          err && err.message === "signer-timeout"
+            ? "Your signer didn't respond — check the extension's" +
+              " popup, then try again."
+            : "Signing was cancelled or failed — nothing linked."
         );
       })
       .finally(function () {
@@ -1020,6 +1045,19 @@
     });
   }
 
+  /* Some signers never settle on dismissal or suppress their prompt —
+     a hung call must not wedge the modal in "Waiting for signer…". */
+  function signerTimeout(promise) {
+    return Promise.race([
+      Promise.resolve(promise),
+      new Promise(function (_, reject) {
+        setTimeout(function () {
+          reject(new Error("signer-timeout"));
+        }, 90000);
+      })
+    ]);
+  }
+
   function doSignIn() {
     if (state.busy) return;
     /* Extension-absent is a friendly state, never a crash. */
@@ -1041,19 +1079,31 @@
           throw new Error("challenge failed");
         }
         var challenge = res.body.challenge;
-        return window.nostr
-          .signEvent({
-            kind: KIND_SIGNIN,
-            created_at: Math.floor(Date.now() / 1000),
-            content: challenge,
-            tags: [["challenge", challenge]]
+        /* getPublicKey FIRST — extensions use it as the site-authorization
+           handshake; signEvent called cold can queue silently with no
+           prompt (the "waiting for signer" hang). */
+        var keyReq =
+          typeof window.nostr.getPublicKey === "function"
+            ? window.nostr.getPublicKey()
+            : Promise.resolve(null);
+        return signerTimeout(keyReq)
+          .then(function (pk) {
+            return signerTimeout(
+              window.nostr.signEvent({
+                kind: KIND_SIGNIN,
+                created_at: Math.floor(Date.now() / 1000),
+                content: challenge,
+                tags: [["challenge", challenge]],
+                pubkey: pk || undefined
+              })
+            );
           })
           .then(function (signed) {
-            return api("/nostr/verify" + shopQuery(), {
-              method: "POST",
-              body: JSON.stringify({ event: JSON.stringify(signed) })
-            });
+          return api("/nostr/verify" + shopQuery(), {
+            method: "POST",
+            body: JSON.stringify({ event: JSON.stringify(signed) })
           });
+        });
       })
       .then(function (res) {
         if (!res) return;
@@ -1071,9 +1121,12 @@
           renderModal();
         }
       })
-      .catch(function () {
+      .catch(function (err) {
         state.notice =
-          "Sign-in was cancelled or failed. Try again when you're ready.";
+          err && err.message === "signer-timeout"
+            ? "Your signer didn't respond — check the extension's" +
+              " popup or approval list, then try again."
+            : "Sign-in was cancelled or failed. Try again when you're ready.";
         if (state.modalOpen) renderModal();
       })
       .finally(function () {
