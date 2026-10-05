@@ -279,12 +279,15 @@ test('checkout retries preserve uncertain requests but allow corrected rejection
 /* --- Release B: NIP-07 sign-in, claim, storefront modes ------------- */
 
 async function installNostrStub(
-  page: import('@playwright/test').Page
+  page: import('@playwright/test').Page,
+  label?: string
 ) {
   /* A NIP-07 extension stand-in: getPublicKey + signEvent backed by the
      harness /_e2e/sign route, so verify() runs against a REAL signed
-     kind-22242 event. */
-  await page.addInitScript(() => {
+     kind-22242 event. ``label`` picks a different fixed test key —
+     needed when the scenario wants an identity that isn't already the
+     shared e2e-buyer account. */
+  await page.addInitScript(l => {
     const w = window as unknown as {
       nostr?: {getPublicKey: () => Promise<string>; signEvent: (e: unknown) => Promise<unknown>}
     }
@@ -294,13 +297,13 @@ async function installNostrStub(
         const r = await fetch('/_e2e/sign', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify(ev)
+          body: JSON.stringify({...(ev as object), label: l})
         })
         const data = await r.json()
         return data.event
       }
     }
-  })
+  }, label || '')
 }
 
 async function setMode(
@@ -498,5 +501,266 @@ test('nostr_only shows the notice but /order still works', async ({
     expect(checkout.status()).toBe(422)
   } finally {
     await setMode(request, 'full')
+  }
+})
+
+/* --- Phase 03.1: email magic-link sign-in + identity linking --------
+   Each scenario uses a FRESH browser context so session cookies never
+   leak between tests in the serial chain. The /_e2e/mailbox harness
+   decrypts the durable account-queue row — no real SMTP. */
+
+async function mailboxLink(
+  request: import('@playwright/test').APIRequestContext,
+  email: string
+) {
+  /* Poll the harness until the newest 'account' row for this
+     recipient decrypts — worker timing is not deterministic. */
+  let link = ''
+  await expect
+    .poll(
+      async () => {
+        const res = await request.get(
+          `${seed.base_url}/_e2e/mailbox?to=${encodeURIComponent(email)}`
+        )
+        const body = await res.json()
+        link = body.link || ''
+        return link
+      },
+      {timeout: 20_000}
+    )
+    .not.toBe('')
+  return link
+}
+
+test('email magic-link sign-in binds past orders', async ({
+  browser,
+  request
+}) => {
+  // An anonymous checkout under the sign-in email — auto-bound to the
+  // account when the magic link verifies (D-09).
+  const checkout = await request.post(
+    `${seed.base_url}/infinitemarkets/api/v1/public/checkout`,
+    {
+      headers: {
+        'Idempotency-Key': crypto.randomUUID() + crypto.randomUUID(),
+        Origin: seed.base_url
+      },
+      data: {
+        merchant_pubkey: seed.pubkey,
+        items: [{d_tag: seed.digital.d_tag, quantity: 1}],
+        email: 'e2e-buyer@example.com'
+      }
+    }
+  )
+  expect(checkout.status()).toBe(201)
+
+  const ctx = await browser.newContext({ignoreHTTPSErrors: true})
+  const page = await ctx.newPage()
+  try {
+    await page.goto(seed.digital_url)
+    await page.locator('[data-gm="signin"]').click()
+    await expect(page.locator('#gm-nostr-modal')).toBeVisible()
+    await page
+      .locator('[data-gm="email-input"]')
+      .fill('e2e-buyer@example.com')
+    await page.locator('#gm-email-btn').click()
+    // Uniform no-oracle copy — identical for every outcome.
+    await expect(page.locator('#gm-nostr-modal')).toContainText(
+      'Check your email'
+    )
+
+    const link = await mailboxLink(request, 'e2e-buyer@example.com')
+    await page.goto(link)
+    // The landing verifies the fragment token, mints the cookie and
+    // redirects to the orders page.
+    await page.waitForURL('**/infinitemarkets/orders**', {
+      timeout: 20_000
+    })
+    // The chip falls back to the verified email (never a npub
+    // placeholder) for an email-only account.
+    await expect(page.locator('#gm-nostr-signin')).toContainText(
+      'e2e-buyer@example.com',
+      {timeout: 20_000}
+    )
+    // The pre-signin order is in the union history, acknowledged once.
+    const orderRow = page.locator('[data-gm="nostr-order"]')
+    await expect(orderRow.first()).toContainText('e2e digital tour')
+    await expect(page.locator('#gm-orders-body')).toContainText(
+      'We found'
+    )
+    await expect(page.locator('#gm-orders-body')).toContainText(
+      'linked to your account'
+    )
+    // One-shot: a second render no longer shows the note.
+    await page.reload()
+    await expect(page.locator('#gm-orders-body')).not.toContainText(
+      'We found'
+    )
+  } finally {
+    await ctx.close()
+  }
+})
+
+test('modal offers both methods with honest availability', async ({
+  browser
+}) => {
+  const ctx = await browser.newContext({ignoreHTTPSErrors: true})
+  const page = await ctx.newPage()
+  try {
+    await page.goto(seed.digital_url)
+    await page.locator('[data-gm="signin"]').click()
+    const modal = page.locator('#gm-nostr-modal')
+    await expect(modal).toBeVisible()
+    // Both method affordances render — Nostr button + email form.
+    await expect(modal.locator('#gm-nostr-modal-signin')).toBeVisible()
+    await expect(modal.locator('[data-gm="email-input"]')).toBeVisible()
+    await expect(modal.locator('#gm-email-btn')).toBeVisible()
+    // The e2e host has (dummy) SMTP configured: the email method is
+    // enabled even with no window.nostr present.
+    await expect(modal.locator('[data-gm="email-input"]')).toBeEnabled()
+  } finally {
+    await ctx.close()
+  }
+})
+
+test('unconfigured email shows the honest hint, not a dead form', async ({
+  browser
+}) => {
+  const ctx = await browser.newContext({ignoreHTTPSErrors: true})
+  const page = await ctx.newPage()
+  try {
+    // Force the capability flag off — the email method must say WHY.
+    await page.route('**/api/v1/public/nostr/challenge**', async route => {
+      const res = await route.fetch()
+      const body = await res.json()
+      body.email_signin = false
+      await route.fulfill({response: res, json: body})
+    })
+    await page.goto(seed.digital_url)
+    await page.locator('[data-gm="signin"]').click()
+    const modal = page.locator('#gm-nostr-modal')
+    await expect(modal.locator('[data-gm="email-input"]')).toBeDisabled()
+    await expect(modal.locator('#gm-email-btn')).toBeDisabled()
+    await expect(modal).toContainText(
+      "Email sign-in isn't configured on this host"
+    )
+  } finally {
+    await ctx.close()
+  }
+})
+
+test('nostr account links an email from the profile page', async ({
+  browser,
+  request
+}) => {
+  const ctx = await browser.newContext({ignoreHTTPSErrors: true})
+  const page = await ctx.newPage()
+  try {
+    await installNostrStub(page)
+    await page.goto(seed.digital_url)
+    await page.locator('[data-gm="signin"]').click()
+    await page.locator('#gm-nostr-modal-signin').click()
+    await expect(page.locator('#gm-nostr-signin')).toContainText(
+      'npub1',
+      {timeout: 20_000}
+    )
+
+    await page.goto(
+      `${seed.base_url}/infinitemarkets/profile?shop=${seed.pubkey}`
+    )
+    // Nostr-only account: npub row + the symmetric link-an-email card.
+    await expect(page.locator('[data-gm="account-card"]')).toContainText(
+      'npub1'
+    )
+    await expect(
+      page.locator('[data-gm="link-email-card"]')
+    ).toBeVisible()
+    await page
+      .locator('[data-gm="link-email-input"]')
+      .fill('e2e-link@example.com')
+    await page.locator('#gm-link-email-btn').click()
+    await expect(page.locator('#gm-link-email-msg')).toContainText(
+      'Check your email'
+    )
+
+    const link = await mailboxLink(request, 'e2e-link@example.com')
+    await page.goto(link)
+    // Link tokens prove without minting a session — the landing shows
+    // the linked state, then Continue returns to the profile.
+    await expect(
+      page.locator('[data-gm="email-auth-linked"]')
+    ).toBeVisible({timeout: 20_000})
+    await page
+      .locator('[data-gm="email-auth-linked"]')
+      .getByRole('link', {name: 'Continue'})
+      .click()
+    await page.waitForURL('**/infinitemarkets/profile**')
+    // Both identities now show, and the kind-0 editor is still live.
+    const card = page.locator('[data-gm="account-card"]')
+    await expect(card).toContainText('e2e-link@example.com')
+    await expect(card).toContainText('npub1')
+    await expect(page.locator('#gm-profile-form')).toBeVisible()
+  } finally {
+    await ctx.close()
+  }
+})
+
+test('email account links a Nostr key from the profile page', async ({
+  browser,
+  request
+}) => {
+  const ctx = await browser.newContext({ignoreHTTPSErrors: true})
+  const page = await ctx.newPage()
+  try {
+    // Sign in by magic link (fresh email-only account).
+    await page.goto(seed.digital_url)
+    await page.locator('[data-gm="signin"]').click()
+    await page
+      .locator('[data-gm="email-input"]')
+      .fill('e2e-linker@example.com')
+    await page.locator('#gm-email-btn').click()
+    await expect(page.locator('#gm-nostr-modal')).toContainText(
+      'Check your email'
+    )
+    const link = await mailboxLink(request, 'e2e-linker@example.com')
+    await page.goto(link)
+    await page.waitForURL('**/infinitemarkets/orders**', {
+      timeout: 20_000
+    })
+
+    // Email-only profile: verified email row, link-nostr card, and a
+    // LOCKED kind-0 state — never a dead editor. A FRESH key: the
+    // shared e2e-buyer key already holds an email identity, so linking
+    // it here would be an honest merge conflict.
+    await installNostrStub(page, 'e2e-linker-key')
+    await page.goto(
+      `${seed.base_url}/infinitemarkets/profile?shop=${seed.pubkey}`
+    )
+    await expect(page.locator('[data-gm="account-card"]')).toContainText(
+      'e2e-linker@example.com'
+    )
+    await expect(
+      page.locator('[data-gm="link-nostr-card"]')
+    ).toBeVisible()
+    await expect(
+      page.locator('[data-gm="profile-locked"]')
+    ).toBeVisible()
+    await expect(page.locator('#gm-profile-form')).toHaveCount(0)
+
+    // Real challenge -> signEvent -> verify round-trip (the stub signs
+    // through /_e2e/sign; the server verifies a REAL signature).
+    await page.locator('#gm-link-nostr-btn').click()
+    const card = page.locator('[data-gm="account-card"]')
+    await expect(card).toContainText('npub1', {timeout: 20_000})
+    await expect(page.locator('#gm-profile-body')).toContainText(
+      'Nostr key linked'
+    )
+    // The editor unlocks once a key is linked.
+    await expect(page.locator('#gm-profile-form')).toBeVisible()
+    await expect(
+      page.locator('[data-gm="profile-locked"]')
+    ).toHaveCount(0)
+  } finally {
+    await ctx.close()
   }
 })

@@ -84,6 +84,16 @@ os.environ.update(
         "LNBITS_EXTENSIONS_PATH": str(TMP / "extroot"),
         "LNBITS_EXTENSIONS_DEACTIVATE_ALL": "false",
         "LNBITS_BACKEND_WALLET_CLASS": "FakeWallet",
+        # Dummy SMTP so is_email_notifications_configured() is True and
+        # the email sign-in method is enabled. Send attempts fail fast
+        # on connection-refused (bounded worker retry) — /_e2e/mailbox
+        # reads the durable queue rows regardless of send state.
+        "LNBITS_EMAIL_NOTIFICATIONS_ENABLED": "true",
+        "LNBITS_EMAIL_NOTIFICATIONS_EMAIL": "e2e@example.com",
+        "LNBITS_EMAIL_NOTIFICATIONS_SERVER": "127.0.0.1",
+        "LNBITS_EMAIL_NOTIFICATIONS_PORT": "10025",
+        "LNBITS_EMAIL_NOTIFICATIONS_USERNAME": "e2e",
+        "LNBITS_EMAIL_NOTIFICATIONS_PASSWORD": "e2e",
         "LNBITS_ADMIN_UI": "true",
         "LNBITS_AUDIT_LOG_REQUEST_BODY": "false",
         "LNBITS_AUDIT_LOG_QUERY_PARAMS": "false",
@@ -480,10 +490,10 @@ async def main() -> None:
     # key so Playwright's window.nostr stub produces a REAL signed event
     # (the verify path exercises Event.verify() against it). Test-only
     # key material; the E2E database is disposable.
-    def _buyer_keys():
+    def _buyer_keys(label: str = "e2e-buyer"):
         from harness.sdk import fixed_test_keys
 
-        return fixed_test_keys("e2e-buyer")
+        return fixed_test_keys(label)
 
     async def e2e_sign(request: Request):
         from nostr_sdk import (
@@ -495,6 +505,10 @@ async def main() -> None:
         )
 
         body = await request.json()
+        # Optional ``label`` picks a different fixed test key so specs
+        # can exercise identities that aren't the shared e2e-buyer
+        # account (e.g. linking a FRESH key — a merge needs one).
+        label = str(body.get("label") or "e2e-buyer")
         builder = EventBuilder(
             Kind(int(body.get("kind", 22242))),
             str(body.get("content", "")),
@@ -505,10 +519,10 @@ async def main() -> None:
         created = body.get("created_at") or int(time.time())
         event = await builder.custom_created_at(
             Timestamp.from_secs(int(created))
-        ).sign(NostrSigner.keys(_buyer_keys()))
+        ).sign(NostrSigner.keys(_buyer_keys(label)))
         return {
             "event": json.loads(event.as_json()),
-            "pubkey": _buyer_keys().public_key().to_hex(),
+            "pubkey": _buyer_keys(label).public_key().to_hex(),
         }
 
     async def e2e_mode(request: Request):
@@ -531,10 +545,67 @@ async def main() -> None:
             dict(merchant), mode, confirm=True
         )
 
+    async def e2e_mailbox(to: str = ""):
+        """Inspect the durable email_queue for the newest 'account' row
+        addressed to ``to`` and return its fragment sign-in link — the
+        magic-link flow proven end to end with zero SMTP dependency.
+        Harness-only (registered post-startup like /_e2e/sign): it
+        decrypts queue custody on a disposable DB, never shipped code.
+        Specs poll this — worker timing is not deterministic."""
+        from infinitemarkets import crypto
+        from infinitemarkets.db import db
+        from infinitemarkets.settings import ext_settings
+
+        if not to:
+            return {"link": None}
+        settings = ext_settings()
+        async with db.connect() as conn:
+            rows = await conn.fetchall(
+                "SELECT * FROM infinitemarkets.email_queue"
+                " WHERE channel = 'account'"
+                " AND state IN ('pending','claimed','failed','suppressed')"
+                " ORDER BY created_at DESC LIMIT 20"
+            )
+        for row in rows:
+            row = dict(row)
+            if not row["recipient_enc"] or not row["payload_enc"]:
+                continue
+            ver = crypto.envelope_version(row["recipient_enc"])
+            try:
+                recipient = crypto.decrypt(
+                    row["recipient_enc"], settings.master_keys[ver],
+                    # Orderless rows bind recipient_enc to the merchant.
+                    record_id=row["merchant_id"], table="email_queue",
+                    column="recipient_enc", key_version=ver,
+                ).decode()
+            except Exception:  # noqa: BLE001 — skip undecryptable rows
+                continue
+            if crypto.normalize(recipient) != crypto.normalize(to):
+                continue
+            pver = crypto.envelope_version(row["payload_enc"])
+            token = json.loads(
+                crypto.decrypt(
+                    row["payload_enc"], settings.master_keys[pver],
+                    record_id=row["id"], table="email_queue",
+                    column="payload_enc", key_version=pver,
+                )
+            )["token"]
+            return {
+                "to": to,
+                "link": (
+                    f"{BASE_URL}/infinitemarkets/auth/email"
+                    f"?shop={seed['pubkey']}#{token}"
+                ),
+                "state": row["state"],
+                "created_at": row["created_at"],
+            }
+        return {"link": None}
+
     app.add_api_route("/_e2e/seed", e2e_seed, methods=["GET"])
     app.add_api_route("/_e2e/settle", e2e_settle, methods=["POST"])
     app.add_api_route("/_e2e/sign", e2e_sign, methods=["POST"])
     app.add_api_route("/_e2e/mode", e2e_mode, methods=["POST"])
+    app.add_api_route("/_e2e/mailbox", e2e_mailbox, methods=["GET"])
 
     import uvicorn
 

@@ -219,6 +219,14 @@
   /* --- sign-in modal ------------------------------------------------------ */
 
   function renderModal() {
+    /* Re-renders (capability-flag probe, busy flips) rebuild the DOM —
+       keep what the buyer already typed instead of wiping it. */
+    var keepEmail = "";
+    var keepNsec = "";
+    var curEmail = document.getElementById("gm-email-input");
+    var curNsec = document.getElementById("gm-nsec-input");
+    if (curEmail && modal.contains(curEmail)) keepEmail = curEmail.value;
+    if (curNsec && modal.contains(curNsec)) keepNsec = curNsec.value;
     GM.clear(modal);
     var close = GM.h("button", {
       type: "button",
@@ -278,6 +286,7 @@
           text: "Sign in with key"
         });
         go.addEventListener("click", doNsecSignin);
+        if (keepNsec) input.value = keepNsec;
         nsecRow.appendChild(input);
         nsecRow.appendChild(go);
       } else {
@@ -339,6 +348,7 @@
         text: state.busy ? "Sending…" : "Email me a sign-in link"
       });
       emailBtn.addEventListener("click", doEmailRequest);
+      if (keepEmail) emailInput.value = keepEmail;
       if (!state.emailAvailable) {
         emailInput.disabled = true;
         emailBtn.disabled = true;
