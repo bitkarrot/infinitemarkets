@@ -1,6 +1,6 @@
 {
   "name": "Infinite Markets",
-  "version": "0.1",
+  "version": "0.2",
   "short_description": "NIP-99 catalog and Lightning checkout with one authoritative inventory.",
   "tile": "/infinitemarkets/static/infinitemarkets/img/infinite-markets-blue.png",
   "min_lnbits_version": "1.6.0",
