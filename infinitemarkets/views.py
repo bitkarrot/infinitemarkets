@@ -550,14 +550,30 @@ async def merchant_page(request: Request, pubkey: str):
     store = await _store_ctx(merchant, theme)
     if store["storefront_mode"] == "nostr_only":
         return _nostr_only_response(request, merchant, store)
+    hero_cfg = theme.get("hero") or {}
+    hero = {
+        "slogan": (
+            hero_cfg.get("slogan") or store["brand_name"]
+            or merchant.get("display_name") or "Our store"
+        ),
+        "subtitle": hero_cfg.get("subtitle") or profile.get("about", ""),
+        "image_url": hero_cfg.get("image_url") or "",
+        "primary": (
+            hero_cfg.get("primary")
+            or {"label": "Shop products", "url": "#products"}
+        ),
+        "secondary": hero_cfg.get("secondary") or {},
+    }
     return _public_response(
         request,
         "public_merchant.html",
         {
             "pubkey": merchant["pubkey"],
-            "display_name": merchant.get("display_name") or "",
-            "about": profile.get("about", ""),
-            "picture": profile.get("picture"),
+            "hero": hero,
+            # the hero is the index-page intro — any browse state
+            # (filter, sort, page) means the shopper is inside the
+            # catalog, so the marketing block steps aside.
+            "show_hero": not request.query_params,
             "products": cards,
             "browse": browse,
             "theme_css": theme_service.emit_css(theme),

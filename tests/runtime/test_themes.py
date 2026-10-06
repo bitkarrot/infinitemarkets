@@ -321,6 +321,66 @@ async def test_public_pages_carry_scheme_toggle_and_dark_tokens(runtime_env):
     assert "prefers-color-scheme: dark" in resp.text
 
 
+async def test_hero_renders_on_index_only_and_validates(runtime_env):
+    """Configurable hero: slogan/subtitle/CTAs/image on the bare index
+    page, hidden behind any browse state; URLs are strictly bounded."""
+    client = runtime_env["client"]
+    merchant = await _merchant(runtime_env)
+    base = f"/infinitemarkets/public/merchants/{merchant['pubkey']}"
+
+    # unconfigured — brand name + a default 'Shop products' anchor CTA
+    index = await client.get(base)
+    assert index.status_code == 200
+    assert 'class="merchant-hero"' in index.text
+    assert "Shop products" in index.text and 'id="products"' in index.text
+    assert "Independent store" not in index.text
+    filtered = await client.get(f"{base}?sort=name")
+    assert "merchant-hero" not in filtered.text
+
+    resp, _ = await _patch_theme(runtime_env, {"hero": {
+        "slogan": "Curated goods",
+        "subtitle": "Made slowly",
+        "image_url": "https://images.example/hero.jpg",
+        "primary": {"label": "Shop all", "url": "#products"},
+        "secondary": {"label": "Our story", "url": "https://example.com/a"},
+    }})
+    assert resp.status_code == 200, resp.text
+    index = await client.get(base)
+    assert "Curated goods" in index.text
+    assert "Made slowly" in index.text
+    assert "merchant-hero--image" in index.text
+    assert "hero.jpg" in index.text
+    assert "Shop all" in index.text and 'href="#products"' in index.text
+    assert "Our story" in index.text
+    filtered = await client.get(f"{base}?sort=name")
+    assert "Curated goods" not in filtered.text
+
+    # URL and shape validation
+    for bad in (
+        {"image_url": "javascript:alert(1)"},
+        {"image_url": "http://images.example/x.jpg"},
+        {"image_url": "//cdn.example/x.jpg"},
+        {"image_url": "https://user:pw@example.com/x.jpg"},
+        {"image_url": "https://192.168.1.1/x.jpg"},
+        {"primary": {"label": "x", "url": "javascript:alert(1)"}},
+        {"primary": "string"},
+        {"bogus": 1},
+    ):
+        resp, _ = await _patch_theme(runtime_env, {"hero": bad})
+        assert resp.status_code == 422, (bad, resp.status_code)
+
+    # label without url defaults to #products; url without label is dropped
+    resp, _ = await _patch_theme(runtime_env, {"hero": {
+        "primary": {"label": "Go", "url": ""},
+        "secondary": {"label": "", "url": "https://example.com"},
+    }})
+    assert resp.status_code == 200, resp.text
+    hero = resp.json()["theme"]["hero"]
+    assert hero["primary"]["url"] == "#products"
+    assert "secondary" not in hero
+    await _patch_theme(runtime_env, {"preset": "warm-market"})
+
+
 async def test_brand_name_overrides_display_name_in_hero(runtime_env):
     """Brand Basics `name` is the shopper-facing name — hero and page
     title must not fall back to the raw merchant display_name."""

@@ -1638,6 +1638,56 @@
                   </div>
                 </q-expansion-item>
 
+                <q-expansion-item label="Hero (index page)" class="q-mb-sm"
+                                  data-gm="hero-editor">
+                  <div class="q-pa-sm">
+                    <div class="text-caption q-mb-sm">
+                      The large intro block on your storefront's main
+                      page — slogan, supporting line and up to two
+                      links. It never shows on any other page, or once
+                      a shopper applies a filter.
+                    </div>
+                    <q-input v-model="gmSettings.theme.hero.slogan" dense
+                             outlined maxlength="120" class="q-mb-sm"
+                             label="Slogan (defaults to store name)">
+                    </q-input>
+                    <q-input v-model="gmSettings.theme.hero.subtitle" dense
+                             outlined type="textarea" autogrow
+                             maxlength="280" class="q-mb-sm"
+                             label="Subtitle">
+                    </q-input>
+                    <q-input v-model="gmSettings.theme.hero.image_url"
+                             dense outlined class="q-mb-sm"
+                             label="Background image URL (https)">
+                    </q-input>
+                    <div class="row q-col-gutter-sm q-mb-sm">
+                      <div class="col-12 col-sm-6">
+                        <q-input v-model="gmSettings.theme.hero.primary.label"
+                                 dense outlined maxlength="30"
+                                 label="Primary button label"></q-input>
+                      </div>
+                      <div class="col-12 col-sm-6">
+                        <q-input v-model="gmSettings.theme.hero.primary.url"
+                                 dense outlined
+                                 label="Primary link (#products, /path or https)">
+                        </q-input>
+                      </div>
+                    </div>
+                    <div class="row q-col-gutter-sm">
+                      <div class="col-12 col-sm-6">
+                        <q-input v-model="gmSettings.theme.hero.secondary.label"
+                                 dense outlined maxlength="30"
+                                 label="Secondary button label"></q-input>
+                      </div>
+                      <div class="col-12 col-sm-6">
+                        <q-input v-model="gmSettings.theme.hero.secondary.url"
+                                 dense outlined
+                                 label="Secondary link"></q-input>
+                      </div>
+                    </div>
+                  </div>
+                </q-expansion-item>
+
                 <q-expansion-item label="Advanced Tokens"
                                   data-gm="advanced-tokens">
                   <div class="q-pa-sm">

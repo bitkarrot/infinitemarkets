@@ -177,7 +177,12 @@
           ],
           theme: {
             preset: "warm-market", layout: "editorial",
-            brand: {}, advanced: {}, advanced_opt_in: false
+            brand: {}, advanced: {}, advanced_opt_in: false,
+            hero: {
+              slogan: "", subtitle: "", image_url: "",
+              primary: {label: "", url: ""},
+              secondary: {label: "", url: ""}
+            }
           },
           saving: false,
           themeError: null,
@@ -258,12 +263,26 @@
           self.gmSettings.displayName = m.display_name || "";
           self.gmSettings.specRevision = m.spec_revision || "";
           var t = m.theme || {};
+          var h = t.hero || {};
           self.gmSettings.theme = {
             preset: t.preset || "warm-market",
             layout: t.layout || "editorial",
             brand: Object.assign({}, t.brand || {}),
             advanced: Object.assign({}, t.advanced || {}),
-            advanced_opt_in: !!t.advanced_opt_in
+            advanced_opt_in: !!t.advanced_opt_in,
+            hero: {
+              slogan: h.slogan || "",
+              subtitle: h.subtitle || "",
+              image_url: h.image_url || "",
+              primary: {
+                label: (h.primary || {}).label || "",
+                url: (h.primary || {}).url || ""
+              },
+              secondary: {
+                label: (h.secondary || {}).label || "",
+                url: (h.secondary || {}).url || ""
+              }
+            }
           };
         } catch (e) {
           self.gmSettings.error = self.gmProblemCopy(e.problem);
@@ -572,6 +591,7 @@
           preset: t.preset,
           layout: t.layout,
           brand: t.brand || {},
+          hero: t.hero || {},
           advanced_opt_in: !!t.advanced_opt_in
         };
         if (t.advanced_opt_in) {

@@ -2,15 +2,25 @@
 {% import "templates/infinitemarkets/public_browse_controls.html" as browse_controls %}
 {% block title %}Shop{% endblock %}
 {% block content %}
-<header class="merchant-hero">
+{% if show_hero %}
+<header class="merchant-hero{{ ' merchant-hero--image' if hero.image_url }}"{% if hero.image_url %} style="background-image: linear-gradient(90deg, rgba(0,0,0,0.62), rgba(0,0,0,0.25)), url('{{ hero.image_url }}')"{% endif %}>
   <div class="merchant-hero-text">
-    <p class="eyebrow">Independent store</p>
-    <h1 class="merchant-title">{{ brand_name or display_name }}</h1>
-    {% if about %}<p class="merchant-about">{{ about }}</p>{% endif %}
+    <h1 class="merchant-title">{{ hero.slogan }}</h1>
+    {% if hero.subtitle %}<p class="merchant-subtitle">{{ hero.subtitle }}</p>{% endif %}
+    <div class="hero-actions">
+      {% if hero.primary and hero.primary.label %}
+      <a class="hero-cta hero-cta--primary" href="{{ hero.primary.url }}">{{ hero.primary.label }}
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14m-6-6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      {% endif %}
+      {% if hero.secondary and hero.secondary.label %}
+      <a class="hero-cta hero-cta--ghost" href="{{ hero.secondary.url }}">{{ hero.secondary.label }}</a>
+      {% endif %}
+    </div>
   </div>
-  {% if picture %}<img class="merchant-picture" src="{{ picture }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}
 </header>
-<div class="section-head">
+{% endif %}
+<div class="section-head" id="products">
   <div class="section-intro">
     <h2>All products</h2>
     {% if layout == 'gallery' %}<p class="section-description">Browse products from this shop.</p>{% endif %}

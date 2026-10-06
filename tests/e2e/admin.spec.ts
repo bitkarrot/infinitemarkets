@@ -614,6 +614,55 @@ test('settings surface: identity, relays, notifications, appearance', async ({
   ).toBeVisible()
 })
 
+test('configurable hero renders on the index page only', async ({page}) => {
+  await page.goto('/infinitemarkets/')
+  const cookies = await page.context().cookies()
+  const csrf = cookies.find(cookie => cookie.name === 'gm_csrf')?.value || ''
+  const url = `/infinitemarkets/api/v1/merchants/${seed.merchant_id}`
+  const set = (data: object) => page.request.patch(url, {
+    headers: {Origin: seed.base_url, 'X-CSRF-Token': csrf},
+    data
+  })
+  const shopUrl = `/infinitemarkets/public/merchants/${seed.pubkey}`
+  try {
+    expect((await set({theme: {hero: {
+      slogan: 'Hand-picked goods',
+      subtitle: 'Small batch, made slowly',
+      primary: {label: 'Shop all', url: '#products'},
+      secondary: {label: 'Our story', url: 'https://example.com/about'}
+    }}})).status()).toBe(200)
+    await page.goto(shopUrl)
+    const hero = page.locator('.merchant-hero')
+    await expect(hero).toBeVisible()
+    await expect(hero).toContainText('Hand-picked goods')
+    await expect(hero).toContainText('Small batch, made slowly')
+    await expect(
+      hero.getByRole('link', {name: 'Shop all'})
+    ).toHaveAttribute('href', '#products')
+    await expect(
+      hero.getByRole('link', {name: 'Our story'})
+    ).toHaveAttribute('href', 'https://example.com/about')
+    // browse state and other pages never show the hero
+    await page.goto(`${shopUrl}?sort=name`)
+    await expect(page.locator('.merchant-hero')).toHaveCount(0)
+    await page.goto(`/infinitemarkets/p/${seed.pubkey}/${seed.digital.d_tag}`)
+    await expect(page.locator('.merchant-hero')).toHaveCount(0)
+    // the admin exposes the editor under Appearance
+    await page.goto('/infinitemarkets/')
+    await page.locator('[data-gm-nav="settings"]').click()
+    await page.getByRole('tab', {name: 'Appearance'}).click()
+    await page.locator('[data-gm="hero-editor"]').click()
+    await expect(
+      page.getByLabel('Slogan (defaults to store name)')
+    ).toHaveValue('Hand-picked goods')
+    await expect(page.getByLabel('Subtitle')).toHaveValue(
+      'Small batch, made slowly'
+    )
+  } finally {
+    expect((await set({theme: {preset: 'warm-market'}})).status()).toBe(200)
+  }
+})
+
 test('storefront is one click away from the admin top level', async ({page}) => {
   await page.goto('/infinitemarkets/')
   const storefront = `/infinitemarkets/public/merchants/${seed.pubkey}`

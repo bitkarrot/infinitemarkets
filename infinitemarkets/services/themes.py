@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import re
 import time
+from urllib.parse import urlparse
 
 from ..db import db, table
 from ..security import unprocessable
@@ -123,7 +124,79 @@ _GATED_PAIRS = (
 )
 
 DEFAULT_THEME = {"preset": "warm-market", "layout": "editorial",
-                 "brand": None, "advanced": None}
+                 "brand": None, "advanced": None, "hero": None}
+
+# Hero (storefront index intro) — bounded content fields, not tokens:
+# slogan/subtitle are length-capped; URLs may be #anchors, same-origin
+# paths, or https links (javascript:/data:/protocol-relative rejected).
+_HERO_ANCHOR = re.compile(r"^#[A-Za-z][\w-]{0,63}$")
+_HERO_PATH = re.compile(r"^/(?!/)[\w\-./?=&%#]{0,511}$")
+_IP_HOST = re.compile(r"^(\d{1,3}\.){3}\d{1,3}$|^\[?[0-9a-fA-F:]+\]?$")
+
+
+def _validate_hero_url(value, field: str) -> str:
+    url = str(value or "").strip()
+    if not url:
+        return ""
+    if _HERO_ANCHOR.fullmatch(url) or _HERO_PATH.fullmatch(url):
+        return url
+    ok = False
+    if url.startswith("https://") and len(url) <= 512 \
+            and not any(ch.isspace() for ch in url):
+        try:
+            parsed = urlparse(url)
+        except ValueError:
+            parsed = None
+        ok = bool(
+            parsed and parsed.hostname and not parsed.username
+            and not _IP_HOST.match(parsed.hostname)
+        )
+    if not ok:
+        raise unprocessable(
+            "invalid-content",
+            f"hero {field} must be a #anchor, /path or https:// URL",
+        )
+    return url
+
+
+def _validate_hero(hero: dict) -> dict:
+    if not isinstance(hero, dict):
+        raise unprocessable("invalid-content", "hero must be an object")
+    unknown = set(hero) - {
+        "slogan", "subtitle", "image_url", "primary", "secondary"
+    }
+    if unknown:
+        raise unprocessable(
+            "invalid-content", f"unknown hero fields: {sorted(unknown)}"
+        )
+    out = {}
+    for field, limit in (("slogan", 120), ("subtitle", 280)):
+        value = str(hero.get(field) or "").strip()
+        if value:
+            out[field] = value[:limit]
+    image_url = _validate_hero_url(hero.get("image_url"), "image_url")
+    if image_url:
+        out["image_url"] = image_url
+    for slot in ("primary", "secondary"):
+        raw = hero.get(slot)
+        if raw is None:
+            continue
+        if not isinstance(raw, dict):
+            raise unprocessable(
+                "invalid-content", f"hero {slot} must be an object"
+            )
+        unknown = set(raw) - {"label", "url"}
+        if unknown:
+            raise unprocessable(
+                "invalid-content",
+                f"unknown hero {slot} fields: {sorted(unknown)}",
+            )
+        label = str(raw.get("label") or "").strip()[:30]
+        url = _validate_hero_url(raw.get("url"), f"{slot}.url") or "#products"
+        if not label:
+            continue
+        out[slot] = {"label": label, "url": url}
+    return out
 
 
 # --- WCAG contrast ---------------------------------------------------------------
@@ -253,7 +326,7 @@ def validate_theme(payload: dict) -> dict:
     if not isinstance(payload, dict):
         raise unprocessable("invalid-content", "theme must be an object")
     unknown = set(payload) - {
-        "preset", "layout", "brand", "advanced", "advanced_opt_in"
+        "preset", "layout", "brand", "advanced", "advanced_opt_in", "hero"
     }
     if unknown:
         raise unprocessable(
@@ -272,6 +345,8 @@ def validate_theme(payload: dict) -> dict:
         )
     if payload.get("brand") is not None:
         theme["brand"] = _validate_brand(payload["brand"])
+    if payload.get("hero") is not None:
+        theme["hero"] = _validate_hero(payload["hero"])
     if payload.get("advanced") is not None:
         theme["advanced"] = _validate_advanced(
             payload["advanced"], bool(payload.get("advanced_opt_in"))

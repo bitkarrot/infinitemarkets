@@ -1239,27 +1239,88 @@
 
 /* --- browse pages (merchant index / collection) — card grid per
    UI-SPEC, in the sketch's warm-market language --------------------- */
+/* Index-page hero — the YNS-style intro band: big slogan, supporting
+   line and up to two pill CTAs. Tinted surface by default; a configured
+   image swaps to a dark gradient overlay with light copy so it reads
+   over any photograph, in either color scheme. */
 .gm-public .merchant-hero {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-md);
-  margin-bottom: var(--space-md);
-}
-.gm-public .merchant-title {
-  font-size: clamp(1.8rem, 4vw, 2.6rem);
-  font-family: var(--font-display);
-  font-weight: 760;
-  letter-spacing: -0.03em;
-  margin: 0;
-}
-.gm-public .merchant-picture {
-  width: 96px;
-  height: 96px;
-  object-fit: cover;
+  margin: clamp(20px, 4vw, 40px) 0;
+  padding: clamp(48px, 9vw, 96px) clamp(24px, 6vw, 80px);
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-sm);
+  background: var(--color-surface-alt);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  overflow: hidden;
+}
+.gm-public .merchant-hero--image {
+  color: #f8f5f0;
+  border-color: transparent;
+  background-color: #1b1510;
+}
+.gm-public .merchant-title {
+  font-size: clamp(2.2rem, 5.5vw, 3.75rem);
+  font-family: var(--font-display);
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+  margin: 0;
+  max-width: 22ch;
+}
+.gm-public .merchant-subtitle {
+  font-size: clamp(1rem, 1.6vw, 1.25rem);
+  color: var(--color-text-muted);
+  line-height: 1.6;
+  max-width: 52ch;
+  margin: 20px 0 0;
+}
+.gm-public .merchant-hero--image .merchant-subtitle {
+  color: rgba(255, 255, 255, 0.88);
+}
+.gm-public .hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 32px;
+}
+.gm-public .hero-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 28px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.gm-public .hero-cta svg { width: 16px; height: 16px; }
+.gm-public .hero-cta:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.gm-public .hero-cta--primary {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+.gm-public .hero-cta--primary:hover {
+  background: var(--color-primary-hover);
+}
+.gm-public .hero-cta--ghost {
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+.gm-public .hero-cta--ghost:hover { background: var(--color-surface); }
+.gm-public .merchant-hero--image .hero-cta--ghost {
+  border-color: rgba(255, 255, 255, 0.55);
+  color: #f8f5f0;
+}
+.gm-public .merchant-hero--image .hero-cta--ghost:hover {
+  border-color: #ffffff;
+  background: rgba(255, 255, 255, 0.14);
 }
 .gm-public .collection-title {
   font-size: clamp(1.6rem, 3.5vw, 2.2rem);
@@ -1711,7 +1772,6 @@
   letter-spacing: -0.025em;
   text-wrap: balance;
 }
-.gm-public[data-layout="gallery"] .merchant-title,
 .gm-public[data-layout="gallery"] .collection-title { font-size: clamp(2rem, 4.5vw, 3rem); line-height: 1.05; }
 .gm-public[data-layout="gallery"] .product-title { font-size: clamp(2rem, 4.5vw, 3rem); line-height: 1.08; }
 .gm-public[data-layout="gallery"] .section-head h2 { font-size: clamp(1.5rem, 3vw, 1.875rem); }
@@ -1730,15 +1790,14 @@
 }
 .gm-public[data-layout="gallery"] .product-summary { line-height: 1.65; }
 
-/* Merchant hero: a quiet tinted band, not a heavy header. */
+/* Gallery keeps the hero structure but lightens its weight and lifts
+   the tinted band to near-transparent. */
 .gm-public[data-layout="gallery"] .merchant-hero {
-  align-items: center;
-  padding: clamp(20px, 3.5vw, 36px) clamp(20px, 4vw, 48px);
-  margin-bottom: clamp(24px, 4vw, 48px);
-  border-radius: var(--radius-lg);
+  border-color: transparent;
   background: color-mix(in srgb, var(--color-surface-alt) 45%, transparent);
+  background-position: center;
+  background-size: cover;
 }
-.gm-public[data-layout="gallery"] .merchant-picture { box-shadow: none; border-radius: var(--radius-full); }
 .gm-public[data-layout="gallery"] .collection-nav { margin: 0 0 clamp(24px, 4vw, 40px); }
 .gm-public[data-layout="gallery"] .collection-link { border-color: transparent; background: var(--color-surface-alt); }
 .gm-public[data-layout="gallery"] .collection-link:hover { border-color: var(--color-text); }
