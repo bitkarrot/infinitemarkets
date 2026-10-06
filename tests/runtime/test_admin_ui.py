@@ -149,6 +149,13 @@ async def test_admin_publications_copy(runtime_env):
     for state in ("pending", "claimed", "publishing",
                   "partially_published", "failed", "superseded"):
         assert state in js
+    # Timestamps + row-detail surface (queued/updated shown in the table,
+    # full intent fields + per-relay evidence in the detail dialog).
+    assert "gmPubKindLabel" in js and "gmPubDetailFields" in js
+    html = (await runtime_env["client"].get("/infinitemarkets/")).text
+    assert 'data-gm="outbox-row"' in html
+    assert 'data-gm="outbox-detail"' in html
+    assert "Queued" in html
 
 
 async def test_admin_notifications_copy(runtime_env):
@@ -453,7 +460,12 @@ async def test_messages_workspace(runtime_env):
         headers=await cookie(),
     )
     assert resp.status_code == 200, resp.text
-    assert all("payload_enc" not in i for i in resp.json()["intents"])
+    intents = resp.json()["intents"]
+    assert all("payload_enc" not in i for i in intents)
+    assert intents and all(
+        i["created_at"] is not None and i["updated_at"] is not None
+        for i in intents
+    )
 
     # --- compose to a fresh npub -> Unknown conversation ---
     other_hex = fixed_test_keys("msg-other").public_key().to_hex()

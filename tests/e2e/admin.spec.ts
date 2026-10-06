@@ -533,6 +533,20 @@ test('publications surface shows relay health + evidence copy', async ({
       .getByText(seed.relay_url)
       .first()
   ).toBeVisible()
+
+  // Outbox rows carry queued/updated timestamps and open a detail view.
+  const outbox = page.locator('[data-gm-surface="publications"]')
+  await expect(
+    outbox.getByRole('columnheader', {name: 'Queued'})
+  ).toBeVisible()
+  await outbox.locator('[data-gm="outbox-row"]').first().click()
+  const detail = page.locator('[data-gm="outbox-detail"]')
+  await expect(detail).toBeVisible()
+  await expect(detail.getByText('Intent ID')).toBeVisible()
+  await expect(detail.getByText('Queued')).toBeVisible()
+  await expect(detail.getByText('Relay delivery evidence')).toBeVisible()
+  await detail.locator('[data-gm="outbox-detail-close"]').click()
+  await expect(detail).toBeHidden()
 })
 
 test('settings surface: identity, relays, notifications, appearance', async ({

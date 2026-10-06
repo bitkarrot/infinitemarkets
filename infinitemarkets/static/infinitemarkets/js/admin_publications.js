@@ -15,7 +15,12 @@
     30406: "Shipping",
     31989: "Handler",
     31990: "Handler info",
-    order_msg: "Order message"
+    order_msg: "Order message",
+    products: "Product",
+    collections: "Collection",
+    shipping_options: "Shipping",
+    categories: "Category",
+    merchant: "Merchant"
   };
 
   var STATE_PILLS = {
@@ -44,6 +49,7 @@
           blossomServers: [],
           intents: [],
           retrying: null,
+          detail: null,
           exceptionOrders: []
         },
         /* q-table columns for the relay-health surface (q-markup-table
@@ -73,8 +79,43 @@
       };
     },
     methods: {
-      gmKindLabel: function (kind) {
-        return KIND_LABELS[kind] || "Kind " + kind;
+      gmPubKindLabel: function (row) {
+        if (!row) return "—";
+        var key = row.event_kind != null ? row.event_kind : row.aggregate_type;
+        return KIND_LABELS[key] || "Kind " + key;
+      },
+      gmSelectPub: function (row) {
+        this.gmPubs.detail = row;
+      },
+      gmPubDetailFields: function (row) {
+        var fields = [
+          { label: "Intent ID", value: row.id, code: true },
+          { label: "Aggregate",
+            value: row.aggregate_type + ":" + row.aggregate_id, code: true },
+          { label: "Revision", value: String(row.aggregate_revision) },
+          { label: "Event kind",
+            value: row.event_kind != null ? String(row.event_kind) : "—" },
+          { label: "Event address",
+            value: row.event_address || "—", code: true },
+          { label: "Attempts", value: String(row.attempts) },
+          { label: "Queued", value: fmtTime(row.created_at) },
+          { label: "Last update", value: fmtTime(row.updated_at) },
+          { label: "Next attempt", value: fmtTime(row.next_attempt_at) },
+          { label: "Claimed", value: row.claimed_at
+              ? fmtTime(row.claimed_at) +
+                (row.claimed_until ? " – " + fmtTime(row.claimed_until) : "") +
+                (row.claimed_by ? " by " + row.claimed_by : "")
+              : "—" },
+          { label: "Depends on", value: (row.depends_on || []).length
+              ? row.depends_on.map(function (d) {
+                  return d.slice(0, 8) + "…" + d.slice(-4);
+                }).join(", ")
+              : "—" }
+        ];
+        if (row.last_error) {
+          fields.push({ label: "Last error", value: row.last_error });
+        }
+        return fields;
       },
       gmPubStateLabel: function (s) {
         return STATE_PILLS[s] || s;
