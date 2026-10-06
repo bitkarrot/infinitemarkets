@@ -229,6 +229,28 @@ async def get_outbox(
     return await relay_service.list_outbox(merchant_id, limit)
 
 
+class OutboxPruneBody(_Strict):
+    older_than_days: int = Field(default=90, ge=7, le=3650)
+
+
+@infinitemarkets_api_router.post("/merchants/{merchant_id}/outbox/prune")
+@problem_boundary
+async def prune_outbox_history(
+    request: Request,
+    merchant_id: str,
+    body: OutboxPruneBody,
+    user: User = Depends(check_user_exists),
+):
+    """Flush terminal outbox history (published/superseded/failed) older
+    than the given window. In-flight intents are untouched."""
+    from .services import relay as relay_service
+
+    await merchant_service.get_merchant_row(merchant_id, str(user.id))
+    return await relay_service.prune_outbox(
+        merchant_id, body.older_than_days
+    )
+
+
 @infinitemarkets_api_router.post(
     "/merchants/{merchant_id}/outbox/{intent_id}/retry"
 )

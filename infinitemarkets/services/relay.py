@@ -347,6 +347,56 @@ async def list_outbox(merchant_id: str, limit: int = 100) -> dict:
     }
 
 
+async def prune_outbox(merchant_id: str, older_than_days: int) -> dict:
+    """Manual history flush — outbox intents have no automatic retention.
+    Deletes terminal rows (published / superseded / failed) whose last
+    touch is older than `older_than_days`, plus their dependency edges
+    and per-relay delivery evidence (the FKs are ON DELETE RESTRICT, so
+    dependents go first). In-flight rows — pending, claimed,
+    partially_published — are never touched, and order/financial/audit
+    tables are entirely out of scope."""
+    days = int(older_than_days)
+    if not 7 <= days <= 3650:
+        raise unprocessable(
+            "invalid-content",
+            "older_than_days must be between 7 and 3650",
+        )
+    cutoff = int(time.time()) - days * 86400
+    deleted = 0
+    async with DomainTransaction() as tx:
+        rows = await tx.fetch_all(
+            f"SELECT id FROM {tx.table('outbox_events')} "
+            "WHERE merchant_id = :m "
+            "AND state IN ('published', 'superseded', 'failed') "
+            "AND updated_at <= :c",
+            {"m": merchant_id, "c": cutoff},
+        )
+        ids = [r["id"] for r in rows]
+        for i in range(0, len(ids), 500):
+            marks = ids[i : i + 500]
+            params = {f"x{j}": v for j, v in enumerate(marks)}
+            in_list = ",".join(f":x{j}" for j in range(len(marks)))
+            # Edges referencing the pruned set on EITHER side —
+            # a surviving row may depend on a pruned one.
+            await tx.execute(
+                f"DELETE FROM {tx.table('outbox_dependencies')} "
+                f"WHERE outbox_event_id IN ({in_list}) "
+                f"OR depends_on_outbox_event_id IN ({in_list})",
+                params,
+            )
+            await tx.execute(
+                f"DELETE FROM {tx.table('relay_publications')} "
+                f"WHERE outbox_event_id IN ({in_list})",
+                params,
+            )
+            deleted += await tx.execute(
+                f"DELETE FROM {tx.table('outbox_events')} "
+                f"WHERE id IN ({in_list})",
+                params,
+            )
+    return {"pruned": deleted, "older_than_days": days}
+
+
 async def retry_intent(merchant_id: str, intent_id: str) -> dict:
     """Requeue a failed/partially_published intent — resets attempts and
     next_attempt_at. Accepted relay targets are never resent (the worker

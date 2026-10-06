@@ -50,7 +50,9 @@
           intents: [],
           retrying: null,
           detail: null,
-          exceptionOrders: []
+          exceptionOrders: [],
+          prune: {show: false, days: 90, busy: false, result: null},
+          pruneDayOptions: [7, 14, 30, 60, 90, 180, 365]
         },
         /* q-table columns for the relay-health surface (q-markup-table
            can't be used — in-DOM template foster-parenting breaks it). */
@@ -188,6 +190,25 @@
           self.gmPubs.error = self.gmProblemCopy(e.problem);
         }
         self.gmPubs.retrying = null;
+      },
+      gmPruneOutbox: async function () {
+        var self = this;
+        var mid = self.gmMerchantId();
+        self.gmPubs.prune.busy = true;
+        self.gmPubs.prune.result = null;
+        try {
+          var res = await self.gmApi(
+            "POST",
+            "/merchants/" + mid + "/outbox/prune",
+            {older_than_days: self.gmPubs.prune.days}
+          );
+          self.gmPubs.prune.result = res;
+          await self.gmLoadPublications();
+        } catch (e) {
+          self.gmPubs.error = self.gmProblemCopy(e.problem);
+          self.gmPubs.prune.show = false;
+        }
+        self.gmPubs.prune.busy = false;
       },
       gmPubCellLabel: function (p) {
         if (!p) return "—";

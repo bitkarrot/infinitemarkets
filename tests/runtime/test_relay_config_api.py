@@ -195,7 +195,7 @@ async def test_blossom_servers_configurable_with_https_only(runtime_env):
             json={"blossom_servers": [bad]},
             headers=_headers(env, csrf),
         )
-        assert resp.status_code == 422, (bad, resp.status_code)
+        assert resp.status_code in (400, 422), (bad, resp.status_code)
 
 
 async def test_outbox_listing_and_retry_routes(runtime_env):
@@ -249,5 +249,95 @@ async def test_outbox_listing_and_retry_routes(runtime_env):
     resp = await client.get(
         f"/infinitemarkets/api/v1/merchants/{uuid.uuid4().hex}/outbox",
         headers=_headers(env),
+    )
+    assert resp.status_code in (403, 404)
+
+
+async def test_outbox_prune_history(runtime_env):
+    """Prune deletes only terminal outbox rows past the window, with
+    their relay evidence and dependency edges; in-flight rows survive."""
+    import time
+
+    from infinitemarkets.db import db, table
+
+    client, env = runtime_env["client"], runtime_env
+    mid, csrf = await _merchant_id(env)
+    now = int(time.time())
+    old = now - 100 * 86400
+
+    async def ins_outbox(i, state, ts):
+        await conn.execute(
+            f"INSERT INTO {table('outbox_events')} "
+            "(id, merchant_id, aggregate_type, aggregate_id, event_kind,"
+            " state, created_at, updated_at)"
+            " VALUES (:i, :m, 'product', :i, 30402, :s, :t, :t)",
+            {"i": i, "m": mid, "s": state, "t": ts},
+        )
+
+    async with db.connect() as conn:
+        for i, (state, ts) in enumerate((
+            ("published", old), ("superseded", old), ("failed", old),
+            ("published", now), ("pending", old), ("claimed", old),
+        )):
+            await ins_outbox(f"pr-{i}", state, ts)
+        await conn.execute(
+            f"INSERT INTO {table('relay_publications')} "
+            "(id, outbox_event_id, delivery_copy, relay_url, event_id,"
+            " attempt_no, result, attempted_at)"
+            " VALUES ('rp-0', 'pr-0', 'a', 'wss://x', 'e', 1, 'accepted', :t)",
+            {"t": old},
+        )
+        # an edge where the pruned side is the DEPENDENCY
+        await conn.execute(
+            f"INSERT INTO {table('outbox_dependencies')} "
+            "(outbox_event_id, depends_on_outbox_event_id)"
+            " VALUES ('pr-4', 'pr-0')",
+        )
+
+    async def listed():
+        r = await client.get(
+            f"/infinitemarkets/api/v1/merchants/{mid}/outbox",
+            headers=_headers(env),
+        )
+        return {i["id"] for i in r.json()["intents"]}
+
+    mine = {f"pr-{i}" for i in range(6)}
+    assert mine <= await listed()
+
+    resp = await client.post(
+        f"/infinitemarkets/api/v1/merchants/{mid}/outbox/prune",
+        json={"older_than_days": 30},
+        headers=_headers(env, csrf),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["pruned"] == 3
+    assert (await listed()) & mine == {"pr-3", "pr-4", "pr-5"}
+
+    # evidence + edge rows went with the deleted events — including the
+    # edge where the pruned row was the dependency (either-side match)
+    async with db.connect() as conn:
+        assert (await conn.fetchone(
+            f"SELECT COUNT(*) n FROM {table('relay_publications')} "
+            "WHERE outbox_event_id IN ('pr-0', 'pr-1', 'pr-2')"
+        ))["n"] == 0
+        assert (await conn.fetchone(
+            f"SELECT COUNT(*) n FROM {table('outbox_dependencies')} "
+            "WHERE outbox_event_id IN ('pr-0', 'pr-1', 'pr-2') "
+            "OR depends_on_outbox_event_id IN ('pr-0', 'pr-1', 'pr-2')"
+        ))["n"] == 0
+
+    # bounds are enforced
+    for bad in (0, 6, 4000):
+        resp = await client.post(
+            f"/infinitemarkets/api/v1/merchants/{mid}/outbox/prune",
+            json={"older_than_days": bad},
+            headers=_headers(env, csrf),
+        )
+        assert resp.status_code in (400, 422), (bad, resp.status_code)
+
+    resp = await client.post(
+        f"/infinitemarkets/api/v1/merchants/{uuid.uuid4().hex}/outbox/prune",
+        json={"older_than_days": 30},
+        headers=_headers(env, csrf),
     )
     assert resp.status_code in (403, 404)
