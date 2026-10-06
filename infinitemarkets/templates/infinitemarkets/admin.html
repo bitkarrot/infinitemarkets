@@ -1288,20 +1288,20 @@
                     <div class="text-subtitle2 q-mb-sm">Identity</div>
                     <q-input v-model="gmSettings.displayName" outlined dense
                              label="Display name" class="q-mb-sm"></q-input>
-                    <q-btn outline dense label="Save display name"
+                    <q-btn color="primary" outline dense label="Save display name"
                            @click="gmSaveDisplayName"></q-btn>
                     <div class="q-mt-md text-caption">Store pubkey (public)</div>
                     <div class="row items-center q-gutter-sm">
                       <code>{{ gmTrunc(gm.merchant.pubkey, 12, 8) }}</code>
-                      <q-btn flat dense label="Copy pubkey"
+                      <q-btn color="primary" flat dense label="Copy pubkey"
                              @click="gmCopy(gm.merchant.pubkey)"></q-btn>
                     </div>
                     <div class="q-mt-sm">
-                      <q-btn outline dense icon="open_in_new"
+                      <q-btn color="primary" outline dense icon="open_in_new"
                              label="View public storefront"
                              :href="'/infinitemarkets/public/merchants/' + gm.merchant.pubkey"
                              target="_blank" rel="noopener"></q-btn>
-                      <q-btn flat dense label="Copy storefront URL"
+                      <q-btn color="primary" flat dense label="Copy storefront URL"
                              @click="gmCopy(gmOrigin() + '/infinitemarkets/public/merchants/' + gm.merchant.pubkey)"></q-btn>
                     </div>
                     <div class="q-mt-sm">
@@ -1343,7 +1343,7 @@
                     <div class="text-caption q-mb-sm">
                       {{ gmSettings.nsecNote }}
                     </div>
-                    <q-btn outline dense label="Import key"
+                    <q-btn color="primary" outline dense label="Import key"
                            :loading="gmSettings.importing"
                            :disable="!gmSettings.nsecInput"
                            @click="gmImportKey"></q-btn>
@@ -1377,7 +1377,7 @@
                                 wallet, then retry.
                               </q-tooltip>
                             </q-badge>
-                            <q-btn v-if="r.paid_invoice"
+                            <q-btn color="primary" v-if="r.paid_invoice"
                                    flat dense size="sm" class="q-ml-xs"
                                    label="Paid externally — retry"
                                    @click="gmRetryRelayAuth(r)"></q-btn>
@@ -1409,7 +1409,7 @@
                                 option-value="value" option-label="label"
                                 emit-value map-options
                                 style="min-width: 130px"></q-select>
-                      <q-btn outline dense label="Add relay"
+                      <q-btn color="primary" outline dense label="Add relay"
                              @click="gmAddRelay"></q-btn>
                     </div>
                     <div class="text-subtitle2 q-mt-md q-mb-sm">
@@ -1427,7 +1427,7 @@
                     <div class="row q-gutter-sm q-mt-sm items-center">
                       <q-input v-model="gmSettings.newBlossom" dense outlined
                                class="col" label="https://blossom.example"></q-input>
-                      <q-btn outline dense label="Add media server"
+                      <q-btn color="primary" outline dense label="Add media server"
                              @click="gmAddBlossom"></q-btn>
                     </div>
                     <q-btn unelevated color="primary" class="q-mt-md"
@@ -1512,7 +1512,7 @@
                       <q-item v-for="e in gmNotify.emails" :key="e">
                         <q-item-section>{{ e }}</q-item-section>
                         <q-item-section side>
-                          <q-btn flat dense label="Send test"
+                          <q-btn color="primary" flat dense label="Send test"
                                  :loading="gmNotify.testing === e"
                                  @click="gmSendTest(e)"></q-btn>
                           <q-btn flat dense color="negative" label="Remove"
@@ -1524,7 +1524,7 @@
                       <q-input v-model="gmNotify.newEmail" dense outlined
                                class="col" label="you@example.com"
                                type="email"></q-input>
-                      <q-btn outline dense label="Add address"
+                      <q-btn color="primary" outline dense label="Add address"
                              :disable="gmNotify.emails.length >= 5"
                              @click="gmAddEmail"></q-btn>
                     </div>
@@ -1669,7 +1669,7 @@
                               :options="gmSettings.cornerOptions"
                               option-value="value" option-label="label"
                               emit-value map-options></q-select>
-                    <q-btn flat dense label="Reset to preset"
+                    <q-btn color="primary" flat dense label="Reset to preset"
                            class="q-mt-sm"
                            @click="gmResetTier('brand')"></q-btn>
                   </div>
@@ -1774,7 +1774,7 @@
                         </div>
                         <div class="text-caption text-grey-7">{{ c.help }}</div>
                       </div>
-                      <q-btn v-if="gmTuneIsCustom(c.token)" flat dense round
+                      <q-btn color="primary" v-if="gmTuneIsCustom(c.token)" flat dense round
                              icon="restart_alt" size="sm"
                              :aria-label="'Reset ' + c.label"
                              @click="gmTuneReset(c.token)">
@@ -1796,7 +1796,7 @@
                             {{ gmTuneValue(r) }}px
                           </span>
                         </div>
-                        <q-btn v-if="gmTuneIsCustom(r.token)" flat dense round
+                        <q-btn color="primary" v-if="gmTuneIsCustom(r.token)" flat dense round
                                icon="restart_alt" size="sm"
                                :aria-label="'Reset ' + r.label"
                                @click="gmTuneReset(r.token)">
@@ -1823,7 +1823,7 @@
                             {{ gmTuneValue(s) }}px
                           </span>
                         </div>
-                        <q-btn v-if="gmTuneIsCustom(s.token)" flat dense round
+                        <q-btn color="primary" v-if="gmTuneIsCustom(s.token)" flat dense round
                                icon="restart_alt" size="sm"
                                :aria-label="'Reset ' + s.label"
                                @click="gmTuneReset(s.token)">
@@ -1838,7 +1838,7 @@
                       </q-slider>
                     </div>
 
-                    <q-btn flat dense no-caps icon="restart_alt"
+                    <q-btn color="primary" flat dense no-caps icon="restart_alt"
                            label="Reset all fine-tuning" class="q-mt-md"
                            :disable="!gmTuneCustomCount()"
                            @click="gmResetTier('advanced')"></q-btn>
@@ -1858,7 +1858,7 @@
                          :loading="gmSettings.saving"
                          :disable="!gmContrastOk"
                          @click="gmSaveTheme"></q-btn>
-                  <q-btn flat label="Reset to preset" class="q-ml-sm"
+                  <q-btn color="primary" flat label="Reset to preset" class="q-ml-sm"
                          @click="gmResetTier('preset')"></q-btn>
                 </div>
               </div>
@@ -1946,7 +1946,7 @@
                         <div class="text-weight-medium">{{ s.title }}</div>
                         <div class="text-caption text-grey-7">{{ s.desc }}</div>
                       </div>
-                      <q-btn outline dense no-caps icon="content_copy"
+                      <q-btn color="primary" outline dense no-caps icon="content_copy"
                              label="Copy snippet" :data-gm="'embed-copy-' + s.id"
                              @click="gmCopyEmbed(s)"></q-btn>
                     </div>
