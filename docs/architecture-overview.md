@@ -1,6 +1,6 @@
 # infinitemarkets — Architecture Overview (as built)
 
-**Status:** Implementation-state document for Release A. It describes what is
+**Status:** Implementation-state document — now covers Releases A and B plus the post-03.1 surfaces in section 4. It describes what is
 actually wired today. `technical-specification.md` remains the normative
 contract — where the two differ, the spec describes the target and this file
 describes the current build. Items marked *Release B/C* are planned surfaces
@@ -100,7 +100,7 @@ in the Publications admin tab; relay delivery is never treated as state truth.
 | `31990` | NIP-89 handler info — tells clients this merchant serves `/p/{naddr}` product pages | publish |
 | `5` | Tombstone / deletion request | product/collection/shipping delete |
 | `30017` / `30018` | Literal NIP-15 stall + product | *Release C* — builders exist, not emitted yet |
-| `1059` (inbound) | NIP-17 gift-wrapped buyer orders | *Release B* — `inbox_events` table and `direction=inbox` relay config exist; no subscription runs yet |
+| `1059` (inbound) | NIP-17 gift-wrapped buyer orders | **Live (Release B)** — the inbox listener maintains cursors in `inbox_events` on `direction=inbox|both` relays |
 
 **What's never exposed:** orders, invoices, buyers' data, or internal state.
 The nsec lives in `merchant_keys`, is used only for event signing, and is
@@ -129,3 +129,44 @@ emails, and prune retained data on fixed intervals.
 **Deletion.** Soft-delete in the DB → a kind-5 tombstone is published so the
 relay copy stops advertising the item — the row is kept for order and audit
 history.
+
+## 4. Post-03.1 surfaces (ad-hoc, released as v0.1–v0.2)
+
+These shipped between 03.1 and Phase 4 planning — committed on `main` and
+covered by runtime + Playwright tests, but not part of a phase plan.
+
+**Public embedding.** Three ways to put a shop on an external page:
+
+- `GET /infinitemarkets/api/v1/public/merchants/{pubkey}/products` —
+  unauthenticated, rate-limited card data with `Access-Control-Allow-Origin: *`
+  (reads only; mutations still require the normal controls).
+- `infinitemarkets/static/infinitemarkets/js/gm-embed.js` — a drop-in
+  component that renders product cards into the host page's own DOM (no
+  iframe). `data-gm-*` attributes select collection/category/limit/title/
+  scheme; `data-gm-mode="modal"` adds an in-page product dialog. Cards and
+  the Buy button land on hosted product/checkout pages.
+- `GET /infinitemarkets/public/embed/merchants/{pubkey}` — a chrome-free
+  iframe listing (browse + filters only) whose CSP is
+  `frame-ancestors 'self' https:`; all other public pages remain `'none'`.
+  It broadcasts height via `postMessage` for auto-sizing.
+
+**Theme system additions** (`services/themes.py`, `views.py::_brand_ctx`):
+brand `logo_url` (same bounded URL rules as hero images — `/path` or
+`https:`), `footer.tagline`/`footer.note` (plain text, escaped, bounded),
+a derived dark-scheme token set emitted alongside light tokens with a
+shopper `data-scheme` toggle persisted in localStorage, and the point-and-click
+Fine-tune admin panel which writes the same allowlisted advanced tokens
+(the Lightning accent lives in `brand.accent` and is edited there).
+
+**Admin surfaces.** About + More nav section (version from `config.json`,
+creator credit, screenshot gallery, link cards), the Embed snippets tab,
+Messages redesigned as conversation list + chat thread, Publications rows
+carrying timestamps and clickable detail, and single-column merchant
+settings.
+
+**Outbox history prune.** `POST /api/v1/merchants/{id}/outbox/prune`
+(`{older_than_days}`, 7–3650) deletes terminal intents — published,
+superseded, failed — plus their `relay_publications` evidence and
+`outbox_dependencies` edges on either side. In-flight rows are never
+touched; the daily `retention_prune` still covers inbox ciphertext, token
+copies, peer-relay cache, and terminal-order PII.

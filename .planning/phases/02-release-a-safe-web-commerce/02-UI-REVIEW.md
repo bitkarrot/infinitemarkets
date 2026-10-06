@@ -91,3 +91,18 @@ No shadcn initialization or third-party component registry exists. UI primitives
 - `tests/runtime/test_themes.py`
 - `tests/e2e/admin.spec.ts`
 - `tests/e2e/buyer.spec.ts`
+
+## Resolution — 2026-10-06
+
+All three non-blocking recommendations are closed:
+
+1. **Typography/spacing token consolidation** — done. The public stylesheet
+   consolidated onto token-driven sizes/weights during the post-02
+   storefront work (YNS design-language pass, gallery layout, hero, footer,
+   filter rail, dark-mode hairlines); literal one-off sizes were folded into
+   the shared scale as each surface was touched.
+2. **Spacing rhythm** — folded into the same consolidation pass.
+3. **Durable visual-regression baselines** — done. `tests/e2e/capture-screenshots.mjs`
+   now produces reproducible storefront/admin screenshots on a seeded
+   instance (light/dark, all four layouts, mobile viewport), and the About
+   tab + README gallery consume them.

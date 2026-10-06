@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 03.1
-current_phase_name: Buyer accounts — email magic-link sign-in and Nostr identity linking
-status: executing
-stopped_at: 03.1-03 complete — buyer-facing account surfaces shipped + e2e-proven; phase 03.1 fully landed
+current_phase: 04
+current_phase_name: Release C — Migration and Cutover
+status: ready-to-plan
+stopped_at: all executed phases complete; tracking docs reconciled 2026-10-06; ad-hoc v0.1–v0.2 work committed and deployed
 last_updated: "2026-10-07T00:00:00.000Z"
 last_activity: 2026-10-07
-last_activity_desc: 03.1-03 executed — widened render gate, two-method modal, profile link cards, /_e2e/mailbox + 20/20 buyer e2e
+last_activity_desc: bookkeeping — 03.1 marked complete, GAM requirements closed, UI-review recommendations resolved, ad-hoc v0.1–v0.2 work documented
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 17
-  completed_plans: 15
-  percent: 65
+  completed_plans: 14
+  percent: 82
 ---
 
 # Project State
@@ -24,16 +24,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-20)
 
 **Core value:** A merchant can sell one authoritative inventory safely through LNbits-backed web and Nostr flows without duplicate invoices, double allocation, or relay delivery being mistaken for payment truth.
-**Current focus:** Phase 3 — Release B: Gamma NIP-17 Orders
+**Current focus:** Phase 4 — Release C: Migration and Cutover (next: plan-phase)
 
 ## Current Position
 
-Phase: 03.1 (Buyer accounts — email magic-link sign-in and Nostr identity linking) — COMPLETE (all 3 plans landed)
-Plan: 03.1-03 complete (frontend surfaces + e2e proof)
-Status: Phase 03.1 done — next is Phase 4 (Release C — Migration and Cutover) or remaining Phase 3 work per roadmap
-Last activity: 2026-10-07 — 03.1-03 executed (render gate, two-method modal, profile links, mailbox harness)
+Phase: 4 (Release C — Migration and Cutover) — NOT STARTED, next step is plan-phase
+Status: Phases 1, 2, 3 and 03.1 all complete (14/17 plans); Phase 3 release gate verified (one operator-deferred item in 03-UAT: live plebeian.market smoke)
+Last activity: 2026-10-06 — tracking docs reconciled; ad-hoc v0.1–v0.2 work documented
 
-Progress: [█████░░░░░] 50% of roadmap phases; Phases 1 and 2 are formally complete
+Progress: [████████░░] 80% of roadmap phases (4/5)
+
+**Ad-hoc work since 03.1 (not phase-planned, committed + deployed, released as v0.1/v0.2):** storefront filters + collection links; configurable index hero; dark/light shopper toggle; Messages list+thread redesign; Publications timestamps/row detail; brand logo URL + footer copy; point-and-click Fine-tune + accent move; single-column merchant settings; primary-colored settings buttons; embeddable shop component (`gm-embed.js` + public products API + CORS), iframe embed with widened CSP, admin Embed snippets; About/More section + screenshots; outbox history prune control; Releases v0.1, v0.2.
 
 ## Performance Metrics
 

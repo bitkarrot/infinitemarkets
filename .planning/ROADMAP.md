@@ -14,7 +14,7 @@ The project advances through four gated vertical stages. GSD Phase 1 executes th
 
 - [x] **Phase 1: Conformance Profile (Contract Phase 0)** - Prove host, SDK, schema, state, security, and protocol assumptions before runtime implementation. (completed 2026-09-20)
 - [x] **Phase 2: Release A — Safe Web Commerce** - Ship catalog publication and LNbits-backed public checkout as the first production vertical slice. (completed 2026-09-27)
-- [ ] **Phase 3: Release B — Gamma NIP-17 Orders** - Add encrypted recipient-specific Gamma order messaging and external-client conformance.
+- [x] **Phase 3: Release B — Gamma NIP-17 Orders** - Add encrypted recipient-specific Gamma order messaging and external-client conformance. (completed 2026-09-29)
 - [ ] **Phase 4: Release C — Legacy Interop and Cutover** - Add literal NIP-15/NIP-04 compatibility and inventory-safe migration.
 
 ## Phase Details
@@ -128,13 +128,13 @@ Plans:
 4. Both identity-link directions work; owned-elsewhere identities union-merge atomically (sessions re-point, loser retires) or reject honestly when unrepresentable.
 5. Sign-in affordance offers both methods with honest availability; profile shows linked identities and gates kind-0 on a real key; orders page acknowledges found history once.
 
-**Plans:** 1/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 
 - [x] 03.1-01-PLAN.md
-- [ ] 03.1-02-PLAN.md
-- [ ] 03.1-03-PLAN.md
+- [x] 03.1-02-PLAN.md
+- [x] 03.1-03-PLAN.md
 
 **Wave 1**
 
@@ -142,11 +142,11 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 03.1-02: magic-link transport + no-oracle request/verify + fragment landing + identity linking/union merge + spec amendment + runtime suite
+- [x] 03.1-02: magic-link transport + no-oracle request/verify + fragment landing + identity linking/union merge + spec amendment + runtime suite
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 03.1-03: two-method modal + widened render gate + profile link cards + orders note + /_e2e/mailbox harness + buyer e2e flows
+- [x] 03.1-03: two-method modal + widened render gate + profile link cards + orders note + /_e2e/mailbox harness + buyer e2e flows
 
 ### Phase 4: Release C — Migration and Cutover
 
@@ -176,6 +176,6 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Conformance Profile | 3/3 | Complete    | 2026-09-20 |
 | 2. Release A — Safe Web Commerce | 4/4 | Complete    | 2026-09-27 |
-| 3. Release B — Gamma NIP-17 Orders | 4/4 | Executed    | - |
-| 03.1. Buyer accounts (INSERTED) | 1/3 | In Progress|  |
+| 3. Release B — Gamma NIP-17 Orders | 4/4 | Complete    | 2026-09-29 |
+| 03.1. Buyer accounts (INSERTED) | 3/3 | Complete   | 2026-10-05 |
 | 4. Release C — Migration and Cutover | 0/3 | Not started | - |

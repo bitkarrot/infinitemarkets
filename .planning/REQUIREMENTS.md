@@ -52,11 +52,11 @@
 
 ### Release B — Gamma NIP-17 Orders
 
-- [ ] **GAM-01**: Merchant can publish and validate a 1–3 relay kind-10050 inbox profile before claiming Gamma order reachability.
-- [ ] **GAM-02**: Buyer can submit a valid NIP-17 kind-16 type-1 order that enters the same canonical pricing, shipping, inventory, invoice, and settlement services as web checkout.
-- [ ] **GAM-03**: Buyer and merchant can exchange kind-16 payment/status/shipping and kind-17 receipt messages with stable rumor identity, independent sender/recipient copies, and settlement-independent receipt semantics.
-- [ ] **GAM-04**: Durable inbox processing verifies and deduplicates outer/seal/rumor identity, preserves encrypted history, resumes completed-session cursors, and routes each copy only to that party's declared relays.
-- [ ] **GAM-05**: Release B passes deployed relay SSRF/egress, recipient-gated relay, NIP-42, overload, and independent external Gamma-client conformance gates.
+- [x] **GAM-01**: Merchant can publish and validate a 1–3 relay kind-10050 inbox profile before claiming Gamma order reachability.
+- [x] **GAM-02**: Buyer can submit a valid NIP-17 kind-16 type-1 order that enters the same canonical pricing, shipping, inventory, invoice, and settlement services as web checkout.
+- [x] **GAM-03**: Buyer and merchant can exchange kind-16 payment/status/shipping and kind-17 receipt messages with stable rumor identity, independent sender/recipient copies, and settlement-independent receipt semantics.
+- [x] **GAM-04**: Durable inbox processing verifies and deduplicates outer/seal/rumor identity, preserves encrypted history, resumes completed-session cursors, and routes each copy only to that party's declared relays.
+- [x] **GAM-05**: Release B passes deployed relay SSRF/egress, recipient-gated relay, NIP-42, overload, and independent external Gamma-client conformance gates.
 
 ### Buyer Accounts
 
@@ -142,11 +142,11 @@ A requirement is complete only when implementation (or Phase 0 probe/model), aut
 | UI-01 | Phase 2 | Complete |
 | UI-02 | Phase 2 | Complete |
 | UI-03 | Phase 2 | Complete |
-| GAM-01 | Phase 3 | Pending |
-| GAM-02 | Phase 3 | Pending |
-| GAM-03 | Phase 3 | Pending |
-| GAM-04 | Phase 3 | Pending |
-| GAM-05 | Phase 3 | Pending |
+| GAM-01 | Phase 3 | Complete |
+| GAM-02 | Phase 3 | Complete |
+| GAM-03 | Phase 3 | Complete |
+| GAM-04 | Phase 3 | Complete |
+| GAM-05 | Phase 3 | Complete |
 | ACC-01 | Phase 03.1 | Complete |
 | ACC-02 | Phase 03.1 | Complete |
 | ACC-03 | Phase 03.1 | Complete |
