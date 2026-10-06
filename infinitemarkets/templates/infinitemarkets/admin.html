@@ -1268,6 +1268,7 @@
           <q-tab name="merchant" label="Merchant"></q-tab>
           <q-tab name="notifications" label="Notifications"></q-tab>
           <q-tab name="appearance" label="Appearance"></q-tab>
+          <q-tab name="embed" label="Embed"></q-tab>
         </q-tabs>
         <q-banner v-if="gmSettings.error" class="bg-negative text-white q-mb-md">
           {{ gmSettings.error }}
@@ -1781,6 +1782,40 @@
                              :label="p.ok ? 'passes' : 'fails'"></q-badge>
                   </div>
                 </div>
+              </div>
+            </div>
+          </q-tab-panel>
+
+          <!-- Embed: copy/paste snippets for the WebPages extension or
+               any external site -->
+          <q-tab-panel name="embed" class="gm-tab-panel">
+            <div class="row q-col-gutter-md">
+              <div class="col-12 col-md-8">
+                <q-card flat bordered>
+                  <q-card-section>
+                    <div class="text-subtitle2">Embed this shop on a web page</div>
+                    <p class="text-caption text-grey-7 q-mb-none">
+                      Paste a snippet into any page — including a page hosted
+                      by the WebPages extension on this LNbits. Keep the full
+                      URL when embedding on another host. Checkout always
+                      happens on the hosted shop pages.
+                    </p>
+                  </q-card-section>
+                  <q-separator></q-separator>
+                  <q-card-section v-for="s in gmEmbedSnippets()" :key="s.id"
+                                  class="q-pt-sm">
+                    <div class="row items-center q-mb-xs">
+                      <div class="col">
+                        <div class="text-weight-medium">{{ s.title }}</div>
+                        <div class="text-caption text-grey-7">{{ s.desc }}</div>
+                      </div>
+                      <q-btn outline dense no-caps icon="content_copy"
+                             label="Copy snippet" :data-gm="'embed-copy-' + s.id"
+                             @click="gmCopyEmbed(s)"></q-btn>
+                    </div>
+                    <pre class="gm-snippet">{{ s.code }}</pre>
+                  </q-card-section>
+                </q-card>
               </div>
             </div>
           </q-tab-panel>
@@ -2376,6 +2411,19 @@
   font-size: 12px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.gm-snippet {
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--color-surface-alt, #f2efe9);
+  border: 1px solid var(--color-border, #e8e0d5);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 0;
+  user-select: all;
 }
 @media (max-width: 1023px) {
   .gm-nav { width: 72px; }

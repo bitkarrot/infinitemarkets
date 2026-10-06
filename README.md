@@ -158,7 +158,9 @@ Two ways to put a storefront on another page:
 <script src="https://<lnbits-host>/infinitemarkets/static/infinitemarkets/js/gm-embed.js" defer></script>
 ```
 
-Optional container attributes: `data-gm-collection="<d_tag>"`, `data-gm-category="<slug>"`, `data-gm-limit="8"`, `data-gm-title`, `data-gm-scheme="dark|light"`. Multiple containers per page are supported.
+Optional container attributes: `data-gm-collection="<d_tag>"`, `data-gm-category="<slug>"`, `data-gm-limit="8"`, `data-gm-title`, `data-gm-scheme="dark|light"`, `data-gm-mode="modal"` (cards open a product dialog in the host page instead of a new tab — the dialog's Buy button still opens hosted checkout), `data-gm-target="_self"`. Multiple containers per page are supported.
+
+Copy-ready snippets for all three options (link grid, modal grid, iframe) are in the admin panel under **Settings → Embed**.
 
 **Iframe embed** — `/infinitemarkets/public/embed/merchants/<pubkey>` renders the browse section with no nav/hero/footer; its CSP allows `frame-ancestors` on `https:` embedders, and it `postMessage`s `{type: 'gm-embed-height', height}` for auto-sizing. Sign-in and order tracking open full pages in new tabs.
 

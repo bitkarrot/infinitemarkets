@@ -608,6 +608,67 @@
           self.gmSettings.themeError = self.gmProblemCopy(e.problem);
         }
         self.gmSettings.saving = false;
+      },
+      /* Embed shop — copy/paste snippets for the WebPages extension or
+         any static page. The component script renders real DOM (no
+         iframe); checkout always happens on the hosted shop pages. */
+      gmEmbedSnippets: function () {
+        var self = this;
+        var pubkey = (self.gm.merchant || {}).pubkey || "<merchant-pubkey>";
+        var origin = self.gmOrigin();
+        var scriptUrl = origin +
+          "/infinitemarkets/static/infinitemarkets/js/gm-embed.js";
+        var frameUrl = origin +
+          "/infinitemarkets/public/embed/merchants/" + pubkey;
+        return [
+          {
+            id: "component-link",
+            title: "Product grid — cards open the shop",
+            desc: "Renders product cards inside your page (no iframe). " +
+                  "Clicking a card opens the hosted product page in a new tab.",
+            code:
+              '<div data-gm-shop="' + pubkey + '" ' +
+              'data-gm-title="Our products"></div>\n' +
+              '<script src="' + scriptUrl + '" defer></' + 'script>'
+          },
+          {
+            id: "component-modal",
+            title: "Product grid — details in a popup",
+            desc: "Cards open a product dialog on your page; only the Buy " +
+                  "button leaves for the hosted checkout page.",
+            code:
+              '<div data-gm-shop="' + pubkey + '" ' +
+              'data-gm-title="Our products" data-gm-mode="modal"></div>\n' +
+              '<script src="' + scriptUrl + '" defer></' + 'script>'
+          },
+          {
+            id: "iframe",
+            title: "Full browse — iframe",
+            desc: "Filters, sorting and pagination inside an auto-sizing " +
+                  "frame; products and order tracking open new tabs.",
+            code:
+              '<iframe id="im-shop" src="' + frameUrl + '" ' +
+              'style="width:100%;border:0" loading="lazy"></iframe>\n' +
+              "<script>\n" +
+              "  addEventListener('message', function (e) {\n" +
+              "    if (e.data && e.data.type === 'gm-embed-height')\n" +
+              "      document.getElementById('im-shop')" +
+              ".style.height = e.data.height + 'px';\n" +
+              "  });\n" +
+              "</" + "script>"
+          }
+        ];
+      },
+      gmCopyEmbed: async function (s) {
+        var self = this;
+        try {
+          await navigator.clipboard.writeText(s.code);
+          self.gmSettings.notice =
+            s.title + " — snippet copied to clipboard.";
+        } catch (e) {
+          self.gmSettings.notice =
+            "Clipboard blocked — select the snippet text and copy it.";
+        }
       }
     },
     mounted: function () {

@@ -19,6 +19,13 @@
  *   data-gm-title="Shop"          heading text ('' or 'false' hides it)
  *   data-gm-scheme="dark|light"   palette override (default: follows
  *                                 prefers-color-scheme)
+ *   data-gm-mode="link|modal"     'link' (default): cards open the
+ *                                 hosted product page in a new tab.
+ *                                 'modal': cards open a product detail
+ *                                 dialog inside the host page; its Buy
+ *                                 button opens hosted checkout.
+ *   data-gm-target="_self"        link-mode navigation target
+ *                                 (default '_blank')
  */
 (function () {
   "use strict";
@@ -47,6 +54,22 @@
     ".gmx-shop .gmx-state{color:var(--gmx-muted);font-size:14px;padding:18px 0}",
     ".gmx-shop .gmx-more{margin-top:16px;font-size:13px}",
     ".gmx-shop .gmx-more a{color:var(--gmx-accent)}",
+    /* Product detail modal (data-gm-mode='modal') — the overlay mounts
+       INSIDE the container so it inherits the shop's palette vars. */
+    ".gmx-shop .gmx-overlay{position:fixed;inset:0;background:rgba(15,12,9,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:18px}",
+    ".gmx-shop .gmx-dialog{background:var(--gmx-bg);color:var(--gmx-fg);border-radius:16px;max-width:520px;width:100%;max-height:85vh;overflow:auto;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.35)}",
+    ".gmx-shop .gmx-dialog .gmx-close{position:absolute;top:10px;right:10px;width:34px;height:34px;border-radius:50%;border:0;background:rgba(0,0,0,.4);color:#fff;font-size:18px;line-height:1;cursor:pointer;z-index:2}",
+    ".gmx-shop .gmx-dialog .gmx-close:hover{background:rgba(0,0,0,.6)}",
+    ".gmx-shop .gmx-dialog .gmx-dialog-art{aspect-ratio:16/10;background:var(--gmx-line);display:flex;align-items:center;justify-content:center;color:var(--gmx-muted);font-size:12px}",
+    ".gmx-shop .gmx-dialog .gmx-dialog-art img{width:100%;height:100%;object-fit:cover;display:block}",
+    ".gmx-shop .gmx-dialog .gmx-dialog-body{padding:16px 18px 20px}",
+    ".gmx-shop .gmx-dialog .gmx-name{margin:0;font-size:19px;font-weight:750}",
+    ".gmx-shop .gmx-dialog .gmx-meta{margin:6px 0 0;font-size:12.5px;color:var(--gmx-muted)}",
+    ".gmx-shop .gmx-dialog .gmx-price{margin:8px 0 0;font-size:17px;font-weight:750}",
+    ".gmx-shop .gmx-dialog .gmx-desc{margin:12px 0 0;font-size:14px;line-height:1.55;white-space:pre-wrap;max-height:200px;overflow:auto}",
+    ".gmx-shop .gmx-dialog .gmx-buy{display:inline-block;margin-top:16px;padding:11px 22px;border-radius:999px;background:var(--gmx-accent);color:#fff;font-size:14px;font-weight:700;text-decoration:none;text-align:center}",
+    ".gmx-shop .gmx-dialog .gmx-buy:hover{filter:brightness(1.08)}",
+    ".gmx-shop .gmx-card{cursor:pointer}",
   ].join("\n");
 
   function injectStyle() {
@@ -81,11 +104,132 @@
     );
   }
 
-  function card(pubkey, product) {
+  /* Cheap de-markdown for the modal — plain text shown via textContent,
+     so no markup ever reaches the host DOM. */
+  function plainText(md) {
+    return String(md || "")
+      .replace(/^#{1,6}\s+/gm, "")
+      .replace(/\*\*(.+?)\*\*/g, "$1")
+      .replace(/\*(.+?)\*/g, "$1")
+      .replace(/`([^`]+)`/g, "$1")
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+      .replace(/^\s*[-*]\s+/gm, "• ")
+      .trim();
+  }
+
+  function openProductModal(container, pubkey, product) {
+    var overlay = el("div", "gmx-overlay");
+    var dialog = el("div", "gmx-dialog");
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("aria-label", product.title || "Product");
+
+    function close() {
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      document.removeEventListener("keydown", onKey);
+    }
+    function onKey(e) {
+      if (e.key === "Escape") close();
+    }
+
+    var closeBtn = el("button", "gmx-close", "✕");
+    closeBtn.type = "button";
+    closeBtn.setAttribute("aria-label", "Close product details");
+    closeBtn.addEventListener("click", close);
+    dialog.appendChild(closeBtn);
+
+    var art = el("div", "gmx-dialog-art");
+    var artHasImage = false;
+    if (product.image) {
+      var img = document.createElement("img");
+      img.src = product.image;
+      img.alt = "";
+      img.referrerPolicy = "no-referrer";
+      art.appendChild(img);
+      artHasImage = true;
+    } else {
+      art.appendChild(el("span", null, "No image"));
+    }
+    dialog.appendChild(art);
+
+    var body = el("div", "gmx-dialog-body");
+    body.appendChild(el("h3", "gmx-name", product.title || "Untitled"));
+    var meta = el("p", "gmx-meta");
+    if (product.availability === "sold") {
+      meta.appendChild(el("span", "gmx-chip gmx-sold", "Sold out"));
+    } else if (product.availability === "preorder") {
+      meta.appendChild(el("span", "gmx-chip", "Pre-order"));
+    } else {
+      meta.appendChild(document.createTextNode("In stock"));
+    }
+    if (product.format === "digital") {
+      meta.appendChild(document.createTextNode(" "));
+      meta.appendChild(el("span", "gmx-chip", "Digital"));
+    }
+    body.appendChild(meta);
+    var price = priceLabel(product);
+    if (price) body.appendChild(el("p", "gmx-price", price));
+
+    var desc = el("p", "gmx-desc", "Loading details…");
+    body.appendChild(desc);
+
+    var buy = el("a", "gmx-buy", "Buy — opens the shop");
+    buy.href = origin + product.url;
+    buy.target = "_blank";
+    buy.rel = "noopener";
+    body.appendChild(buy);
+    dialog.appendChild(body);
+
+    overlay.appendChild(dialog);
+    overlay.addEventListener("click", function (e) {
+      if (e.target === overlay) close();
+    });
+    document.addEventListener("keydown", onKey);
+    container.appendChild(overlay);
+    closeBtn.focus();
+
+    /* Fill in the full description asynchronously — the listing payload
+       stays light, detail comes from the product endpoint on demand. */
+    fetch(
+      extBase + "/api/v1/public/products/" + pubkey + "/" + product.d_tag,
+      {credentials: "omit"}
+    )
+      .then(function (r) {
+        if (!r.ok) throw new Error("unavailable");
+        return r.json();
+      })
+      .then(function (d) {
+        var text = plainText(d.description_md || d.summary || "");
+        desc.textContent = text || "No description provided.";
+        var imgs = (d.images || []).filter(function (i) {
+          return i.url;
+        });
+        if (imgs.length && !artHasImage) {
+          art.textContent = "";
+          var first = document.createElement("img");
+          first.src = imgs[0].url;
+          first.alt = "";
+          first.referrerPolicy = "no-referrer";
+          art.appendChild(first);
+        }
+      })
+      .catch(function () {
+        desc.textContent = "";
+      });
+  }
+
+  function card(container, pubkey, product, opts) {
     var link = el("a", "gmx-card");
     link.href = origin + product.url;
-    link.target = "_blank";
-    link.rel = "noopener";
+    if (opts.mode === "modal") {
+      link.addEventListener("click", function (e) {
+        e.preventDefault();
+        openProductModal(container, pubkey, product);
+      });
+    } else {
+      link.target = opts.target;
+      link.rel = "noopener";
+    }
 
     var art = el("div", "gmx-art");
     if (product.image) {
@@ -178,9 +322,17 @@
           state(container, "No products on sale yet.");
           return;
         }
+        var opts = {
+          mode: container.getAttribute("data-gm-mode") === "modal"
+            ? "modal"
+            : "link",
+          target: container.getAttribute("data-gm-target") === "_self"
+            ? "_self"
+            : "_blank",
+        };
         var grid = el("div", "gmx-grid");
         products.forEach(function (p) {
-          grid.appendChild(card(pubkey, p));
+          grid.appendChild(card(container, pubkey, p, opts));
         });
         container.appendChild(grid);
 
