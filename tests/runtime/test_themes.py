@@ -319,3 +319,25 @@ async def test_public_pages_carry_scheme_toggle_and_dark_tokens(runtime_env):
     assert 'id="gm-scheme-toggle"' in resp.text
     assert 'data-scheme="dark"' in resp.text
     assert "prefers-color-scheme: dark" in resp.text
+
+
+async def test_brand_name_overrides_display_name_in_hero(runtime_env):
+    """Brand Basics `name` is the shopper-facing name — hero and page
+    title must not fall back to the raw merchant display_name."""
+    client = runtime_env["client"]
+    merchant = await _merchant(runtime_env)
+    resp, _ = await _patch_theme(
+        runtime_env, {"brand": {"name": "Corner Store"}}
+    )
+    assert resp.status_code == 200, resp.text
+    try:
+        resp = await client.get(
+            f"/infinitemarkets/public/merchants/{merchant['pubkey']}"
+        )
+        assert resp.status_code == 200
+        assert '<h1 class="merchant-title">Corner Store</h1>' in resp.text
+        assert 'merchant-title">admin shop<' not in resp.text
+        assert "<title>Shop · Corner Store" in resp.text
+    finally:
+        # preset reset clears the brand block for later tests
+        await _patch_theme(runtime_env, {"preset": "warm-market"})

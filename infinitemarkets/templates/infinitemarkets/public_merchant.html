@@ -1,11 +1,11 @@
 {% extends "templates/infinitemarkets/public_base.html" %}
 {% import "templates/infinitemarkets/public_browse_controls.html" as browse_controls %}
-{% block title %}{{ display_name }}{% endblock %}
+{% block title %}Shop{% endblock %}
 {% block content %}
 <header class="merchant-hero">
   <div class="merchant-hero-text">
     <p class="eyebrow">Independent store</p>
-    <h1 class="merchant-title">{{ display_name }}</h1>
+    <h1 class="merchant-title">{{ brand_name or display_name }}</h1>
     {% if about %}<p class="merchant-about">{{ about }}</p>{% endif %}
   </div>
   {% if picture %}<img class="merchant-picture" src="{{ picture }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}

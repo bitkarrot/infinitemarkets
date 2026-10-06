@@ -2,7 +2,7 @@
 {% block title %}Order via Nostr{% endblock %}
 {% block content %}
 <div class="nostr-only" data-gm="nostr-only">
-  <h1>{{ merchant_name or 'This shop' }} sells through Nostr.</h1>
+  <h1>{{ brand_name or merchant_name or 'This shop' }} sells through Nostr.</h1>
   <p class="nostr-only-lead">
     This shop takes orders through private Nostr messages — no account,
     no checkout form. Everything is encrypted end to end.

@@ -311,7 +311,7 @@
     </aside>
     {% endif %}
     <p class="merchant-line">Sold by
-      {% if storefront_url %}<a href="{{ storefront_url }}">{{ merchant_name or brand_name or 'this shop' }}</a>
+      {% if storefront_url %}<a href="{{ storefront_url }}">{{ brand_name or merchant_name or 'this shop' }}</a>
       {% else %}{{ merchant_name or merchant_pubkey }}{% endif %}</p>
   </div>
 

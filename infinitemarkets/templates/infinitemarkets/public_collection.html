@@ -6,7 +6,7 @@
   <p class="eyebrow">Collection</p>
   <h1 class="collection-title">{{ collection.title }}</h1>
   {% if collection.description_md %}<p class="merchant-about">{{ collection.description_md }}</p>{% endif %}
-  <p class="merchant-line"><a class="collection-back" href="/infinitemarkets/public/merchants/{{ merchant_pubkey }}">← {{ merchant_name or 'Shop' }}</a></p>
+  <p class="merchant-line"><a class="collection-back" href="/infinitemarkets/public/merchants/{{ merchant_pubkey }}">← {{ brand_name or merchant_name or 'Shop' }}</a></p>
 </header>
 <div class="section-head">
   <div class="section-intro">
