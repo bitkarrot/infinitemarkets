@@ -32,9 +32,6 @@
       <nav class="store-nav" aria-label="Store">
         {% if storefront_url %}
         <a href="{{ storefront_url }}"{% if nav_active == 'shop' %} aria-current="page"{% endif %}>Shop</a>
-        {% for c in nav_collections or [] %}
-        <a href="/infinitemarkets/public/collections/{{ shop_pubkey }}/{{ c.d_tag }}"{% if nav_active == c.d_tag %} aria-current="page"{% endif %}>{{ c.title }}</a>
-        {% endfor %}
         {% endif %}
         <a class="nav-track" href="{{ track_url }}"{% if nav_active == 'track' %} aria-current="page"{% endif %}>
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 7l9-4 9 4v10l-9 4-9-4V7zm9 2.2L5 6.3v9.4l7 3.1V9.2zm2 9.6l5-2.2V6.3l-5 2.2v10.3z" fill="currentColor"/></svg>

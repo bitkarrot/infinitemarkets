@@ -172,6 +172,29 @@ async def _web_order(env: dict) -> tuple[dict, str]:
 # --- admin surface --------------------------------------------------------------
 
 
+async def test_collection_links_stay_out_of_shared_header(runtime_env):
+    env = runtime_env
+    merchant = await _merchant(env)
+    pubkey = merchant["pubkey"]
+    collection_url = (
+        f"/infinitemarkets/public/collections/{pubkey}/"
+        f"{env['collection']['d_tag']}"
+    )
+    for path in (
+        f"/infinitemarkets/public/merchants/{pubkey}",
+        collection_url,
+    ):
+        response = await env["client"].get(path)
+        assert response.status_code == 200, response.text
+        header = response.text.split('<nav class="store-nav"', 1)[1].split(
+            "</nav>", 1
+        )[0]
+        assert collection_url not in header
+        assert "Shop" in header and "Track order" in header
+        if path != collection_url:
+            assert collection_url in response.text
+
+
 async def test_mode_api_shape_and_d10_gate(runtime_env):
     """GET exposes mode + blocked map; PUT enforces the two-step
     confirm and the D-10 inbox gate for showcase/nostr_only."""
