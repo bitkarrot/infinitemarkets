@@ -475,13 +475,16 @@ async def test_magic_link_suppressed_when_email_disabled(runtime_env, monkeypatc
     assert mine[0]["last_error"] == "email-disabled"
 
 
-async def test_account_channel_uses_email_account_bucket(runtime_env, monkeypatch):
+async def test_account_channel_uses_email_account_bucket(
+    runtime_env, monkeypatch, window_headroom
+):
     """``channel='account'`` consumes the ``email-account`` bucket keyed
     on ``recipient_hash`` — never ``consent-revoked``, never the
     ``email-merchant`` bucket. The (cap+1)th send in the window defers."""
     svcs = _svc()
     env = runtime_env
     await _reset_buckets(env)
+    await window_headroom(3600)  # hourly bucket: keep the burst in one hour
     from lnbits.settings import settings as host_settings
 
     monkeypatch.setattr(
@@ -587,10 +590,13 @@ async def test_request_uniform_body_no_oracle(runtime_env):
     assert acct["email_enc"]
 
 
-async def test_request_per_ip_bucket_is_honest_429(runtime_env):
+async def test_request_per_ip_bucket_is_honest_429(
+    runtime_env, window_headroom
+):
     """D-06 — the per-IP bucket (10/min) is an honest 429."""
     env = runtime_env
     await _reset_buckets(env)
+    await window_headroom()
     client = env["client"]
     last = None
     for i in range(11):

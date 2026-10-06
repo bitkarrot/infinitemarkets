@@ -420,7 +420,7 @@ async def test_paid_write_negative_ok_surfaces_and_retries(
 
 
 async def test_relay_wrap_rate_cap_drops_pre_decrypt(
-    runtime_env, monkeypatch,
+    runtime_env, monkeypatch, frozen_inbox_clock,
 ):
     """>300 wraps/min on one relay scope: excess dropped BEFORE decrypt.
 

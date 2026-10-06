@@ -380,3 +380,31 @@ async def runtime_env(tmp_path_factory):
                 "ext_module": ext_module,
                 "tmp": tmp,
             }
+
+
+@pytest.fixture
+def window_headroom():
+    """Await until the current fixed rate-limit window has headroom.
+
+    The extension's limiters count in fixed windows (``now - now % N``).
+    A test that asserts a cap trips must land every request in ONE
+    window; when a window is about to roll over, wait it out instead of
+    flaking (a roll-over splits the burst across two buckets)."""
+
+    async def wait(window_s: int = 60, margin_s: int = 10) -> None:
+        remaining = window_s - time.time() % window_s
+        if remaining < margin_s:
+            await asyncio.sleep(remaining + 0.2)
+
+    return wait
+
+
+@pytest.fixture
+def frozen_inbox_clock(monkeypatch):
+    """Pin the inbox admission clock so a multi-second burst of wraps is
+    counted in a single fixed window (see ``window_headroom``)."""
+    from infinitemarkets.services import inbox
+
+    now = int(time.time())
+    monkeypatch.setattr(inbox, "_now", lambda: now)
+    return now

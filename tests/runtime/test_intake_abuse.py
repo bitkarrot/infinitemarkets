@@ -285,7 +285,9 @@ async def test_admission_bound_kind_ptag_sig_order(runtime_env, monkeypatch):
     assert len(await _inbox_rows(env, mid)) == before
 
 
-async def test_wrap_relay_flood_bucket(runtime_env, monkeypatch):
+async def test_wrap_relay_flood_bucket(
+    runtime_env, monkeypatch, frozen_inbox_clock
+):
     """§15 wraps-per-(merchant,relay) cap: excess wraps drop at admission
     even when each carries a distinct outer author (the bucket keys on
     relay+merchant, not identity)."""
@@ -314,7 +316,7 @@ async def test_wrap_relay_flood_bucket(runtime_env, monkeypatch):
 
 
 async def test_per_author_flood_drop_before_validation(
-    runtime_env, monkeypatch
+    runtime_env, monkeypatch, frozen_inbox_clock
 ):
     """A fixed outer-key flood hits the per-author admission bucket —
     wraps beyond the cap never reach insert or unwrap."""

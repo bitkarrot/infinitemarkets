@@ -10,7 +10,6 @@ payment hashes, or complete BOLT11 strings in any admin-side response."""
 from __future__ import annotations
 
 import asyncio
-import time
 import uuid
 
 import pytest
@@ -199,7 +198,7 @@ async def test_protective_headers_everywhere(runtime_env):
         assert resp.headers["referrer-policy"] == "no-referrer", resp
 
 
-async def test_checkout_rate_limits(runtime_env, monkeypatch):
+async def test_checkout_rate_limits(runtime_env, monkeypatch, window_headroom):
     """Both §15 windows engage: the per-minute cap trips first."""
     monkeypatch.setenv("INFINITEMARKETS_CHECKOUT_RATE_LIMIT", "2")
     from infinitemarkets.db import db
@@ -215,10 +214,8 @@ async def test_checkout_rate_limits(runtime_env, monkeypatch):
         "items": [{"d_tag": runtime_env["product"]["d_tag"],
                    "quantity": 1}],
     }
-    # The limiter is a fixed 60s window: four requests straddling a
-    # minute boundary would land in two buckets and never trip the cap.
-    if time.time() % 60 > 50:
-        await asyncio.sleep(61 - time.time() % 60)
+    # Fixed 60s window: keep all four requests in one bucket.
+    await window_headroom()
     results = []
     for _ in range(4):
         resp = await anon.post(
