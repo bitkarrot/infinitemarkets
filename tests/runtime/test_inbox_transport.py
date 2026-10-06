@@ -669,13 +669,26 @@ async def test_peer_relay_discovery_and_cache(runtime_env, monkeypatch):
                 )
             assert [r["relay_url"] for r in rows] == [inbox_peer.url]
 
-            # Cache hit — no second REQ to the discovery relay.
-            reqs = len(discovery.received_reqs)
+            # Cache hit — no second REQ for THIS buyer. Count only REQs
+            # whose filter names the buyer: the merchant's own background
+            # discovery shares the relay and would otherwise race the
+            # count (seen on the slower ARM runner).
+            def buyer_reqs() -> int:
+                return sum(
+                    1 for req in list(discovery.received_reqs)
+                    if any(
+                        buyer_pk in (flt.get("authors") or [])
+                        for flt in req[2:] if isinstance(flt, dict)
+                    )
+                )
+
+            reqs = buyer_reqs()
+            assert reqs >= 1
             routes2 = await peer_mod.resolve_buyer_inbox_relays(
                 mid, buyer_pk
             )
             assert routes2 == routes
-            assert len(discovery.received_reqs) == reqs
+            assert buyer_reqs() == reqs
 
 
 async def test_peer_relay_no_route_sentinel(runtime_env, monkeypatch):
