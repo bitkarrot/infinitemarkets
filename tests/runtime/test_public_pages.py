@@ -401,6 +401,45 @@ async def test_collection_and_merchant_pages(runtime_env):
         assert forbidden not in body
 
 
+async def test_embed_listing_drops_chrome_and_allows_same_origin_framing(runtime_env):
+    """The embed route renders only the browse section — no store nav,
+    hero or footer — while keeping the sign-in chip and track-order in
+    a compact toolbar. CSP allows SAME-ORIGIN framing only; the normal
+    storefront stays frame-ancestors 'none'."""
+    client = runtime_env["client"]
+    merchant = await _merchant(runtime_env)
+    _, product = await _catalog_and_product(runtime_env)
+
+    resp = await client.get(
+        f"/infinitemarkets/public/embed/merchants/{merchant['pubkey']}"
+    )
+    assert resp.status_code == 200
+    _assert_public_headers(resp)
+    csp = resp.headers["content-security-policy"]
+    assert "frame-ancestors 'self'" in csp
+    assert "frame-ancestors 'none'" not in csp
+    assert 'class="gm-public gm-embed"' in resp.text
+    assert "merchant-hero" not in resp.text
+    assert "store-header" not in resp.text
+    assert "store-footer" not in resp.text
+    assert 'class="embed-toolbar"' in resp.text
+    assert product["title"] in resp.text
+    # outbound links open a new tab; filter links stay in-embed
+    assert 'target="_blank"' in resp.text
+    embed_path = f"/infinitemarkets/public/embed/merchants/{merchant['pubkey']}"
+    filtered = await client.get(embed_path, params={"sort": "name"})
+    assert filtered.status_code == 200
+    # filter/category links keep the shopper inside the embed URL
+    assert f'href="{embed_path}' in filtered.text
+    assert "merchant-hero" not in filtered.text
+
+    # the full storefront keeps its frame-ancestors 'none'
+    resp = await client.get(
+        f"/infinitemarkets/public/merchants/{merchant['pubkey']}"
+    )
+    assert "frame-ancestors 'none'" in resp.headers["content-security-policy"]
+
+
 async def test_hidden_and_sold_and_preorder_states(runtime_env):
     client = runtime_env["client"]
     merchant = await _merchant(runtime_env)

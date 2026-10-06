@@ -48,6 +48,12 @@ _PUBLIC_CSP = (
     "img-src 'self' https:; connect-src 'self'; frame-ancestors 'none'; "
     "base-uri 'none'; form-action 'self'"
 )
+# The embed route is iframe-able by SAME-ORIGIN pages only (the WebPages
+# extension serves on this host) — every other public page stays
+# frame-ancestors 'none'.
+_EMBED_CSP = _PUBLIC_CSP.replace(
+    "frame-ancestors 'none'", "frame-ancestors 'self'"
+)
 
 
 def infinitemarkets_renderer():
@@ -201,7 +207,7 @@ def _nostr_only_response(request: Request, merchant: dict,
 
 
 def _public_response(request: Request, template: str, ctx: dict,
-                   status: int = 200) -> HTMLResponse:
+                   status: int = 200, embed_ok: bool = False) -> HTMLResponse:
     ctx.setdefault("theme_css", "")
     ctx.setdefault("layout", "editorial")
     ctx.setdefault("price_label", nip89.price_label)
@@ -212,7 +218,9 @@ def _public_response(request: Request, template: str, ctx: dict,
     )
     for k, v in PUBLIC_HEADERS.items():
         resp.headers[k] = v
-    resp.headers["Content-Security-Policy"] = _PUBLIC_CSP
+    resp.headers["Content-Security-Policy"] = (
+        _EMBED_CSP if embed_ok else _PUBLIC_CSP
+    )
     return resp
 
 
@@ -509,23 +517,11 @@ async def collection_page(request: Request, pubkey: str, d_tag: str):
     )
 
 
-@infinitemarkets_generic_router.get(
-    "/public/merchants/{pubkey}", response_class=HTMLResponse
-)
-async def merchant_page(request: Request, pubkey: str):
-    limited = await _public_guard(request)
-    if limited is not None:
-        return limited
-    merchant = await nip89.merchant_by_pubkey(pubkey)
-    if not merchant or merchant["state"] in ("deactivating", "inactive"):
-        return _public_response(request, "public_invalid.html", {},
-                                status=404)
-    profile = (
-        json.loads(merchant["profile_json"]) if merchant["profile_json"] else {}
-    )
-    products, browse = await _browse_products(request, merchant)
+async def _product_cards(products: list[dict], merchant: dict) -> list[dict]:
+    """Image + availability cards for public listing pages (merchant
+    index and the embeddable listing share the same shape)."""
     images = await _card_images([p["id"] for p in products])
-    cards = [
+    return [
         {
             "d_tag": p["d_tag"],
             "title": p["title"] or "",
@@ -544,6 +540,24 @@ async def merchant_page(request: Request, pubkey: str):
         }
         for p in products
     ]
+
+
+@infinitemarkets_generic_router.get(
+    "/public/merchants/{pubkey}", response_class=HTMLResponse
+)
+async def merchant_page(request: Request, pubkey: str):
+    limited = await _public_guard(request)
+    if limited is not None:
+        return limited
+    merchant = await nip89.merchant_by_pubkey(pubkey)
+    if not merchant or merchant["state"] in ("deactivating", "inactive"):
+        return _public_response(request, "public_invalid.html", {},
+                                status=404)
+    profile = (
+        json.loads(merchant["profile_json"]) if merchant["profile_json"] else {}
+    )
+    products, browse = await _browse_products(request, merchant)
+    cards = await _product_cards(products, merchant)
     from .services import themes as theme_service
 
     theme = await theme_service.get_theme(merchant["id"])
@@ -581,6 +595,46 @@ async def merchant_page(request: Request, pubkey: str):
             **store,
             "collections": store["all_collections"],
         },
+    )
+
+
+@infinitemarkets_generic_router.get(
+    "/public/embed/merchants/{pubkey}", response_class=HTMLResponse
+)
+async def embed_merchant_page(request: Request, pubkey: str):
+    """Chrome-free product listing for SAME-ORIGIN iframe embedding
+    (e.g. the WebPages extension): no header nav, hero or footer — the
+    browse section plus a compact sign-in / track-order toolbar.
+    Filters, sort and pagination stay inside the iframe; products and
+    order tracking open full pages in a new tab."""
+    limited = await _public_guard(request)
+    if limited is not None:
+        return limited
+    merchant = await nip89.merchant_by_pubkey(pubkey)
+    if not merchant or merchant["state"] in ("deactivating", "inactive"):
+        return _public_response(request, "public_invalid.html", {},
+                                status=404)
+    products, browse = await _browse_products(request, merchant)
+    cards = await _product_cards(products, merchant)
+    from .services import themes as theme_service
+
+    theme = await theme_service.get_theme(merchant["id"])
+    store = await _store_ctx(merchant, theme)
+    if store["storefront_mode"] == "nostr_only":
+        return _nostr_only_response(request, merchant, store)
+    return _public_response(
+        request,
+        "public_embed.html",
+        {
+            "pubkey": merchant["pubkey"],
+            "products": cards,
+            "browse": browse,
+            "theme_css": theme_service.emit_css(theme),
+            "nav_active": "shop",
+            **store,
+            "collections": store["all_collections"],
+        },
+        embed_ok=True,
     )
 
 

@@ -1,4 +1,4 @@
-{% macro filters(browse, collections, pubkey, active_collection='') %}
+{% macro filters(browse, collections, pubkey, active_collection='', link_target='') %}
 <aside class="browse-rail" aria-label="Product filters">
   <details class="browse-disclosure" open>
     <summary>Filters</summary>
@@ -14,9 +14,9 @@
       {% if collections %}
       <nav class="browse-group browse-collections" aria-label="Collections">
         <h3>Collections</h3>
-        {% if active_collection %}<a href="/infinitemarkets/public/merchants/{{ pubkey }}">All products</a>{% endif %}
+        {% if active_collection %}<a href="/infinitemarkets/public/merchants/{{ pubkey }}"{% if link_target %} target="{{ link_target }}" rel="noopener"{% endif %}>All products</a>{% endif %}
         {% for item in collections %}
-        <a href="/infinitemarkets/public/collections/{{ pubkey }}/{{ item.d_tag }}"{% if item.d_tag == active_collection %} aria-current="page"{% endif %}>{{ item.title }}</a>
+        <a href="/infinitemarkets/public/collections/{{ pubkey }}/{{ item.d_tag }}"{% if item.d_tag == active_collection %} aria-current="page"{% endif %}{% if link_target %} target="{{ link_target }}" rel="noopener"{% endif %}>{{ item.title }}</a>
         {% endfor %}
       </nav>
       {% endif %}

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+{#- Chrome-free listing for same-origin iframe embedding (WebPages
+    extension). No header nav, hero or footer — the browse section plus
+    a compact toolbar. Filters/sort/pagination navigate inside the
+    frame; products, collections and order tracking open new tabs. -#}
+{% import "templates/infinitemarkets/public_browse_controls.html" as browse_controls %}
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Shop{% if brand_name %} · {{ brand_name }}{% endif %}</title>
+  <link rel="stylesheet" href="/infinitemarkets/static/infinitemarkets/css/gm-public.css?v={{ asset_revision }}">
+  {% if theme_css %}<style>{{ theme_css | safe }}</style>{% endif %}
+</head>
+<body>
+{%- set track_url = '/infinitemarkets/order' ~ ('?shop=' ~ shop_pubkey if shop_pubkey else '') -%}
+<div class="gm-public gm-embed" data-layout="{{ layout }}" data-shop="{{ shop_pubkey or '' }}" data-embed="1">
+  <div class="embed-toolbar">
+    {% if storefront_url %}
+    <a class="brand" href="{{ storefront_url }}" target="_blank" rel="noopener">
+      <span class="brand-mark" aria-hidden="true">{{ brand_initials or 'G' }}</span>
+      <span class="brand-name">{{ brand_name or 'Infinitemarkets' }}</span>
+    </a>
+    {% endif %}
+    <span class="embed-spacer"></span>
+    {% if nostr_signin %}
+    <div class="nostr-account" id="gm-nostr-account">
+      <button type="button" class="nav-signin" id="gm-nostr-signin" data-gm="signin"
+              aria-haspopup="menu" aria-expanded="false">Sign in</button>
+      <div class="nostr-menu" id="gm-nostr-menu" role="menu" hidden></div>
+    </div>
+    {% endif %}
+    <a class="embed-track" href="{{ track_url }}" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 7l9-4 9 4v10l-9 4-9-4V7zm9 2.2L5 6.3v9.4l7 3.1V9.2zm2 9.6l5-2.2V6.3l-5 2.2v10.3z" fill="currentColor"/></svg>
+      Track order
+    </a>
+    <button type="button" class="nav-scheme" id="gm-scheme-toggle"
+            aria-label="Switch to dark mode" aria-pressed="false">
+      <svg class="scheme-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M20.8 14.1A8.6 8.6 0 0 1 9.9 3.2a.9.9 0 0 0-1.1-1.1A10.5 10.5 0 1 0 22 15.2a.9.9 0 0 0-1.2-1.1z"/></svg>
+      <svg class="scheme-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false" hidden><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2" fill="currentColor" stroke="none"/><path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6m0-13.4l1.6 1.6m10.2 10.2 1.6 1.6"/></g></svg>
+    </button>
+  </div>
+  <main class="gm-main" id="gm-main">
+    <div class="section-head">
+      <div class="section-intro">
+        <h2>All products</h2>
+        {% if layout == 'gallery' %}<p class="section-description">Browse products from this shop.</p>{% endif %}
+      </div>
+      <span class="section-count">{{ browse.total }} item{{ 's' if browse.total != 1 }}</span>
+    </div>
+    <div class="browse-layout">
+      {{ browse_controls.filters(browse, collections, pubkey, link_target='_blank') }}
+      <div class="browse-results">
+        {{ browse_controls.sort(browse) }}
+        {% if products %}
+        <div class="card-grid">
+          {% for p in products %}
+          <a class="product-card" href="/infinitemarkets/p/{{ pubkey }}/{{ p.d_tag }}" target="_blank" rel="noopener">
+            <div class="card-art">
+              {% if p.image %}<img src="{{ p.image }}" alt="" loading="{{ 'eager' if layout == 'gallery' and loop.first else 'lazy' }}" referrerpolicy="no-referrer">{% endif %}
+              {% if layout == 'gallery' %}
+                {% if p.hover_image %}<img class="card-alt-image" src="{{ p.hover_image }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}
+                {% if not p.image %}<span class="card-placeholder">No image available</span>{% endif %}
+                {% if p.availability in ('sold', 'preorder') or p.format == 'digital' %}
+                <span class="card-badges">
+                  {% if p.availability == 'sold' %}<span class="card-badge">Sold out</span>{% elif p.availability == 'preorder' %}<span class="card-badge">Pre-order</span>{% endif %}
+                  {% if p.format == 'digital' %}<span class="card-badge">Digital</span>{% endif %}
+                </span>
+                {% endif %}
+              {% endif %}
+            </div>
+            <div class="card-body">
+              <h3 class="card-title">{{ p.title }}</h3>
+              {% if p.availability == 'sold' %}
+              <p class="card-meta"><span class="chip chip-sold">Sold out</span></p>
+              {% elif p.availability == 'preorder' %}
+              <p class="card-meta"><span class="chip chip-preorder">Pre-order</span></p>
+              {% else %}
+              <p class="card-meta">In stock{% if p.format == 'digital' %}<span class="card-tag">Digital</span>{% endif %}</p>
+              {% endif %}
+              {% if p.amount_minor is not none %}
+              <p class="card-price">{{ price_label(p.amount_minor, p.currency, p.currency_decimals) }}</p>
+              {% endif %}
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+        {{ browse_controls.pagination(browse) }}
+        {% elif browse.category or browse.collection or browse.min_price or browse.max_price or browse.currency and browse.currencies | length > 1 %}
+        <p class="storefront-empty">No products match these filters. <a href="{{ browse.clear_url }}">Clear filters</a>.</p>
+        {% else %}<p class="storefront-empty">This shop has no products on sale yet.</p>{% endif %}
+      </div>
+    </div>
+  </main>
+</div>
+<script src="/infinitemarkets/static/infinitemarkets/js/public_storefront.js?v={{ asset_revision }}" defer></script>
+{% if nostr_signin %}<script src="/infinitemarkets/static/infinitemarkets/js/public_nostr.js?v={{ asset_revision }}" defer></script>{% endif %}
+</body>
+</html>

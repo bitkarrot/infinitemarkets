@@ -93,6 +93,27 @@
     render();
   })();
 
+  /* Embeddable listing — inside an iframe the page broadcasts its
+     content height as {type: 'gm-embed-height', height} so a static
+     host page can auto-size the frame. '*' is safe: the payload is a
+     public page's pixel height only. */
+  (function () {
+    var embed = document.querySelector(".gm-public[data-embed]");
+    if (!embed || window.parent === window) return;
+    var post = function () {
+      window.parent.postMessage(
+        {type: "gm-embed-height",
+         height: document.documentElement.scrollHeight},
+        "*"
+      );
+    };
+    if (window.ResizeObserver) {
+      new ResizeObserver(post).observe(document.body);
+    }
+    window.addEventListener("load", post);
+    post();
+  })();
+
   /* --- DOM helpers (never innerHTML with API values — XSS boundary) ---- */
 
   GM.h = function (tag, attrs, children) {
