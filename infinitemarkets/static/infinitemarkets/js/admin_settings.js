@@ -118,7 +118,10 @@
     { token: "--color-on-primary", label: "Text on buttons",
       help: "The label color inside buttons." },
     { token: "--color-primary-hover", label: "Button hover",
-      help: "Button color while the pointer is over it." }
+      help: "Button color while the pointer is over it." },
+    { token: "--color-accent", label: "Lightning accent",
+      help: "Tints the lightning-bolt icons and the pulsing “waiting " +
+            "for payment” dot. Does not change buttons or links." }
   ];
   var TUNE_RADIUS = [
     { token: "--radius-sm", label: "Small corners", max: 24, def: 6,
@@ -619,25 +622,41 @@
         var n = parseInt(v, 10);
         return isNaN(n) ? item.def : n;
       },
+      /* The accent is stored in the brand block (existing stores keep
+         their saved value); every other token is an advanced override. */
       gmTuneIsCustom: function (token) {
-        var adv = this.gmSettings.theme.advanced || {};
+        var t = this.gmSettings.theme;
+        if (token === "--color-accent") return !!(t.brand || {}).accent;
+        var adv = t.advanced || {};
         return Object.prototype.hasOwnProperty.call(adv, token);
       },
       gmTuneSet: function (token, value, px) {
         var t = this.gmSettings.theme;
+        if (token === "--color-accent") {
+          if (!t.brand) t.brand = {};
+          t.brand.accent = value;
+          if (t.advanced) delete t.advanced["--color-accent"];
+          return;
+        }
         if (!t.advanced) t.advanced = {};
         t.advanced[token] = px ? Math.round(Number(value)) + "px" : value;
         t.advanced_opt_in = true;
       },
       gmTuneReset: function (token) {
         var t = this.gmSettings.theme;
+        if (token === "--color-accent") {
+          if (t.brand) delete t.brand.accent;
+          return;
+        }
         if (t.advanced) delete t.advanced[token];
         if (!t.advanced || !Object.keys(t.advanced).length) {
           t.advanced_opt_in = false;
         }
       },
       gmTuneCustomCount: function () {
-        return Object.keys(this.gmSettings.theme.advanced || {}).length;
+        var t = this.gmSettings.theme;
+        return Object.keys(t.advanced || {}).length +
+          ((t.brand || {}).accent ? 1 : 0);
       },
       gmResetTier: function (tier) {
         var t = this.gmSettings.theme;
@@ -649,6 +668,7 @@
         } else if (tier === "advanced") {
           t.advanced = {};
           t.advanced_opt_in = false;
+          if (t.brand) delete t.brand.accent;
         }
       },
       gmSaveTheme: async function () {

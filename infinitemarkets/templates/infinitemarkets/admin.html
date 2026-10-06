@@ -1637,28 +1637,6 @@
                       A logo image replaces the initials tile in the store
                       header.
                     </div>
-                    <q-input v-model="gmSettings.theme.brand.accent" dense
-                             outlined label="Accent color (#rrggbb)"
-                             class="q-mb-xs" data-gm="accent-input">
-                      <template v-slot:append>
-                        <label class="gm-tune-swatch" title="Pick a color">
-                          <input type="color" aria-label="Pick accent color"
-                                 :value="gmPreviewTokens['--color-accent']"
-                                 @input="gmSettings.theme.brand.accent = $event.target.value">
-                        </label>
-                      </template>
-                    </q-input>
-                    <div class="text-caption text-grey-7 q-mb-sm"
-                         data-gm="accent-help">
-                      <q-icon name="bolt" size="16px"
-                              :style="{ color: gmPreviewTokens['--color-accent'] }">
-                      </q-icon>
-                      A small highlight color: it tints the lightning-bolt
-                      icons (checkout &amp; trust list) and the pulsing dot on
-                      “waiting for payment”. It does <strong>not</strong>
-                      change buttons or links — set those under
-                      <em>Fine-tune → Buttons &amp; links</em> below.
-                    </div>
                     <q-select v-model="gmSettings.theme.brand.font" dense
                               outlined label="Type style"
                               :options="gmSettings.fontStacks"

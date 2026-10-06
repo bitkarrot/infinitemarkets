@@ -720,14 +720,21 @@ test('fine-tune is point-and-click: swatches and sliders drive the storefront', 
   await page.locator('[data-gm-nav="settings"]').click()
   await page.getByRole('tab', {name: 'Appearance'}).click()
 
-  // The accent explains exactly where it shows up
+  // Accent lives in Fine-tune now, not Brand Basics
   await page.locator('[data-gm="brand-basics"]').click()
-  await expect(page.locator('[data-gm="accent-help"]')).toContainText('lightning-bolt')
-  await expect(page.locator('[data-gm="accent-help"]')).toContainText('buttons or links')
+  await expect(page.locator('[data-gm="brand-basics"]').getByLabel(/Accent color/)).toHaveCount(0)
 
   await page.locator('[data-gm="advanced-tokens"]').click()
   // no technical checkbox / raw token text boxes
   await expect(page.locator('[data-gm="advanced-tokens"] input[type="text"]')).toHaveCount(0)
+
+  // the accent row explains exactly where it shows up and saves to the brand
+  const accent = page.locator('[data-tune="--color-accent"]')
+  await expect(accent).toContainText('Lightning accent')
+  await expect(accent).toContainText('lightning-bolt')
+  await expect(accent).toContainText('Does not change buttons or links')
+  await accent.locator('input[type="color"]').fill('#ff00aa')
+  await expect(accent.getByText('custom', {exact: true})).toBeVisible()
 
   // pick a button color with the swatch
   const primary = page.locator('[data-tune="--color-primary"]')
@@ -752,6 +759,7 @@ test('fine-tune is point-and-click: swatches and sliders drive the storefront', 
   )).text()
   expect(html).toContain('--color-primary: #0b6b3a')
   expect(html).toContain('--radius-md: 24px')
+  expect(html).toContain('--color-accent: #ff00aa')
 
   // reset arrows clear a single override, and reset-all opts back out
   await primary.getByRole('button', {name: 'Reset Buttons & links'}).click()
@@ -765,6 +773,7 @@ test('fine-tune is point-and-click: swatches and sliders drive the storefront', 
   )).text()
   expect(cleared).not.toContain('--color-primary: #0b6b3a')
   expect(cleared).not.toContain('--radius-md: 24px')
+  expect(cleared).not.toContain('--color-accent: #ff00aa')
 })
 
 test('unauthenticated admin visit redirects or denies', async ({
