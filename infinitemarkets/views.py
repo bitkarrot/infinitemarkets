@@ -326,7 +326,7 @@ async def product_page(request: Request, pubkey: str, d_tag: str):
 
 
 def _browse_price(value: str | None) -> Decimal | None:
-    if value and re.fullmatch(r"\d{1,9}(?:\.\d{1,6})?", value):
+    if value and re.fullmatch(r"\d{1,18}(?:\.\d{1,18})?", value):
         return Decimal(value)
     return None
 
@@ -379,6 +379,11 @@ async def _browse_products(request: Request, merchant: dict,
         selected_currency = currencies[0]
     elif not selected_currency or selected_currency not in currencies:
         selected_currency = ""
+    priced_rows = [
+        row for row in rows if selected_currency and row["currency"] == selected_currency
+        and row["amount_minor"] is not None
+    ]
+    prices = [_product_price(row) for row in priced_rows]
     min_price = _browse_price(request.query_params.get("min_price"))
     max_price = _browse_price(request.query_params.get("max_price"))
     if selected_category:
@@ -420,8 +425,8 @@ async def _browse_products(request: Request, merchant: dict,
         "category": selected_category,
         "collection": request.query_params.get("collection", "")[:64] if not collection_id else "",
         "currency": selected_currency if len(currencies) > 1 else "",
-        "min_price": str(min_price) if min_price is not None else "",
-        "max_price": str(max_price) if max_price is not None else "",
+        "min_price": format(min_price, "f") if min_price is not None else "",
+        "max_price": format(max_price, "f") if max_price is not None else "",
         "sort": sort if sort != "newest" else "",
     }
     query = {key: value for key, value in query.items() if value}
@@ -433,6 +438,12 @@ async def _browse_products(request: Request, merchant: dict,
         "category": selected_category,
         "collection": query.get("collection", ""),
         "currency": selected_currency,
+        "price_min": format(min(prices), "f") if prices else "",
+        "price_max": format(max(prices), "f") if prices else "",
+        "price_step": format(
+            Decimal(1).scaleb(-max(row["currency_decimals"] or 0 for row in priced_rows)),
+            "f",
+        ) if priced_rows else "",
         "min_price": query.get("min_price", ""),
         "max_price": query.get("max_price", ""),
         "sort": sort,

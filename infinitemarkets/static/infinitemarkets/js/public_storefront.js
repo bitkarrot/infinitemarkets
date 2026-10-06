@@ -6,8 +6,47 @@
   "use strict";
 
   var GM = (window.GM = window.GM || {});
+  var wideBrowse = window.matchMedia("(min-width: 900px)");
   document.querySelectorAll(".browse-disclosure").forEach(function (panel) {
-    panel.open = window.matchMedia("(min-width: 900px)").matches;
+    function syncBrowse() { panel.open = wideBrowse.matches; }
+    syncBrowse();
+    wideBrowse.addEventListener("change", syncBrowse);
+  });
+  document.querySelectorAll(".browse-price-track").forEach(function (track) {
+    var lower = track.querySelector('[name="min_price"]');
+    var upper = track.querySelector('[name="max_price"]');
+    var minOutput = track.nextElementSibling.querySelector('[data-price-readout="min"]');
+    var maxOutput = track.nextElementSibling.querySelector('[data-price-readout="max"]');
+    function updatePrice(changed) {
+      if (Number(lower.value) > Number(upper.value)) {
+        if (changed === lower) upper.value = lower.value;
+        else lower.value = upper.value;
+      }
+      var width = Number(lower.max) - Number(lower.min);
+      var start = width ? (Number(lower.value) - Number(lower.min)) / width * 100 : 0;
+      var end = width ? (Number(upper.value) - Number(lower.min)) / width * 100 : 100;
+      track.style.setProperty("--price-start", start + "%");
+      track.style.setProperty("--price-end", end + "%");
+      lower.style.zIndex = changed === lower ? "2" : "1";
+      upper.style.zIndex = changed === upper ? "2" : "1";
+      minOutput.textContent = lower.value + " " + track.dataset.currency;
+      maxOutput.textContent = upper.value + " " + track.dataset.currency;
+    }
+    lower.addEventListener("input", function () { updatePrice(lower); });
+    upper.addEventListener("input", function () { updatePrice(upper); });
+    updatePrice(lower);
+    track.closest("form").addEventListener("submit", function () {
+      if (Number(lower.value) === Number(lower.min)) lower.disabled = true;
+      if (Number(upper.value) === Number(upper.max)) upper.disabled = true;
+    });
+  });
+  document.querySelectorAll('.browse-filter-form select[name="currency"]').forEach(function (currency) {
+    currency.addEventListener("change", function () {
+      currency.closest("form").querySelectorAll('.browse-price-track input').forEach(function (input) {
+        input.disabled = true;
+      });
+      currency.closest("form").requestSubmit();
+    });
   });
 
   /* --- DOM helpers (never innerHTML with API values — XSS boundary) ---- */

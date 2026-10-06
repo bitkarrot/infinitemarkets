@@ -1352,15 +1352,19 @@
 .gm-public .browse-filter-form { display: grid; gap: 16px; }
 .gm-public .browse-group { border: 0; border-top: 1px solid var(--color-border); margin: 0; padding: 12px 0 0; min-width: 0; }
 .gm-public .browse-group legend, .gm-public .browse-group h3 { padding: 0; margin: 0 0 10px; font-size: 15px; font-weight: 650; }
-.gm-public .browse-group label, .gm-public .browse-collections a { display: flex; align-items: center; gap: 8px; min-height: 36px; color: var(--color-text); font-size: 14px; text-decoration: none; }
-.gm-public .browse-group input[type="radio"] { accent-color: var(--color-primary); }
-.gm-public .browse-collections { display: grid; }
-.gm-public .browse-collections a:hover, .gm-public .browse-collections a:focus-visible { color: var(--color-primary); text-decoration: underline; }
-.gm-public .browse-collections a[aria-current="page"] { font-weight: 700; text-decoration: underline; }
+.gm-public .browse-group label, .gm-public .browse-categories a, .gm-public .browse-collections a { display: flex; align-items: center; gap: 8px; min-height: 36px; color: var(--color-text); font-size: 14px; text-decoration: none; }
+.gm-public .browse-categories, .gm-public .browse-collections { display: grid; }
+.gm-public .browse-categories a:hover, .gm-public .browse-categories a:focus-visible, .gm-public .browse-collections a:hover, .gm-public .browse-collections a:focus-visible { color: var(--color-primary); text-decoration: underline; }
+.gm-public .browse-categories a[aria-current="page"], .gm-public .browse-collections a[aria-current="page"] { font-weight: 700; text-decoration: underline; }
 .gm-public .browse-field { display: grid; gap: 6px; font-size: 14px; }
-.gm-public .browse-price { display: grid; gap: 8px; }
-.gm-public .browse-price label { display: grid; gap: 4px; }
-.gm-public .browse-price input, .gm-public .browse-field select, .gm-public .browse-sort select { width: 100%; min-height: 40px; background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 6px 10px; }
+.gm-public .browse-price { display: grid; gap: 12px; }
+.gm-public .browse-field select, .gm-public .browse-sort select { width: 100%; min-height: 40px; background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 6px 10px; }
+.gm-public .browse-price-track { position: relative; height: 36px; margin: 0 10px; display: grid; align-items: center; background: linear-gradient(to right, var(--color-border) var(--price-start, 0%), var(--color-primary) var(--price-start, 0%), var(--color-primary) var(--price-end, 100%), var(--color-border) var(--price-end, 100%)) center / 100% 5px no-repeat; }
+.gm-public .browse-price-track input { position: absolute; width: 100%; height: 36px; margin: 0; appearance: none; background: transparent; pointer-events: none; }
+.gm-public .browse-price-track input::-webkit-slider-thumb { appearance: none; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--color-primary); background: var(--color-bg); cursor: pointer; pointer-events: auto; }
+.gm-public .browse-price-track input::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--color-primary); background: var(--color-bg); cursor: pointer; pointer-events: auto; }
+.gm-public .browse-price-values { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--color-text-muted); font-size: 14px; }
+.gm-public .browse-price-only { margin: 0; color: var(--color-text-muted); font-size: 14px; }
 .gm-public .browse-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .gm-public .browse-actions button, .gm-public .browse-sort button { min-height: 40px; border: 1px solid var(--color-primary); border-radius: var(--radius-md); background: var(--color-primary); color: var(--color-on-primary); padding: 6px 14px; cursor: pointer; }
 .gm-public .browse-actions a { color: var(--color-text-muted); }
@@ -1369,6 +1373,9 @@
 .gm-public .browse-pagination { display: flex; justify-content: center; align-items: center; gap: 20px; margin: 36px 0; }
 .gm-public .browse-pagination a { color: var(--color-primary); }
 .gm-public .browse-disclosure summary:focus-visible, .gm-public .browse-layout a:focus-visible, .gm-public .browse-layout input:focus-visible, .gm-public .browse-layout select:focus-visible, .gm-public .browse-layout button:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 2px; }
+@media (min-width: 900px) {
+  .gm-public .browse-disclosure summary { display: none; }
+}
 @media (max-width: 899px) {
   .gm-public .browse-layout { display: block; }
   .gm-public .browse-rail { margin-bottom: 16px; }

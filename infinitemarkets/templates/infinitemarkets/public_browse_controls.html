@@ -1,15 +1,16 @@
 {% macro filters(browse, collections, pubkey, active_collection='') %}
 <aside class="browse-rail" aria-label="Product filters">
-  <details class="browse-disclosure">
+  <details class="browse-disclosure" open>
     <summary>Filters</summary>
+    <nav class="browse-group browse-categories" aria-label="Categories">
+      <h3>Categories</h3>
+      <a href="{{ browse.clear_url }}"{% if not browse.category %} aria-current="page"{% endif %}>All categories</a>
+      {% for slug, name in browse.categories %}
+      <a href="{{ browse.clear_url }}?category={{ slug }}"{% if browse.category == slug %} aria-current="page"{% endif %}>{{ name }}</a>
+      {% endfor %}
+    </nav>
     <form method="get" class="browse-filter-form">
-      <fieldset class="browse-group">
-        <legend>Categories</legend>
-        <label><input type="radio" name="category" value="" {% if not browse.category %}checked{% endif %}> All categories</label>
-        {% for slug, name in browse.categories %}
-        <label><input type="radio" name="category" value="{{ slug }}" {% if browse.category == slug %}checked{% endif %}> {{ name }}</label>
-        {% endfor %}
-      </fieldset>
+      {% if browse.category %}<input type="hidden" name="category" value="{{ browse.category }}">{% endif %}
       {% if collections %}
       <nav class="browse-group browse-collections" aria-label="Collections">
         <h3>Collections</h3>
@@ -30,9 +31,20 @@
       {% if browse.currency %}
       <fieldset class="browse-group browse-price">
         <legend>Price ({{ browse.currency }})</legend>
-        <label>Minimum <input type="number" min="0" step="any" name="min_price" value="{{ browse.min_price }}"></label>
-        <label>Maximum <input type="number" min="0" step="any" name="max_price" value="{{ browse.max_price }}"></label>
+        {% if browse.price_min and browse.price_min != browse.price_max %}
+        <div class="browse-price-track" data-currency="{{ browse.currency }}">
+          <input type="range" name="min_price" min="{{ browse.price_min }}" max="{{ browse.price_max }}" step="{{ browse.price_step }}" value="{{ browse.min_price or browse.price_min }}" aria-label="Minimum price in {{ browse.currency }}">
+          <input type="range" name="max_price" min="{{ browse.price_min }}" max="{{ browse.price_max }}" step="{{ browse.price_step }}" value="{{ browse.max_price or browse.price_max }}" aria-label="Maximum price in {{ browse.currency }}">
+        </div>
+        <div class="browse-price-values"><output data-price-readout="min">{{ browse.min_price or browse.price_min }} {{ browse.currency }}</output><output data-price-readout="max">{{ browse.max_price or browse.price_max }} {{ browse.currency }}</output></div>
+        {% elif browse.price_min %}
+        <p class="browse-price-only">Only price: {{ browse.price_min }} {{ browse.currency }}</p>
+        {% else %}
+        <p class="browse-price-only">No priced products in this currency.</p>
+        {% endif %}
       </fieldset>
+      {% elif browse.currencies | length > 1 %}
+      <p class="browse-price-only">Choose a currency to filter by price.</p>
       {% endif %}
       {% if browse.collection %}<input type="hidden" name="collection" value="{{ browse.collection }}">{% endif %}
       {% if browse.sort != 'newest' %}<input type="hidden" name="sort" value="{{ browse.sort }}">{% endif %}

@@ -434,7 +434,9 @@ test('all layouts preserve browse filters and sorting on mobile', async ({page})
       await page.goto(url)
       await expect(page.locator('.gm-public')).toHaveAttribute('data-layout', layout)
       await expect(page.locator('.browse-disclosure')).toHaveAttribute('open', '')
-      await expect(page.locator(`input[type="radio"][name="category"][value="${slug}"]`)).toBeChecked()
+      await expect(page.locator('.browse-disclosure summary')).toBeHidden()
+      const category = page.locator(`.browse-categories a[href="${shopUrl}?category=${slug}"]`)
+      await expect(category).toHaveAttribute('aria-current', 'page')
       await expect(page.getByLabel('Sort by')).toHaveValue('name')
       await expect(page.locator('.browse-collections a')).toHaveCount(1)
       await expect(page.locator('.store-nav a')).toHaveCount(2)
@@ -442,12 +444,39 @@ test('all layouts preserve browse filters and sorting on mobile', async ({page})
       await page.reload()
       await expect(page.locator('.browse-disclosure')).not.toHaveAttribute('open', '')
       await page.locator('.browse-disclosure summary').click()
-      await expect(page.locator(`input[type="radio"][name="category"][value="${slug}"]`)).toBeVisible()
+      await expect(category).toBeVisible()
       await expect(page.locator('.browse-actions a')).toHaveAttribute('href', shopUrl)
     }
   } finally {
     expect((await set('editorial')).status()).toBe(200)
   }
+})
+
+test('price slider filters one currency and wide filters stay open', async ({page}) => {
+  await page.goto('/infinitemarkets/')
+  const response = await page.request.get('/infinitemarkets/api/v1/categories')
+  expect(response.status()).toBe(200)
+  const categories = await response.json() as {id: string, public_slug: string}[]
+  const slug = categories.find(category => category.id === seed.digital.category_id)?.public_slug
+  expect(slug).toBeTruthy()
+  const shopUrl = `/infinitemarkets/public/merchants/${seed.pubkey}`
+  await page.setViewportSize({width: 390, height: 844})
+  await page.goto(`${shopUrl}?category=${slug}`)
+  await expect(page.locator('.browse-disclosure')).not.toHaveAttribute('open', '')
+  await page.locator('.browse-disclosure summary').click()
+  const price = page.locator('.browse-price-track')
+  await expect(price.locator('[name="min_price"]')).toHaveAttribute('min', '2500')
+  await expect(price.locator('[name="max_price"]')).toHaveAttribute('max', '7500')
+  await price.locator('[name="min_price"]').focus()
+  await price.locator('[name="min_price"]').press('End')
+  await expect(price.locator('[name="min_price"]')).toHaveValue('7500')
+  await expect(page.locator('[data-price-readout="min"]')).toContainText('7500 SAT')
+  await page.locator('.browse-actions button').click()
+  await expect(page).toHaveURL(/min_price=7500/)
+  await expect(page.locator('.product-card')).toHaveCount(1)
+  await page.setViewportSize({width: 1280, height: 900})
+  await expect(page.locator('.browse-disclosure')).toHaveAttribute('open', '')
+  await expect(page.locator('.browse-disclosure summary')).toBeHidden()
 })
 
 test('gallery listing cards stay scoped and adapt to mobile', async ({page}) => {

@@ -156,9 +156,30 @@ async def test_browse_categories_sort_and_collection_filters(runtime_env):
     path = f"/infinitemarkets/public/merchants/{merchant['pubkey']}"
     resp = await client.get(path)
     assert resp.status_code == 200
-    assert 'name="category"' in resp.text
-    assert books["public_slug"] in resp.text
+    assert '<input type="radio" name="category"' not in resp.text
+    assert '<details class="browse-disclosure" open>' in resp.text
     assert books["id"] not in resp.text
+    link = re.search(r'<a href="([^"]+)"[^>]*>Books</a>', resp.text)
+    assert link is not None
+    assert link.group(1) == f"{path}?category={books['public_slug']}"
+    category_page = await client.get(link.group(1))
+    assert category_page.status_code == 200
+    assert set(re.findall(r'<h3 class="card-title">([^<]+)</h3>', category_page.text)) == {
+        "Alpha Guide", "Zebra Guide",
+    }
+    assert "Gallery Print" not in category_page.text
+    assert 'aria-current="page">Books</a>' in category_page.text
+    assert f'href="{path}">All categories</a>' in category_page.text
+    art_link = re.search(r'<a href="([^"]+)"[^>]*>Art</a>', category_page.text)
+    assert art_link is not None
+    art_page = await client.get(art_link.group(1))
+    assert re.findall(r'<h3 class="card-title">([^<]+)</h3>', art_page.text) == [
+        "Gallery Print",
+    ]
+    priced = await client.get(
+        path, params={"category": books["public_slug"], "min_price": "1000"}
+    )
+    assert f'href="{path}?category={art["public_slug"]}"' in priced.text
     resp = await client.get(
         path, params={"category": books["public_slug"], "currency": "SAT", "sort": "price-asc"}
     )
@@ -194,6 +215,7 @@ async def test_browse_categories_sort_and_collection_filters(runtime_env):
     resp = await client.get(url, params={"sort": "name"})
     assert resp.status_code == 200
     assert 'aria-current="page">Reading</a>' in resp.text
+    assert f'href="{url}?category={books["public_slug"]}"' in resp.text
     assert re.findall(r'<h3 class="card-title">([^<]+)</h3>', resp.text) == [
         "Alpha Guide", "Zebra Guide",
     ]
@@ -212,12 +234,48 @@ async def test_browse_prices_require_one_currency(runtime_env):
     assert mixed.status_code == 200
     assert "Price: High to Low" not in mixed.text
     assert usd["d_tag"] in mixed.text and sat["d_tag"] in mixed.text
+    assert 'type="range" name="min_price"' not in mixed.text
+    assert "Choose a currency to filter by price" in mixed.text
     filtered = await client.get(
         path, params={"currency": "SAT", "min_price": "2000", "sort": "price-asc"}
     )
     assert filtered.status_code == 200
     assert sat["d_tag"] in filtered.text and usd["d_tag"] not in filtered.text
     assert 'value="price-asc" selected' in filtered.text
+
+
+async def test_price_slider_bounds_stay_stable_when_category_or_price_changes(runtime_env):
+    client = runtime_env["client"]
+    merchant = await _merchant(runtime_env)
+    headers = _headers(runtime_env)
+    response = await client.post(
+        f"{API}/categories", json={"name": "Price range"}, headers=headers
+    )
+    assert response.status_code == 201
+    category = response.json()
+    for amount in (100, 200, 300):
+        response = await client.post(
+            f"{API}/products",
+            json={"category_id": category["id"], "title": f"Range {amount}",
+                  "amount_minor": amount, "currency": "XTS", "currency_decimals": 0,
+                  "format": "digital", "visibility": "on-sale"},
+            headers=headers,
+        )
+        assert response.status_code == 201, response.text
+    path = f"/infinitemarkets/public/merchants/{merchant['pubkey']}"
+    for params in ({"currency": "XTS"},
+                   {"currency": "XTS", "category": category["public_slug"],
+                    "min_price": "150", "max_price": "250"}):
+        resp = await client.get(path, params=params)
+        assert resp.status_code == 200
+        assert 'type="range" name="min_price" min="100" max="300"' in resp.text
+        assert 'type="range" name="max_price" min="100" max="300"' in resp.text
+        if "min_price" in params:
+            assert re.findall(r'<h3 class="card-title">([^<]+)</h3>', resp.text) == [
+                "Range 200"
+            ]
+            assert 'max="300" step="1" value="150"' in resp.text
+            assert 'max="300" step="1" value="250"' in resp.text
 
 
 async def test_browse_pagination_keeps_category_and_sort(runtime_env):
