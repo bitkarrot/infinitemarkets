@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720" role="img" aria-label="Demo Node Atlas print detail">
+  <rect width="720" height="720" fill="#ede4d5"/>
+  <rect x="64" y="78" width="592" height="564" fill="#ba6e50"/>
+  <g fill="none" stroke="#f9e8d0" stroke-width="4"><circle cx="357" cy="353" r="248"/><circle cx="357" cy="353" r="172"/><circle cx="357" cy="353" r="92"/><path d="M109 372l127-114 125 53 151-132 101 107M146 496l153-183 172 190 137-150M236 258l63 55 62-2 110 192"/></g>
+  <g fill="#173f45"><circle cx="109" cy="372" r="16"/><circle cx="236" cy="258" r="16"/><circle cx="361" cy="311" r="16"/><circle cx="512" cy="179" r="16"/><circle cx="613" cy="286" r="16"/><circle cx="299" cy="313" r="16"/><circle cx="471" cy="503" r="16"/><circle cx="608" cy="353" r="16"/></g>
+  <text x="84" y="611" fill="#f9e8d0" font-family="system-ui,sans-serif" font-size="18" letter-spacing="4">NODE ATLAS / DETAIL</text>
+</svg>

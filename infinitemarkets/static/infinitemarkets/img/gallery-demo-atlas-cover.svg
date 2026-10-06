@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720" role="img" aria-label="Demo Node Atlas print">
+  <rect width="720" height="720" fill="#d7c7b1"/>
+  <rect x="131" y="62" width="458" height="596" rx="3" fill="#342e2d"/>
+  <rect x="150" y="81" width="420" height="558" fill="#f7eee0"/>
+  <circle cx="360" cy="337" r="174" fill="#bc7050"/>
+  <g fill="none" stroke="#f6e4c9" stroke-width="3"><circle cx="360" cy="337" r="115"/><circle cx="360" cy="337" r="67"/><path d="M193 343l113-71 118 31 112-86M219 425l125-104 112 119 67-91"/></g>
+  <g fill="#f7eee0"><circle cx="193" cy="343" r="9"/><circle cx="306" cy="272" r="9"/><circle cx="424" cy="303" r="9"/><circle cx="536" cy="217" r="9"/><circle cx="344" cy="321" r="9"/><circle cx="456" cy="440" r="9"/></g>
+  <text x="184" y="560" fill="#342e2d" font-family="system-ui,sans-serif" font-size="35" font-weight="600">NODE ATLAS</text>
+  <text x="184" y="595" fill="#665952" font-family="system-ui,sans-serif" font-size="17" letter-spacing="4">A STUDY IN CONNECTIONS</text>
+</svg>

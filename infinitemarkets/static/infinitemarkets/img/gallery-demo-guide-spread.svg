@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720" role="img" aria-label="Demo Lightning Field Guide inside pages">
+  <rect width="720" height="720" fill="#d9ddd5"/>
+  <rect x="55" y="140" width="610" height="440" rx="12" fill="#b0b8af"/>
+  <path d="M65 130h285q10 0 10 10v430H65zM360 140q0-10 10-10h285v440H360z" fill="#fffaf1"/>
+  <path d="M360 149v416" stroke="#c2b8a5" stroke-width="3"/>
+  <text x="100" y="207" fill="#225d62" font-family="system-ui,sans-serif" font-size="19" letter-spacing="3">FIELD NOTES / 01</text>
+  <text x="100" y="257" fill="#173842" font-family="system-ui,sans-serif" font-size="30" font-weight="600">Routes &amp; relays</text>
+  <g fill="#b4b9ae"><rect x="100" y="304" width="204" height="7" rx="3"/><rect x="100" y="329" width="195" height="7" rx="3"/><rect x="100" y="354" width="212" height="7" rx="3"/><rect x="100" y="379" width="171" height="7" rx="3"/></g>
+  <g fill="none" stroke="#317a77" stroke-width="4"><path d="M415 430l74-140 114 69-51 109-137-38zM489 290l63 178"/></g>
+  <g fill="#c38352"><circle cx="415" cy="430" r="13"/><circle cx="489" cy="290" r="13"/><circle cx="603" cy="359" r="13"/><circle cx="552" cy="468" r="13"/></g>
+</svg>
