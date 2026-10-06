@@ -97,6 +97,51 @@
     "--radius-sm", "--radius-md", "--radius-lg",
     "--space-sm", "--space-md", "--space-lg", "--space-16"
   ];
+  /* Point-and-click fine-tune controls — friendly names over the same
+     allowlisted tokens the server validates (colors #rrggbb, radius
+     0-24px, spacing 0-99px). */
+  var TUNE_COLORS = [
+    { token: "--color-bg", label: "Page background",
+      help: "Behind everything on your storefront." },
+    { token: "--color-surface", label: "Cards & panels",
+      help: "Header, footer, product cards and checkout boxes." },
+    { token: "--color-surface-alt", label: "Soft highlights",
+      help: "Hover states, chips, and the hero tint." },
+    { token: "--color-border", label: "Lines & borders",
+      help: "Dividers and card outlines." },
+    { token: "--color-text", label: "Text color",
+      help: "Headings, prices and body text." },
+    { token: "--color-text-muted", label: "Secondary text",
+      help: "Captions, descriptions and helper text." },
+    { token: "--color-primary", label: "Buttons & links",
+      help: "Buy/Pay buttons, selected filters, active links." },
+    { token: "--color-on-primary", label: "Text on buttons",
+      help: "The label color inside buttons." },
+    { token: "--color-primary-hover", label: "Button hover",
+      help: "Button color while the pointer is over it." }
+  ];
+  var TUNE_RADIUS = [
+    { token: "--radius-sm", label: "Small corners", max: 24, def: 6,
+      help: "Chips, badges and small boxes." },
+    { token: "--radius-md", label: "Medium corners", max: 24, def: 10,
+      help: "Buttons, inputs and cards." },
+    { token: "--radius-lg", label: "Large corners", max: 24, def: 16,
+      help: "Big panels, hero and galleries." }
+  ];
+  var TUNE_SPACE = [
+    { token: "--space-sm", label: "Tight gaps", max: 24, def: 8,
+      help: "Space between small related items." },
+    { token: "--space-md", label: "Normal gaps", max: 40, def: 16,
+      help: "Padding inside cards and between rows." },
+    { token: "--space-lg", label: "Roomy gaps", max: 64, def: 32,
+      help: "Space between page sections." },
+    { token: "--space-16", label: "Section breathing room", max: 96, def: 64,
+      help: "Extra space above the footer and on message pages." }
+  ];
+  var TUNE_LABELS = {};
+  TUNE_COLORS.forEach(function (c) { TUNE_LABELS[c.token] = c.label; });
+  TUNE_LABELS["--color-focus"] = "Keyboard focus ring";
+
   var DIRECTIONS = [
     { value: "public", label: "Public (outbox)" },
     { value: "inbox", label: "Inbox" },
@@ -165,6 +210,9 @@
           boundaryNote: BOUNDARY_NOTE,
           presetNames: PRESET_NAMES,
           advancedTokens: ADVANCED_TOKENS,
+          tuneColors: TUNE_COLORS,
+          tuneRadius: TUNE_RADIUS,
+          tuneSpace: TUNE_SPACE,
           fontStacks: [
             { value: "system", label: "System" },
             { value: "serif", label: "Serif" },
@@ -226,7 +274,8 @@
           var bg = tokens[pair[1]];
           var ratio = contrast(fg, bg);
           return {
-            pair: pair[0] + " on " + pair[1],
+            pair: (TUNE_LABELS[pair[0]] || pair[0]) + " on " +
+              (TUNE_LABELS[pair[1]] || pair[1]),
             ratio: ratio,
             ok: ratio >= 4.5
           };
@@ -561,6 +610,34 @@
           t["--color-bg"], t["--color-surface"], t["--color-primary"],
           t["--color-accent"]
         ];
+      },
+      /* Fine-tune helpers — the first edit opts in automatically; no
+         technical toggle. Resetting the last override opts back out. */
+      gmTuneValue: function (item) {
+        var v = this.gmPreviewTokens[item.token];
+        if (item.def === undefined) return v;
+        var n = parseInt(v, 10);
+        return isNaN(n) ? item.def : n;
+      },
+      gmTuneIsCustom: function (token) {
+        var adv = this.gmSettings.theme.advanced || {};
+        return Object.prototype.hasOwnProperty.call(adv, token);
+      },
+      gmTuneSet: function (token, value, px) {
+        var t = this.gmSettings.theme;
+        if (!t.advanced) t.advanced = {};
+        t.advanced[token] = px ? Math.round(Number(value)) + "px" : value;
+        t.advanced_opt_in = true;
+      },
+      gmTuneReset: function (token) {
+        var t = this.gmSettings.theme;
+        if (t.advanced) delete t.advanced[token];
+        if (!t.advanced || !Object.keys(t.advanced).length) {
+          t.advanced_opt_in = false;
+        }
+      },
+      gmTuneCustomCount: function () {
+        return Object.keys(this.gmSettings.theme.advanced || {}).length;
       },
       gmResetTier: function (tier) {
         var t = this.gmSettings.theme;

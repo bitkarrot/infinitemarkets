@@ -715,6 +715,58 @@ test('appearance choices are not clipped by the settings panel', async ({page}) 
   }), {timeout: 5_000}).toBe(true)
 })
 
+test('fine-tune is point-and-click: swatches and sliders drive the storefront', async ({page, request}) => {
+  await page.goto('/infinitemarkets/')
+  await page.locator('[data-gm-nav="settings"]').click()
+  await page.getByRole('tab', {name: 'Appearance'}).click()
+
+  // The accent explains exactly where it shows up
+  await page.locator('[data-gm="brand-basics"]').click()
+  await expect(page.locator('[data-gm="accent-help"]')).toContainText('lightning-bolt')
+  await expect(page.locator('[data-gm="accent-help"]')).toContainText('buttons or links')
+
+  await page.locator('[data-gm="advanced-tokens"]').click()
+  // no technical checkbox / raw token text boxes
+  await expect(page.locator('[data-gm="advanced-tokens"] input[type="text"]')).toHaveCount(0)
+
+  // pick a button color with the swatch
+  const primary = page.locator('[data-tune="--color-primary"]')
+  await expect(primary).toContainText('Buttons & links')
+  await primary.locator('input[type="color"]').fill('#0b6b3a')
+  await expect(primary.getByText('custom', {exact: true})).toBeVisible()
+
+  // click the far right of the medium-corners track → maximum roundness
+  const radius = page.locator('[data-tune="--radius-md"]')
+  const track = radius.locator('.q-slider__track-container')
+  const width = (await track.boundingBox())!.width
+  await track.click({position: {x: width - 1, y: 8}})
+  await expect(radius).toContainText('24px')
+  await expect(radius.getByText('custom', {exact: true})).toBeVisible()
+
+  await page.getByRole('button', {name: 'Save appearance'}).click()
+  await expect(page.getByText('Appearance saved')).toBeVisible({timeout: 15_000})
+
+  // the storefront now carries the overrides
+  const html = await (await request.get(
+    `/infinitemarkets/public/merchants/${seed.pubkey}`
+  )).text()
+  expect(html).toContain('--color-primary: #0b6b3a')
+  expect(html).toContain('--radius-md: 24px')
+
+  // reset arrows clear a single override, and reset-all opts back out
+  await primary.getByRole('button', {name: 'Reset Buttons & links'}).click()
+  await expect(primary.getByText('custom', {exact: true})).toHaveCount(0)
+  await page.getByRole('button', {name: 'Reset all fine-tuning'}).click()
+  await expect(radius.getByText('custom', {exact: true})).toHaveCount(0)
+  await page.getByRole('button', {name: 'Save appearance'}).click()
+  await expect(page.getByText('Appearance saved')).toBeVisible({timeout: 15_000})
+  const cleared = await (await request.get(
+    `/infinitemarkets/public/merchants/${seed.pubkey}`
+  )).text()
+  expect(cleared).not.toContain('--color-primary: #0b6b3a')
+  expect(cleared).not.toContain('--radius-md: 24px')
+})
+
 test('unauthenticated admin visit redirects or denies', async ({
   browser
 }) => {

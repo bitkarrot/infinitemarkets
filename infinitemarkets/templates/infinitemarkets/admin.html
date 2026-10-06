@@ -1639,7 +1639,26 @@
                     </div>
                     <q-input v-model="gmSettings.theme.brand.accent" dense
                              outlined label="Accent color (#rrggbb)"
-                             class="q-mb-sm"></q-input>
+                             class="q-mb-xs" data-gm="accent-input">
+                      <template v-slot:append>
+                        <label class="gm-tune-swatch" title="Pick a color">
+                          <input type="color" aria-label="Pick accent color"
+                                 :value="gmPreviewTokens['--color-accent']"
+                                 @input="gmSettings.theme.brand.accent = $event.target.value">
+                        </label>
+                      </template>
+                    </q-input>
+                    <div class="text-caption text-grey-7 q-mb-sm"
+                         data-gm="accent-help">
+                      <q-icon name="bolt" size="16px"
+                              :style="{ color: gmPreviewTokens['--color-accent'] }">
+                      </q-icon>
+                      A small highlight color: it tints the lightning-bolt
+                      icons (checkout &amp; trust list) and the pulsing dot on
+                      “waiting for payment”. It does <strong>not</strong>
+                      change buttons or links — set those under
+                      <em>Fine-tune → Buttons &amp; links</em> below.
+                    </div>
                     <q-select v-model="gmSettings.theme.brand.font" dense
                               outlined label="Type style"
                               :options="gmSettings.fontStacks"
@@ -1726,19 +1745,102 @@
                   </div>
                 </q-expansion-item>
 
-                <q-expansion-item label="Advanced Tokens"
+                <q-expansion-item label="Fine-tune colors, roundness & spacing"
                                   data-gm="advanced-tokens">
                   <div class="q-pa-sm">
-                    <q-checkbox v-model="gmSettings.theme.advanced_opt_in"
-                                label="Enable advanced tokens — bounded token overrides only; no custom CSS, scripts, or fonts.">
-                    </q-checkbox>
-                    <div v-if="gmSettings.theme.advanced_opt_in" class="q-mt-sm">
-                      <q-input v-for="t in gmSettings.advancedTokens" :key="t"
-                               v-model="gmSettings.theme.advanced[t]" dense
-                               outlined :label="t" class="q-mb-xs"></q-input>
+                    <div class="text-caption q-mb-md">
+                      Point and click — pick a color, drag a slider, and the
+                      preview updates instantly. Anything you change is marked
+                      <q-badge outline label="custom"></q-badge>; use the
+                      reset arrow to go back to the preset value. Only
+                      colors, corner roundness and spacing can be changed
+                      (no custom code).
                     </div>
-                    <q-btn flat dense label="Reset to preset"
-                           class="q-mt-sm"
+
+                    <div class="text-subtitle2 q-mb-xs">Colors</div>
+                    <div v-for="c in gmSettings.tuneColors" :key="c.token"
+                         class="gm-tune-row" :data-tune="c.token">
+                      <label class="gm-tune-swatch">
+                        <input type="color"
+                               :value="gmPreviewTokens[c.token]"
+                               :aria-label="c.label"
+                               @input="gmTuneSet(c.token, $event.target.value)">
+                      </label>
+                      <div class="gm-tune-text">
+                        <div class="text-body2">
+                          {{ c.label }}
+                          <q-badge v-if="gmTuneIsCustom(c.token)" outline
+                                   label="custom" class="q-ml-xs"></q-badge>
+                        </div>
+                        <div class="text-caption text-grey-7">{{ c.help }}</div>
+                      </div>
+                      <q-btn v-if="gmTuneIsCustom(c.token)" flat dense round
+                             icon="restart_alt" size="sm"
+                             :aria-label="'Reset ' + c.label"
+                             @click="gmTuneReset(c.token)">
+                        <q-tooltip>Back to preset</q-tooltip>
+                      </q-btn>
+                    </div>
+
+                    <div class="text-subtitle2 q-mt-md q-mb-xs">
+                      Roundness
+                    </div>
+                    <div v-for="r in gmSettings.tuneRadius" :key="r.token"
+                         class="gm-tune-slider" :data-tune="r.token">
+                      <div class="row items-center no-wrap">
+                        <div class="col text-body2">
+                          {{ r.label }}
+                          <q-badge v-if="gmTuneIsCustom(r.token)" outline
+                                   label="custom" class="q-ml-xs"></q-badge>
+                          <span class="text-caption text-grey-7 q-ml-xs">
+                            {{ gmTuneValue(r) }}px
+                          </span>
+                        </div>
+                        <q-btn v-if="gmTuneIsCustom(r.token)" flat dense round
+                               icon="restart_alt" size="sm"
+                               :aria-label="'Reset ' + r.label"
+                               @click="gmTuneReset(r.token)">
+                          <q-tooltip>Back to preset</q-tooltip>
+                        </q-btn>
+                      </div>
+                      <div class="text-caption text-grey-7">{{ r.help }}</div>
+                      <q-slider :model-value="gmTuneValue(r)" :min="0"
+                                :max="r.max" :step="1" label dense
+                                :aria-label="r.label"
+                                @update:model-value="gmTuneSet(r.token, $event, true)">
+                      </q-slider>
+                    </div>
+
+                    <div class="text-subtitle2 q-mt-md q-mb-xs">Spacing</div>
+                    <div v-for="s in gmSettings.tuneSpace" :key="s.token"
+                         class="gm-tune-slider" :data-tune="s.token">
+                      <div class="row items-center no-wrap">
+                        <div class="col text-body2">
+                          {{ s.label }}
+                          <q-badge v-if="gmTuneIsCustom(s.token)" outline
+                                   label="custom" class="q-ml-xs"></q-badge>
+                          <span class="text-caption text-grey-7 q-ml-xs">
+                            {{ gmTuneValue(s) }}px
+                          </span>
+                        </div>
+                        <q-btn v-if="gmTuneIsCustom(s.token)" flat dense round
+                               icon="restart_alt" size="sm"
+                               :aria-label="'Reset ' + s.label"
+                               @click="gmTuneReset(s.token)">
+                          <q-tooltip>Back to preset</q-tooltip>
+                        </q-btn>
+                      </div>
+                      <div class="text-caption text-grey-7">{{ s.help }}</div>
+                      <q-slider :model-value="gmTuneValue(s)" :min="0"
+                                :max="s.max" :step="1" label dense
+                                :aria-label="s.label"
+                                @update:model-value="gmTuneSet(s.token, $event, true)">
+                      </q-slider>
+                    </div>
+
+                    <q-btn flat dense no-caps icon="restart_alt"
+                           label="Reset all fine-tuning" class="q-mt-md"
+                           :disable="!gmTuneCustomCount()"
                            @click="gmResetTier('advanced')"></q-btn>
                   </div>
                 </q-expansion-item>
@@ -1794,6 +1896,13 @@
                           </div>
                         </div>
                       </template>
+                    </div>
+                    <div class="gm-preview-bolt">
+                      <q-icon name="bolt" size="16px"
+                              :style="{ color: 'var(--color-accent)' }">
+                      </q-icon>
+                      Pay instantly with Lightning
+                      <span class="gm-preview-pulse"></span>
                     </div>
                     <span class="gm-preview-btn"
                           :style="{ background: 'var(--color-primary)', color: 'var(--color-on-primary)', borderRadius: 'var(--radius-md)' }">
@@ -2405,6 +2514,49 @@
   padding: 10px 20px;
   font-weight: 600;
 }
+.gm-preview-bolt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0;
+  font-size: 13px;
+}
+.gm-preview-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent, #d69a3a);
+}
+/* point-and-click fine-tune rows */
+.gm-tune-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+}
+.gm-tune-text { flex: 1; min-width: 0; }
+.gm-tune-swatch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid rgba(127, 127, 127, 0.45);
+  cursor: pointer;
+}
+.gm-tune-swatch input[type="color"] {
+  position: absolute;
+  inset: -8px;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.gm-tune-slider { padding: 4px 8px 6px 0; }
 .gm-preview-checkout {
   border: 1px solid var(--color-border, #d9d4cc);
   border-radius: var(--radius-md, 8px);
