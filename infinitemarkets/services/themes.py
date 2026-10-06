@@ -382,7 +382,7 @@ _DARK_SURFACES: dict[str, str] = {
     "--color-bg": "#1b1510",
     "--color-surface": "#241c15",
     "--color-surface-alt": "#2e241b",
-    "--color-border": "#4a3b2d",
+    "--color-border": "rgba(245, 239, 230, 0.12)",
     "--color-text": "#f5efe6",
     "--color-text-muted": "#b8a996",
     "--color-focus": "#8ab5ff",
