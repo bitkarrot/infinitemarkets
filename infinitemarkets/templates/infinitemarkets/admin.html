@@ -2418,8 +2418,11 @@
   line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  background: var(--color-surface-alt, #f2efe9);
-  border: 1px solid var(--color-border, #e8e0d5);
+  /* theme-neutral: works under LNbits light AND dark admin themes —
+     the --color-* tokens only exist on the public storefront */
+  background: rgba(127, 127, 127, 0.14);
+  border: 1px solid rgba(127, 127, 127, 0.35);
+  color: inherit;
   border-radius: 8px;
   padding: 10px 12px;
   margin: 0;
