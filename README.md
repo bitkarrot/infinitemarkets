@@ -147,6 +147,21 @@ INFINITEMARKETS_PUBLIC_BASE_URL=https://shop.example.com
 
 Switching to `showcase`/`nostr_only` requires proven Nostr inbox readiness. Existing private order links, in-flight invoices, and sign-in work in every mode.
 
+## Embedding a shop
+
+Two ways to put a storefront on another page:
+
+**Component embed (no iframe)** — `gm-embed.js` renders product cards into the host page's own DOM by fetching the public `GET /api/v1/public/merchants/{pubkey}/products` endpoint (CORS-open, unauthenticated, rate-limited). Checkout still happens on the hosted product pages, which cards open in a new tab.
+
+```html
+<div data-gm-shop="<64-hex merchant pubkey>" data-gm-title="Our products"></div>
+<script src="https://<lnbits-host>/infinitemarkets/static/infinitemarkets/js/gm-embed.js" defer></script>
+```
+
+Optional container attributes: `data-gm-collection="<d_tag>"`, `data-gm-category="<slug>"`, `data-gm-limit="8"`, `data-gm-title`, `data-gm-scheme="dark|light"`. Multiple containers per page are supported.
+
+**Iframe embed** — `/infinitemarkets/public/embed/merchants/<pubkey>` renders the browse section with no nav/hero/footer; its CSP allows `frame-ancestors` on `https:` embedders, and it `postMessage`s `{type: 'gm-embed-height', height}` for auto-sizing. Sign-in and order tracking open full pages in new tabs.
+
 ## Security posture
 
 - Relay-target egress screening: discovered/inbox relay targets are DNS-resolved and non-global ranges (private, loopback, link-local, multicast, reserved, metadata incl. `169.254.169.254`, CGNAT) rejected at validate, connect, and reconnect — IPv4 and IPv6

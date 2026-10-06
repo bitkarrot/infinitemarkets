@@ -34,6 +34,11 @@ PUBLIC_HEADERS = {
     "Cache-Control": "no-store",
     "Referrer-Policy": "no-referrer",
     "X-Content-Type-Options": "nosniff",
+    # Embeddable widgets (gm-embed.js) fetch these public, unauthenticated,
+    # rate-limited reads from arbitrary host pages. Mutations still can't
+    # be driven cross-origin: they need a CORS preflight, which this API
+    # does not answer.
+    "Access-Control-Allow-Origin": "*",
 }
 
 
@@ -85,6 +90,77 @@ async def public_merchant(pubkey: str, request: Request, response: Response):
         },
         "state": "active" if merchant["state"] == "active" else "draft",
     }
+
+
+@infinitemarkets_public_api_router.get("/merchants/{pubkey}/products")
+@public_boundary
+async def public_merchant_products(
+    pubkey: str, request: Request, response: Response
+):
+    """Card-shape listing for embeddable widgets and headless consumers —
+    the same browse visibility rules as the storefront, no internals.
+    ``?collection=<d_tag>`` / ``?category=<slug>`` match the HTML browse
+    params; cards link back to the hosted product pages."""
+    await _guard(request, response)
+    merchant = await nip89.merchant_by_pubkey(pubkey)
+    if not merchant or merchant["state"] in ("deactivating", "inactive"):
+        raise not_found("merchant not found")
+    sql = (
+        "SELECT p.id, p.d_tag, p.title, p.amount_minor, p.currency, "
+        "p.currency_decimals, p.format, p.visibility, p.stock_on_hand, "
+        "p.stock_reserved, p.nip99_status, p.draft, p.deleted_at, "
+        "cat.name AS category_name, cat.public_slug AS category_slug "
+        f"FROM {table('products')} p "
+        f"JOIN {table('categories')} cat ON cat.id = p.category_id "
+        "WHERE p.merchant_id = :m AND cat.deleted_at IS NULL "
+        "AND p.deleted_at IS NULL AND NOT p.draft "
+        "AND p.parent_product_id IS NULL AND p.visibility != 'hidden'"
+    )
+    params = {"m": merchant["id"]}
+    if request.query_params.get("collection"):
+        sql += (
+            f" AND EXISTS (SELECT 1 FROM {table('product_collections')} pc "
+            f"JOIN {table('collections')} c ON c.id = pc.collection_id "
+            "WHERE pc.product_id = p.id AND c.merchant_id = :m "
+            "AND c.deleted_at IS NULL AND c.d_tag = :collection)"
+        )
+        params["collection"] = request.query_params["collection"][:64]
+    if request.query_params.get("category"):
+        sql += " AND cat.public_slug = :category"
+        params["category"] = request.query_params["category"][:64]
+    async with db.connect() as conn:
+        rows = [dict(r) for r in await conn.fetchall(sql, params)]
+        images: dict[str, str] = {}
+        if rows:
+            placeholders = ", ".join(f":p{i}" for i in range(len(rows)))
+            image_rows = await conn.fetchall(
+                f"SELECT product_id, url FROM {table('product_images')} "
+                f"WHERE product_id IN ({placeholders}) ORDER BY sort_order, id",
+                {f"p{i}": r["id"] for i, r in enumerate(rows)},
+            )
+            for img in image_rows:
+                images.setdefault(img["product_id"], img["url"])
+    products = [
+        {
+            "d_tag": r["d_tag"],
+            "title": r["title"] or "",
+            "price": {
+                "amount_minor": r["amount_minor"],
+                "currency": r["currency"],
+                "decimals": r["currency_decimals"],
+            },
+            "availability": nip89.availability_state(
+                dict(r) | {"_merchant": merchant}
+            ),
+            "format": r["format"],
+            "category": r["category_name"] or "",
+            "category_slug": r["category_slug"] or "",
+            "image": images.get(r["id"]),
+            "url": f"/infinitemarkets/p/{merchant['pubkey']}/{r['d_tag']}",
+        }
+        for r in rows
+    ]
+    return {"pubkey": merchant["pubkey"], "products": products}
 
 
 @infinitemarkets_public_api_router.get("/products/{pubkey}/{d_tag}")

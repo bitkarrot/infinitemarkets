@@ -48,11 +48,11 @@ _PUBLIC_CSP = (
     "img-src 'self' https:; connect-src 'self'; frame-ancestors 'none'; "
     "base-uri 'none'; form-action 'self'"
 )
-# The embed route is iframe-able by SAME-ORIGIN pages only (the WebPages
-# extension serves on this host) — every other public page stays
-# frame-ancestors 'none'.
+# The embed route is iframe-able by any HTTPS page (it is meant to be
+# embedded — e.g. a WebPages static page on this host or an external
+# site). Every other public page stays frame-ancestors 'none'.
 _EMBED_CSP = _PUBLIC_CSP.replace(
-    "frame-ancestors 'none'", "frame-ancestors 'self'"
+    "frame-ancestors 'none'", "frame-ancestors 'self' https:"
 )
 
 

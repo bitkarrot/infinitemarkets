@@ -440,6 +440,50 @@ async def test_embed_listing_drops_chrome_and_allows_same_origin_framing(runtime
     assert "frame-ancestors 'none'" in resp.headers["content-security-policy"]
 
 
+async def test_public_products_api_feeds_embed_widget(runtime_env):
+    """The listing endpoint backs gm-embed.js: card fields only, CORS-open
+    for unauthenticated reads, browse-equivalent visibility rules."""
+    client = runtime_env["client"]
+    merchant = await _merchant(runtime_env)
+    _, product = await _catalog_and_product(
+        runtime_env, title="Widget Item", amount_minor=2500,
+        currency="SAT", currency_decimals=0, format="digital",
+    )
+    _, hidden = await _catalog_and_product(runtime_env, visibility="hidden")
+
+    resp = await client.get(
+        f"{API}/public/merchants/{merchant['pubkey']}/products"
+    )
+    assert resp.status_code == 200
+    assert resp.headers["access-control-allow-origin"] == "*"
+    body = resp.json()
+    assert body["pubkey"] == merchant["pubkey"]
+    cards = {p["d_tag"]: p for p in body["products"]}
+    assert product["d_tag"] in cards
+    assert hidden["d_tag"] not in cards
+    card = cards[product["d_tag"]]
+    assert card["title"] == "Widget Item"
+    assert card["price"] == {
+        "amount_minor": 2500, "currency": "SAT", "decimals": 0
+    }
+    assert card["availability"] in ("available", "sold", "preorder")
+    assert card["url"] == (
+        f"/infinitemarkets/p/{merchant['pubkey']}/{product['d_tag']}"
+    )
+    # no internals
+    for forbidden in ("id", "merchant_id", "category_id", "stock_on_hand",
+                      "stock_reserved", "draft", "deleted_at"):
+        assert forbidden not in card
+
+    # category filter behaves like the browse param
+    resp = await client.get(
+        f"{API}/public/merchants/{merchant['pubkey']}/products",
+        params={"category": "no-such-slug"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["products"] == []
+
+
 async def test_hidden_and_sold_and_preorder_states(runtime_env):
     client = runtime_env["client"]
     merchant = await _merchant(runtime_env)
