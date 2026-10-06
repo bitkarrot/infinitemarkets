@@ -6,6 +6,7 @@ override, verbatim copy, header-only order token, scoped theme emission."""
 from __future__ import annotations
 
 import asyncio
+import uuid
 
 import pytest
 import pytest_asyncio
@@ -238,3 +239,92 @@ async def test_theme_emission_scoped(runtime_env):
     admin = await client.get("/infinitemarkets/")
     assert admin.status_code == 200
     assert "--color-bg: #0b0f14" not in admin.text
+
+
+async def test_gallery_listing_cards_and_editorial_baseline(runtime_env):
+    from infinitemarkets.db import DomainTransaction
+    from infinitemarkets.services import themes
+
+    client = runtime_env["client"]
+    mid = runtime_env["merchant_id"]
+    pubkey = runtime_env["pubkey"]
+    product = runtime_env["physical"]
+    headers = {
+        "Origin": ORIGIN,
+        "X-CSRF-Token": client.cookies.get("gm_csrf"),
+    }
+    async with DomainTransaction() as tx:
+        for sort_order in range(3):
+            await tx.execute(
+                f"INSERT INTO {tx.table('product_images')} "
+                "(id, product_id, url, sort_order) "
+                "VALUES (:id, :product, :url, :sort)",
+                {"id": uuid.uuid4().hex, "product": product["id"],
+                 "url": f"https://images.example/{sort_order}.jpg",
+                 "sort": sort_order},
+            )
+    collection = await client.post(
+        f"{API}/collections", json={"title": "Gallery listing"},
+        headers=headers,
+    )
+    assert collection.status_code == 201, collection.text
+    assigned = await client.patch(
+        f"{API}/products/{product['id']}",
+        json={"collection_ids": [collection.json()["id"]]},
+        headers=headers,
+    )
+    assert assigned.status_code == 200, assigned.text
+    shop_url = f"/infinitemarkets/public/merchants/{pubkey}"
+    collection_url = (
+        f"/infinitemarkets/public/collections/{pubkey}/"
+        f"{collection.json()['d_tag']}"
+    )
+    original = await themes.get_theme(mid)
+    try:
+        await themes.save_theme(mid, {"layout": "gallery"})
+        for url in (shop_url, collection_url):
+            page = await client.get(url)
+            assert page.status_code == 200, page.text
+            assert 'data-layout="gallery"' in page.text
+            card = page.text.split(
+                f'href="/infinitemarkets/p/{pubkey}/{product["d_tag"]}"', 1
+            )[1].split("</a>", 1)[0]
+            assert 'src="https://images.example/0.jpg"' in card
+            assert 'class="card-alt-image" src="https://images.example/1.jpg"' in card
+            assert 'images.example/2.jpg' not in card
+            assert 'class="section-description"' in page.text
+        shop = (await client.get(shop_url)).text
+        assert 'class="card-badge">Digital</span>' in shop
+        assert 'class="card-placeholder">No image available</span>' in shop
+        assert f'href="{shop_url}">View all products' in (
+            await client.get(collection_url)
+        ).text
+        async with DomainTransaction() as tx:
+            await tx.execute(
+                f"UPDATE {tx.table('products')} SET visibility = 'pre-order' "
+                "WHERE id = :id", {"id": product["id"]},
+            )
+        assert 'class="card-badge">Pre-order</span>' in (
+            await client.get(shop_url)
+        ).text
+        async with DomainTransaction() as tx:
+            await tx.execute(
+                f"UPDATE {tx.table('products')} SET visibility = 'on-sale', "
+                "stock_on_hand = 0 WHERE id = :id", {"id": product["id"]},
+            )
+        assert 'class="card-badge">Sold out</span>' in (
+            await client.get(shop_url)
+        ).text
+        await themes.save_theme(mid, {"layout": "editorial"})
+        editorial = (await client.get(shop_url)).text
+        assert 'data-layout="editorial"' in editorial
+        assert 'class="card-alt-image"' not in editorial
+        assert 'class="card-badges"' not in editorial
+        assert 'class="section-description"' not in editorial
+    finally:
+        async with DomainTransaction() as tx:
+            await tx.execute(
+                f"UPDATE {tx.table('products')} SET visibility = 'on-sale', "
+                "stock_on_hand = 5 WHERE id = :id", {"id": product["id"]},
+            )
+        await themes.save_theme(mid, original)

@@ -413,6 +413,42 @@ test('gallery layout is selectable and keeps the editorial checkout flow', async
   }
 })
 
+test('gallery listing cards stay scoped and adapt to mobile', async ({page}) => {
+  await page.goto('/infinitemarkets/')
+  const cookies = await page.context().cookies()
+  const csrf = cookies.find(cookie => cookie.name === 'gm_csrf')?.value || ''
+  const url = `/infinitemarkets/api/v1/merchants/${seed.merchant_id}`
+  const set = (layout: string) => page.request.patch(url, {
+    headers: {Origin: seed.base_url, 'X-CSRF-Token': csrf},
+    data: {theme: {layout}}
+  })
+  try {
+    expect((await set('gallery')).status()).toBe(200)
+    await page.goto(`/infinitemarkets/public/merchants/${seed.pubkey}`)
+    const grid = page.locator('.card-grid')
+    await expect(grid.locator('.product-card')).toHaveCount(2)
+    await expect(grid.locator('.card-badge').filter({hasText: 'Digital'})).toHaveCount(1)
+    await expect(page.locator('.section-description')).toBeVisible()
+    expect(await grid.evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(3)
+    expect(await grid.locator('.card-art').first().evaluate(el => getComputedStyle(el).aspectRatio)).toBe('1 / 1')
+    await page.setViewportSize({width: 768, height: 900})
+    expect(await grid.evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(2)
+    const collectionUrl = await page.locator('.collection-link').first().getAttribute('href')
+    expect(collectionUrl).toBeTruthy()
+    await page.goto(collectionUrl!)
+    await expect(page.locator('.section-view-all')).toHaveAttribute(
+      'href', `/infinitemarkets/public/merchants/${seed.pubkey}`
+    )
+    await page.setViewportSize({width: 390, height: 844})
+    expect(await page.locator('.card-grid').evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(1)
+  } finally {
+    expect((await set('editorial')).status()).toBe(200)
+  }
+  await page.goto(`/infinitemarkets/public/merchants/${seed.pubkey}`)
+  await expect(page.locator('.gm-public')).toHaveAttribute('data-layout', 'editorial')
+  await expect(page.locator('.card-badges')).toHaveCount(0)
+})
+
 test('publications surface shows relay health + evidence copy', async ({
   page
 }) => {

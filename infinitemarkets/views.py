@@ -52,9 +52,8 @@ def infinitemarkets_renderer():
     return template_renderer(["infinitemarkets"])
 
 
-async def _first_images(product_ids: list[str]) -> dict[str, str]:
-    """Lowest-sort_order image URL per product — one query for card
-    thumbnails on browse pages."""
+async def _card_images(product_ids: list[str]) -> dict[str, list[str]]:
+    """First two images per product in one browse-page query."""
     if not product_ids:
         return {}
     from .db import db, table
@@ -64,12 +63,14 @@ async def _first_images(product_ids: list[str]) -> dict[str, str]:
     async with db.connect() as conn:
         rows = await conn.fetchall(
             f"SELECT product_id, url FROM {table('product_images')} "
-            f"WHERE product_id IN ({placeholders}) ORDER BY sort_order",
+            f"WHERE product_id IN ({placeholders}) ORDER BY sort_order, id",
             params,
         )
-    out: dict[str, str] = {}
-    for r in rows:
-        out.setdefault(r["product_id"], r["url"])
+    out: dict[str, list[str]] = {}
+    for row in rows:
+        urls = out.setdefault(row["product_id"], [])
+        if len(urls) < 2:
+            urls.append(row["url"])
     return out
 
 
@@ -354,9 +355,11 @@ async def collection_page(request: Request, pubkey: str, d_tag: str):
     from .services import themes as theme_service
 
     collection = nip89.collection_json(dict(row), member_dicts)
-    images = await _first_images([m["id"] for m in members])
+    images = await _card_images([m["id"] for m in members])
     for prod, member in zip(collection["products"], member_dicts):
-        prod["image"] = images.get(member["id"])
+        urls = images.get(member["id"], [])
+        prod["image"] = urls[0] if urls else None
+        prod["hover_image"] = urls[1] if len(urls) > 1 else None
         prod["format"] = member["format"]
     theme = await theme_service.get_theme(merchant["id"])
     store = await _store_ctx(merchant, theme)
@@ -401,7 +404,7 @@ async def merchant_page(request: Request, pubkey: str):
             " ORDER BY created_at",
             {"m": merchant["id"]},
         )
-    images = await _first_images([p["id"] for p in products])
+    images = await _card_images([p["id"] for p in products])
     cards = [
         {
             "d_tag": p["d_tag"],
@@ -409,7 +412,11 @@ async def merchant_page(request: Request, pubkey: str):
             "amount_minor": p["amount_minor"],
             "currency": p["currency"],
             "currency_decimals": p["currency_decimals"],
-            "image": images.get(p["id"]),
+            "image": images[p["id"]][0] if p["id"] in images else None,
+            "hover_image": (
+                images[p["id"]][1] if len(images.get(p["id"], [])) > 1
+                else None
+            ),
             "format": p["format"],
             "availability": nip89.availability_state(
                 dict(p) | {"_merchant": merchant}

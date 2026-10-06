@@ -18,14 +18,27 @@
 {% endif %}
 {% if products %}
 <div class="section-head">
-  <h2>Catalog</h2>
+  <div class="section-intro">
+    <h2>Catalog</h2>
+    {% if layout == 'gallery' %}<p class="section-description">Browse products from this shop.</p>{% endif %}
+  </div>
   <span class="section-count">{{ products | length }} item{{ 's' if products | length != 1 }}</span>
 </div>
 <div class="card-grid">
   {% for p in products %}
   <a class="product-card" href="/infinitemarkets/p/{{ pubkey }}/{{ p.d_tag }}">
     <div class="card-art">
-      {% if p.image %}<img src="{{ p.image }}" alt="" loading="lazy">{% endif %}
+      {% if p.image %}<img src="{{ p.image }}" alt="" loading="{{ 'eager' if layout == 'gallery' and loop.first else 'lazy' }}" referrerpolicy="no-referrer">{% endif %}
+      {% if layout == 'gallery' %}
+        {% if p.hover_image %}<img class="card-alt-image" src="{{ p.hover_image }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}
+        {% if not p.image %}<span class="card-placeholder">No image available</span>{% endif %}
+        {% if p.availability in ('sold', 'preorder') or p.format == 'digital' %}
+        <span class="card-badges">
+          {% if p.availability == 'sold' %}<span class="card-badge">Sold out</span>{% elif p.availability == 'preorder' %}<span class="card-badge">Pre-order</span>{% endif %}
+          {% if p.format == 'digital' %}<span class="card-badge">Digital</span>{% endif %}
+        </span>
+        {% endif %}
+      {% endif %}
     </div>
     <div class="card-body">
       <h3 class="card-title">{{ p.title }}</h3>
@@ -44,6 +57,7 @@
   {% endfor %}
 </div>
 {% else %}
-<p class="storefront-empty">This shop has no products on sale yet.</p>
+{% if layout == 'gallery' %}<p class="storefront-empty">No products are available right now. Check back soon.</p>
+{% else %}<p class="storefront-empty">This shop has no products on sale yet.</p>{% endif %}
 {% endif %}
 {% endblock %}
