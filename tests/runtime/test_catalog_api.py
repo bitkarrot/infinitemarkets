@@ -39,18 +39,18 @@ async def _merchant(runtime_env) -> str:
     return runtime_env["merchant_id"]
 
 
-async def _catalog(runtime_env) -> str:
+async def _category(runtime_env) -> str:
     await _merchant(runtime_env)
-    if "catalog_id" in runtime_env:
-        return runtime_env["catalog_id"]
+    if "category_id" in runtime_env:
+        return runtime_env["category_id"]
     resp = await runtime_env["client"].post(
-        f"{API}/catalogs",
+        f"{API}/categories",
         json={"name": "main", "default_currency": "USD"},
         headers=await _cookie(runtime_env),
     )
     assert resp.status_code == 201, resp.text
-    runtime_env["catalog_id"] = resp.json()["id"]
-    return runtime_env["catalog_id"]
+    runtime_env["category_id"] = resp.json()["id"]
+    return runtime_env["category_id"]
 
 
 async def _outbox(runtime_env, agg_type=None):
@@ -84,62 +84,78 @@ async def _deps(runtime_env, intent_id):
 # --- happy path + bounds --------------------------------------------------------
 
 
-async def test_catalog_crud(runtime_env):
-    cid = await _catalog(runtime_env)
+async def test_category_crud(runtime_env):
+    cid = await _category(runtime_env)
     client = runtime_env["client"]
     resp = await client.get(
-        f"{API}/catalogs", headers={"Origin": ORIGIN}
+        f"{API}/categories", headers={"Origin": ORIGIN}
     )
     assert resp.status_code == 200
-    assert any(c["id"] == cid for c in resp.json())
+    original = next(c for c in resp.json() if c["id"] == cid)
+    assert original["public_slug"] and original["public_slug"] != cid
 
     resp = await client.patch(
-        f"{API}/catalogs/{cid}",
+        f"{API}/categories/{cid}",
         json={"name": "renamed", "default_currency": "USD"},
         headers=await _cookie(runtime_env),
     )
     assert resp.status_code == 200
     assert resp.json()["name"] == "renamed"
+    assert resp.json()["public_slug"] == original["public_slug"]
 
 
-async def test_catalog_delete_guards(runtime_env):
-    main = await _catalog(runtime_env)
+async def test_categories_have_no_legacy_api_alias(runtime_env):
+    cid = await _category(runtime_env)
+    client = runtime_env["client"]
+    headers = await _cookie(runtime_env)
+    assert (await client.get(f"{API}/catalogs", headers=headers)).status_code == 404
+    resp = await client.post(
+        f"{API}/products",
+        json={"catalog_id": cid, "title": "legacy", "format": "digital",
+              "amount_minor": 100, "currency": "SAT", "draft": True},
+        headers=headers,
+    )
+    assert resp.status_code == 422
+
+
+async def test_category_delete_guards(runtime_env):
+    main = await _category(runtime_env)
     client = runtime_env["client"]
     headers = await _cookie(runtime_env)
 
     resp = await client.post(
-        f"{API}/catalogs", json={"name": "second"}, headers=headers
+        f"{API}/categories", json={"name": "second"}, headers=headers
     )
     assert resp.status_code == 201
     second = resp.json()["id"]
 
     prod = await client.post(
         f"{API}/products",
-        json={"catalog_id": second, "title": "pinned", "format": "digital",
+        json={"category_id": second, "title": "pinned", "format": "digital",
               "amount_minor": 5, "currency": "SAT", "draft": True},
         headers=headers,
     )
     assert prod.status_code == 201, prod.text
 
     # live product -> refused, nothing orphaned
-    resp = await client.delete(f"{API}/catalogs/{second}", headers=headers)
+    resp = await client.delete(f"{API}/categories/{second}", headers=headers)
     assert resp.status_code == 409
-    assert resp.json()["type"].endswith("catalog-not-empty")
+    assert resp.json()["type"].endswith("category-not-empty")
 
     # once emptied the delete lands and the row leaves the list
     resp = await client.delete(
         f"{API}/products/{prod.json()['id']}", headers=headers
     )
     assert resp.status_code == 200
-    resp = await client.delete(f"{API}/catalogs/{second}", headers=headers)
+    resp = await client.delete(f"{API}/categories/{second}", headers=headers)
     assert resp.status_code == 200
-    listed = await client.get(f"{API}/catalogs", headers={"Origin": ORIGIN})
+    listed = await client.get(f"{API}/categories", headers={"Origin": ORIGIN})
     assert second not in [c["id"] for c in listed.json()]
 
     # a deleted catalog cannot take new products
     resp = await client.post(
         f"{API}/products",
-        json={"catalog_id": second, "title": "x", "format": "digital",
+        json={"category_id": second, "title": "x", "format": "digital",
               "amount_minor": 1, "currency": "SAT", "draft": True},
         headers=headers,
     )
@@ -148,40 +164,40 @@ async def test_catalog_delete_guards(runtime_env):
     # the shop's last remaining catalog cannot be deleted
     others = [c["id"] for c in listed.json() if c["id"] != main]
     for cid in others:
-        r = await client.delete(f"{API}/catalogs/{cid}", headers=headers)
+        r = await client.delete(f"{API}/categories/{cid}", headers=headers)
         assert r.status_code in (200, 409)
-    resp = await client.delete(f"{API}/catalogs/{main}", headers=headers)
+    resp = await client.delete(f"{API}/categories/{main}", headers=headers)
     assert resp.status_code in (409,)
-    assert resp.json()["type"].endswith(("last-catalog", "catalog-not-empty"))
+    assert resp.json()["type"].endswith(("last-category", "category-not-empty"))
 
 
 async def test_product_validation_bounds(runtime_env):
-    cid = await _catalog(runtime_env)
+    cid = await _category(runtime_env)
     client = runtime_env["client"]
     headers = await _cookie(runtime_env)
 
     cases = [
-        {"catalog_id": cid, "title": "x" * 201},
-        {"catalog_id": cid, "summary": "x" * 501},
-        {"catalog_id": cid, "description_md": "x" * (64 * 1024 + 1)},
-        {"catalog_id": cid, "images": [
+        {"category_id": cid, "title": "x" * 201},
+        {"category_id": cid, "summary": "x" * 501},
+        {"category_id": cid, "description_md": "x" * (64 * 1024 + 1)},
+        {"category_id": cid, "images": [
             f"https://x.example/{i}.png" for i in range(17)
         ]},
-        {"catalog_id": cid, "images": ["http://insecure.example/x.png"]},
-        {"catalog_id": cid, "currency": "usd"},        # lowercase
-        {"catalog_id": cid, "currency": "TOOLONGCURR"},
-        {"catalog_id": cid, "currency_decimals": 19},
-        {"catalog_id": cid, "product_type": "bogus"},
-        {"catalog_id": cid, "stock_on_hand": -1},
-        {"catalog_id": cid, "stock_on_hand": 1.5},
-        {"catalog_id": cid, "stock_on_hand": True},
-        {"catalog_id": cid, "stock_on_hand": 2**63},
-        {"catalog_id": cid, "stock_reserved": 1},
-        {"catalog_id": cid, "amount_minor": -1},
-        {"catalog_id": cid, "amount_minor": 1.5},
-        {"catalog_id": cid, "amount_minor": True},
-        {"catalog_id": cid, "amount_minor": 2**63},
-        {"catalog_id": cid, "unknown_field": 1},
+        {"category_id": cid, "images": ["http://insecure.example/x.png"]},
+        {"category_id": cid, "currency": "usd"},        # lowercase
+        {"category_id": cid, "currency": "TOOLONGCURR"},
+        {"category_id": cid, "currency_decimals": 19},
+        {"category_id": cid, "product_type": "bogus"},
+        {"category_id": cid, "stock_on_hand": -1},
+        {"category_id": cid, "stock_on_hand": 1.5},
+        {"category_id": cid, "stock_on_hand": True},
+        {"category_id": cid, "stock_on_hand": 2**63},
+        {"category_id": cid, "stock_reserved": 1},
+        {"category_id": cid, "amount_minor": -1},
+        {"category_id": cid, "amount_minor": 1.5},
+        {"category_id": cid, "amount_minor": True},
+        {"category_id": cid, "amount_minor": 2**63},
+        {"category_id": cid, "unknown_field": 1},
     ]
     for payload in cases:
         resp = await client.post(
@@ -192,12 +208,12 @@ async def test_product_validation_bounds(runtime_env):
 
 
 async def test_product_crud_and_outbox_intent(runtime_env):
-    cid = await _catalog(runtime_env)
+    cid = await _category(runtime_env)
     client = runtime_env["client"]
     resp = await client.post(
         f"{API}/products",
         json={
-            "catalog_id": cid,
+            "category_id": cid,
             "title": "beans",
             "summary": "good beans",
             "description_md": "# beans\n\nRoasted. <script>x</script>",
@@ -245,11 +261,11 @@ async def test_published_at_preserved_across_edits(runtime_env):
 
 
 async def test_draft_produces_no_intent(runtime_env):
-    cid = await _catalog(runtime_env)
+    cid = await _category(runtime_env)
     client = runtime_env["client"]
     resp = await client.post(
         f"{API}/products",
-        json={"catalog_id": cid, "title": "wip", "draft": True},
+        json={"category_id": cid, "title": "wip", "draft": True},
         headers=await _cookie(runtime_env),
     )
     assert resp.status_code == 201
@@ -259,14 +275,14 @@ async def test_draft_produces_no_intent(runtime_env):
 
 
 async def test_variation_rules(runtime_env):
-    cid = await _catalog(runtime_env)
+    cid = await _category(runtime_env)
     client = runtime_env["client"]
     headers = await _cookie(runtime_env)
 
     # variable parent
     resp = await client.post(
         f"{API}/products",
-        json={"catalog_id": cid, "title": "shirt",
+        json={"category_id": cid, "title": "shirt",
               "product_type": "variable"},
         headers=headers,
     )
@@ -276,7 +292,7 @@ async def test_variation_rules(runtime_env):
     # simple product cannot parent a variation
     resp = await client.post(
         f"{API}/products",
-        json={"catalog_id": cid, "title": "plain",
+        json={"category_id": cid, "title": "plain",
               "product_type": "simple"},
         headers=headers,
     )
@@ -284,7 +300,7 @@ async def test_variation_rules(runtime_env):
 
     resp = await client.post(
         f"{API}/products",
-        json={"catalog_id": cid, "title": "shirt-M",
+        json={"category_id": cid, "title": "shirt-M",
               "product_type": "variation",
               "parent_product_id": simple},
         headers=headers,
@@ -293,7 +309,7 @@ async def test_variation_rules(runtime_env):
 
     resp = await client.post(
         f"{API}/products",
-        json={"catalog_id": cid, "title": "shirt-M",
+        json={"category_id": cid, "title": "shirt-M",
               "product_type": "variation",
               "parent_product_id": parent},
         headers=headers,
@@ -304,7 +320,7 @@ async def test_variation_rules(runtime_env):
     # depth=1: a variation cannot parent another variation
     resp = await client.post(
         f"{API}/products",
-        json={"catalog_id": cid, "title": "shirt-M-tall",
+        json={"category_id": cid, "title": "shirt-M-tall",
               "product_type": "variation",
               "parent_product_id": var_id},
         headers=headers,
@@ -313,7 +329,7 @@ async def test_variation_rules(runtime_env):
 
 
 async def test_collection_zero_members_no_intent(runtime_env):
-    await _catalog(runtime_env)
+    await _category(runtime_env)
     client = runtime_env["client"]
     resp = await client.post(
         f"{API}/collections",
@@ -328,7 +344,7 @@ async def test_collection_zero_members_no_intent(runtime_env):
 
 
 async def test_membership_enqueues_collection_and_product_dep(runtime_env):
-    await _catalog(runtime_env)
+    await _category(runtime_env)
     client = runtime_env["client"]
     headers = await _cookie(runtime_env)
     col_id = runtime_env["empty_col"]
@@ -360,7 +376,7 @@ async def test_membership_enqueues_collection_and_product_dep(runtime_env):
 
 
 async def test_shipping_validation(runtime_env):
-    await _catalog(runtime_env)
+    await _category(runtime_env)
     client = runtime_env["client"]
     headers = await _cookie(runtime_env)
 
@@ -439,7 +455,7 @@ async def test_dry_run_deterministic(runtime_env):
 
 
 async def test_bulk_product_updates_are_atomic_and_publication_safe(runtime_env):
-    cid = await _catalog(runtime_env)
+    cid = await _category(runtime_env)
     client = runtime_env["client"]
     headers = await _cookie(runtime_env)
     source = await client.post(
@@ -454,7 +470,7 @@ async def test_bulk_product_updates_are_atomic_and_publication_safe(runtime_env)
         response = await client.post(
             f"{API}/products",
             json={
-                "catalog_id": cid,
+                "category_id": cid,
                 "title": title,
                 "amount_minor": amount,
                 "currency": "SAT",
@@ -654,7 +670,7 @@ async def test_owner_scoping(runtime_env):
             },
         )
         # user B has no merchant -> catalog list 404s
-        resp = await c2.get(f"{API}/catalogs")
+        resp = await c2.get(f"{API}/categories")
         assert resp.status_code == 404
         # and cannot read user A's product (merchant-scoped fetch)
         resp = await c2.get(

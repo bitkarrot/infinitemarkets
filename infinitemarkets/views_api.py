@@ -431,70 +431,70 @@ async def delete_merchant(
     return await merchant_service.begin_deactivation(merchant_id, user)
 
 
-# --- section 5.2 catalog routes ---------------------------------------------------
+# --- section 5.2 category routes ---------------------------------------------------
 #
 # These paths carry no merchant id — the caller's 1:1 merchant resolves
 # implicitly (POST /merchants is the only way to create one).
 
-from .services import catalog as catalog_service  # noqa: E402
+from .services import catalog as category_service  # noqa: E402
 
 
 async def _mid(user) -> str:
     return (await merchant_service.current_merchant(user))["id"]
 
 
-@infinitemarkets_api_router.post("/catalogs", status_code=201)
+@infinitemarkets_api_router.post("/categories", status_code=201)
 @problem_boundary
-async def create_catalog(
+async def create_category(
     request: Request,
     body: dict,
     user: User = Depends(check_user_exists),
 ):
-    return await catalog_service.create_catalog(await _mid(user), user, body)
+    return await category_service.create_category(await _mid(user), user, body)
 
 
-@infinitemarkets_api_router.get("/catalogs")
+@infinitemarkets_api_router.get("/categories")
 @problem_boundary
-async def list_catalogs(
+async def list_categories(
     request: Request, user: User = Depends(check_user_exists)
 ):
-    return await catalog_service.list_catalogs(await _mid(user), user)
+    return await category_service.list_categories(await _mid(user), user)
 
 
-@infinitemarkets_api_router.get("/catalogs/{catalog_id}")
+@infinitemarkets_api_router.get("/categories/{category_id}")
 @problem_boundary
-async def get_catalog(
+async def get_category(
     request: Request,
-    catalog_id: str,
+    category_id: str,
     user: User = Depends(check_user_exists),
 ):
-    return await catalog_service.get_catalog(
-        await _mid(user), user, catalog_id
+    return await category_service.get_category(
+        await _mid(user), user, category_id
     )
 
 
-@infinitemarkets_api_router.patch("/catalogs/{catalog_id}")
+@infinitemarkets_api_router.patch("/categories/{category_id}")
 @problem_boundary
-async def patch_catalog(
+async def patch_category(
     request: Request,
-    catalog_id: str,
+    category_id: str,
     body: dict,
     user: User = Depends(check_user_exists),
 ):
-    return await catalog_service.patch_catalog(
-        await _mid(user), user, catalog_id, body
+    return await category_service.patch_category(
+        await _mid(user), user, category_id, body
     )
 
 
-@infinitemarkets_api_router.delete("/catalogs/{catalog_id}")
+@infinitemarkets_api_router.delete("/categories/{category_id}")
 @problem_boundary
-async def delete_catalog(
+async def delete_category(
     request: Request,
-    catalog_id: str,
+    category_id: str,
     user: User = Depends(check_user_exists),
 ):
-    return await catalog_service.delete_catalog(
-        await _mid(user), user, catalog_id
+    return await category_service.delete_category(
+        await _mid(user), user, category_id
     )
 
 
@@ -505,7 +505,7 @@ async def create_product(
     body: dict,
     user: User = Depends(check_user_exists),
 ):
-    return await catalog_service.create_product(await _mid(user), user, body)
+    return await category_service.create_product(await _mid(user), user, body)
 
 
 @infinitemarkets_api_router.post("/products/bulk")
@@ -515,7 +515,7 @@ async def bulk_products(
     body: BulkProductsBody,
     user: User = Depends(check_user_exists),
 ):
-    return await catalog_service.bulk_products(
+    return await category_service.bulk_products(
         await _mid(user), user, body.product_ids, body.action, body.value
     )
 
@@ -525,10 +525,10 @@ async def bulk_products(
 async def list_products(
     request: Request,
     user: User = Depends(check_user_exists),
-    catalog_id: str | None = None,
+    category_id: str | None = None,
 ):
-    return await catalog_service.list_products(
-        await _mid(user), user, catalog_id=catalog_id
+    return await category_service.list_products(
+        await _mid(user), user, category_id=category_id
     )
 
 
@@ -539,7 +539,7 @@ async def get_product(
     product_id: str,
     user: User = Depends(check_user_exists),
 ):
-    return await catalog_service.get_product(
+    return await category_service.get_product(
         await _mid(user), user, product_id
     )
 
@@ -552,7 +552,7 @@ async def patch_product(
     body: dict,
     user: User = Depends(check_user_exists),
 ):
-    return await catalog_service.patch_product(
+    return await category_service.patch_product(
         await _mid(user), user, product_id, body
     )
 
@@ -564,7 +564,7 @@ async def delete_product(
     product_id: str,
     user: User = Depends(check_user_exists),
 ):
-    return await catalog_service.delete_product(
+    return await category_service.delete_product(
         await _mid(user), user, product_id
     )
 
@@ -578,7 +578,7 @@ async def add_product_image(
     body: dict,
     user: User = Depends(check_user_exists),
 ):
-    return await catalog_service.add_product_image(
+    return await category_service.add_product_image(
         await _mid(user), user, product_id, body
     )
 
@@ -590,7 +590,7 @@ async def get_product_events(
     product_id: str,
     user: User = Depends(check_user_exists),
 ):
-    return await catalog_service.product_events(
+    return await category_service.product_events(
         await _mid(user), user, product_id
     )
 
@@ -602,7 +602,7 @@ async def create_collection(
     body: dict,
     user: User = Depends(check_user_exists),
 ):
-    return await catalog_service.create_collection(
+    return await category_service.create_collection(
         await _mid(user), user, body
     )
 
@@ -612,7 +612,7 @@ async def create_collection(
 async def list_collections(
     request: Request, user: User = Depends(check_user_exists)
 ):
-    return await catalog_service.list_collections(await _mid(user), user)
+    return await category_service.list_collections(await _mid(user), user)
 
 
 @infinitemarkets_api_router.get("/collections/{collection_id}")
@@ -622,7 +622,7 @@ async def get_collection(
     collection_id: str,
     user: User = Depends(check_user_exists),
 ):
-    return await catalog_service.get_collection(
+    return await category_service.get_collection(
         await _mid(user), user, collection_id
     )
 
@@ -635,7 +635,7 @@ async def patch_collection(
     body: dict,
     user: User = Depends(check_user_exists),
 ):
-    return await catalog_service.patch_collection(
+    return await category_service.patch_collection(
         await _mid(user), user, collection_id, body
     )
 
@@ -648,7 +648,7 @@ async def delete_collection(
     user: User = Depends(check_user_exists),
     strip: bool = False,
 ):
-    return await catalog_service.delete_collection(
+    return await category_service.delete_collection(
         await _mid(user), user, collection_id, strip=strip
     )
 
@@ -660,7 +660,7 @@ async def create_shipping(
     body: dict,
     user: User = Depends(check_user_exists),
 ):
-    return await catalog_service.create_shipping(await _mid(user), user, body)
+    return await category_service.create_shipping(await _mid(user), user, body)
 
 
 @infinitemarkets_api_router.get("/shipping")
@@ -668,7 +668,7 @@ async def create_shipping(
 async def list_shipping(
     request: Request, user: User = Depends(check_user_exists)
 ):
-    return await catalog_service.list_shipping(await _mid(user), user)
+    return await category_service.list_shipping(await _mid(user), user)
 
 
 @infinitemarkets_api_router.get("/shipping/{option_id}")
@@ -678,7 +678,7 @@ async def get_shipping(
     option_id: str,
     user: User = Depends(check_user_exists),
 ):
-    return await catalog_service.get_shipping(
+    return await category_service.get_shipping(
         await _mid(user), user, option_id
     )
 
@@ -691,7 +691,7 @@ async def patch_shipping(
     body: dict,
     user: User = Depends(check_user_exists),
 ):
-    return await catalog_service.patch_shipping(
+    return await category_service.patch_shipping(
         await _mid(user), user, option_id, body
     )
 
@@ -704,7 +704,7 @@ async def delete_shipping(
     user: User = Depends(check_user_exists),
     strip: bool = False,
 ):
-    return await catalog_service.delete_shipping(
+    return await category_service.delete_shipping(
         await _mid(user), user, option_id, strip=strip
     )
 

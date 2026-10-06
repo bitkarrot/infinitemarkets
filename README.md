@@ -10,16 +10,16 @@ An [LNbits](https://github.com/lnbits/lnbits) extension that gives a merchant on
 
 <video src="https://github.com/bitkarrot/infinitemarkets/raw/main/docs/assets/infinitemarkets_demo.mp4" controls muted playsinline width="100%"></video>
 
-[▶ Watch the demo](docs/assets/infinitemarkets_demo.mp4) (~3.5 min) — merchant key import, catalog publish to public relays, a live Lightning purchase, and encrypted order messaging, all on a live host.
+[▶ Watch the demo](docs/assets/infinitemarkets_demo.mp4) (~3.5 min) — merchant key import, product listing publication to public relays, a live Lightning purchase, and encrypted order messaging, all on a live host.
 
 ## Features
 
-### Catalog & web commerce (Release A)
-- Products, collections, shipping options, and visibility flags (`on-sale`, `hidden`, `pre-order`, draft)
-- Public storefront with private per-order links — no buyer accounts required
+### Categories & web commerce (Release A)
+- Merchant-defined categories (one primary category per product), curated collections, shipping options, and visibility flags (`on-sale`, `hidden`, `pre-order`, draft)
+- Public storefront with category and collection browsing, price/currency filters, newest/price/name sorting, and private per-order links
 - Lightning checkout: quote → reservation → invoice → settlement saga with late-settlement reconciliation
-- Reversible order archiving, bulk catalog operations, order notifications over host SMTP
-- NIP-99 catalog publication to public relays with durable per-relay outbox evidence
+- Reversible order archiving, bulk product operations, order notifications over host SMTP
+- NIP-99 product and Gamma collection publication to public relays with durable per-relay outbox evidence
 
 ### Gamma Nostr orders (Release B)
 - **Kind-10050 inbox profile**: merchants publish declared inbox relays and activate only after reachability is proven

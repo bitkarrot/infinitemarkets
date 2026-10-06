@@ -319,13 +319,13 @@ async def seed_merchant(env: dict, nak_ws: str) -> dict:
                  "t": now},
             )
 
-    catalog = await catalog_service.create_catalog(
+    catalog = await catalog_service.create_category(
         mid, user, {"name": "conf", "default_currency": "SAT"}
     )
     digital = await catalog_service.create_product(
         mid, user,
         {
-            "catalog_id": catalog["id"],
+            "category_id": catalog["id"],
             "title": "conf digital widget",
             "amount_minor": 700, "currency": "SAT",
             "visibility": "on-sale", "stock_on_hand": 50,
@@ -335,7 +335,7 @@ async def seed_merchant(env: dict, nak_ws: str) -> dict:
     physical = await catalog_service.create_product(
         mid, user,
         {
-            "catalog_id": catalog["id"],
+            "category_id": catalog["id"],
             "title": "conf physical widget",
             "amount_minor": 900, "currency": "SAT",
             "visibility": "on-sale", "stock_on_hand": 50,

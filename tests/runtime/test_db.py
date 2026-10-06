@@ -9,6 +9,7 @@ adapter.
 from __future__ import annotations
 
 import asyncio
+import uuid
 from pathlib import Path
 
 import pytest
@@ -266,3 +267,83 @@ async def test_checkout_safety_upgrade_preserves_financial_values(ext_db):
             f"SELECT total_sat FROM {tx.table('orders')} WHERE id = 'upgrade'"
         )
         assert order["total_sat"] == 12345
+
+
+async def test_categories_upgrade_keeps_products_and_publication_history(tmp_path):
+    from lnbits.db import Database
+    from lnbits.settings import settings
+
+    from infinitemarkets.migrations import m001_initial, m009_categories
+
+    previous = settings.lnbits_data_folder
+    settings.lnbits_data_folder = str(tmp_path)
+    try:
+        database = Database(f"ext_upgrade_{uuid.uuid4().hex[:12]}")
+        async with database.connect() as conn:
+            s = conn.references_schema
+            await m001_initial(conn)
+            await conn.execute(
+                f"INSERT INTO {s}merchants "
+                "(id, user_id, pubkey, key_ref, wallet_id_enc, wallet_id_hash) "
+                "VALUES ('merchant', 'user', 'pubkey', 'key', :wallet, 'hash')",
+                {"wallet": b"opaque-wallet"},
+            )
+            await conn.execute(
+                f"INSERT INTO {s}catalogs "
+                "(id, merchant_id, name) VALUES ('original', 'merchant', 'Main Catalog')"
+            )
+            await conn.execute(
+                f"INSERT INTO {s}products "
+                "(id, merchant_id, catalog_id, d_tag, product_type, format) "
+                "VALUES ('product', 'merchant', 'original', 'product', 'simple', 'digital')"
+            )
+            await conn.execute(
+                f"INSERT INTO {s}outbox_events "
+                "(id, merchant_id, aggregate_type, aggregate_id, aggregate_revision, "
+                "event_kind, state, attempts, next_attempt_at, claim_token, "
+                "created_at, updated_at) VALUES "
+                "('intent', 'merchant', 'catalogs', 'original', 0, 30017, "
+                "'pending', 0, 0, 0, 0, 0)"
+            )
+            await conn.execute(
+                f"INSERT INTO {s}protocol_addresses "
+                "(id, domain_type, domain_id, protocol, event_kind, author_pubkey, d_tag) "
+                "VALUES ('address', 'catalogs', 'original', 'nip15', 30017, "
+                "'pubkey', 'stall')"
+            )
+            await conn.execute(
+                f"INSERT INTO {s}relay_publications "
+                "(id, outbox_event_id, delivery_copy, relay_url, event_id, "
+                "attempt_no, result, attempted_at) VALUES "
+                "('receipt', 'intent', 'public', 'wss://relay.example', "
+                "'event', 1, 'ok', 1)"
+            )
+            await m009_categories(conn)
+            category = await conn.fetchone(
+                f"SELECT name, public_slug FROM {s}categories WHERE id = 'original'"
+            )
+            product = await conn.fetchone(
+                f"SELECT category_id FROM {s}products WHERE id = 'product'"
+            )
+            intent = await conn.fetchone(
+                f"SELECT aggregate_type, aggregate_id FROM {s}outbox_events "
+                "WHERE id = 'intent'"
+            )
+            address = await conn.fetchone(
+                f"SELECT domain_type, domain_id FROM {s}protocol_addresses "
+                "WHERE id = 'address'"
+            )
+            publication = await conn.fetchone(
+                f"SELECT outbox_event_id, event_id, result FROM {s}relay_publications "
+                "WHERE id = 'receipt'"
+            )
+            assert category["name"] == "Main Catalog"
+            assert category["public_slug"] and category["public_slug"] != "original"
+            assert product["category_id"] == "original"
+            assert intent["aggregate_type"] == "categories"
+            assert intent["aggregate_id"] == "original"
+            assert address["domain_type"] == "categories"
+            assert address["domain_id"] == "original"
+            assert publication == {"outbox_event_id": "intent", "event_id": "event", "result": "ok"}
+    finally:
+        settings.lnbits_data_folder = previous

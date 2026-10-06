@@ -283,7 +283,7 @@ async def test_messages_workspace(runtime_env):
 
     # A product to order.
     resp = await client.post(
-        f"{API}/catalogs",
+        f"{API}/categories",
         json={"name": "msgs", "default_currency": "SAT"},
         headers=await cookie(),
     )
@@ -291,7 +291,7 @@ async def test_messages_workspace(runtime_env):
     resp = await client.post(
         f"{API}/products",
         json={
-            "catalog_id": resp.json()["id"],
+            "category_id": resp.json()["id"],
             "title": "msg widget",
             "amount_minor": 500,
             "currency": "SAT",

@@ -1,4 +1,4 @@
-"""Catalog domain — spec sections 4.2–4.6, 6.7, 15.
+"""Product and category domain — spec sections 4.2–4.6, 6.7, 15.
 
 Write paths go through ``DomainTransaction`` (raw connection — host
 ``rewrite_values`` stripping does NOT apply there, preserving markdown/JSON
@@ -371,50 +371,51 @@ async def _enqueue_shipping(
 
 
 async def _enqueue_stall_if_enabled(
-    tx: DomainTransaction, merchant_id: str, catalog_id: str,
+    tx: DomainTransaction, merchant_id: str, category_id: str,
     pubkey: str,
 ) -> None:
     row = await tx.fetch_one(
-        f"SELECT publish_nip15, nip15_stall_d FROM {tx.table('catalogs')} "
+        f"SELECT publish_nip15, nip15_stall_d FROM {tx.table('categories')} "
         "WHERE id = :i",
-        {"i": catalog_id},
+        {"i": category_id},
     )
     if row and row["publish_nip15"]:
         await enqueue_intent(
-            tx, merchant_id, "catalogs", catalog_id, 30017,
+            tx, merchant_id, "categories", category_id, 30017,
             event_address=f"30017:{pubkey}:{row['nip15_stall_d'] or ''}",
         )
 
 
-# --- catalogs -------------------------------------------------------------------
+# --- categories -------------------------------------------------------------------
 
 
-_CATALOG_FIELDS = {
+_CATEGORY_FIELDS = {
     "name", "description", "default_currency", "default_location",
     "nip15_stall_d", "publish_gamma", "publish_nip15",
 }
 
 
-async def create_catalog(merchant_id: str, user, payload: dict) -> dict:
+async def create_category(merchant_id: str, user, payload: dict) -> dict:
     await _merchant_owned(merchant_id, user)
-    _reject_unknown(payload, _CATALOG_FIELDS)
+    _reject_unknown(payload, _CATEGORY_FIELDS)
     name = _check_title(payload.get("name"), "name")
     description = _check_description(payload.get("description"))
     currency = payload.get("default_currency")
     if currency is not None and not CURRENCY_RE.match(currency):
         raise unprocessable("invalid-content", "invalid default_currency")
-    catalog_id = uuid.uuid4().hex
+    category_id = uuid.uuid4().hex
     stall_d = payload.get("nip15_stall_d") or _gen_d_tag()
     now = _now()
     async with DomainTransaction() as tx:
         await tx.execute(
-            f"INSERT INTO {tx.table('catalogs')} "
+            f"INSERT INTO {tx.table('categories')} "
             "(id, merchant_id, name, description, default_currency,"
             " default_location, nip15_stall_d, publish_gamma, publish_nip15,"
-            " created_at, updated_at) "
-            "VALUES (:i, :m, :n, :d, :c, :l, :sd, :pg, :pn, :t, :t)",
+            " public_slug, created_at, updated_at) "
+            "VALUES (:i, :m, :n, :d, :c, :l, :sd, :pg, :pn, :slug, :t, :t)",
             {
-                "i": catalog_id,
+                "slug": uuid.uuid4().hex,
+                "i": category_id,
                 "m": merchant_id,
                 "n": name,
                 "d": description,
@@ -426,28 +427,28 @@ async def create_catalog(merchant_id: str, user, payload: dict) -> dict:
                 "t": now,
             },
         )
-    return await get_catalog(merchant_id, user, catalog_id)
+    return await get_category(merchant_id, user, category_id)
 
 
-async def list_catalogs(merchant_id: str, user) -> list[dict]:
+async def list_categories(merchant_id: str, user) -> list[dict]:
     await _merchant_owned(merchant_id, user)
-    return await _fetchall("catalogs", merchant_id)
+    return await _fetchall("categories", merchant_id)
 
 
-async def get_catalog(merchant_id: str, user, catalog_id: str) -> dict:
+async def get_category(merchant_id: str, user, category_id: str) -> dict:
     await _merchant_owned(merchant_id, user)
-    row = await _fetch("catalogs", catalog_id, merchant_id)
+    row = await _fetch("categories", category_id, merchant_id)
     if row["deleted_at"] is not None:
-        raise not_found("catalog not found")
+        raise not_found("category not found")
     return row
 
 
-async def patch_catalog(merchant_id: str, user, catalog_id: str,
+async def patch_category(merchant_id: str, user, category_id: str,
                         patch: dict) -> dict:
     merchant = await _merchant_owned(merchant_id, user)
-    row = await _fetch("catalogs", catalog_id, merchant_id)
+    row = await _fetch("categories", category_id, merchant_id)
     if row["deleted_at"] is not None:
-        raise not_found("catalog not found")
+        raise not_found("category not found")
     allowed = {
         "name", "description", "default_currency", "default_location",
         "publish_gamma", "publish_nip15",
@@ -477,54 +478,54 @@ async def patch_catalog(merchant_id: str, user, catalog_id: str,
     async with DomainTransaction() as tx:
         for col, val in updates.items():
             await tx.execute(
-                f"UPDATE {tx.table('catalogs')} SET {col} = :v,"
+                f"UPDATE {tx.table('categories')} SET {col} = :v,"
                 " updated_at = :t WHERE id = :i",
-                {"v": val, "t": _now(), "i": catalog_id},
+                {"v": val, "t": _now(), "i": category_id},
             )
         if updates:
             await _enqueue_stall_if_enabled(
-                tx, merchant_id, catalog_id, merchant["pubkey"]
+                tx, merchant_id, category_id, merchant["pubkey"]
             )
-    return await get_catalog(merchant_id, user, catalog_id)
+    return await get_category(merchant_id, user, category_id)
 
 
-async def delete_catalog(merchant_id: str, user, catalog_id: str) -> dict:
-    """Soft delete — the catalog row is retained. Refused while live
+async def delete_category(merchant_id: str, user, category_id: str) -> dict:
+    """Soft delete — the category row is retained. Refused while live
     products still sit in it (they would be orphaned) and for the shop's
-    last remaining catalog (new products need somewhere to live)."""
+    last remaining category (new products need somewhere to live)."""
     await _merchant_owned(merchant_id, user)
-    row = await _fetch("catalogs", catalog_id, merchant_id)
+    row = await _fetch("categories", category_id, merchant_id)
     if row["deleted_at"] is not None:
-        raise not_found("catalog not found")
+        raise not_found("category not found")
     async with DomainTransaction() as tx:
         live = await tx.fetch_one(
             f"SELECT COUNT(*) AS n FROM {tx.table('products')} "
-            "WHERE catalog_id = :i AND deleted_at IS NULL",
-            {"i": catalog_id},
+            "WHERE category_id = :i AND deleted_at IS NULL",
+            {"i": category_id},
         )
         if live["n"]:
             raise conflict(
-                "catalog-not-empty",
-                "Catalog still has products",
+                "category-not-empty",
+                "Category still has products",
                 f"{live['n']} product(s) — move or delete them first",
             )
         others = await tx.fetch_one(
-            f"SELECT COUNT(*) AS n FROM {tx.table('catalogs')} "
+            f"SELECT COUNT(*) AS n FROM {tx.table('categories')} "
             "WHERE merchant_id = :m AND id != :i AND deleted_at IS NULL",
-            {"m": merchant_id, "i": catalog_id},
+            {"m": merchant_id, "i": category_id},
         )
         if not others["n"]:
             raise conflict(
-                "last-catalog",
-                "Cannot delete the last catalog",
-                "create another catalog first",
+                "last-category",
+                "Cannot delete the last category",
+                "create another category first",
             )
         await tx.execute(
-            f"UPDATE {tx.table('catalogs')} SET deleted_at = :t,"
+            f"UPDATE {tx.table('categories')} SET deleted_at = :t,"
             " updated_at = :t WHERE id = :i",
-            {"t": _now(), "i": catalog_id},
+            {"t": _now(), "i": category_id},
         )
-    return {"deleted": True, "id": catalog_id}
+    return {"deleted": True, "id": category_id}
 
 
 # --- products --------------------------------------------------------------------
@@ -766,7 +767,7 @@ async def _replace_product_details(
 
 
 _PRODUCT_PAYLOAD_FIELDS = set(_PRODUCT_FIELDS) | {
-    "catalog_id", "d_tag", "product_type", "format", "parent_product_id",
+    "category_id", "d_tag", "product_type", "format", "parent_product_id",
     "stock_reserved", "images", "specs", "categories", "collection_ids",
     "shipping_option_ids", "shipping_collection_ids", "delivery_content",
 }
@@ -825,11 +826,11 @@ async def create_product(merchant_id: str, user, payload: dict) -> dict:
     _validate_product_payload(payload)
     product_type = payload.get("product_type", "simple")
     fmt = payload.get("format", "physical")
-    if not payload.get("catalog_id"):
-        raise unprocessable("invalid-content", "catalog_id is required")
-    catalog = await _fetch("catalogs", payload["catalog_id"], merchant_id)
-    if catalog["deleted_at"] is not None:
-        raise not_found("catalog not found")
+    if not payload.get("category_id"):
+        raise unprocessable("invalid-content", "category_id is required")
+    category = await _fetch("categories", payload["category_id"], merchant_id)
+    if category["deleted_at"] is not None:
+        raise not_found("category not found")
     d_tag = payload.get("d_tag") or _gen_d_tag()
     _check_d_tag(d_tag)
 
@@ -845,9 +846,9 @@ async def create_product(merchant_id: str, user, payload: dict) -> dict:
             from .fx import default_currency_decimals
 
             fields["currency_decimals"] = default_currency_decimals(fields.get("currency"))
-        cols = ["id", "merchant_id", "catalog_id", "d_tag", "product_type",
+        cols = ["id", "merchant_id", "category_id", "d_tag", "product_type",
                 "format", "revision", "created_at", "updated_at"]
-        vals = [product_id, merchant_id, payload["catalog_id"], d_tag,
+        vals = [product_id, merchant_id, payload["category_id"], d_tag,
                 product_type, fmt, 0, now, now]
         if parent_id:
             cols.append("parent_product_id")
@@ -888,13 +889,13 @@ async def create_product(merchant_id: str, user, payload: dict) -> dict:
             tx, merchant_id, product_id, 0, merchant["pubkey"]
         )
         await _enqueue_stall_if_enabled(
-            tx, merchant_id, payload["catalog_id"], merchant["pubkey"]
+            tx, merchant_id, payload["category_id"], merchant["pubkey"]
         )
     return await get_product(merchant_id, user, product_id)
 
 
 async def list_products(merchant_id: str, user,
-                        catalog_id: str | None = None) -> list[dict]:
+                        category_id: str | None = None) -> list[dict]:
     await _merchant_owned(merchant_id, user)
     from ..db import db, table
 
@@ -903,9 +904,9 @@ async def list_products(merchant_id: str, user,
         " AND deleted_at IS NULL"
     )
     params: dict = {"m": merchant_id}
-    if catalog_id:
-        sql += " AND catalog_id = :c"
-        params["c"] = catalog_id
+    if category_id:
+        sql += " AND category_id = :c"
+        params["c"] = category_id
     sql += " ORDER BY created_at, id"
     async with db.connect() as conn:
         rows = await conn.fetchall(sql, params)
@@ -2055,14 +2056,14 @@ async def product_events(merchant_id: str, user, product_id: str,
             shipping_refs=shipping_refs,
         )
     ]
-    catalog = await _fetch("catalogs", row["catalog_id"], merchant_id)
-    if catalog["publish_nip15"]:
+    category = await _fetch("categories", row["category_id"], merchant_id)
+    if category["publish_nip15"]:
         try:
             rendered.append(
                 events.nip15_product_event(
                     row,
-                    stall_d=catalog["nip15_stall_d"],
-                    stall_currency=catalog["default_currency"] or "",
+                    stall_d=category["nip15_stall_d"],
+                    stall_currency=category["default_currency"] or "",
                     parent_d_tag=parent_d_tag,
                     images=[dict(i) for i in images],
                     specs=[dict(s) for s in specs],

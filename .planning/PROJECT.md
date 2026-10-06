@@ -2,7 +2,7 @@
 
 ## What This Is
 
-infinitemarkets is a standard Python LNbits extension for merchants who want to publish Infinitemarkets/NIP-99 catalogs and accept Lightning orders without leaving inventory, payment, or relay reliability to a browser session. LNbits remains the wallet and settlement authority; the extension owns commerce state, inventory, protocol projection, and durable delivery. Development follows the corrected contract in `docs/technical-specification.md`, with `docs/architecture-proposal.md` as supporting rationale.
+infinitemarkets is a standard Python LNbits extension for merchants who want to organize products into merchant-defined categories, publish Infinitemarkets/NIP-99 listings and curated collections, and accept Lightning orders without leaving inventory, payment, or relay reliability to a browser session. LNbits remains the wallet and settlement authority; the extension owns commerce state, inventory, protocol projection, and durable delivery. Development follows the corrected contract in `docs/technical-specification.md`, with `docs/architecture-proposal.md` as supporting rationale.
 
 ## Core Value
 

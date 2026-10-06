@@ -473,7 +473,7 @@ async def publish(merchant_id: str, user,
     await relay_service.ensure_default_relays(merchant_id)
     async with DomainTransaction() as tx:
         # Merchant profile + NIP-89 handler pair are always republished;
-        # catalog aggregates are enqueued by services/catalog.py on their
+        # commerce aggregates are enqueued by services/catalog.py on their
         # own mutations — a full republish enqueues one per live aggregate.
         for kind in (0, 31989, 31990):
             await _enqueue_intent(
@@ -492,19 +492,19 @@ async def publish(merchant_id: str, user,
                     tx, merchant_id, agg_table, r["id"], kind,
                     revision=r["revision"],
                 )
-        # NIP-15 projection: stall + products for nip15-enabled catalogs
-        nip15_catalogs = await tx.fetch_all(
-            f"SELECT id FROM {tx.table('catalogs')} "
+        # NIP-15 projection: stall + products for nip15-enabled categories
+        nip15_categories = await tx.fetch_all(
+            f"SELECT id FROM {tx.table('categories')} "
             "WHERE merchant_id = :m AND publish_nip15 AND deleted_at IS NULL",
             {"m": merchant_id},
         )
-        for cat in nip15_catalogs:
+        for cat in nip15_categories:
             await _enqueue_intent(
-                tx, merchant_id, "catalogs", cat["id"], 30017
+                tx, merchant_id, "categories", cat["id"], 30017
             )
             prods = await tx.fetch_all(
                 f"SELECT id, revision FROM {tx.table('products')} "
-                "WHERE catalog_id = :c AND merchant_id = :m"
+                "WHERE category_id = :c AND merchant_id = :m"
                 " AND deleted_at IS NULL",
                 {"c": cat["id"], "m": merchant_id},
             )

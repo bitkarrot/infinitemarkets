@@ -1,4 +1,5 @@
 {% extends "templates/infinitemarkets/public_base.html" %}
+{% import "templates/infinitemarkets/public_browse_controls.html" as browse_controls %}
 {% block title %}{{ collection.title }}{% endblock %}
 {% block content %}
 <header class="collection-header">
@@ -7,51 +8,58 @@
   {% if collection.description_md %}<p class="merchant-about">{{ collection.description_md }}</p>{% endif %}
   <p class="merchant-line"><a class="collection-back" href="/infinitemarkets/public/merchants/{{ merchant_pubkey }}">← {{ merchant_name or 'Shop' }}</a></p>
 </header>
-{% if collection.products %}
 <div class="section-head">
   <div class="section-intro">
     <h2>Products</h2>
     {% if layout == 'gallery' %}<p class="section-description">Browse products in this collection.</p>{% endif %}
   </div>
   <div class="section-actions">
-    <span class="section-count">{{ collection.products | length }} item{{ 's' if collection.products | length != 1 }}</span>
+    <span class="section-count">{{ browse.total }} item{{ 's' if browse.total != 1 }}</span>
     {% if layout == 'gallery' %}<a class="section-view-all" href="/infinitemarkets/public/merchants/{{ merchant_pubkey }}">View all products →</a>{% endif %}
   </div>
 </div>
-<div class="card-grid">
-  {% for p in collection.products %}
-  <a class="product-card" href="/infinitemarkets/p/{{ merchant_pubkey }}/{{ p.d_tag }}">
-    <div class="card-art">
-      {% if p.image %}<img src="{{ p.image }}" alt="" loading="{{ 'eager' if layout == 'gallery' and loop.first else 'lazy' }}" referrerpolicy="no-referrer">{% endif %}
-      {% if layout == 'gallery' %}
-        {% if p.hover_image %}<img class="card-alt-image" src="{{ p.hover_image }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}
-        {% if not p.image %}<span class="card-placeholder">No image available</span>{% endif %}
-        {% if p.availability in ('sold', 'preorder') or p.format == 'digital' %}
-        <span class="card-badges">
-          {% if p.availability == 'sold' %}<span class="card-badge">Sold out</span>{% elif p.availability == 'preorder' %}<span class="card-badge">Pre-order</span>{% endif %}
-          {% if p.format == 'digital' %}<span class="card-badge">Digital</span>{% endif %}
-        </span>
-        {% endif %}
-      {% endif %}
+<div class="browse-layout">
+  {{ browse_controls.filters(browse, all_collections, merchant_pubkey, collection.d_tag) }}
+  <div class="browse-results">
+    {{ browse_controls.sort(browse) }}
+    {% if collection.products %}
+    <div class="card-grid">
+      {% for p in collection.products %}
+      <a class="product-card" href="/infinitemarkets/p/{{ merchant_pubkey }}/{{ p.d_tag }}">
+        <div class="card-art">
+          {% if p.image %}<img src="{{ p.image }}" alt="" loading="{{ 'eager' if layout == 'gallery' and loop.first else 'lazy' }}" referrerpolicy="no-referrer">{% endif %}
+          {% if layout == 'gallery' %}
+            {% if p.hover_image %}<img class="card-alt-image" src="{{ p.hover_image }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}
+            {% if not p.image %}<span class="card-placeholder">No image available</span>{% endif %}
+            {% if p.availability in ('sold', 'preorder') or p.format == 'digital' %}
+            <span class="card-badges">
+              {% if p.availability == 'sold' %}<span class="card-badge">Sold out</span>{% elif p.availability == 'preorder' %}<span class="card-badge">Pre-order</span>{% endif %}
+              {% if p.format == 'digital' %}<span class="card-badge">Digital</span>{% endif %}
+            </span>
+            {% endif %}
+          {% endif %}
+        </div>
+        <div class="card-body">
+          <h3 class="card-title">{{ p.title }}</h3>
+          {% if p.availability == 'sold' %}
+          <p class="card-meta"><span class="chip chip-sold">Sold out</span></p>
+          {% elif p.availability == 'preorder' %}
+          <p class="card-meta"><span class="chip chip-preorder">Pre-order</span></p>
+          {% else %}
+          <p class="card-meta">In stock{% if p.format == 'digital' %}<span class="card-tag">Digital</span>{% endif %}</p>
+          {% endif %}
+          {% if p.amount_minor is not none %}
+          <p class="card-price">{{ price_label(p.amount_minor, p.currency, p.currency_decimals) }}</p>
+          {% endif %}
+        </div>
+      </a>
+      {% endfor %}
     </div>
-    <div class="card-body">
-      <h3 class="card-title">{{ p.title }}</h3>
-      {% if p.availability == 'sold' %}
-      <p class="card-meta"><span class="chip chip-sold">Sold out</span></p>
-      {% elif p.availability == 'preorder' %}
-      <p class="card-meta"><span class="chip chip-preorder">Pre-order</span></p>
-      {% else %}
-      <p class="card-meta">In stock{% if p.format == 'digital' %}<span class="card-tag">Digital</span>{% endif %}</p>
-      {% endif %}
-      {% if p.amount_minor is not none %}
-      <p class="card-price">{{ price_label(p.amount_minor, p.currency, p.currency_decimals) }}</p>
-      {% endif %}
-    </div>
-  </a>
-  {% endfor %}
+    {{ browse_controls.pagination(browse) }}
+    {% elif browse.category or browse.min_price or browse.max_price or browse.currency and browse.currencies | length > 1 %}
+    <p class="storefront-empty">No products match these filters. <a href="{{ browse.clear_url }}">Clear filters</a>.</p>
+    {% elif layout == 'gallery' %}<p class="storefront-empty">No products are available in this collection yet. <a href="/infinitemarkets/public/merchants/{{ merchant_pubkey }}">Browse all products</a>.</p>
+    {% else %}<p class="storefront-empty">This collection has no products yet.</p>{% endif %}
+  </div>
 </div>
-{% else %}
-{% if layout == 'gallery' %}<p class="storefront-empty">No products are available in this collection yet. <a href="/infinitemarkets/public/merchants/{{ merchant_pubkey }}">Browse all products</a>.</p>
-{% else %}<p class="storefront-empty">This collection has no products yet.</p>{% endif %}
-{% endif %}
 {% endblock %}

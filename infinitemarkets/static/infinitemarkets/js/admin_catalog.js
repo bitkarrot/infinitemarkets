@@ -21,7 +21,7 @@
     { name: "state", label: "State", field: "nip99_status", align: "left", style: "width: 100px" },
     { name: "actions", label: "Actions", field: "id", align: "left", style: "width: 140px" }
   ];
-  var CATALOG_COLUMNS = [
+  var CATEGORY_COLUMNS = [
     { name: "name", label: "Name", field: "name", align: "left", sortable: true, style: "width: 240px" },
     { name: "products", label: "Products", field: "_products", align: "left", style: "width: 100px" },
     { name: "description", label: "Description", field: "description", align: "left", style: "width: 280px" },
@@ -60,12 +60,12 @@
           loading: false,
           error: null,
           tab: "products",
-          catalogs: [],
+          categories: [],
           products: [],
           collections: [],
           shipping: [],
           productColumns: PRODUCT_COLUMNS,
-          catalogColumns: CATALOG_COLUMNS,
+          categoryColumns: CATEGORY_COLUMNS,
           collectionColumns: COLLECTION_COLUMNS,
           shippingColumns: SHIPPING_COLUMNS,
           selectedProducts: [],
@@ -87,7 +87,7 @@
             show: false, saving: false, error: null, isNew: true,
             form: {}
           },
-          catalogEditor: {
+          categoryEditor: {
             show: false, saving: false, error: null, isNew: true,
             form: {}
           },
@@ -111,9 +111,9 @@
       gmCatalogRows: function () {
         var counts = {};
         this.gmCatalog.products.forEach(function (p) {
-          counts[p.catalog_id] = (counts[p.catalog_id] || 0) + 1;
+          counts[p.category_id] = (counts[p.category_id] || 0) + 1;
         });
-        return this.gmCatalog.catalogs.map(function (c) {
+        return this.gmCatalog.categories.map(function (c) {
           return Object.assign({}, c, { _products: counts[c.id] || 0 });
         });
       },
@@ -140,12 +140,12 @@
         self.gmCatalog.error = null;
         try {
           var res = await Promise.all([
-            self.gmApi("GET", "/catalogs"),
+            self.gmApi("GET", "/categories"),
             self.gmApi("GET", "/products"),
             self.gmApi("GET", "/collections"),
             self.gmApi("GET", "/shipping")
           ]);
-          self.gmCatalog.catalogs = res[0];
+          self.gmCatalog.categories = res[0];
           self.gmCatalog.products = res[1];
           self.gmCatalog.collections = res[2];
           self.gmCatalog.shipping = res[3];
@@ -163,8 +163,8 @@
         this.gmCatalog.editor = {
           show: true, saving: false, error: null, isNew: true,
           form: {
-            catalog_id: this.gmCatalog.catalogs.length
-              ? this.gmCatalog.catalogs[0].id
+            category_id: this.gmCatalog.categories.length
+              ? this.gmCatalog.categories[0].id
               : "",
             title: "", summary: "", description_md: "",
             product_type: "simple", format: "digital",
@@ -185,7 +185,7 @@
           show: true, saving: false, error: null, isNew: false,
           form: {
             id: d.id,
-            catalog_id: d.catalog_id,
+            category_id: d.category_id,
             title: d.title || "", summary: d.summary || "",
             description_md: d.description_md || "",
             product_type: d.product_type || "simple",
@@ -211,7 +211,7 @@
         ed.error = null;
         var f = ed.form;
         var body = {
-          catalog_id: f.catalog_id,
+          category_id: f.category_id,
           title: f.title,
           summary: f.summary || undefined,
           description_md: f.description_md || undefined,
@@ -398,17 +398,17 @@
         ed.saving = false;
       },
 
-      /* --- catalogs ------------------------------------------------------ */
-      gmNewCatalog: function () {
-        this.gmCatalog.tab = "catalogs";
-        this.gmCatalog.catalogEditor = {
+      /* --- categories ------------------------------------------------------ */
+      gmNewCategory: function () {
+        this.gmCatalog.tab = "categories";
+        this.gmCatalog.categoryEditor = {
           show: true, saving: false, error: null, isNew: true,
           form: { name: "", description: "" }
         };
       },
-      gmEditCatalog: function (row) {
-        this.gmCatalog.tab = "catalogs";
-        this.gmCatalog.catalogEditor = {
+      gmEditCategory: function (row) {
+        this.gmCatalog.tab = "categories";
+        this.gmCatalog.categoryEditor = {
           show: true, saving: false, error: null, isNew: false,
           form: {
             id: row.id, name: row.name || "",
@@ -416,9 +416,9 @@
           }
         };
       },
-      gmSaveCatalog: async function () {
+      gmSaveCategory: async function () {
         var self = this;
-        var ed = self.gmCatalog.catalogEditor;
+        var ed = self.gmCatalog.categoryEditor;
         ed.saving = true;
         ed.error = null;
         var f = ed.form;
@@ -428,12 +428,12 @@
         };
         try {
           if (ed.isNew) {
-            await self.gmApi("POST", "/catalogs", body);
+            await self.gmApi("POST", "/categories", body);
           } else {
-            await self.gmApi("PATCH", "/catalogs/" + f.id, body);
+            await self.gmApi("PATCH", "/categories/" + f.id, body);
           }
           ed.show = false;
-          self.gmCatalog.notice = ed.isNew ? "Catalog created." : "Catalog saved.";
+          self.gmCatalog.notice = ed.isNew ? "Category created." : "Category saved.";
           await self.gmLoadCatalog();
         } catch (e) {
           ed.error = self.gmProblemCopy(e.problem);
@@ -534,8 +534,8 @@
             ? "collections"
             : dlg.kind === "shipping"
               ? "shipping"
-              : dlg.kind === "catalog"
-                ? "catalogs"
+              : dlg.kind === "category"
+                ? "categories"
                 : "products") +
           "/" +
           dlg.id +

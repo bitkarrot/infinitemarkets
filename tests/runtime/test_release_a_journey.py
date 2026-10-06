@@ -50,14 +50,14 @@ async def _setup(runtime_env):
             {"m": mid},
         )
     resp = await client.post(
-        f"{API}/catalogs",
+        f"{API}/categories",
         json={"name": "main", "default_currency": "SAT"},
         headers=await cookie(),
     )
     cid = resp.json()["id"]
     resp = await client.post(
         f"{API}/products",
-        json={"catalog_id": cid, "title": "tour", "amount_minor": 2500,
+        json={"category_id": cid, "title": "tour", "amount_minor": 2500,
               "currency": "SAT", "visibility": "on-sale",
               "stock_on_hand": 3, "format": "digital"},
         headers=await cookie(),

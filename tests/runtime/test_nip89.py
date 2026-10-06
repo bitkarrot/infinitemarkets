@@ -48,17 +48,17 @@ async def _merchant(runtime_env) -> tuple[str, dict]:
 async def _create_product(client, merchant_id: str, headers: dict,
                           **over) -> dict:
     # a catalog is required first
-    catalogs = await client.get(f"{API}/catalogs", headers=headers)
-    if catalogs.json():
-        catalog_id = catalogs.json()[0]["id"]
+    categories = await client.get(f"{API}/categories", headers=headers)
+    if categories.json():
+        category_id = categories.json()[0]["id"]
     else:
         resp = await client.post(
-            f"{API}/catalogs", json={"name": "Store"}, headers=headers
+            f"{API}/categories", json={"name": "Store"}, headers=headers
         )
         assert resp.status_code == 201, resp.text
-        catalog_id = resp.json()["id"]
+        category_id = resp.json()["id"]
     payload = {
-        "catalog_id": catalog_id,
+        "category_id": category_id,
         "title": "NIP-89 Test Product",
         "amount_minor": 4200,
         "currency": "USD",
@@ -154,7 +154,7 @@ async def test_public_product_json_contract(runtime_env):
     assert body["availability"] == "available"
     assert body["stock"] == 5
     # no internals
-    for forbidden in ("id", "merchant_id", "catalog_id", "stock_reserved",
+    for forbidden in ("id", "merchant_id", "category_id", "stock_reserved",
                       "wallet_id_enc", "key_ref", "user_id"):
         assert forbidden not in body
     assert resp.headers["cache-control"] == "no-store"

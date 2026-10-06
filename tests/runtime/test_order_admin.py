@@ -59,7 +59,7 @@ async def _setup(runtime_env):
             {"m": mid},
         )
     resp = await client.post(
-        f"{API}/catalogs",
+        f"{API}/categories",
         json={"name": "main", "default_currency": "SAT"},
         headers=await cookie(),
     )
@@ -70,7 +70,7 @@ async def _setup(runtime_env):
         resp = await client.post(
             f"{API}/products",
             json={
-                "catalog_id": cid, "title": title,
+                "category_id": cid, "title": title,
                 "amount_minor": 500, "currency": "SAT",
                 "visibility": "on-sale", "stock_on_hand": stock,
                 "format": fmt,
@@ -109,7 +109,7 @@ async def _setup(runtime_env):
         base_url=ORIGIN,
     )
     runtime_env.update({
-        "merchant_id": mid, "catalog_id": cid,
+        "merchant_id": mid, "category_id": cid,
         "merchant_pubkey": merchant["pubkey"],
         "make_product": product, "cookie": cookie, "anon": anon,
     })

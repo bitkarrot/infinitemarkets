@@ -136,9 +136,11 @@ test('storefront navigation and track-order recovery', async ({page}) => {
   await page.goto(seed.digital_url)
   const nav = page.locator('.store-nav')
   await expect(nav.getByRole('link', {name: 'Shop'})).toBeVisible()
-  await expect(nav.getByRole('link', {name: 'Featured'})).toBeVisible()
+  await expect(nav.getByRole('link', {name: 'Featured'})).toHaveCount(0)
   await expect(page.locator('[data-gm="trust-list"]')).toContainText('available on your order page right after payment')
-  await nav.getByRole('link', {name: 'Track order'}).click()
+  await nav.getByRole('link', {name: 'Shop'}).click()
+  await expect(page.locator('.browse-collections').getByRole('link', {name: 'Featured'})).toBeVisible()
+  await page.locator('.store-nav').getByRole('link', {name: 'Track order'}).click()
 
   await expect(page.locator('.order-title')).toHaveText('Track your order')
   await expect(page.locator('#gm-order-card')).toBeHidden()

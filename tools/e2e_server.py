@@ -209,7 +209,7 @@ async def _seed(app, seed: dict, relay_url: str) -> None:
         pubkey = E2E_PUBKEY
 
         resp = await client.post(
-            f"{api}/catalogs",
+            f"{api}/categories",
             json={"name": "main", "default_currency": "SAT"},
             headers=await cookie(),
         )
@@ -219,7 +219,7 @@ async def _seed(app, seed: dict, relay_url: str) -> None:
         resp = await client.post(
             f"{api}/products",
             json={
-                "catalog_id": cid,
+                "category_id": cid,
                 "d_tag": "e2e-digital-tour",
                 "title": "e2e digital tour",
                 "summary": "A guided digital tour experience",
@@ -257,7 +257,7 @@ async def _seed(app, seed: dict, relay_url: str) -> None:
         resp = await client.post(
             f"{api}/products",
             json={
-                "catalog_id": cid,
+                "category_id": cid,
                 "d_tag": "e2e-poster",
                 "title": "e2e poster",
                 "summary": "Printed poster — ships tracked",

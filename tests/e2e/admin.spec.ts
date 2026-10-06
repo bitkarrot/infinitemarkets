@@ -237,23 +237,23 @@ test('catalog surface lists products with editor CTAs', async ({page}) => {
   await expect(catalog.getByText('e2e poster').first()).toBeVisible()
 })
 
-test('catalogs tab: create, rename, and delete guards', async ({page}) => {
+test('categories tab: create, rename, and delete guards', async ({page}) => {
   const base = `Seasonal ${Date.now()}`
   const renamed = `${base} drop`
   await page.goto('/infinitemarkets/')
   await page.locator('[data-gm-nav="catalog"]').click()
   const catalog = page.locator('[data-gm-surface="catalog"]')
-  await expect(catalog.getByRole('button', {name: 'New catalog'})).toBeVisible({
+  await expect(catalog.getByRole('button', {name: 'New category'})).toBeVisible({
     timeout: 15_000
   })
 
   // create a second catalog in-pane (no dialog)
-  await catalog.getByRole('button', {name: 'New catalog'}).click()
+  await catalog.getByRole('button', {name: 'New category'}).click()
   const editor = catalog.locator('[data-gm-catalog-editor="catalog"]')
   await expect(editor).toBeVisible()
   await editor.getByLabel('Name').fill(base)
-  await editor.getByRole('button', {name: 'Create catalog'}).click()
-  const table = catalog.locator('[data-gm-table="catalogs"]')
+  await editor.getByRole('button', {name: 'Create category'}).click()
+  const table = catalog.locator('[data-gm-table="categories"]')
   await expect(table.getByText(base)).toBeVisible({timeout: 15_000})
 
   // it is selectable when creating a product
@@ -264,16 +264,16 @@ test('catalogs tab: create, rename, and delete guards', async ({page}) => {
   await catalog.getByRole('button', {name: 'Cancel'}).click()
 
   // rename
-  await catalog.getByRole('tab', {name: 'Catalogs'}).click()
+  await catalog.getByRole('tab', {name: 'Categories'}).click()
   const row = table.locator('tr', {hasText: base})
-  await row.getByRole('button', {name: 'Edit catalog'}).click()
+  await row.getByRole('button', {name: 'Edit category'}).click()
   await editor.getByLabel('Name').fill(renamed)
-  await editor.getByRole('button', {name: 'Save catalog'}).click()
+  await editor.getByRole('button', {name: 'Save category'}).click()
   await expect(table.getByText(renamed)).toBeVisible({timeout: 15_000})
 
   // a catalog that still holds products cannot be deleted
   const main = table.locator('tr', {hasText: 'main', hasNotText: 'Seasonal'})
-  await main.getByRole('button', {name: 'Delete catalog'}).click()
+  await main.getByRole('button', {name: 'Delete category'}).click()
   const dialog = page.locator('.q-dialog')
   await dialog.getByRole('button', {name: 'Delete', exact: true}).click()
   await expect(dialog).toContainText('product(s)')
@@ -283,7 +283,7 @@ test('catalogs tab: create, rename, and delete guards', async ({page}) => {
   await dialog.getByRole('button', {name: 'Keep'}).click()
 
   // an empty one can
-  await row.getByRole('button', {name: 'Delete catalog'}).click()
+  await row.getByRole('button', {name: 'Delete category'}).click()
   await dialog.getByRole('button', {name: 'Delete', exact: true}).click()
   await expect(table.getByText(renamed)).toHaveCount(0, {
     timeout: 15_000
@@ -328,7 +328,7 @@ test('catalog editors stay in-pane and bulk tools update selected products', asy
     const response = await page.request.post('/infinitemarkets/api/v1/products', {
       headers,
       data: {
-        catalog_id: seed.digital.catalog_id,
+        category_id: seed.digital.category_id,
         title,
         amount_minor: amount,
         currency: 'SAT',
@@ -413,6 +413,43 @@ test('gallery layout is selectable and keeps the editorial checkout flow', async
   }
 })
 
+test('all layouts preserve browse filters and sorting on mobile', async ({page}) => {
+  await page.goto('/infinitemarkets/')
+  const cookies = await page.context().cookies()
+  const csrf = cookies.find(cookie => cookie.name === 'gm_csrf')?.value || ''
+  const merchantUrl = `/infinitemarkets/api/v1/merchants/${seed.merchant_id}`
+  const categories = await page.request.get('/infinitemarkets/api/v1/categories')
+  expect(categories.status()).toBe(200)
+  const slug = (await categories.json())[0].public_slug
+  const shopUrl = `/infinitemarkets/public/merchants/${seed.pubkey}`
+  const url = `${shopUrl}?category=${slug}&sort=name`
+  const set = (layout: string) => page.request.patch(merchantUrl, {
+    headers: {Origin: seed.base_url, 'X-CSRF-Token': csrf},
+    data: {theme: {layout}}
+  })
+  try {
+    for (const layout of ['editorial', 'guided', 'compact', 'gallery']) {
+      expect((await set(layout)).status()).toBe(200)
+      await page.setViewportSize({width: 1280, height: 900})
+      await page.goto(url)
+      await expect(page.locator('.gm-public')).toHaveAttribute('data-layout', layout)
+      await expect(page.locator('.browse-disclosure')).toHaveAttribute('open', '')
+      await expect(page.locator(`input[type="radio"][name="category"][value="${slug}"]`)).toBeChecked()
+      await expect(page.getByLabel('Sort by')).toHaveValue('name')
+      await expect(page.locator('.browse-collections a')).toHaveCount(1)
+      await expect(page.locator('.store-nav a')).toHaveCount(2)
+      await page.setViewportSize({width: 390, height: 844})
+      await page.reload()
+      await expect(page.locator('.browse-disclosure')).not.toHaveAttribute('open', '')
+      await page.locator('.browse-disclosure summary').click()
+      await expect(page.locator(`input[type="radio"][name="category"][value="${slug}"]`)).toBeVisible()
+      await expect(page.locator('.browse-actions a')).toHaveAttribute('href', shopUrl)
+    }
+  } finally {
+    expect((await set('editorial')).status()).toBe(200)
+  }
+})
+
 test('gallery listing cards stay scoped and adapt to mobile', async ({page}) => {
   await page.goto('/infinitemarkets/')
   const cookies = await page.context().cookies()
@@ -433,7 +470,7 @@ test('gallery listing cards stay scoped and adapt to mobile', async ({page}) => 
     expect(await grid.locator('.card-art').first().evaluate(el => getComputedStyle(el).aspectRatio)).toBe('1 / 1')
     await page.setViewportSize({width: 768, height: 900})
     expect(await grid.evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(2)
-    const collectionUrl = await page.locator('.collection-link').first().getAttribute('href')
+    const collectionUrl = await page.locator('.browse-collections a').first().getAttribute('href')
     expect(collectionUrl).toBeTruthy()
     await page.goto(collectionUrl!)
     await expect(page.locator('.section-view-all')).toHaveAttribute(

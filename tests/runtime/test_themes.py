@@ -193,13 +193,13 @@ async def test_theme_reaches_public_page_only(runtime_env):
     assert current.json()["theme"]["preset"] == "clean-minimal"
 
     # a published-state product page carries the scoped emission
-    catalogs = await client.get(f"{API}/catalogs", headers=_headers(runtime_env))
-    if catalogs.json():
-        catalog_id = catalogs.json()[0]["id"]
+    categories = await client.get(f"{API}/categories", headers=_headers(runtime_env))
+    if categories.json():
+        category_id = categories.json()[0]["id"]
     else:
-        catalog_id = (
+        category_id = (
             await client.post(
-                f"{API}/catalogs", json={"name": "T"},
+                f"{API}/categories", json={"name": "T"},
                 headers=_headers(runtime_env),
             )
         ).json()["id"]
@@ -207,7 +207,7 @@ async def test_theme_reaches_public_page_only(runtime_env):
         await client.post(
             f"{API}/products",
             json={
-                "catalog_id": catalog_id,
+                "category_id": category_id,
                 "title": "Themed",
                 "amount_minor": 100,
                 "currency": "USD",

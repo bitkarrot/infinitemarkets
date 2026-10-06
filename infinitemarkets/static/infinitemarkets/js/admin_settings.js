@@ -473,9 +473,9 @@
           {
             full: "Browse + web checkout — the normal store.",
             showcase:
-              "Catalog browses; buy controls become 'Order via Nostr' guidance.",
+              "Products remain visible; buy controls become 'Order via Nostr' guidance.",
             browse_only:
-              "No new purchases; catalog stops publishing changes to Nostr.",
+              "No new purchases; products stop publishing changes to Nostr.",
             nostr_only:
               "Storefront shows a Nostr-only notice; ordering happens over Nostr DMs."
           }[m] || ""

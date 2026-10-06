@@ -54,17 +54,17 @@ async def _merchant(runtime_env) -> dict:
 async def _catalog_and_product(runtime_env, **over) -> tuple[dict, dict]:
     client = runtime_env["client"]
     headers = _headers(runtime_env)
-    catalogs = await client.get(f"{API}/catalogs", headers=headers)
-    if catalogs.json():
-        catalog_id = catalogs.json()[0]["id"]
+    categories = await client.get(f"{API}/categories", headers=headers)
+    if categories.json():
+        category_id = categories.json()[0]["id"]
     else:
         resp = await client.post(
-            f"{API}/catalogs", json={"name": "Public Store"},
+            f"{API}/categories", json={"name": "Public Store"},
             headers=headers,
         )
-        catalog_id = resp.json()["id"]
+        category_id = resp.json()["id"]
     payload = {
-        "catalog_id": catalog_id,
+        "category_id": category_id,
         "title": f"Public Product {uuid.uuid4().hex[:6]}",
         "amount_minor": 1500,
         "currency": "USD",
@@ -77,7 +77,7 @@ async def _catalog_and_product(runtime_env, **over) -> tuple[dict, dict]:
     resp = await client.post(f"{API}/products", json=payload,
                              headers=headers)
     assert resp.status_code == 201, resp.text
-    return {"id": catalog_id}, resp.json()
+    return {"id": category_id}, resp.json()
 
 
 def _assert_public_headers(resp):
@@ -128,6 +128,136 @@ async def test_prices_render_in_major_units(runtime_env):
     assert "15.00 USD" in storefront.text
     assert "2,500 sats" in storefront.text
     assert "1500 USD" not in storefront.text
+
+
+async def test_browse_categories_sort_and_collection_filters(runtime_env):
+    client = runtime_env["client"]
+    merchant = await _merchant(runtime_env)
+    headers = _headers(runtime_env)
+    first = await client.post(f"{API}/categories", json={"name": "Books"}, headers=headers)
+    second = await client.post(f"{API}/categories", json={"name": "Art"}, headers=headers)
+    assert first.status_code == second.status_code == 201
+    books, art = first.json(), second.json()
+    products = []
+    for category, title, amount in (
+        (books, "Zebra Guide", 300),
+        (books, "Alpha Guide", 100),
+        (art, "Gallery Print", 200),
+    ):
+        resp = await client.post(
+            f"{API}/products",
+            json={"category_id": category["id"], "title": title,
+                  "amount_minor": amount, "currency": "SAT", "format": "digital",
+                  "visibility": "on-sale", "stock_on_hand": 5},
+            headers=headers,
+        )
+        assert resp.status_code == 201, resp.text
+        products.append(resp.json())
+    path = f"/infinitemarkets/public/merchants/{merchant['pubkey']}"
+    resp = await client.get(path)
+    assert resp.status_code == 200
+    assert 'name="category"' in resp.text
+    assert books["public_slug"] in resp.text
+    assert books["id"] not in resp.text
+    resp = await client.get(
+        path, params={"category": books["public_slug"], "currency": "SAT", "sort": "price-asc"}
+    )
+    assert resp.status_code == 200
+    assert re.findall(r'<h3 class="card-title">([^<]+)</h3>', resp.text) == [
+        "Alpha Guide", "Zebra Guide",
+    ]
+    assert "Gallery Print" not in resp.text
+    resp = await client.get(path, params={"category": "not-a-category"})
+    assert "No products match these filters" in resp.text
+    collection_resp = await client.post(
+        f"{API}/collections", json={"title": "Reading"}, headers=headers
+    )
+    assert collection_resp.status_code == 201
+    collection = collection_resp.json()
+    for product in products[:2]:
+        response = await client.patch(
+            f"{API}/products/{product['id']}",
+            json={"collection_ids": [collection["id"]]}, headers=headers,
+        )
+        assert response.status_code == 200
+    scoped = await client.get(
+        path, params={
+            "collection": collection["d_tag"],
+            "category": books["public_slug"],
+            "sort": "name",
+        }
+    )
+    assert re.findall(r'<h3 class="card-title">([^<]+)</h3>', scoped.text) == [
+        "Alpha Guide", "Zebra Guide",
+    ]
+    url = f"/infinitemarkets/public/collections/{merchant['pubkey']}/{collection['d_tag']}"
+    resp = await client.get(url, params={"sort": "name"})
+    assert resp.status_code == 200
+    assert 'aria-current="page">Reading</a>' in resp.text
+    assert re.findall(r'<h3 class="card-title">([^<]+)</h3>', resp.text) == [
+        "Alpha Guide", "Zebra Guide",
+    ]
+
+
+async def test_browse_prices_require_one_currency(runtime_env):
+    client = runtime_env["client"]
+    merchant = await _merchant(runtime_env)
+    _, usd = await _catalog_and_product(runtime_env, title="USD artwork")
+    _, sat = await _catalog_and_product(
+        runtime_env, title="SAT artwork", amount_minor=2500,
+        currency="SAT", currency_decimals=0,
+    )
+    path = f"/infinitemarkets/public/merchants/{merchant['pubkey']}"
+    mixed = await client.get(path, params={"sort": "price-desc"})
+    assert mixed.status_code == 200
+    assert "Price: High to Low" not in mixed.text
+    assert usd["d_tag"] in mixed.text and sat["d_tag"] in mixed.text
+    filtered = await client.get(
+        path, params={"currency": "SAT", "min_price": "2000", "sort": "price-asc"}
+    )
+    assert filtered.status_code == 200
+    assert sat["d_tag"] in filtered.text and usd["d_tag"] not in filtered.text
+    assert 'value="price-asc" selected' in filtered.text
+
+
+async def test_browse_pagination_keeps_category_and_sort(runtime_env):
+    client = runtime_env["client"]
+    merchant = await _merchant(runtime_env)
+    headers = _headers(runtime_env)
+    response = await client.post(
+        f"{API}/categories", json={"name": "Editions"}, headers=headers
+    )
+    assert response.status_code == 201
+    category = response.json()
+    for index in range(25):
+        response = await client.post(
+            f"{API}/products",
+            json={"category_id": category["id"], "title": f"Edition {index:02d}",
+                  "amount_minor": 100, "currency": "SAT", "format": "digital",
+                  "visibility": "on-sale", "stock_on_hand": 1},
+            headers=headers,
+        )
+        assert response.status_code == 201, response.text
+    path = f"/infinitemarkets/public/merchants/{merchant['pubkey']}"
+    params = {"category": category["public_slug"], "sort": "name"}
+    first = await client.get(path, params=params)
+    assert first.status_code == 200
+    assert len(re.findall(r'<h3 class="card-title">', first.text)) == 24
+    assert f"category={category['public_slug']}&amp;sort=name&amp;page=2" in first.text
+    second = await client.get(path, params=params | {"page": 2})
+    assert second.status_code == 200
+    assert re.findall(r'<h3 class="card-title">([^<]+)</h3>', second.text) == [
+        "Edition 24"
+    ]
+    assert f"category={category['public_slug']}&amp;sort=name&amp;page=1" in second.text
+    invalid = await client.get(path, params=params | {"page": "²"})
+    assert invalid.status_code == 200
+    assert len(re.findall(r'<h3 class="card-title">', invalid.text)) == 24
+    beyond = await client.get(path, params=params | {"page": 999})
+    assert beyond.status_code == 200
+    assert re.findall(r'<h3 class="card-title">([^<]+)</h3>', beyond.text) == [
+        "Edition 24"
+    ]
 
 
 async def test_product_gallery_exposes_all_supported_images(runtime_env):
@@ -198,7 +328,7 @@ async def test_collection_and_merchant_pages(runtime_env):
     assert resp.status_code == 200
     body = resp.json()
     assert {p["d_tag"] for p in body["products"]} == {product["d_tag"]}
-    for forbidden in ("id", "merchant_id", "catalog_id"):
+    for forbidden in ("id", "merchant_id", "category_id"):
         assert forbidden not in body
         for p in body["products"]:
             assert forbidden not in p

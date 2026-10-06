@@ -23,7 +23,7 @@ M001_TABLES = {
     "merchants",
     "merchant_keys",
     "settings",
-    "catalogs",
+    "categories",
     "products",
     "product_images",
     "product_specs",

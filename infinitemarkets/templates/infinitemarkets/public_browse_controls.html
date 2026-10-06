@@ -1,0 +1,73 @@
+{% macro filters(browse, collections, pubkey, active_collection='') %}
+<aside class="browse-rail" aria-label="Product filters">
+  <details class="browse-disclosure">
+    <summary>Filters</summary>
+    <form method="get" class="browse-filter-form">
+      <fieldset class="browse-group">
+        <legend>Categories</legend>
+        <label><input type="radio" name="category" value="" {% if not browse.category %}checked{% endif %}> All categories</label>
+        {% for slug, name in browse.categories %}
+        <label><input type="radio" name="category" value="{{ slug }}" {% if browse.category == slug %}checked{% endif %}> {{ name }}</label>
+        {% endfor %}
+      </fieldset>
+      {% if collections %}
+      <nav class="browse-group browse-collections" aria-label="Collections">
+        <h3>Collections</h3>
+        {% if active_collection %}<a href="/infinitemarkets/public/merchants/{{ pubkey }}">All products</a>{% endif %}
+        {% for item in collections %}
+        <a href="/infinitemarkets/public/collections/{{ pubkey }}/{{ item.d_tag }}"{% if item.d_tag == active_collection %} aria-current="page"{% endif %}>{{ item.title }}</a>
+        {% endfor %}
+      </nav>
+      {% endif %}
+      {% if browse.currencies | length > 1 %}
+      <label class="browse-field">Currency
+        <select name="currency">
+          <option value="">All currencies</option>
+          {% for currency in browse.currencies %}<option value="{{ currency }}" {% if browse.currency == currency %}selected{% endif %}>{{ currency }}</option>{% endfor %}
+        </select>
+      </label>
+      {% endif %}
+      {% if browse.currency %}
+      <fieldset class="browse-group browse-price">
+        <legend>Price ({{ browse.currency }})</legend>
+        <label>Minimum <input type="number" min="0" step="any" name="min_price" value="{{ browse.min_price }}"></label>
+        <label>Maximum <input type="number" min="0" step="any" name="max_price" value="{{ browse.max_price }}"></label>
+      </fieldset>
+      {% endif %}
+      {% if browse.collection %}<input type="hidden" name="collection" value="{{ browse.collection }}">{% endif %}
+      {% if browse.sort != 'newest' %}<input type="hidden" name="sort" value="{{ browse.sort }}">{% endif %}
+      <div class="browse-actions"><button type="submit">Apply filters</button><a href="{{ browse.clear_url }}">Clear filters</a></div>
+    </form>
+  </details>
+</aside>
+{% endmacro %}
+
+{% macro sort(browse) %}
+<form method="get" class="browse-sort">
+  {% if browse.category %}<input type="hidden" name="category" value="{{ browse.category }}">{% endif %}
+  {% if browse.collection %}<input type="hidden" name="collection" value="{{ browse.collection }}">{% endif %}
+  {% if browse.currency and browse.currencies | length > 1 %}<input type="hidden" name="currency" value="{{ browse.currency }}">{% endif %}
+  {% if browse.min_price %}<input type="hidden" name="min_price" value="{{ browse.min_price }}">{% endif %}
+  {% if browse.max_price %}<input type="hidden" name="max_price" value="{{ browse.max_price }}">{% endif %}
+  <label for="browse-sort">Sort by</label>
+  <select id="browse-sort" name="sort">
+    <option value="newest" {% if browse.sort == 'newest' %}selected{% endif %}>Newest</option>
+    {% if browse.currency %}
+    <option value="price-asc" {% if browse.sort == 'price-asc' %}selected{% endif %}>Price: Low to High</option>
+    <option value="price-desc" {% if browse.sort == 'price-desc' %}selected{% endif %}>Price: High to Low</option>
+    {% endif %}
+    <option value="name" {% if browse.sort == 'name' %}selected{% endif %}>Name: A–Z</option>
+  </select>
+  <button type="submit">Sort</button>
+</form>
+{% endmacro %}
+
+{% macro pagination(browse) %}
+{% if browse.previous or browse.next %}
+<nav class="browse-pagination" aria-label="Product pages">
+  {% if browse.previous %}<a href="{{ browse.previous }}">Previous page</a>{% endif %}
+  <span>Page {{ browse.page }}</span>
+  {% if browse.next %}<a href="{{ browse.next }}">Next page</a>{% endif %}
+</nav>
+{% endif %}
+{% endmacro %}

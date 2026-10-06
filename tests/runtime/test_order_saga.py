@@ -52,7 +52,7 @@ async def _setup(runtime_env):
             {"m": mid},
         )
     resp = await client.post(
-        f"{API}/catalogs",
+        f"{API}/categories",
         json={"name": "main", "default_currency": "SAT"},
         headers=await cookie(),
     )
@@ -63,7 +63,7 @@ async def _setup(runtime_env):
         resp = await client.post(
             f"{API}/products",
             json={
-                "catalog_id": cid, "title": title,
+                "category_id": cid, "title": title,
                 "amount_minor": 500, "currency": "SAT",
                 "visibility": "on-sale", "stock_on_hand": stock,
                 "format": "digital",
@@ -74,7 +74,7 @@ async def _setup(runtime_env):
         return resp.json()
 
     runtime_env.update({
-        "merchant_id": mid, "catalog_id": cid,
+        "merchant_id": mid, "category_id": cid,
         "make_product": product, "cookie": cookie,
     })
     yield
@@ -230,7 +230,7 @@ async def test_digital_delivery_revealed_only_after_confirmed_payment(runtime_en
     resp = await client.post(
         f"{API}/products",
         json={
-            "catalog_id": runtime_env["catalog_id"], "title": "zine",
+            "category_id": runtime_env["category_id"], "title": "zine",
             "amount_minor": 700, "currency": "SAT", "visibility": "on-sale",
             "stock_on_hand": 5, "format": "digital", "delivery_content": secret,
         },
@@ -302,7 +302,7 @@ async def test_delivery_content_rejected_for_physical_products(runtime_env):
     resp = await client.post(
         f"{API}/products",
         json={
-            "catalog_id": runtime_env["catalog_id"], "title": "mug",
+            "category_id": runtime_env["category_id"], "title": "mug",
             "amount_minor": 700, "currency": "SAT", "visibility": "on-sale",
             "format": "physical", "delivery_content": "https://x.example/f",
         },

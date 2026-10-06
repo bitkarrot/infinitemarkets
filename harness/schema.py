@@ -10,7 +10,7 @@ tables: ``products``, ``orders``, ``order_items``, ``order_events``,
 Column names/types are kept literal against the specification so plan 01-03's
 P0-14 closure gate can diff this DDL against the spec registry. Only columns
 the executable models exercise are included; tables outside the model subset
-(``merchants``, ``catalogs`` ...) are referenced by plain TEXT columns without
+(``merchants``, ``categories`` ...) are referenced by plain TEXT columns without
 FKs, mirroring the tracer's convention.
 
 Dialect notes (verified against the pinned stack):

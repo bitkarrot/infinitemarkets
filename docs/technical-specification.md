@@ -1,12 +1,12 @@
 # infinitemarkets — Technical Specification
 
-**Status:** Corrected draft — ready for Phase 0 planning; implementation remains gated on Phase 0 acceptance
+**Status:** Normative implementation contract; Release A/B implemented, Release C import work pending
 **Audience:** Implementers of the `infinitemarkets` LNbits extension
-**Companion document:** `gamma-native-python-extension-proposal.md` (architecture and rationale; this document is the normative build contract)
+**Companion document:** `architecture-proposal.md` (architecture and rationale; this document is the normative build contract)
 **Target host baseline:** LNbits `v1.6.2-rc1`, commit `e336fe1`; other versions require CI qualification
 **Primary protocol:** Infinitemarkets marketplace protocol, pinned to `market-spec` commit
 `5dc79c5db0d41c0bea774debf445cce041192840` (2025-05-10)
-**Protocol dependencies:** NIP-99, NIP-17, NIP-44 (v2), NIP-59, NIP-89; NIP-15/NIP-04 compatibility in Release C; NIP-37 deferred
+**Protocol dependencies:** NIP-99, NIP-17, NIP-44 (v2), NIP-59, NIP-89; NIP-15/NIP-04 compatibility projections are legacy/deferred and not a Release C live-publication gate; NIP-37 deferred
 
 The key words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are to be interpreted as
 in RFC 2119. Where this specification and the pinned Infinitemarkets draft conflict, the
@@ -93,7 +93,7 @@ flowchart LR
 
     subgraph Gamma[infinitemarkets extension - commerce authority]
         Boundary[Extension routes and lifecycle hooks]
-        Services[Checkout, catalog, order, and settlement services]
+        Services[Checkout, product/category, order, and settlement services]
         PaymentAdapter[LNbits payment adapter]
         Workers[Reconciliation, inbox, and outbox workers]
         GammaDB[(Namespaced extension database)]
@@ -122,7 +122,7 @@ flowchart LR
     GammaDB -->|Pending publication intents| Transport
     Relays -->|Encrypted orders and messages| Transport
     Transport -->|Durably admit before processing| GammaDB
-    Transport -->|Signed catalog and order events| Relays
+    Transport -->|Signed product, collection and order events| Relays
 ```
 
 Flow and ownership rules:
@@ -133,9 +133,9 @@ Flow and ownership rules:
 2. HTTP traffic enters through the LNbits FastAPI host. Merchant routes use LNbits
    authentication and wallet ownership checks; public checkout remains capability- and
    rate-limit constrained as specified in §5 and §15.
-3. The extension owns catalog, inventory, reservation, order, inbox, outbox, and local
-   payment-projection state in its namespaced database. It MUST NOT write LNbits core
-   payment tables directly.
+3. The extension owns categories, products, collections, inventory, reservations,
+   orders, inbox, outbox, and local payment-projection state in its namespaced
+   database. It MUST NOT write LNbits core payment tables directly.
 4. Invoice creation crosses the boundary only through the LNbits payment service with
    `extension="infinitemarkets"` and `external_id="infinitemarkets:<order.id>"`. LNbits core
    persists the authoritative incoming payment and delegates Lightning operations to the
@@ -157,7 +157,7 @@ Flow and ownership rules:
 
 ### 3.1 Internal identifiers
 
-- Domain entity ids (`merchant`, catalog/product/order/outbox/etc.) are UUIDv4 hex
+- Domain entity ids (`merchant`, category/product/order/outbox/etc.) are UUIDv4 hex
   generated server-side; natural-key support tables use the explicit composite keys in §4.
 - All protocol-visible `d` tags are independent random identifiers, **not** the internal
   primary key, so that internal IDs never leak into public events.
@@ -176,7 +176,7 @@ product:     30402:<merchant_pubkey>:<product_d>      (Gamma)
                                                         composite id for variations)
 collection:  30405:<merchant_pubkey>:<collection_d>
 shipping:    30406:<merchant_pubkey>:<shipping_d>
-stall:       30017:<merchant_pubkey>:<stall_d>        (one per catalog)
+stall:       30017:<merchant_pubkey>:<stall_d>        (one per category; legacy NIP-15)
 app rec:     31989:<merchant_pubkey>:30402
 app info:    31990:<merchant_pubkey>:<handler_d>
 ```
@@ -223,9 +223,9 @@ All tables live in the extension's namespaced database. Types are given in porta
 terms (`TEXT`, `INTEGER`, `BIGINT`, `BOOLEAN`, `TIMESTAMP`, `BLOB`) mapped to
 SQLite/Postgres by the migration layer. `TIMESTAMP` values are UTC epoch seconds
 unless noted. SQLite foreign-key enforcement MUST be enabled and tested. Domain/history
-FKs use `ON DELETE RESTRICT`; catalog entities are soft-deleted so historical orders and
-protocol tombstones remain valid. JSON fields are parsed into bounded typed models at
-the boundary—never interpolated into SQL.
+FKs use `ON DELETE RESTRICT`; categories and products are soft-deleted so
+historical orders and protocol tombstones remain valid. JSON fields are parsed
+into bounded typed models at the boundary—never interpolated into SQL.
 
 ### 4.1 `merchants`
 
@@ -250,11 +250,22 @@ the boundary—never interpolated into SQL.
   any order is `invoice_pending|awaiting_payment`. Existing payments keep wallet/source-
   wallet snapshots; ownership loss at settlement is a manual payment exception.
 
-### 4.2 `catalogs`
+### 4.2 `categories`
 
 `id` PK, `merchant_id` FK, `name`, `description`, `default_currency`,
-`default_location`, `nip15_stall_d` (NULL until published), `publish_gamma` BOOL,
-`publish_nip15` BOOL, `deleted_at`, `created_at`, `updated_at`.
+`default_location`, `nip15_stall_d` (legacy stall projection), `publish_gamma` BOOL,
+`publish_nip15` BOOL, `public_slug` (merchant-scoped stable public filter identifier),
+`deleted_at`, `created_at`, `updated_at`. Each merchant may create multiple
+categories; every product belongs to exactly one category. Collections curate
+products across categories. Existing `catalogs` rows and `products.catalog_id`
+are renamed in place by m009 (including existing public-slug backfill), not
+copied or discarded. The old `/catalogs` API and `catalog_id` product field are
+not supported after this migration. NIP-99 defines addressable classified
+listings (kind `30402`) and draft/inactive listings (kind `30403`), not
+categories or catalogs: these categories are local merchant-managed entities,
+not a new Nostr event kind. Products publish as `30402`; curated Gamma
+collections publish as `30405` and shipping options as `30406`. Live NIP-15
+stall publication is deferred, not a requirement for categories.
 
 ### 4.3 `products`
 
@@ -262,7 +273,7 @@ the boundary—never interpolated into SQL.
 |---|---|---|
 | id | TEXT PK | |
 | merchant_id | TEXT NOT NULL FK | |
-| catalog_id | TEXT NOT NULL FK | |
+| category_id | TEXT NOT NULL FK→categories.id | One primary shopper-facing category per product |
 | d_tag | TEXT NOT NULL | UNIQUE(merchant_id, d_tag) |
 | parent_product_id | TEXT NULL FK→products.id | variations only |
 | product_type | TEXT NOT NULL | `simple`/`variable`/`variation` |
@@ -302,7 +313,7 @@ parent chain depth = 1 (a variation cannot be a parent)
 
 - `product_images` (product_id FK, url, dimensions, sort_order)
 - `product_specs` (product_id FK, key, value)
-- `product_categories` (product_id FK, category)
+- `product_categories` (product_id FK, category): optional NIP-99 `t` keyword tags; these are not the shopper-facing primary category in `categories`.
 - `product_collections` (product_id FK, collection_id FK, UNIQUE pair)
 - `product_shipping_options` (product_id FK, shipping_option_id FK,
   `extra_cost_minor` NULL, UNIQUE pair)
@@ -520,7 +531,7 @@ Orderless `account` rows (`signin_link`) carry the AEAD'd magic-link payload in
 ### 4.19 Indexes (minimum)
 
 ```text
-products(merchant_id, catalog_id)        orders(merchant_id, state)
+products(merchant_id, category_id)       orders(merchant_id, state)
 products(merchant_id, nip15_product_id) UNIQUE WHERE nip15_product_id IS NOT NULL
 orders(payment_hash) UNIQUE              inbox_events(outer_event_id) UNIQUE
 inbox_events(rumor_id) UNIQUE WHERE rumor_id IS NOT NULL
@@ -614,11 +625,11 @@ POST   /merchants/{id}/notifications/test  send a test message to a configured a
 DELETE /merchants/{id}                     begin two-step deactivation (§6.7); never destroys key before tombstones are durable
 ```
 
-### 5.2 Admin — catalog
+### 5.2 Admin — products and categories
 
 ```text
-GET|POST            /catalogs
-GET|PATCH|DELETE    /catalogs/{id}
+GET|POST            /categories
+GET|PATCH|DELETE    /categories/{id}
 GET|POST            /products
 GET|PATCH|DELETE    /products/{id}
 POST                /products/bulk           body: {product_ids, action, value?}
@@ -643,7 +654,7 @@ POST  /orders/{id}/public-token/reissue authenticated web-order token rotation; 
 GET   /orders/{id}/events              audit log
 ```
 
-### 5.4 Public — catalog and checkout
+### 5.4 Public — browsing and checkout
 
 ```text
 GET   /public/merchants/{pubkey}                    profile + preferences (no internals)
@@ -668,6 +679,17 @@ POST  /public/nostr/link/email                      session-bound link request f
 GET   /public/nostr/link/challenge                  session-bound link challenge (purpose=link, never mints a session)
 POST  /public/nostr/link/verify                     signed link event; attaches or union-merges the proven identity
 ```
+
+The standalone HTML routes `/infinitemarkets/public/merchants/{pubkey}` and
+`/infinitemarkets/public/collections/{pubkey}/{d_tag}` provide browsing across
+all layout presets. `category=<public_slug>` selects one primary category;
+`collection=<collection_d_tag>` narrows the merchant listing to a curated
+group, and the collection links open dedicated shareable collection pages.
+`sort=newest|name|price-asc|price-desc` and bounded `min_price`/`max_price`
+apply to the selected currency only (price sort is unavailable across mixed
+currencies until `currency` is selected).
+`page` is 1-based with 24 products per page; filter and sort changes reset to
+page 1. The public slug, not the internal category id, is used in links.
 
 The `naddr` handler decodes bech32, requires kind `30402`, a local merchant pubkey, and
 a valid `d` identifier, and ignores embedded relay hints for server-side fetching. It
@@ -841,10 +863,13 @@ are intentionally different. Golden fixtures MUST catch this distinction.
 
 ### 6.6 NIP-15 compatibility events
 
-**Stall 30017** — one per catalog; `d` = `catalog.nip15_stall_d`; content JSON:
+This section documents the retained legacy/dry-run projection, not an active
+Release C live-publication requirement.
+
+**Stall 30017** — historical NIP-15 projection, one per category; `d` = `category.nip15_stall_d`; content JSON:
 
 ```jsonc
-{"id": "<stall_d>", "name": "<catalog.name>", "description": "<…>",
+{"id": "<stall_d>", "name": "<category.name>", "description": "<…>",
  "currency": "<default_currency>",
  "shipping": [{"id": "<opt_d>", "name": "<title>", "cost": <decimal>, "regions": […]}]}
 ```
@@ -857,7 +882,7 @@ are intentionally different. Golden fixtures MUST catch this distinction.
 `specs` is an array of `[name,value]` pairs; `quantity` is an integer or `null` for
 unlimited stock. Lossy rules (must be surfaced in UI preview):
 
-- product in multiple collections → belongs to exactly one stall (its catalog's);
+- product in multiple collections → belongs to exactly one stall (its category's);
 - variations → independent 30018; preferred id `<parent_d>-<variation_d>`. If that
   violates the NIP-15 id bound/collides, use `v-` + first 32 hex chars of
   SHA-256(length-prefixed parent d + variation d). Persist the chosen
@@ -866,7 +891,7 @@ unlimited stock. Lossy rules (must be surfaced in UI preview):
 - `extra-cost` shipping → NIP-15 product `shipping[].cost` (per-unit surcharge); the
   stall zone keeps the base `cost` separately—do not add them together in the event;
 - NIP-15 publication requires product and projected shipping currencies to equal the
-  catalog/stall currency. Mismatches are a compatibility-preview error, not converted
+  category/stall currency. Mismatches are a compatibility-preview error, not converted
   at volatile publication-time rates;
 - a stall containing digital products includes a deterministic zero-cost `digital`
   shipping zone because NIP-15 orders must select one zone; digital products add no
@@ -1072,7 +1097,7 @@ to `pending` or `partially_published` by a fencing-token compare-and-swap.
 4. Resolve each `item` to a canonical product owned by that merchant; reject
    cross-merchant references. A NIP-15 order must contain products from one stall and a
    shipping id defined by that stall (the deterministic digital zone for all-digital
-   orders). Gamma/web orders may span catalogs only when one selected shipping option
+   orders). Gamma/web orders may span categories only when one selected shipping option
    validly covers all physical items. Order currency is **sats**; source currencies
    convert per §3.4 and mixed-currency carts are permitted.
 5. Validate: only `on-sale` products are purchasable in v1; `hidden` and
@@ -1260,7 +1285,7 @@ Worker loop:
    to the current replacement intent or rebuilt—never treated as satisfied by stale
    content.
 3. Build unsigned event(s) from **current** domain state (not stale payload) for
-   catalog aggregates. An `order_msg` row stores an encrypted-at-rest descriptor with
+   commerce aggregates. An `order_msg` row stores an encrypted-at-rest descriptor with
    a fixed rumor `created_at`, canonical rumor id, recipient, and semantic payload;
    retries reuse the same rumor id but create fresh seal/wrapper timestamps, keys,
    ciphertexts, and outer event ids. Receivers dedupe retry wraps by rumor id.
@@ -1269,8 +1294,8 @@ Worker loop:
    future beyond configured tolerance; otherwise pause and alert clock health rather
    than publishing an event relays may reject or treat as older. Construct both NIP-17
    delivery copies per §6.9.
-5. Resolve target relays: public set for catalog events; recipient and merchant
-   kind-10050 sets for the two gift wraps (§9.3).
+5. Resolve target relays: public set for product, collection, and shipping
+   events; recipient and merchant kind-10050 sets for the two gift wraps (§9.3).
 6. Publish; record one `relay_publications` row per copy and relay.
 7. A future/old-timestamp relay rejection is not "fixed" by backdating and creating a
    competing addressable event. Record it, pause that target, and surface host/relay
@@ -1615,7 +1640,7 @@ merchant action. Default expiry remains 30 days.
 1. **Preview** accepts authenticated local JSON (10 MiB maximum) or validated Nostr
    events; it never fetches a user-supplied URL/path or opens another extension database
    by arbitrary name. Build `{stalls, products, zones, quantities, ids, keys: pubkey-only}`.
-   Treat all fields as untrusted; private keys are never in the catalog path.
+   Treat all fields as untrusted; private keys are never accepted by the preview path.
 2. **Execute** imports using §3.1's id-preservation/mapping rules. Any collision or
    invalid legacy id is explicit in the manifest; unresolved conflicts block execution.
 3. **Dry run** renders all 30402/30405/30406/30017/30018 events and runs §6
@@ -1752,13 +1777,15 @@ pages load no third-party scripts.
 
 ## 18. Release gates
 
-- **Release A** (Gamma/NIP-99 catalog + web checkout): 30402/30405/30406, kind-0,
+- **Release A** (Gamma/NIP-99 product listings + web checkout): 30402/30405/30406, kind-0,
   NIP-89, web checkout, invoice saga, inventory, outbox, key custody, and hardening.
   Excludes NIP-17/NIP-04 and MUST NOT claim Gamma order-protocol support.
 - **Release B** (full Gamma merchant): kind-10050 publication/discovery, NIP-17
   sender+receiver copies, type 1–4 messages, kind-17 receipts, egress controls, and
   external-client conformance.
-- **Release C** (interop): NIP-15 30017/30018, NIP-04 order channel, and migration.
+- **Release C** (migration): audited legacy JSON/Nostr/CSV import and scarce-stock
+  cutover rehearsal. Live NIP-15 30017/30018 publication and NIP-04 ordering
+  are not current release gates.
 
 ---
 
@@ -1921,12 +1948,13 @@ extension.
 | P0-13 Decimal/FX | Fractional minor-unit lines and mixed-currency shipping use approved Decimal units/ceiling; stale or provenance-free quotes fail before reservation; float-boundary error is measured and approved. |
 | P0-14 contract closure | All transitions, fields, routes, event fixtures, release gates and `infinitemarkets` identifiers resolve with no undeclared dependency. |
 
-Release A reruns applicable host/domain/security assertions through the real catalog,
+Release A reruns applicable host/domain/security assertions through the real category and product services,
 checkout, settlement, worker and notification implementation. Release B additionally
 requires deployed SSRF/egress controls, recipient-gated relay evidence, and an independent
-Gamma client flow. Release C requires literal NIP-15 fixtures and a cutover rehearsal with
-an old payable invoice against scarce stock. Release-B/C evidence is planned now but is
-not a prerequisite for Release A.
+Gamma client flow. Release C requires an audited legacy import and a cutover
+rehearsal with an old payable invoice against scarce stock; live NIP-15 fixture
+publication is not a release gate. Release-B/C evidence is not a prerequisite
+for Release A.
 
 Recommended OpenGSD sequence in the implementation repository:
 

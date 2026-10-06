@@ -62,7 +62,7 @@ async def _setup(runtime_env):
             {"m": mid},
         )
     resp = await client.post(
-        f"{API}/catalogs",
+        f"{API}/categories",
         json={"name": "modes", "default_currency": "SAT"},
         headers=await cookie(),
     )
@@ -70,7 +70,7 @@ async def _setup(runtime_env):
     resp = await client.post(
         f"{API}/products",
         json={
-            "catalog_id": cid,
+            "category_id": cid,
             "title": "mode widget",
             "amount_minor": 500,
             "currency": "SAT",

@@ -10,7 +10,7 @@ Gate matrix (D-07..D-11):
   ``full``. The Nostr order channel is never mode-gated.
 - ``browse_page_allowed`` — product/collection/merchant browse pages
   render normally except ``nostr_only`` (Nostr-notice page).
-- ``publish_allowed`` — catalog aggregates pause in ``browse_only``
+- ``publish_allowed`` — commerce aggregates pause in ``browse_only``
   (D-09); ``order_msg``/``merchant_profile`` publish in every mode.
 
 D-08 hard invariant: modes gate NEW purchases and browse depth only —
@@ -34,28 +34,28 @@ DEFAULT_MODE = "full"
 #: Modes whose selection requires ``inbox_state == 'active'`` (D-10).
 INBOX_GATED_MODES = frozenset({"showcase", "nostr_only"})
 
-#: Catalog aggregates paused under ``browse_only`` (D-09). Everything
+#: Commerce aggregates paused under ``browse_only`` (D-09). Everything
 #: else — ``order_msg``, ``merchant_profile``, ``merchant`` (kind-10050),
 #: tombstones — publishes in every mode.
-CATALOG_AGGREGATES = frozenset(
-    {"products", "collections", "shipping_options", "catalogs"}
+COMMERCE_AGGREGATES = frozenset(
+    {"products", "collections", "shipping_options", "categories"}
 )
 
 #: Human-facing effect list, surfaced by the two-step admin confirm.
 MODE_IMPACT = {
     "full": [
         "Browse, cart and web checkout work normally.",
-        "The catalog publishes to Nostr relays as usual.",
+        "Product, collection, and shipping changes publish to Nostr relays as usual.",
     ],
     "showcase": [
         "Web checkout and instant quotes are turned off.",
         "Product pages show 'Order via Nostr' guidance instead.",
         "Existing order links and in-flight payments still work.",
-        "The catalog keeps publishing to Nostr relays.",
+        "Product and collection changes keep publishing to Nostr relays.",
     ],
     "browse_only": [
         "Web checkout and instant quotes are turned off.",
-        "The catalog stops publishing new changes to Nostr relays.",
+        "Product, collection, and shipping changes stop publishing to Nostr relays.",
         "Existing order links and in-flight payments still work.",
         "Visitors can still browse the storefront.",
     ],
@@ -115,7 +115,7 @@ def browse_page_allowed(mode: str, page_kind: str) -> bool:
 
 
 def publish_allowed(mode: str) -> bool:
-    """Catalog aggregates pause under ``browse_only`` (D-09)."""
+    """Commerce aggregates pause under ``browse_only`` (D-09)."""
     return mode != "browse_only"
 
 

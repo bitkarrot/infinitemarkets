@@ -134,8 +134,8 @@ ORDER_MSG_NO_ROUTE_DEADLINE_S = 48 * 3600
 
 # OQ6-pinned transient failure vocabulary — these are transport states,
 # not relay verdicts, so they classify as retryable 'timeout'.
-_CATALOG_AGGREGATES = frozenset(
-    {"products", "collections", "shipping_options", "catalogs"}
+_COMMERCE_AGGREGATES = frozenset(
+    {"products", "collections", "shipping_options", "categories"}
 )
 TRANSIENT_REASONS = frozenset(
     {
@@ -341,8 +341,8 @@ async def render_intent(row: dict, database=None) -> dict | None:
     from ..db import table
 
     async with (database or default_db).connect() as conn:
-        if agg in _CATALOG_AGGREGATES:
-            # D-09: browse_only pauses catalog publication — intents are
+        if agg in _COMMERCE_AGGREGATES:
+            # D-09: browse_only pauses commerce publication — intents are
             # superseded by the same "no longer publishable" posture the
             # publish_nip15 gate uses; order_msg/merchant_profile are
             # unaffected.
@@ -396,10 +396,10 @@ async def render_intent(row: dict, database=None) -> dict | None:
                 "WHERE psc.product_id = :p AND c.deleted_at IS NULL",
                 {"p": p["id"]})
             if kind == 30018:
-                catalog = await conn.fetchone(
-                    f"SELECT * FROM {table('catalogs')} WHERE id = :c",
-                    {"c": p["catalog_id"]})
-                if not catalog or not catalog["publish_nip15"]:
+                category = await conn.fetchone(
+                    f"SELECT * FROM {table('categories')} WHERE id = :c",
+                    {"c": p["category_id"]})
+                if not category or not category["publish_nip15"]:
                     return None
                 parent_d = None
                 if p["product_type"] == "variation":
@@ -408,8 +408,8 @@ async def render_intent(row: dict, database=None) -> dict | None:
                         "WHERE id = :i", {"i": p["parent_product_id"]})
                     parent_d = parent["d_tag"] if parent else None
                 return events.nip15_product_event(
-                    p, stall_d=catalog["nip15_stall_d"],
-                    stall_currency=catalog["default_currency"] or "",
+                    p, stall_d=category["nip15_stall_d"],
+                    stall_currency=category["default_currency"] or "",
                     parent_d_tag=parent_d,
                     images=[dict(i) for i in images],
                     specs=[dict(s) for s in specs],
@@ -481,14 +481,14 @@ async def render_intent(row: dict, database=None) -> dict | None:
                 dict(o), pubkey=merchant["pubkey"],
                 spec_revision=_spec_revision())
 
-        if agg == "catalogs":
+        if agg == "categories":
             cat = await conn.fetchone(
-                f"SELECT * FROM {table('catalogs')} WHERE id = :i",
+                f"SELECT * FROM {table('categories')} WHERE id = :i",
                 {"i": row["aggregate_id"]})
             if not cat or cat["deleted_at"] is not None \
                     or not cat["publish_nip15"]:
                 return None
-            # zones: the catalog's referenced shipping options + the
+            # zones: the category's referenced shipping options + the
             # deterministic digital zone when digital products exist
             zones = []
             opts = await conn.fetchall(
@@ -498,7 +498,7 @@ async def render_intent(row: dict, database=None) -> dict | None:
                 f"JOIN {table('product_collections')} pc "
                 "ON pc.collection_id = cs.collection_id "
                 f"JOIN {table('products')} p ON p.id = pc.product_id "
-                "WHERE p.catalog_id = :c AND p.deleted_at IS NULL"
+                "WHERE p.category_id = :c AND p.deleted_at IS NULL"
                 " AND so.deleted_at IS NULL",
                 {"c": cat["id"]})
             for o in opts:
@@ -514,7 +514,7 @@ async def render_intent(row: dict, database=None) -> dict | None:
                 })
             digital = await conn.fetchone(
                 f"SELECT id FROM {table('products')} "
-                "WHERE catalog_id = :c AND format = 'digital'"
+                "WHERE category_id = :c AND format = 'digital'"
                 " AND deleted_at IS NULL AND NOT draft LIMIT 1",
                 {"c": cat["id"]})
             if digital:
@@ -1084,7 +1084,7 @@ def _targets_inbox_set(row: dict) -> bool:
 
 
 async def publish_targets(row: dict, database=None) -> list[str]:
-    """Relay targets for one intent: the public set for catalog/profile
+    """Relay targets for one intent: the public set for commerce/profile
     events; public ∪ inbox for the kind-10050 publish set. ``order_msg``
     intents return [] — _publish_order_msg resolves recipient/sender
     copy sets from peer_relays + merchant inbox relays internally."""

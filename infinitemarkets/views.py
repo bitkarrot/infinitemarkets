@@ -12,8 +12,10 @@ from __future__ import annotations
 
 import json
 import re
+from decimal import Decimal
 from hashlib import sha256
 from pathlib import Path
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -107,7 +109,8 @@ async def _nav_collections(merchant_id: str) -> list[dict]:
             f"SELECT 1 FROM {table('product_collections')} pc "
             f"JOIN {table('products')} p ON p.id = pc.product_id "
             "WHERE pc.collection_id = c.id AND p.deleted_at IS NULL"
-            " AND NOT p.draft AND p.visibility != 'hidden'"
+            " AND NOT p.draft AND p.parent_product_id IS NULL"
+            " AND p.visibility != 'hidden'"
             ") ORDER BY c.title",
             {"m": merchant_id},
         )
@@ -322,6 +325,126 @@ async def product_page(request: Request, pubkey: str, d_tag: str):
     )
 
 
+def _browse_price(value: str | None) -> Decimal | None:
+    if value and re.fullmatch(r"\d{1,9}(?:\.\d{1,6})?", value):
+        return Decimal(value)
+    return None
+
+
+def _product_price(row: dict) -> Decimal:
+    return Decimal(row["amount_minor"] or 0).scaleb(-(row["currency_decimals"] or 0))
+
+
+async def _browse_products(request: Request, merchant: dict,
+                           collection_id: str | None = None) -> tuple[list[dict], dict]:
+    from .db import db, table
+
+    sql = (
+        "SELECT p.id, p.d_tag, p.title, p.amount_minor, p.currency, "
+        "p.currency_decimals, p.format, p.visibility, p.stock_on_hand, "
+        "p.stock_reserved, p.nip99_status, p.created_at, p.draft, p.deleted_at, "
+        "cat.name AS category_name, cat.public_slug AS category_slug "
+        f"FROM {table('products')} p "
+        f"JOIN {table('categories')} cat ON cat.id = p.category_id "
+        "WHERE p.merchant_id = :merchant AND cat.deleted_at IS NULL "
+        "AND p.deleted_at IS NULL AND NOT p.draft "
+        "AND p.parent_product_id IS NULL AND p.visibility != 'hidden'"
+    )
+    params = {"merchant": merchant["id"]}
+    if collection_id:
+        sql += (
+            f" AND EXISTS (SELECT 1 FROM {table('product_collections')} pc "
+            "WHERE pc.product_id = p.id AND pc.collection_id = :collection_id)"
+        )
+        params["collection_id"] = collection_id
+    elif request.query_params.get("collection"):
+        sql += (
+            f" AND EXISTS (SELECT 1 FROM {table('product_collections')} pc "
+            f"JOIN {table('collections')} c ON c.id = pc.collection_id "
+            "WHERE pc.product_id = p.id AND c.merchant_id = :merchant "
+            "AND c.deleted_at IS NULL AND c.d_tag = :collection)"
+        )
+        params["collection"] = request.query_params["collection"][:64]
+    async with db.connect() as conn:
+        rows = [dict(row) for row in await conn.fetchall(sql, params)]
+
+    categories = {
+        row["category_slug"]: row["category_name"]
+        for row in rows if row["category_slug"]
+    }
+    currencies = sorted({row["currency"] for row in rows if row["currency"]})
+    selected_category = request.query_params.get("category", "")[:64]
+    selected_currency = request.query_params.get("currency", "")[:8]
+    if len(currencies) == 1:
+        selected_currency = currencies[0]
+    elif not selected_currency or selected_currency not in currencies:
+        selected_currency = ""
+    min_price = _browse_price(request.query_params.get("min_price"))
+    max_price = _browse_price(request.query_params.get("max_price"))
+    if selected_category:
+        rows = [row for row in rows if row["category_slug"] == selected_category]
+    if selected_currency:
+        rows = [row for row in rows if row["currency"] == selected_currency]
+        if min_price is not None:
+            rows = [
+                row for row in rows
+                if row["amount_minor"] is not None and _product_price(row) >= min_price
+            ]
+        if max_price is not None:
+            rows = [
+                row for row in rows
+                if row["amount_minor"] is not None and _product_price(row) <= max_price
+            ]
+    else:
+        min_price = max_price = None
+    sort = request.query_params.get("sort", "newest")
+    if sort not in ("newest", "name", "price-asc", "price-desc") or (
+        sort.startswith("price-") and not selected_currency
+    ):
+        sort = "newest"
+    rows.sort(key=lambda row: row["id"])
+    if sort == "name":
+        rows.sort(key=lambda row: (row["title"] or "").casefold())
+    elif sort.startswith("price-"):
+        rows.sort(key=_product_price, reverse=sort == "price-desc")
+        rows.sort(key=lambda row: row["amount_minor"] is None)
+    else:
+        rows.sort(key=lambda row: row["created_at"], reverse=True)
+    total = len(rows)
+    raw_page = request.query_params.get("page", "1")
+    page_size = 24
+    max_page = max(1, (total + page_size - 1) // page_size)
+    page = min(max(int(raw_page), 1), max_page) if re.fullmatch(r"[0-9]{1,4}", raw_page) else 1
+    rows = rows[(page - 1) * page_size:page * page_size]
+    query = {
+        "category": selected_category,
+        "collection": request.query_params.get("collection", "")[:64] if not collection_id else "",
+        "currency": selected_currency if len(currencies) > 1 else "",
+        "min_price": str(min_price) if min_price is not None else "",
+        "max_price": str(max_price) if max_price is not None else "",
+        "sort": sort if sort != "newest" else "",
+    }
+    query = {key: value for key, value in query.items() if value}
+    path = request.url.path
+    next_page = page + 1 if page * page_size < total else None
+    browse = {
+        "categories": sorted(categories.items(), key=lambda item: (item[1].casefold(), item[0])),
+        "currencies": currencies,
+        "category": selected_category,
+        "collection": query.get("collection", ""),
+        "currency": selected_currency,
+        "min_price": query.get("min_price", ""),
+        "max_price": query.get("max_price", ""),
+        "sort": sort,
+        "total": total,
+        "page": page,
+        "previous": f"{path}?{urlencode(query | {'page': page - 1})}" if page > 1 else None,
+        "next": f"{path}?{urlencode(query | {'page': next_page})}" if next_page else None,
+        "clear_url": path,
+    }
+    return rows, browse
+
+
 @infinitemarkets_generic_router.get(
     "/public/collections/{pubkey}/{d_tag}", response_class=HTMLResponse
 )
@@ -344,13 +467,7 @@ async def collection_page(request: Request, pubkey: str, d_tag: str):
         if not row:
             return _public_response(request, "public_invalid.html", {},
                                     status=404)
-        members = await conn.fetchall(
-            f"SELECT p.* FROM {table('products')} p "
-            f"JOIN {table('product_collections')} pc ON pc.product_id = p.id "
-            "WHERE pc.collection_id = :c AND p.deleted_at IS NULL"
-            " AND NOT p.draft AND p.visibility != 'hidden'",
-            {"c": row["id"]},
-        )
+    members, browse = await _browse_products(request, merchant, row["id"])
     member_dicts = [dict(m) | {"_merchant": merchant} for m in members]
     from .services import themes as theme_service
 
@@ -370,6 +487,7 @@ async def collection_page(request: Request, pubkey: str, d_tag: str):
         "public_collection.html",
         {
             "collection": collection,
+            "browse": browse,
             "merchant_pubkey": pubkey,
             "merchant_name": merchant.get("display_name") or "",
             "theme_css": theme_service.emit_css(theme),
@@ -394,16 +512,7 @@ async def merchant_page(request: Request, pubkey: str):
     profile = (
         json.loads(merchant["profile_json"]) if merchant["profile_json"] else {}
     )
-    from .db import db, table
-
-    async with db.connect() as conn:
-        products = await conn.fetchall(
-            f"SELECT * FROM {table('products')} "
-            "WHERE merchant_id = :m AND deleted_at IS NULL AND NOT draft"
-            " AND parent_product_id IS NULL AND visibility != 'hidden'"
-            " ORDER BY created_at",
-            {"m": merchant["id"]},
-        )
+    products, browse = await _browse_products(request, merchant)
     images = await _card_images([p["id"] for p in products])
     cards = [
         {
@@ -439,6 +548,7 @@ async def merchant_page(request: Request, pubkey: str):
             "about": profile.get("about", ""),
             "picture": profile.get("picture"),
             "products": cards,
+            "browse": browse,
             "theme_css": theme_service.emit_css(theme),
             "nav_active": "shop",
             **store,

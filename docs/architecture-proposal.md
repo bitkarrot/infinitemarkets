@@ -2,7 +2,7 @@
 
 ## Architecture and Implementation Proposal
 
-**Status:** Supporting rationale synchronized with the corrected Phase 0 contract
+**Status:** Historical supporting rationale; current category schema and Release C scope are defined by `technical-specification.md` and `.planning/REQUIREMENTS.md`
 **Extension ID:** `infinitemarkets`
 **Implementation:** Standard Python LNbits extension
 **Primary protocol:** Infinitemarkets marketplace protocol
@@ -20,7 +20,11 @@
 
 `technical-specification.md` is the normative build contract. If an example or phase
 sketch in this rationale differs, the technical specification wins; the mismatch must be
-corrected rather than delegated to implementation.
+corrected rather than delegated to implementation. The original NIP-15 live
+publication proposal below was dropped from Release C; it is preserved here as
+historical context, not a current deployment promise. The merchant-facing
+category is the current `categories` table, replacing the old `catalogs` table
+in m009 without changing product ownership or existing order records.
 
 ---
 
@@ -477,22 +481,28 @@ Merchant
 
 The first release should use `manual` Lightning payment requests because the extension creates a specific LNbits invoice after validating the order.
 
-### 9.2 Catalog
+### 9.2 Category
 
 ```text
-Catalog
+Category
 - id
 - merchant_id
+- public_slug
 - name
 - description
 - default_currency
 - default_location
-- nip15_stall_id
+- nip15_stall_d
 - publish_nip15
 - publish_gamma
 ```
 
-A catalog is an internal boundary. It may generate one NIP-15 stall and one or more Gamma collections, but those protocol objects are not the catalog record itself.
+A category is a merchant-defined, shopper-facing product grouping. Every product
+belongs to one category, while curated Gamma collections may span categories.
+NIP-99 publishes the product listing, not a category event. The old plan for
+one NIP-15 stall per category is historical and is not a supported live
+interop feature. A stable `public_slug`, separate from the internal UUID,
+identifies the category in storefront filter URLs.
 
 ### 9.3 Product
 
@@ -500,7 +510,7 @@ A catalog is an internal boundary. It may generate one NIP-15 stall and one or m
 Product
 - id
 - merchant_id
-- catalog_id
+- category_id
 - d_tag
 - parent_product_id
 - product_type: simple | variable | variation
@@ -1126,12 +1136,12 @@ PATCH  /infinitemarkets/api/v1/merchants/{merchant_id}/notifications
 POST   /infinitemarkets/api/v1/merchants/{merchant_id}/notifications/test
 ```
 
-### 19.2 Catalog routes
+### 19.2 Category routes
 
 ```text
-GET    /infinitemarkets/api/v1/catalogs
-POST   /infinitemarkets/api/v1/catalogs
-PATCH  /infinitemarkets/api/v1/catalogs/{catalog_id}
+GET    /infinitemarkets/api/v1/categories
+POST   /infinitemarkets/api/v1/categories
+PATCH  /infinitemarkets/api/v1/categories/{category_id}
 GET    /infinitemarkets/api/v1/products
 POST   /infinitemarkets/api/v1/products
 GET    /infinitemarkets/api/v1/products/{product_id}

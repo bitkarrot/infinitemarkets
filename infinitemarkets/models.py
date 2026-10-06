@@ -47,7 +47,7 @@ class MerchantSetting(BaseModel):
     value: str | None = None
 
 
-class Catalog(BaseModel):
+class Category(BaseModel):
     id: str
     merchant_id: str
     name: str | None = None
@@ -65,7 +65,7 @@ class Catalog(BaseModel):
 class Product(BaseModel):
     id: str
     merchant_id: str
-    catalog_id: str
+    category_id: str
     d_tag: str
     parent_product_id: str | None = None
     product_type: str

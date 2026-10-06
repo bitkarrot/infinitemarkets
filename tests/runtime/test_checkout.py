@@ -57,7 +57,7 @@ async def _setup(runtime_env):
             {"m": mid},
         )
     resp = await client.post(
-        f"{API}/catalogs",
+        f"{API}/categories",
         json={"name": "main", "default_currency": "USD"},
         headers=await cookie(),
     )
@@ -67,7 +67,7 @@ async def _setup(runtime_env):
     async def product(body) -> dict:
         resp = await client.post(
             f"{API}/products",
-            json={"catalog_id": cid, **body},
+            json={"category_id": cid, **body},
             headers=await cookie(),
         )
         assert resp.status_code == 201, resp.text
@@ -92,7 +92,7 @@ async def _setup(runtime_env):
     })
 
     runtime_env.update({
-        "merchant_id": mid, "catalog_id": cid,
+        "merchant_id": mid, "category_id": cid,
         "widget": widget, "gizmo": gizmo, "draft": draft,
         "usd_item": usd_item,
     })
@@ -516,7 +516,7 @@ async def test_shipping_rejects_invalid_coverage(runtime_env, problem):
     response = await client.post(
         f"{API}/products", headers=headers,
         json={
-            "catalog_id": runtime_env["catalog_id"], "title": "shipping restrictions",
+            "category_id": runtime_env["category_id"], "title": "shipping restrictions",
             "format": "physical", "visibility": "on-sale", "currency": "SAT",
             "amount_minor": 100, "stock_on_hand": 1,
             "shipping_option_ids": [] if problem == "unassigned" else [option["id"]],
@@ -571,7 +571,7 @@ async def test_shipping_quotes_include_precision_and_components(
     response = await client.post(
         f"{API}/products", headers=headers,
         json={
-            "catalog_id": runtime_env["catalog_id"], "title": "shipping components",
+            "category_id": runtime_env["category_id"], "title": "shipping components",
             "format": "physical", "visibility": "on-sale", "currency": "SAT",
             "amount_minor": 100, "stock_on_hand": 5,
             "weight_value": 500, "weight_unit": "g",
@@ -620,7 +620,7 @@ async def test_reclaimed_checkout_fences_stale_admission(runtime_env, monkeypatc
     client = runtime_env["client"]
     headers = {"Origin": ORIGIN, "X-CSRF-Token": client.cookies.get("gm_csrf")}
     response = await client.post(f"{API}/products", headers=headers, json={
-        "catalog_id": runtime_env["catalog_id"], "title": "stale admission",
+        "category_id": runtime_env["category_id"], "title": "stale admission",
         "amount_minor": 100, "currency": "SAT", "format": "digital",
         "visibility": "on-sale", "stock_on_hand": 2,
     })
@@ -665,7 +665,7 @@ async def test_stock_rejection_does_not_leave_recoverable_received_order(runtime
     client = runtime_env["client"]
     headers = {"Origin": ORIGIN, "X-CSRF-Token": client.cookies.get("gm_csrf")}
     response = await client.post(f"{API}/products", headers=headers, json={
-        "catalog_id": runtime_env["catalog_id"], "title": "stock rejection",
+        "category_id": runtime_env["category_id"], "title": "stock rejection",
         "amount_minor": 100, "currency": "SAT", "format": "digital",
         "visibility": "on-sale", "stock_on_hand": 1,
     })
@@ -704,7 +704,7 @@ async def test_checkout_caps_are_transactional(runtime_env, monkeypatch, cap):
     client = runtime_env["client"]
     headers = {"Origin": ORIGIN, "X-CSRF-Token": client.cookies.get("gm_csrf")}
     response = await client.post(f"{API}/products", headers=headers, json={
-        "catalog_id": runtime_env["catalog_id"], "title": f"{cap} cap race",
+        "category_id": runtime_env["category_id"], "title": f"{cap} cap race",
         "amount_minor": 100, "currency": "SAT", "format": "digital", "visibility": "on-sale",
     })
     assert response.status_code == 201, response.text

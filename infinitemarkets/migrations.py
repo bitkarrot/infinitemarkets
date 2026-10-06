@@ -1229,3 +1229,34 @@ async def m008_buyer_accounts(db: Connection):
         f"ALTER TABLE {s}nostr_challenges ADD COLUMN account_id TEXT"
         f" REFERENCES {s}buyer_accounts(id)"
     )
+
+
+async def m009_categories(db: Connection):
+    s = db.references_schema
+    await db.execute(f"ALTER TABLE {s}catalogs RENAME TO categories")
+    await db.execute(
+        f"ALTER TABLE {s}products RENAME COLUMN catalog_id TO category_id"
+    )
+    await db.execute(f"ALTER TABLE {s}categories ADD COLUMN public_slug TEXT")
+    for row in await db.fetchall(f"SELECT id FROM {s}categories"):
+        await db.execute(
+            f"UPDATE {s}categories SET public_slug = :slug WHERE id = :id",
+            {"slug": uuid.uuid4().hex, "id": row["id"]},
+        )
+    await db.execute(
+        f"CREATE UNIQUE INDEX ux_categories_public_slug "
+        f"ON {s}categories(merchant_id, public_slug)"
+    )
+    await db.execute(
+        f"CREATE INDEX ix_products_merchant_category "
+        f"ON {s}products(merchant_id, category_id)"
+    )
+    await db.execute(f"DROP INDEX {s}ix_products_merchant_catalog")
+    await db.execute(
+        f"UPDATE {s}outbox_events SET aggregate_type = 'categories' "
+        "WHERE aggregate_type = 'catalogs'"
+    )
+    await db.execute(
+        f"UPDATE {s}protocol_addresses SET domain_type = 'categories' "
+        "WHERE domain_type = 'catalogs'"
+    )

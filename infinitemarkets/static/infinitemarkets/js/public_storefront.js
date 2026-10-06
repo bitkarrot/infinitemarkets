@@ -6,6 +6,9 @@
   "use strict";
 
   var GM = (window.GM = window.GM || {});
+  document.querySelectorAll(".browse-disclosure").forEach(function (panel) {
+    panel.open = window.matchMedia("(min-width: 900px)").matches;
+  });
 
   /* --- DOM helpers (never innerHTML with API values — XSS boundary) ---- */
 

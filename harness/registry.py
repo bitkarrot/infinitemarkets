@@ -188,11 +188,11 @@ HTTP_ROUTES: tuple[str, ...] = (
     "POST /merchants/{id}/notifications/test",
     "DELETE /merchants/{id}",
     # 5.2 admin — catalog
-    "GET /catalogs",
-    "POST /catalogs",
-    "GET /catalogs/{id}",
-    "PATCH /catalogs/{id}",
-    "DELETE /catalogs/{id}",
+    "GET /categories",
+    "POST /categories",
+    "GET /categories/{id}",
+    "PATCH /categories/{id}",
+    "DELETE /categories/{id}",
     "GET /products",
     "POST /products",
     "POST /products/bulk",
@@ -364,7 +364,7 @@ TABLE_NOT_MODELED = "not-modeled"
 TABLE_CLASSIFICATION: dict[str, str] = {
     # 4.1-4.3
     "merchants": TABLE_NOT_MODELED,
-    "catalogs": TABLE_NOT_MODELED,
+    "categories": TABLE_NOT_MODELED,
     "products": TABLE_MODELED,
     # 4.4 product detail tables
     "product_images": TABLE_NOT_MODELED,

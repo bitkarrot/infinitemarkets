@@ -6,7 +6,7 @@
 ## User Stories
 
 - As an operator, I can prove the exact LNbits/SDK/deployment profile before merchants use real funds.
-- As a merchant, I can manage one protected catalog and wallet-backed inventory and see whether each publication was acknowledged.
+- As a merchant, I can manage multiple protected product categories, wallet-backed inventory, and see whether each product/collection publication was acknowledged.
 - As a web buyer, I can receive a server-priced Lightning invoice and privately follow order state without exposing an order token in URLs or logs.
 - As a Nostr buyer, I can exchange Gamma order messages through my declared inbox relays without public fallback routing.
 - As a migrating merchant, I can preview and cut over a legacy catalog without allocating stock already promised by an old payable invoice.
@@ -31,11 +31,11 @@
 - [x] **QUAL-13**: Implementer can prove Decimal units, provider provenance, five-minute freshness, per-component ceiling, and rejection-before-reservation for stale/invalid FX quotes.
 - [x] **QUAL-14**: Implementer can validate that every normative transition, field, route, event fixture, release gate, and `infinitemarkets` identifier closes without an undeclared dependency.
 
-### Release A — Catalog and Web Commerce
+### Release A — Categories and Web Commerce
 
 - [x] **MERC-01**: Merchant can create/import a protected Nostr identity, bind an owned incoming LNbits wallet, configure relays/notifications, and activate/deactivate without exposing raw keys or credentials.
-- [x] **CAT-01**: Merchant can create and update canonical catalogs, simple/variable/variation products, collections, images/specifications, shipping options, stock, visibility, and local drafts under the normative validation rules.
-- [x] **CAT-02**: Merchant can soft-delete catalog entities with ordered reference removal, durable tombstones, stable protocol addresses, and retained historical order integrity.
+- [x] **CAT-01**: Merchant can create and update categories (one per product), simple/variable/variation products, cross-category collections, images/specifications, shipping options, stock, visibility, and local drafts under the normative validation rules.
+- [x] **CAT-02**: Merchant can soft-delete category entities only when empty and another active category remains; product and collection deletion retain ordered reference removal, durable tombstones, stable protocol addresses, and historical order integrity.
 - [x] **PUB-01**: Merchant can publish deterministic Gamma/NIP-99 `0`, `30402`, `30405`, `30406`, `31989`, and `31990` events through a durable, ordered outbox with positive per-relay ACK evidence.
 - [x] **PUB-02**: Merchant can inspect relay health, pending/partial/failed publication state, and retry/supersession outcomes without reading secret-bearing logs.
 - [x] **WEB-01**: Buyer can open a local NIP-89 naddr product page and browse active public products, collections, shipping, price, and availability without seeing merchant internals.
