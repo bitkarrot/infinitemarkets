@@ -12,6 +12,40 @@ An [LNbits](https://github.com/lnbits/lnbits) extension that gives a merchant on
 
 [▶ Watch the demo](docs/assets/infinitemarkets_demo.mp4) (~3.5 min) — merchant key import, product listing publication to public relays, a live Lightning purchase, and encrypted order messaging, all on a live host.
 
+## Screenshots
+
+### Merchant admin panel
+
+<table>
+  <tr>
+    <td><img src="infinitemarkets/static/infinitemarkets/img/screenshots/admin-orders.jpg" alt="Orders workspace"><br>Orders</td>
+    <td><img src="infinitemarkets/static/infinitemarkets/img/screenshots/admin-categories.jpg" alt="Categories and products"><br>Categories &amp; products</td>
+    <td><img src="infinitemarkets/static/infinitemarkets/img/screenshots/admin-publications.jpg" alt="Publications"><br>Publications</td>
+  </tr>
+  <tr>
+    <td><img src="infinitemarkets/static/infinitemarkets/img/screenshots/admin-messages.jpg" alt="Messages"><br>Messages</td>
+    <td><img src="infinitemarkets/static/infinitemarkets/img/screenshots/admin-appearance.jpg" alt="Appearance settings"><br>Appearance</td>
+    <td><img src="infinitemarkets/static/infinitemarkets/img/screenshots/admin-embed.jpg" alt="Embed snippets"><br>Embed</td>
+  </tr>
+</table>
+
+### Public storefront
+
+<table>
+  <tr>
+    <td><img src="infinitemarkets/static/infinitemarkets/img/screenshots/store-home.jpg" alt="Storefront home"><br>Storefront</td>
+    <td><img src="infinitemarkets/static/infinitemarkets/img/screenshots/store-product.jpg" alt="Product page"><br>Product page</td>
+    <td><img src="infinitemarkets/static/infinitemarkets/img/screenshots/store-gallery.jpg" alt="Gallery layout"><br>Gallery layout</td>
+  </tr>
+  <tr>
+    <td><img src="infinitemarkets/static/infinitemarkets/img/screenshots/store-dark.jpg" alt="Dark mode"><br>Dark mode</td>
+    <td><img src="infinitemarkets/static/infinitemarkets/img/screenshots/store-mobile.jpg" alt="Mobile storefront"><br>Mobile</td>
+    <td><img src="infinitemarkets/static/infinitemarkets/img/screenshots/store-embed.jpg" alt="Embedded component"><br>Embedded on a page</td>
+  </tr>
+</table>
+
+Screenshots are captured on a seeded demo instance; the Messages view shows a fictional demo conversation. Regenerate with `tests/e2e/capture-screenshots.mjs`.
+
 ## Features
 
 ### Categories & web commerce (Release A)

@@ -776,6 +776,27 @@ test('fine-tune is point-and-click: swatches and sliders drive the storefront', 
   expect(cleared).not.toContain('--color-accent: #ff00aa')
 })
 
+test('about surface: identity, screenshots and the More links', async ({page}) => {
+  await page.goto('/infinitemarkets/')
+  await page.locator('[data-gm-nav="about"]').click()
+  await expect(page.locator('[data-gm="about-name"]')).toContainText('Infinite Markets')
+  await expect(page.locator('[data-gm="about-version"]')).toContainText('v')
+  await expect(page.locator('[data-gm="about-creator"]')).toContainText('bitkarrot')
+  const shots = page.locator('[data-gm="shots-admin"] .gm-shot, [data-gm="shots-storefront"] .gm-shot')
+  await expect(shots).toHaveCount(12)
+  await expect.poll(() =>
+    page.locator('.gm-shot img').evaluateAll(
+      els => els.every(i => (i as HTMLImageElement).complete && (i as HTMLImageElement).naturalWidth > 0)
+    )
+  ).toBe(true)
+  await shots.first().click()
+  await expect(page.locator('.gm-shot-full')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await page.getByRole('tab', {name: 'More'}).click()
+  const links = page.locator('[data-gm-surface="about"] a[target="_blank"][href^="http"]')
+  expect(await links.count()).toBeGreaterThan(8)
+})
+
 test('unauthenticated admin visit redirects or denies', async ({
   browser
 }) => {

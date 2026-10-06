@@ -42,6 +42,10 @@ def _asset_revision() -> str:
 
 
 _ASSET_REVISION = _asset_revision()
+_EXT_VERSION = str(
+    json.loads(Path(__file__).with_name("config.json").read_text())
+    .get("version", "")
+)
 
 _PUBLIC_CSP = (
     "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
@@ -253,6 +257,7 @@ async def index(request: Request, user: User = Depends(check_user_exists)):
             # lnbits/core/views/generic.py), not a dict.
             "user": user.json(),
             "asset_revision": _ASSET_REVISION,
+            "ext_version": _EXT_VERSION,
         },
     )
     response.headers["Cache-Control"] = "no-store"

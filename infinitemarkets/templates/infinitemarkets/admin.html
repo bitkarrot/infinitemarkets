@@ -5,8 +5,8 @@
     label — no icon-only mutators (UI-SPEC). Admin surfaces NEVER receive
     merchant theme tokens; host palette only. Vue {{ }} markup lives in
     {% raw %} so Jinja passes it through untouched. -#}
+<div id="gm-admin-root" class="gm-admin q-pa-md" data-version="{{ ext_version }}">
 {% raw %}
-<div id="gm-admin-root" class="gm-admin q-pa-md">
 
   <q-banner v-if="gm.blocked" class="bg-negative text-white q-mb-md"
             data-gm="topology-banner">
@@ -101,6 +101,11 @@
                 @click="gmNav('settings')" data-gm-nav="settings">
           <q-item-section avatar><q-icon name="settings"></q-icon></q-item-section>
           <q-item-section>Settings</q-item-section>
+        </q-item>
+        <q-item clickable :active="gm.view === 'about'"
+                @click="gmNav('about')" data-gm-nav="about">
+          <q-item-section avatar><q-icon name="info"></q-icon></q-item-section>
+          <q-item-section>About</q-item-section>
         </q-item>
         <q-separator spaced></q-separator>
         <q-item clickable tag="a" target="_blank" rel="noopener"
@@ -1936,6 +1941,143 @@
           </q-tab-panel>
         </q-tab-panels>
       </section>
+
+      <!-- ================= About + More ================= -->
+      <section v-show="gm.view === 'about'" data-gm-surface="about">
+        <h1 class="text-h6 q-mb-md">About Infinite Markets</h1>
+        <q-tabs v-model="gmAbout.tab" dense class="q-mb-md">
+          <q-tab name="about" label="About" data-gm="about-tab"></q-tab>
+          <q-tab name="more" label="More" data-gm="more-tab"></q-tab>
+        </q-tabs>
+
+        <q-tab-panels v-model="gmAbout.tab" animated>
+          <q-tab-panel name="about" class="gm-tab-panel">
+            <q-card flat bordered class="q-mb-md">
+              <q-card-section class="row items-center no-wrap q-gutter-md">
+                <img class="gm-about-logo" alt=""
+                     src="/infinitemarkets/static/infinitemarkets/img/infinite-markets-blue.png">
+                <div class="col">
+                  <div class="text-h6" data-gm="about-name">
+                    Infinite Markets
+                    <q-badge v-if="gmAboutVersion" outline
+                             :label="'v' + gmAboutVersion"
+                             data-gm="about-version"></q-badge>
+                  </div>
+                  <div class="text-body2">
+                    One inventory, two rails: a classic web shop with
+                    Lightning checkout and a native Nostr commerce channel
+                    with encrypted (NIP-17) ordering — built as an
+                    <a href="https://github.com/lnbits/lnbits" target="_blank"
+                       rel="noopener">LNbits</a> extension.
+                  </div>
+                  <div class="q-mt-sm text-body2" data-gm="about-creator">
+                    Created by
+                    <a :href="gmAbout.creatorUrl" target="_blank"
+                       rel="noopener"><strong>{{ gmAbout.creator }}</strong></a>
+                    · MIT licensed
+                  </div>
+                </div>
+              </q-card-section>
+              <q-separator></q-separator>
+              <q-card-actions>
+                <q-btn color="primary" flat no-caps icon="code"
+                       label="Source on GitHub" :href="gmAbout.repoUrl"
+                       target="_blank" rel="noopener"></q-btn>
+                <q-btn color="primary" flat no-caps icon="new_releases"
+                       label="Releases" :href="gmAbout.repoUrl + '/releases'"
+                       target="_blank" rel="noopener"></q-btn>
+                <q-btn color="primary" flat no-caps icon="bug_report"
+                       label="Report an issue"
+                       :href="gmAbout.repoUrl + '/issues'" target="_blank"
+                       rel="noopener"></q-btn>
+              </q-card-actions>
+            </q-card>
+
+            <div class="text-subtitle2 q-mb-xs">Admin panel</div>
+            <div class="gm-shot-grid q-mb-lg" data-gm="shots-admin">
+              <button v-for="s in gmAbout.shots.admin" :key="s.file"
+                      type="button" class="gm-shot"
+                      :aria-label="'View screenshot: ' + s.title"
+                      @click="gmAboutOpen(s)">
+                <img :src="gmAboutShot(s)" :alt="s.title + ' screenshot'"
+                     loading="lazy">
+                <span class="gm-shot-title">{{ s.title }}</span>
+                <span class="gm-shot-caption">{{ s.caption }}</span>
+              </button>
+            </div>
+
+            <div class="text-subtitle2 q-mb-xs">Public storefront</div>
+            <div class="gm-shot-grid" data-gm="shots-storefront">
+              <button v-for="s in gmAbout.shots.storefront" :key="s.file"
+                      type="button" class="gm-shot"
+                      :aria-label="'View screenshot: ' + s.title"
+                      @click="gmAboutOpen(s)">
+                <img :src="gmAboutShot(s)" :alt="s.title + ' screenshot'"
+                     loading="lazy">
+                <span class="gm-shot-title">{{ s.title }}</span>
+                <span class="gm-shot-caption">{{ s.caption }}</span>
+              </button>
+            </div>
+          </q-tab-panel>
+
+          <q-tab-panel name="more" class="gm-tab-panel">
+            <div class="row q-col-gutter-md">
+              <div v-for="g in gmAbout.linkGroups" :key="g.title"
+                   class="col-12 col-md-4">
+                <q-card flat bordered>
+                  <q-card-section class="q-pb-none">
+                    <div class="text-subtitle2">{{ g.title }}</div>
+                  </q-card-section>
+                  <q-list>
+                    <q-item v-for="l in g.links" :key="l.href" clickable
+                            tag="a" :href="l.href" target="_blank"
+                            rel="noopener">
+                      <q-item-section avatar>
+                        <q-icon :name="l.icon" color="primary"></q-icon>
+                      </q-item-section>
+                      <q-item-section>
+                        <q-item-label>{{ l.label }}</q-item-label>
+                        <q-item-label caption>{{ l.note }}</q-item-label>
+                      </q-item-section>
+                      <q-item-section side>
+                        <q-icon name="open_in_new" size="xs"></q-icon>
+                      </q-item-section>
+                    </q-item>
+                  </q-list>
+                </q-card>
+              </div>
+            </div>
+            <q-card flat bordered class="q-mt-md">
+              <q-card-section>
+                <div class="text-subtitle2">Made by bitkarrot</div>
+                <div class="text-body2">
+                  Infinite Markets is free, open-source software. If it helps
+                  your shop, a star on
+                  <a :href="gmAbout.repoUrl" target="_blank"
+                     rel="noopener">GitHub</a> or a bug report goes a long
+                  way.
+                </div>
+              </q-card-section>
+            </q-card>
+          </q-tab-panel>
+        </q-tab-panels>
+
+        <q-dialog v-model="gmAbout.preview.show">
+          <q-card class="gm-shot-dialog">
+            <q-card-section class="row items-center q-pb-none">
+              <div class="text-subtitle1 col">{{ gmAbout.preview.title }}</div>
+              <q-btn flat round dense icon="close" v-close-popup
+                     aria-label="Close screenshot"></q-btn>
+            </q-card-section>
+            <q-card-section>
+              <img :src="gmAbout.preview.src"
+                   :alt="gmAbout.preview.title + ' screenshot'"
+                   class="gm-shot-full">
+              <div class="text-caption q-mt-sm">{{ gmAbout.preview.caption }}</div>
+            </q-card-section>
+          </q-card>
+        </q-dialog>
+      </section>
     </main>
   </div>
   </div>
@@ -2366,6 +2508,7 @@
 <script src="/infinitemarkets/static/infinitemarkets/js/admin_messages.js?v={{ asset_revision }}"></script>
 <script src="/infinitemarkets/static/infinitemarkets/js/admin_settings.js?v={{ asset_revision }}"></script>
 <script src="/infinitemarkets/static/infinitemarkets/js/admin_notifications.js?v={{ asset_revision }}"></script>
+<script src="/infinitemarkets/static/infinitemarkets/js/admin_about.js?v={{ asset_revision }}"></script>
 <style>
 /* Store bar — shop identity + one-click storefront access (top-level). */
 .gm-topbar {
@@ -2570,6 +2713,46 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.gm-about-logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+.gm-shot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+.gm-shot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  background: none;
+  border: 1px solid rgba(127, 127, 127, 0.35);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: zoom-in;
+}
+.gm-shot:hover { border-color: var(--q-primary); }
+.gm-shot:focus-visible { outline: 2px solid var(--q-primary); outline-offset: 2px; }
+.gm-shot img {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  object-position: top;
+  display: block;
+  background: rgba(127, 127, 127, 0.15);
+}
+.gm-shot-title { padding: 6px 12px 0; font-weight: 600; }
+.gm-shot-caption { padding: 0 12px 12px; font-size: 12px; opacity: 0.75; }
+.gm-shot-dialog { width: min(1100px, 96vw); max-width: 96vw; }
+.gm-shot-full { width: 100%; height: auto; border-radius: 8px; display: block; }
 .gm-snippet {
   font-family: "SFMono-Regular", Consolas, monospace;
   font-size: 12px;
