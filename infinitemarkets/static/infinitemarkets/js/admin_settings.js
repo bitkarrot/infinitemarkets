@@ -182,7 +182,8 @@
               slogan: "", subtitle: "", image_url: "",
               primary: {label: "", url: ""},
               secondary: {label: "", url: ""}
-            }
+            },
+            footer: {tagline: "", note: ""}
           },
           saving: false,
           themeError: null,
@@ -282,6 +283,10 @@
                 label: (h.secondary || {}).label || "",
                 url: (h.secondary || {}).url || ""
               }
+            },
+            footer: {
+              tagline: (t.footer || {}).tagline || "",
+              note: (t.footer || {}).note || ""
             }
           };
         } catch (e) {
@@ -592,6 +597,7 @@
           layout: t.layout,
           brand: t.brand || {},
           hero: t.hero || {},
+          footer: t.footer || {},
           advanced_opt_in: !!t.advanced_opt_in
         };
         if (t.advanced_opt_in) {

@@ -381,6 +381,43 @@ async def test_hero_renders_on_index_only_and_validates(runtime_env):
     await _patch_theme(runtime_env, {"preset": "warm-market"})
 
 
+async def test_brand_logo_and_footer_copy(runtime_env):
+    """Brand Basics logo_url replaces the initials tile; footer tagline
+    and note are editable with bounded fields and defaults on empty."""
+    client = runtime_env["client"]
+    merchant = await _merchant(runtime_env)
+    base = f"/infinitemarkets/public/merchants/{merchant['pubkey']}"
+
+    resp, _ = await _patch_theme(runtime_env, {
+        "brand": {"logo_url": "https://cdn.example/logo.svg"},
+        "footer": {"tagline": "Handmade in small batches.",
+                   "note": "© Example Co — all rights reserved."},
+    })
+    assert resp.status_code == 200, resp.text
+    page = await client.get(base)
+    assert 'class="brand-mark brand-mark-img"' in page.text
+    assert 'src="https://cdn.example/logo.svg"' in page.text
+    assert "Handmade in small batches." in page.text
+    assert "© Example Co" in page.text
+    assert "powered by Infinitemarkets" not in page.text
+
+    # logo URL is strictly bounded — no javascript:/data:/anchors/IPs
+    for bad in ("javascript:alert(1)", "data:image/svg+xml,x",
+                "//cdn.example/x.png", "#local", "https://192.168.1.1/x.png"):
+        resp, _ = await _patch_theme(
+            runtime_env, {"brand": {"logo_url": bad}})
+        assert resp.status_code == 422, (bad, resp.status_code)
+
+    # footer caps + unknown-field rejection
+    resp, _ = await _patch_theme(runtime_env, {"footer": {"bogus": 1}})
+    assert resp.status_code == 422
+    resp, _ = await _patch_theme(
+        runtime_env, {"footer": {"note": "x" * 500}})
+    assert resp.status_code == 200
+    assert len(resp.json()["theme"]["footer"]["note"]) == 200
+    await _patch_theme(runtime_env, {"preset": "warm-market"})
+
+
 async def test_brand_name_overrides_display_name_in_hero(runtime_env):
     """Brand Basics `name` is the shopper-facing name — hero and page
     title must not fall back to the raw merchant display_name."""

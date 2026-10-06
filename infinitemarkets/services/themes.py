@@ -124,7 +124,8 @@ _GATED_PAIRS = (
 )
 
 DEFAULT_THEME = {"preset": "warm-market", "layout": "editorial",
-                 "brand": None, "advanced": None, "hero": None}
+                 "brand": None, "advanced": None, "hero": None,
+                 "footer": None}
 
 # Hero (storefront index intro) — bounded content fields, not tokens:
 # slogan/subtitle are length-capped; URLs may be #anchors, same-origin
@@ -134,29 +135,45 @@ _HERO_PATH = re.compile(r"^/(?!/)[\w\-./?=&%#]{0,511}$")
 _IP_HOST = re.compile(r"^(\d{1,3}\.){3}\d{1,3}$|^\[?[0-9a-fA-F:]+\]?$")
 
 
+def _https_url_ok(url: str) -> bool:
+    if not url.startswith("https://") or len(url) > 512 \
+            or any(ch.isspace() for ch in url):
+        return False
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
+    return bool(
+        parsed and parsed.hostname and not parsed.username
+        and not _IP_HOST.match(parsed.hostname)
+    )
+
+
 def _validate_hero_url(value, field: str) -> str:
     url = str(value or "").strip()
     if not url:
         return ""
-    if _HERO_ANCHOR.fullmatch(url) or _HERO_PATH.fullmatch(url):
+    if _HERO_ANCHOR.fullmatch(url) or _HERO_PATH.fullmatch(url) \
+            or _https_url_ok(url):
         return url
-    ok = False
-    if url.startswith("https://") and len(url) <= 512 \
-            and not any(ch.isspace() for ch in url):
-        try:
-            parsed = urlparse(url)
-        except ValueError:
-            parsed = None
-        ok = bool(
-            parsed and parsed.hostname and not parsed.username
-            and not _IP_HOST.match(parsed.hostname)
-        )
-    if not ok:
-        raise unprocessable(
-            "invalid-content",
-            f"hero {field} must be a #anchor, /path or https:// URL",
-        )
-    return url
+    raise unprocessable(
+        "invalid-content",
+        f"hero {field} must be a #anchor, /path or https:// URL",
+    )
+
+
+def _validate_media_url(value, field: str) -> str:
+    """Logos/backgrounds: same-origin /path or https:// only — no
+    #anchors, data:, javascript:, protocol-relative or IP-literal hosts."""
+    url = str(value or "").strip()
+    if not url:
+        return ""
+    if _HERO_PATH.fullmatch(url) or _https_url_ok(url):
+        return url
+    raise unprocessable(
+        "invalid-content",
+        f"{field} must be a /path or https:// URL",
+    )
 
 
 def _validate_hero(hero: dict) -> dict:
@@ -269,11 +286,35 @@ def _validate_brand(brand: dict) -> dict:
                 f"corners must be one of {CORNERS}",
             )
         out["corners"] = brand["corners"]
-    unknown = set(brand) - {"name", "initials", "accent", "font", "corners"}
+    if brand.get("logo_url") is not None:
+        logo = _validate_media_url(brand.get("logo_url"), "brand logo_url")
+        if logo:
+            out["logo_url"] = logo
+    unknown = set(brand) - {
+        "name", "initials", "accent", "font", "corners", "logo_url",
+    }
     if unknown:
         raise unprocessable(
             "invalid-content", f"unknown brand fields: {sorted(unknown)}"
         )
+    return out
+
+
+def _validate_footer(footer: dict) -> dict:
+    """Storefront footer copy — bounded text, no markup (rendered as
+    textContent by Jinja escaping regardless)."""
+    if not isinstance(footer, dict):
+        raise unprocessable("invalid-content", "footer must be an object")
+    unknown = set(footer) - {"tagline", "note"}
+    if unknown:
+        raise unprocessable(
+            "invalid-content", f"unknown footer fields: {sorted(unknown)}"
+        )
+    out = {}
+    for field, limit in (("tagline", 280), ("note", 200)):
+        value = str(footer.get(field) or "").strip()
+        if value:
+            out[field] = value[:limit]
     return out
 
 
@@ -326,7 +367,8 @@ def validate_theme(payload: dict) -> dict:
     if not isinstance(payload, dict):
         raise unprocessable("invalid-content", "theme must be an object")
     unknown = set(payload) - {
-        "preset", "layout", "brand", "advanced", "advanced_opt_in", "hero"
+        "preset", "layout", "brand", "advanced", "advanced_opt_in",
+        "hero", "footer",
     }
     if unknown:
         raise unprocessable(
@@ -347,6 +389,8 @@ def validate_theme(payload: dict) -> dict:
         theme["brand"] = _validate_brand(payload["brand"])
     if payload.get("hero") is not None:
         theme["hero"] = _validate_hero(payload["hero"])
+    if payload.get("footer") is not None:
+        theme["footer"] = _validate_footer(payload["footer"])
     if payload.get("advanced") is not None:
         theme["advanced"] = _validate_advanced(
             payload["advanced"], bool(payload.get("advanced_opt_in"))

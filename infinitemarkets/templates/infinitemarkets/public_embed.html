@@ -19,7 +19,7 @@
   <div class="embed-toolbar">
     {% if storefront_url %}
     <a class="brand" href="{{ storefront_url }}" target="_blank" rel="noopener">
-      <span class="brand-mark" aria-hidden="true">{{ brand_initials or 'G' }}</span>
+      {% if brand_logo %}<img class="brand-mark brand-mark-img" src="{{ brand_logo }}" alt="" referrerpolicy="no-referrer">{% else %}<span class="brand-mark" aria-hidden="true">{{ brand_initials or 'G' }}</span>{% endif %}
       <span class="brand-name">{{ brand_name or 'Infinitemarkets' }}</span>
     </a>
     {% endif %}

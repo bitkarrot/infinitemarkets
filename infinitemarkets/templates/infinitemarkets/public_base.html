@@ -14,18 +14,26 @@
 </head>
 <body>
 {%- set track_url = '/infinitemarkets/order' ~ ('?shop=' ~ shop_pubkey if shop_pubkey else '') -%}
+{%- macro brand_mark() -%}
+  {%- if brand_logo -%}
+    <img class="brand-mark brand-mark-img" src="{{ brand_logo }}" alt=""
+         referrerpolicy="no-referrer">
+  {%- else -%}
+    <span class="brand-mark" aria-hidden="true">{{ brand_initials or 'G' }}</span>
+  {%- endif -%}
+{%- endmacro -%}
 <div class="gm-public" data-layout="{{ layout }}" data-shop="{{ shop_pubkey or '' }}">
   <a class="skip-link" href="#gm-main">Skip to content</a>
   <header class="store-header">
     <div class="store-header-inner">
       {% if storefront_url %}
       <a class="brand" href="{{ storefront_url }}">
-        <span class="brand-mark" aria-hidden="true">{{ brand_initials or 'G' }}</span>
+        {{ brand_mark() }}
         <span class="brand-name">{{ brand_name or 'Infinitemarkets' }}</span>
       </a>
       {% else %}
       <span class="brand">
-        <span class="brand-mark" aria-hidden="true">{{ brand_initials or 'G' }}</span>
+        {{ brand_mark() }}
         <span class="brand-name">{{ brand_name or 'Infinitemarkets' }}</span>
       </span>
       {% endif %}
@@ -59,13 +67,17 @@
     <div class="store-footer-inner">
       <div class="footer-about">
         <strong>{{ brand_name or 'Infinitemarkets' }}</strong>
-        <p>Pay with any Lightning wallet. No account needed — every order gets its own private link to check its status.</p>
+        <p>{{ footer_tagline or 'Pay with any Lightning wallet. No account needed — every order gets its own private link to check its status.' }}</p>
       </div>
       <nav class="footer-links" aria-label="Footer">
         {% if storefront_url %}<a href="{{ storefront_url }}">Shop</a>{% endif %}
         <a href="{{ track_url }}">Track an order</a>
       </nav>
+      {% if footer_note %}
+      <p class="footer-fine">{{ footer_note }}</p>
+      {% else %}
       <p class="footer-fine"><strong>Lightning checkout</strong> · private by default · powered by Infinitemarkets on LNbits</p>
+      {% endif %}
     </div>
   </footer>
 </div>

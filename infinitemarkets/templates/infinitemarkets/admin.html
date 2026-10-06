@@ -1629,6 +1629,14 @@
                     <q-input v-model="gmSettings.theme.brand.initials" dense
                              outlined label="Logo initials (up to 3 characters)"
                              maxlength="3" class="q-mb-sm"></q-input>
+                    <q-input v-model="gmSettings.theme.brand.logo_url" dense
+                             outlined class="q-mb-sm"
+                             label="Logo image URL (https or /path)">
+                    </q-input>
+                    <div class="text-caption text-grey-7 q-mb-sm">
+                      A logo image replaces the initials tile in the store
+                      header.
+                    </div>
                     <q-input v-model="gmSettings.theme.brand.accent" dense
                              outlined label="Accent color (#rrggbb)"
                              class="q-mb-sm"></q-input>
@@ -1695,6 +1703,26 @@
                                  label="Secondary link"></q-input>
                       </div>
                     </div>
+                  </div>
+                </q-expansion-item>
+
+                <q-expansion-item label="Footer" class="q-mb-sm"
+                                  data-gm="footer-editor">
+                  <div class="q-pa-sm">
+                    <div class="text-caption q-mb-sm">
+                      The strip at the bottom of every public page — your
+                      store description plus the small-print line. Empty
+                      fields fall back to the defaults.
+                    </div>
+                    <q-input v-model="gmSettings.theme.footer.tagline" dense
+                             outlined type="textarea" autogrow maxlength="280"
+                             class="q-mb-sm"
+                             label="Footer description (tagline)">
+                    </q-input>
+                    <q-input v-model="gmSettings.theme.footer.note" dense
+                             outlined maxlength="200"
+                             label="Fine print line">
+                    </q-input>
                   </div>
                 </q-expansion-item>
 

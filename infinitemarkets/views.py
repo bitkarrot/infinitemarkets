@@ -88,10 +88,14 @@ def _brand_ctx(merchant: dict | None, theme: dict | None) -> dict:
     brand = (theme or {}).get("brand") or {}
     name = brand.get("name") or (merchant or {}).get("display_name") or ""
     initials = brand.get("initials") or (name[:1].upper() if name else "")
+    footer = (theme or {}).get("footer") or {}
     pubkey = (merchant or {}).get("pubkey")
     return {
         "brand_name": name,
         "brand_initials": initials,
+        "brand_logo": brand.get("logo_url") or "",
+        "footer_tagline": footer.get("tagline") or "",
+        "footer_note": footer.get("note") or "",
         "shop_pubkey": pubkey or "",
         "storefront_url": (
             f"/infinitemarkets/public/merchants/{pubkey}" if pubkey else ""

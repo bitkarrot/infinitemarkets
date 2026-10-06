@@ -103,6 +103,14 @@ body { margin: 0; }
   font-weight: 800;
   letter-spacing: 0.02em;
 }
+/* Uploaded logo replaces the initials tile — neutral surface keeps the
+   mark legible in both light and dark schemes. */
+.gm-public .brand-mark-img {
+  object-fit: contain;
+  padding: 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
 .gm-public .store-nav {
   display: flex;
   align-items: center;
