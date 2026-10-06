@@ -2,6 +2,10 @@
    Infinitemarkets documents. Every rule is scoped under .gm-public; nothing
    here may leak into admin surfaces (public/admin separation, §5.4). */
 
+/* The themed surface is a div inside <body> — reset the UA margin so it
+   paints edge-to-edge (the default 8px ring was glaring in dark mode). */
+body { margin: 0; }
+
 .gm-public {
   /* fallback tokens — the merchant theme (Task 3 presets) overrides these
      via emitted custom properties on the same scope. Warm Market palette
