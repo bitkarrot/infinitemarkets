@@ -49,6 +49,50 @@
     });
   });
 
+  /* Light/dark scheme toggle — shopper preference, never a merchant
+     theme field. No stored choice means the browser's
+     prefers-color-scheme wins via the emitted media rule; an explicit
+     toggle sets data-scheme (which outranks it) and persists. */
+  (function () {
+    var KEY = "gm-scheme";
+    var root = document.querySelector(".gm-public");
+    var btn = document.getElementById("gm-scheme-toggle");
+    if (!root || !btn) return;
+    var media = window.matchMedia("(prefers-color-scheme: dark)");
+    function stored() {
+      try {
+        var v = localStorage.getItem(KEY);
+        return v === "dark" || v === "light" ? v : null;
+      } catch (e) { return null; }
+    }
+    function effective() {
+      return root.getAttribute("data-scheme") ||
+        (media.matches ? "dark" : "light");
+    }
+    function render() {
+      var dark = effective() === "dark";
+      btn.setAttribute("aria-pressed", dark ? "true" : "false");
+      btn.setAttribute("aria-label",
+        dark ? "Switch to light mode" : "Switch to dark mode");
+      var moon = btn.querySelector(".scheme-moon");
+      var sun = btn.querySelector(".scheme-sun");
+      if (moon) moon.hidden = dark;
+      if (sun) sun.hidden = !dark;
+    }
+    btn.addEventListener("click", function () {
+      var next = effective() === "dark" ? "light" : "dark";
+      root.setAttribute("data-scheme", next);
+      try { localStorage.setItem(KEY, next); } catch (e) { /* private mode */ }
+      render();
+    });
+    media.addEventListener("change", function () {
+      if (!root.getAttribute("data-scheme")) render();
+    });
+    var saved = stored();
+    if (saved) root.setAttribute("data-scheme", saved);
+    render();
+  })();
+
   /* --- DOM helpers (never innerHTML with API values — XSS boundary) ---- */
 
   GM.h = function (tag, attrs, children) {

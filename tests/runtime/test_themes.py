@@ -271,3 +271,51 @@ async def test_advanced_tokens_preserve_secondary_text_and_focus(runtime_env, to
     )
     assert response.status_code == 422
     assert response.json()["type"] == "urn:infinitemarkets:contrast-gate"
+
+
+def test_dark_scheme_tokens_meet_the_same_contrast_gate():
+    """Every preset (and a merchant-darkened primary) derives a dark set
+    that still clears the WCAG pairs on the dark surfaces."""
+    from infinitemarkets.services import themes
+
+    for preset in themes.PRESETS:
+        dark = themes.dark_scheme_tokens({"preset": preset})
+        bg = dark["--color-bg"]
+        assert dark["color-scheme"] == "dark"
+        for key in ("--color-text", "--color-text-muted",
+                    "--color-primary", "--color-primary-hover",
+                    "--color-focus"):
+            assert themes.contrast_ratio(dark[key], bg) >= 4.5, (preset, key)
+        assert themes.contrast_ratio(
+            dark["--color-on-primary"], dark["--color-primary"]
+        ) >= 4.5, preset
+        css = themes.emit_css({"preset": preset})
+        assert 'data-scheme="dark"' in css
+        assert "prefers-color-scheme: dark" in css
+        assert '[data-scheme="light"]' in css
+        # base light tokens still emitted alongside the dark variant
+        assert themes.resolve_tokens({"preset": preset})["--color-bg"] in css
+
+    # A merchant primary that is already dark gets lightened for dark mode.
+    dark = themes.dark_scheme_tokens(
+        {"preset": "warm-market",
+         "advanced": {"--color-primary": "#1a0f00"}}
+    )
+    assert dark["--color-primary"] != "#1a0f00"
+    assert themes.contrast_ratio(
+        dark["--color-primary"], dark["--color-bg"]
+    ) >= 4.5
+
+
+async def test_public_pages_carry_scheme_toggle_and_dark_tokens(runtime_env):
+    """The nav scheme toggle renders on public chrome and the emitted
+    theme carries the shopper-scheme blocks for every layout preset."""
+    client = runtime_env["client"]
+    merchant = await _merchant(runtime_env)
+    resp = await client.get(
+        f"/infinitemarkets/signin?shop={merchant['pubkey']}"
+    )
+    assert resp.status_code == 200
+    assert 'id="gm-scheme-toggle"' in resp.text
+    assert 'data-scheme="dark"' in resp.text
+    assert "prefers-color-scheme: dark" in resp.text

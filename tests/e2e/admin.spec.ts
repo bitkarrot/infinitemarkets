@@ -479,6 +479,44 @@ test('price slider filters one currency and wide filters stay open', async ({pag
   await expect(page.locator('.browse-disclosure summary')).toBeHidden()
 })
 
+test('nav scheme toggle flips dark and light on every layout', async ({page}) => {
+  await page.goto('/infinitemarkets/')
+  const cookies = await page.context().cookies()
+  const csrf = cookies.find(cookie => cookie.name === 'gm_csrf')?.value || ''
+  const url = `/infinitemarkets/api/v1/merchants/${seed.merchant_id}`
+  const set = (layout: string) => page.request.patch(url, {
+    headers: {Origin: seed.base_url, 'X-CSRF-Token': csrf},
+    data: {theme: {layout}}
+  })
+  const shopUrl = `/infinitemarkets/public/merchants/${seed.pubkey}`
+  const root = page.locator('.gm-public')
+  const toggle = page.getByRole('button', {name: /mode/i})
+  try {
+    await page.goto(shopUrl)
+    await page.evaluate(() => localStorage.removeItem('gm-scheme'))
+    for (const layout of ['editorial', 'guided', 'compact', 'gallery']) {
+      expect((await set(layout)).status()).toBe(200)
+      await page.goto(shopUrl)
+      await expect(root).toHaveAttribute('data-layout', layout)
+      await expect(toggle).toBeVisible()
+      await toggle.click()
+      await expect(root).toHaveAttribute('data-scheme', 'dark')
+      await expect(toggle).toHaveAttribute('aria-pressed', 'true')
+      await expect(root).toHaveCSS('background-color', 'rgb(27, 21, 16)')
+      await toggle.click()
+      await expect(root).toHaveAttribute('data-scheme', 'light')
+      await expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    }
+    // the choice persists across navigation
+    await toggle.click()
+    await page.reload()
+    await expect(root).toHaveAttribute('data-scheme', 'dark')
+    await page.evaluate(() => localStorage.removeItem('gm-scheme'))
+  } finally {
+    expect((await set('editorial')).status()).toBe(200)
+  }
+})
+
 test('gallery listing cards stay scoped and adapt to mobile', async ({page}) => {
   await page.goto('/infinitemarkets/')
   const cookies = await page.context().cookies()

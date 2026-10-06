@@ -298,12 +298,98 @@ def resolve_tokens(theme: dict | None) -> dict[str, str]:
     return tokens
 
 
+# --- viewer dark scheme ------------------------------------------------------------
+
+# Warm dark neutrals — the dark counterpart of the Warm Market palette.
+# The merchant brand never picks these; they only color surfaces/text
+# when the shopper opts into dark mode (or their system requests it).
+_DARK_SURFACES: dict[str, str] = {
+    "--color-bg": "#1b1510",
+    "--color-surface": "#241c15",
+    "--color-surface-alt": "#2e241b",
+    "--color-border": "#4a3b2d",
+    "--color-text": "#f5efe6",
+    "--color-text-muted": "#b8a996",
+    "--color-focus": "#8ab5ff",
+    "--shadow-sm": "0 1px 2px rgba(0, 0, 0, 0.45)",
+    "--shadow-md": "0 8px 24px rgba(0, 0, 0, 0.45)",
+    "--shadow-lg": "0 18px 52px rgba(0, 0, 0, 0.55)",
+}
+
+
+def _mix_hex(a: str, b: str, t: float) -> str:
+    """srgb channel mix of ``a`` toward ``b`` by t in [0, 1]."""
+    ca, cb = a.lstrip("#"), b.lstrip("#")
+    out = []
+    for i in (0, 2, 4):
+        va, vb = int(ca[i : i + 2], 16), int(cb[i : i + 2], 16)
+        out.append(round(va + (vb - va) * t))
+    return "#" + "".join(f"{v:02x}" for v in out)
+
+
+def _lighten_to(color: str, bg: str, target: float) -> str:
+    """Mix ``color`` toward white until it clears ``target``:1 on ``bg``.
+
+    Merchant primaries are contrast-gated against their LIGHT surfaces;
+    a dark primary would vanish on the dark palette, so the dark scheme
+    lightens it — cap at 85% white so the brand hue stays recognizable.
+    """
+    mixed = color
+    t = 0.0
+    while contrast_ratio(mixed, bg) < target and t < 0.85:
+        t += 0.05
+        mixed = _mix_hex(color, "#ffffff", t)
+    return mixed
+
+
+def dark_scheme_tokens(theme: dict | None) -> dict[str, str]:
+    """Derive the dark-scheme token set from the resolved light tokens.
+
+    Brand color is preserved: the primary (and hover/accent/focus) are
+    lightened just enough to meet the same WCAG pairs on dark surfaces,
+    and --color-on-primary flips to the dark surface color because the
+    lightened primary now carries dark text.
+    """
+    tokens = resolve_tokens(theme)
+    dark = dict(_DARK_SURFACES)
+    bg = dark["--color-bg"]
+    dark["--color-primary"] = _lighten_to(tokens["--color-primary"], bg, 4.5)
+    dark["--color-primary-hover"] = _lighten_to(
+        tokens["--color-primary-hover"], bg, 4.5
+    )
+    dark["--color-on-primary"] = bg
+    accent = tokens["--color-accent"]
+    dark["--color-accent"] = (
+        accent if contrast_ratio(accent, bg) >= 3.0
+        else _lighten_to(accent, bg, 3.0)
+    )
+    dark["color-scheme"] = "dark"
+    return dark
+
+
 def emit_css(theme: dict | None) -> str:
-    """Resolved tokens as a `.gm-public`-scoped custom-property block —
-    the ONLY place theme values become CSS."""
+    """Resolved tokens as `.gm-public`-scoped custom-property blocks —
+    the ONLY place theme values become CSS.
+
+    Emits the light base plus a dark-scheme variant: explicit shopper
+    choice (`data-scheme="dark"`) always applies, and absent an explicit
+    override the viewer's `prefers-color-scheme` picks the dark set.
+    The attribute selectors (0,2,0) outrank this inline `.gm-public`
+    block so merchant tokens never defeat the shopper's dark choice.
+    """
     tokens = resolve_tokens(theme)
     body = ";\n  ".join(f"{k}: {v}" for k, v in sorted(tokens.items()))
-    return f".gm-public {{\n  {body};\n}}"
+    dark_body = ";\n    ".join(
+        f"{k}: {v}" for k, v in sorted(dark_scheme_tokens(theme).items())
+    )
+    dark_sel = ".gm-public[data-scheme=\"dark\"]"
+    return (
+        f".gm-public {{\n  {body};\n  color-scheme: light;\n}}\n"
+        f"{dark_sel} {{\n    {dark_body};\n}}\n"
+        "@media (prefers-color-scheme: dark) {\n"
+        f"  .gm-public:not([data-scheme=\"light\"]) {{\n    {dark_body};\n  }}\n"
+        "}"
+    )
 
 
 def theme_layout(theme: dict | None) -> str:
