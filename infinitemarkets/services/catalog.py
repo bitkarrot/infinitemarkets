@@ -1183,6 +1183,44 @@ async def patch_product(merchant_id: str, user, product_id: str,
     return await get_product(merchant_id, user, product_id)
 
 
+async def confirm_stock_count(
+    merchant_id: str, user, product_id: str, quantity: int
+) -> dict:
+    """Merchant attests a physical count for an imported product — required
+    (with a ``complete`` cutover epoch) before it can publish or sell.
+    Counts below already-reserved stock fail closed."""
+    if not isinstance(quantity, int) or quantity < 0:
+        raise unprocessable("invalid-content", "quantity must be a non-negative integer")
+    await _merchant_owned(merchant_id, user)
+    async with DomainTransaction() as tx:
+        row = await tx.fetch_one(
+            f"SELECT stock_reserved, import_source_kind "
+            f"FROM {tx.table('products')} "
+            f"WHERE id = :i AND merchant_id = :m AND deleted_at IS NULL"
+            f"{tx.for_update}",
+            {"i": product_id, "m": merchant_id},
+        )
+        if not row:
+            raise not_found("product not found")
+        if row["import_source_kind"] is None:
+            raise conflict(
+                "not-imported",
+                "Physical counts only apply to imported products",
+            )
+        if row["stock_reserved"] > quantity:
+            raise conflict(
+                "insufficient-stock",
+                "Reserved stock exceeds the counted quantity",
+            )
+        await tx.execute(
+            f"UPDATE {tx.table('products')} "
+            "SET stock_on_hand = :q, stock_counted_at = :t, updated_at = :t "
+            "WHERE id = :i AND merchant_id = :m",
+            {"i": product_id, "q": quantity, "t": _now(), "m": merchant_id},
+        )
+    return {"id": product_id, "stock_on_hand": quantity, "stock_counted": True}
+
+
 async def bulk_products(
     merchant_id: str,
     user,

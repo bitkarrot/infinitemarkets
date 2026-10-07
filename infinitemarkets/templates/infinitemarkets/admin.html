@@ -1127,6 +1127,16 @@
                       <q-item-label caption>
                         {{ liability.invoice_hash.slice(0, 16) }}…
                       </q-item-label>
+                      <div class="row q-gutter-xs q-mt-xs items-center">
+                        <q-input dense outlined type="number" min="0"
+                                 style="width: 9rem" label="Counted stock"
+                                 :model-value="gmMigration.stockCounts[liability.product_id]"
+                                 @update:model-value="gmMigration.stockCounts[liability.product_id] = $event">
+                        </q-input>
+                        <q-btn dense outline label="Record count" size="sm"
+                               :loading="gmMigration.busy"
+                               @click="gmRecordStockCount(liability.product_id)"></q-btn>
+                      </div>
                     </q-item-section>
                     <q-item-section side
                                     v-if="['payable', 'waiting', 'partitioned']

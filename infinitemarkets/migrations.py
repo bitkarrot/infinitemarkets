@@ -1392,3 +1392,10 @@ async def m012_cutover_source_contracts(db: Connection):
         "'24759dc45d5d5b9c733031c2eb9142cd618eed3198bd779669bd2ac3ce659d51', 0)"
         " ON CONFLICT (id) DO NOTHING"
     )
+
+
+async def m013_stock_count_gate(db: Connection):
+    s = db.references_schema
+    await db.execute(
+        f"ALTER TABLE {s}products ADD COLUMN stock_counted_at {db.big_int}"
+    )

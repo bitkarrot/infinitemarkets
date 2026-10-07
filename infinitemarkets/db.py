@@ -106,29 +106,33 @@ def released_product_clause(ref: str, table_fn) -> str:
 
     ``ref`` is the product table alias/name usable inside the predicate.
     Imported rows stay blocked until a ``complete`` epoch covers their
-    import; ``import_authorized`` alone is never sufficient. ``table_fn``
-    qualifies names per dialect (``db.table`` outside, ``tx.table`` inside).
+    import AND the merchant has recorded an explicit physical stock count
+    (``stock_counted_at``); ``import_authorized`` alone is never
+    sufficient. ``table_fn`` qualifies names per dialect (``db.table``
+    outside, ``tx.table`` inside).
     """
     return (
-        f"({ref}.import_source_kind IS NULL OR EXISTS ("
+        f"({ref}.import_source_kind IS NULL OR ("
+        f"{ref}.stock_counted_at IS NOT NULL AND EXISTS ("
         f"SELECT 1 FROM {table_fn('import_rows')} r "
         f"JOIN {table_fn('catalog_imports')} ci ON ci.id = r.import_id "
         f"AND ci.merchant_id = {ref}.merchant_id "
         f"JOIN {table_fn('cutover_epochs')} e ON e.import_id = r.import_id "
         f"AND e.merchant_id = ci.merchant_id AND e.state = 'complete' "
-        f"WHERE r.product_id = {ref}.id))"
+        f"WHERE r.product_id = {ref}.id)))"
     )
 
 
 def released_product_select(ref: str, table_fn) -> str:
     """SELECT fragment — ``import_released`` bool for dict-based checks."""
     return (
-        f"EXISTS (SELECT 1 FROM {table_fn('import_rows')} r "
+        f"({ref}.stock_counted_at IS NOT NULL AND EXISTS ("
+        f"SELECT 1 FROM {table_fn('import_rows')} r "
         f"JOIN {table_fn('catalog_imports')} ci ON ci.id = r.import_id "
         f"AND ci.merchant_id = {ref}.merchant_id "
         f"JOIN {table_fn('cutover_epochs')} e ON e.import_id = r.import_id "
         f"AND e.merchant_id = ci.merchant_id AND e.state = 'complete' "
-        f"WHERE r.product_id = {ref}.id) AS import_released"
+        f"WHERE r.product_id = {ref}.id)) AS import_released"
     )
 
 

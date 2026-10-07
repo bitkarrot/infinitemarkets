@@ -24,6 +24,7 @@
           audit: null,
           cutover: null,
           liabilities: [],
+          stockCounts: {},
           sourceCheck: null,
           preview: null,
           result: null,
@@ -106,6 +107,29 @@
           this.gmMigration.error = this.gmProblemCopy(error.problem);
         } finally {
           this.gmMigration.busy = false;
+        }
+      },
+      gmRecordStockCount: async function (productId) {
+        var state = this.gmMigration;
+        var quantity = parseInt(state.stockCounts[productId], 10);
+        if (!Number.isInteger(quantity) || quantity < 0) {
+          state.error = "Enter a non-negative counted quantity.";
+          return;
+        }
+        try {
+          state.busy = true;
+          await this.gmApi(
+            "POST", "/products/" + productId + "/stock-count",
+            { quantity: quantity }
+          );
+          state.error = null;
+          if (state.cutover) {
+            await this.gmLoadCutover(state.cutover.id);
+          }
+        } catch (error) {
+          state.error = this.gmProblemCopy(error.problem);
+        } finally {
+          state.busy = false;
         }
       },
       gmCheckOldSource: async function () {

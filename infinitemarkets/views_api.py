@@ -901,6 +901,23 @@ async def delete_product(
     )
 
 
+class StockCountBody(_Strict):
+    quantity: int = Field(ge=0, le=2**31 - 1)
+
+
+@infinitemarkets_api_router.post("/products/{product_id}/stock-count")
+@problem_boundary
+async def confirm_product_stock_count(
+    request: Request,
+    product_id: str,
+    body: StockCountBody,
+    user: User = Depends(check_user_exists),
+):
+    return await category_service.confirm_stock_count(
+        await _mid(user), user, product_id, body.quantity
+    )
+
+
 @infinitemarkets_api_router.post("/products/{product_id}/images",
                               status_code=201)
 @problem_boundary

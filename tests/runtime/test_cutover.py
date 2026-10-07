@@ -428,7 +428,18 @@ async def test_complete_releases_products_and_reblocks_on_reactivation(
     )
     assert completed.status_code == 200 and completed.json()["state"] == "complete"
 
-    # released product can now publish and is purchasable
+    # released epoch alone is not enough — no physical stock count yet
+    patch = await client.patch(
+        f"{API}/products/{liability['product_id']}",
+        headers=headers, json={"draft": False, "visibility": "on-sale"},
+    )
+    assert patch.status_code == 409
+
+    count = await client.post(
+        f"{API}/products/{liability['product_id']}/stock-count",
+        headers=headers, json={"quantity": 7},
+    )
+    assert count.status_code == 200, count.text
     patch = await client.patch(
         f"{API}/products/{liability['product_id']}",
         headers=headers, json={"draft": False, "visibility": "on-sale"},
