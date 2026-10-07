@@ -103,7 +103,8 @@ Decisions are logged in PROJECT.md and the normative specification.
 - The new demo uses a fresh disposable database rather than migrating old demo orders and the previously hand-added images. If those records must remain visible, the old database requires a separate recovery plan.
 - Release B cannot claim production readiness without deployed egress controls and external-client evidence.
 - Release C requires a live scarce-stock payable-invoice cutover rehearsal.
-- 04-02 cutover lifecycle implemented end-to-end: instance-wide disable + restart attestation, source-contract hash, signed snapshot, per-liability wait/partition/reconcile, completion gate, physical-count activation, abort retaining holds, and a leased reconcile pass riding the 60s reconciliation worker. Remaining: more adversarial negatives (tampered snapshot, foreign wallet, unowned merchant), PostgreSQL qualification, and a real installed nostrmarket evidence pass.
+- 04-02 cutover lifecycle implemented and hardened: instance-wide disable + restart attestation, source-contract hash, signed snapshot, per-liability wait/partition/reconcile, completion gate, physical-count activation, abort retaining holds, leased reconcile pass. Adversarial negatives (tampered snapshot, foreign/unowned wallet, missing/extra invoices) pass on SQLite AND PostgreSQL (docker postgres:18); real installed nostrmarket source evidence verified at contract hash 24759dc4.
+- 04-03 implemented: merchant product CSV export (`infinitemarkets-products-v1`) + bounded native reimport as blocked drafts; attested activation (signed attestation → complete epoch) for zero-liability non-nostrmarket imports, stock-count gate still required; owned-media ingest (manifest+sha256 upload into host data folder, audited relink); lightnin-dark preset + storefront tier (quad grid, hero_hidden, footer logo). Remaining: live scarce-stock rehearsal (04-04), then release gate + push.
 
 ### Roadmap Evolution
 
@@ -120,6 +121,6 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 ## Session Continuity
 
-Last session: 2026-10-07T21:00:00.000Z
-Stopped at: Phase 4 04-02 cutover lifecycle implemented (snapshot verification, liability wait/partition/reconcile, completion gate, leased background pass); activation ceremony, adversarial negatives, 04-03/04 pending
-Resume file: .planning/phases/04-release-c-migration-and-cutover/04-02-PLAN.md
+Last session: 2026-10-07T22:30:00.000Z
+Stopped at: Phase 4 04-03 implemented and committed (export, native reimport, attested activation, owned media, storefront profile); 04-04 scarce-stock rehearsal pending
+Resume file: .planning/phases/04-release-c-migration-and-cutover/04-04-PLAN.md
