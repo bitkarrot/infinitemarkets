@@ -71,8 +71,8 @@
 - [x] ~~**LEG-01**: Merchant can publish literal NIP-15 `30017`/`30018` projections~~ — **Dropped** (Phase-4 scope amendment: import-only, no live legacy interop).
 - [x] ~~**LEG-02**: Legacy buyer literal NIP-04 type 0/1/2 message exchange~~ — **Dropped** (Phase-4 scope amendment).
 - [ ] **LEG-03**: Merchant can preview, validate, dry-run, execute, and audit JSON/Nostr legacy catalog import without arbitrary path/URL/database access or private-key leakage. Import sources include nostrmarket JSON/Nostr events AND e-commerce CSV exports (Shopify first; column-mapping extensible to WooCommerce) — file upload only, never URL fetch.
-- [ ] **LEG-04**: Merchant can freeze old order intake and reconcile, wait, or partition every still-payable `legacy_liability_qty` before imported stock is sellable, independent of key strategy.
-- [ ] **LEG-05**: Release C passes a scarce-stock cutover rehearsal in which an old unpaid invoice and a new catalog can never allocate the same unit twice. *(NIP-15 fixture criterion removed — LEG-01/02 dropped in the Phase-4 scope amendment.)*
+- [ ] **LEG-04**: Merchant can initiate and verify an external old-intake freeze, reconcile/wait/partition every still-payable legacy invoice quantity, and release imported stock only after a complete authoritative post-freeze snapshot with every payable unit verified terminal or durably held, independent of key strategy. Unverifiable sources remain blocked drafts; a local cancel/expiry flag or operator assertion is not proof an invoice cannot settle.
+- [ ] **LEG-05**: Release C passes a scarce-stock cutover rehearsal proving the web/Gamma freeze guard and shared conditional stock writer cannot allocate the same physical unit to an old unpaid invoice and a new order; a separate real-transaction contention test must actually reach the stock writer. *(NIP-15 fixture criterion removed — LEG-01/02 dropped in the Phase-4 scope amendment.)*
 
 ## v2 Requirements
 

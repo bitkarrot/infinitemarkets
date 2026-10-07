@@ -48,4 +48,8 @@ This is a direct review by the current model, **not** an independent cross-AI re
 4. Redesign the rehearsal into a freeze-guard test plus a separate genuinely reachable concurrent allocation test for both supported DB backends; prove that removing the stock guard makes the latter fail.
 5. Tighten import data normalization, signature format, dedup/retry, upload immutability and privacy before task execution.
 
-**Disposition:** Rework plans with `/gsd-plan-phase 4 --reviews` (or manually revise with the user on binding D-03/D-09), then independently verify the revised plans. No implementation or tests were run in this review.
+**Disposition at review time:** Existing plans needed revision; no implementation or tests were run in this review.
+
+## Revision follow-up (2026-10-07)
+
+The user authorized correcting unsafe prior decisions. CONTEXT D-03 now uses a review holding category and explicit recategorization; D-07/D-09 require verified old-source intake stop and fail-closed abort; D-10 separates the policy guard and real stock contention; D-11 defines the external-proof boundary. RESEARCH, ROADMAP, REQUIREMENTS and plans 04-01/02/03 have been revised accordingly. This is a **plan-only** response to the findings, not implementation verification or an independent cross-model re-review. Phase 4 remains pending until code and release gates pass.
