@@ -29,7 +29,7 @@ dev = [
 package = false
 # GHSA-ffc3-869f-jxw9 / CVE-2026-102268 — the pinned LNbits host declares
 # pyjwt~=2.12.0 (vulnerable <=2.13.0); resolve the patched 2.14.x line.
-override-dependencies = ["pyjwt>=2.14.0,<3.0.0"]
+override-dependencies = ["pyjwt>=2.14.0,<3.0.0", "multidict>=6.9.1", "oauthlib>=4.0.0"]
 
 [tool.uv.sources]
 lnbits = { path = ".cache/lnbits" }
