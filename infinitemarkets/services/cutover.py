@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import time
@@ -38,6 +39,63 @@ async def _next_event_sequence(tx: DomainTransaction, epoch_id: str) -> int:
     return row["n"]
 
 
+MAX_SOURCE_FILES = 128
+MAX_SOURCE_FILE_BYTES = 1_048_576
+
+
+def _source_code_files(root: Path) -> list[Path]:
+    if root.is_symlink() or not root.is_dir():
+        return []
+    candidates = list(root.rglob("*"))
+    if len(candidates) > 10_000 or any(path.is_symlink() for path in candidates):
+        return []
+    files = sorted(
+        path.relative_to(root).as_posix()
+        for path in candidates
+        if path.is_file() and (path.suffix == ".py" or path.name == "config.json")
+    )
+    if len(files) > MAX_SOURCE_FILES:
+        return []
+    for relative in files:
+        path = root / relative
+        try:
+            if path.is_symlink() or path.stat().st_size > MAX_SOURCE_FILE_BYTES:
+                return []
+        except OSError:
+            return []
+    return [root / relative for relative in files]
+
+
+def _source_code_hash(root: Path) -> str | None:
+    files = _source_code_files(root)
+    if not files:
+        return None
+    digest = hashlib.sha256()
+    for path in files:
+        try:
+            relative = path.relative_to(root).as_posix()
+            data = path.read_bytes()
+        except OSError:
+            return None
+        if len(data) > MAX_SOURCE_FILE_BYTES:
+            return None
+        digest.update(len(relative).to_bytes(4, "big"))
+        digest.update(relative.encode())
+        digest.update(len(data).to_bytes(8, "big"))
+        digest.update(data)
+    return digest.hexdigest()
+
+
+async def _source_contract(source_id: str) -> dict | None:
+    async with db.connect() as conn:
+        row = await conn.fetchone(
+            f"SELECT * FROM {table('cutover_source_contracts')} "
+            "WHERE source_id = :s ORDER BY created_at DESC, id DESC LIMIT 1",
+            {"s": source_id},
+        )
+    return dict(row) if row else None
+
+
 async def old_source_status() -> dict:
     try:
         installed = await get_installed_extension("nostrmarket")
@@ -48,7 +106,20 @@ async def old_source_status() -> dict:
     if (installed.active is not False
             or "nostrmarket" not in host_settings.lnbits_deactivated_extensions):
         return {"disabled": False, "reason_code": "legacy-active"}
-    return {"disabled": True, "reason_code": "snapshot-unverified"}
+    contract = await _source_contract("nostrmarket")
+    if not contract:
+        return {"disabled": True, "reason_code": "source-contract-missing"}
+    digest = _source_code_hash(installed.ext_dir)
+    if digest is None:
+        return {"disabled": True, "reason_code": "source-unreadable"}
+    if digest != contract["code_hash"]:
+        return {"disabled": True, "reason_code": "source-contract-mismatch"}
+    return {
+        "disabled": True, "reason_code": "snapshot-unverified",
+        "source_contract": {
+            "code_hash": digest, "git_commit": contract["git_commit"],
+        },
+    }
 
 
 async def _old_source_rows(user_id: str) -> tuple[dict, list, list, list]:

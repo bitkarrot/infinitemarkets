@@ -119,22 +119,54 @@ async def test_staging_requires_owned_legacy_import_and_never_authorizes_stock(
     assert restarted.json()["state"] == "staged"
 
 
-async def test_old_source_requires_installed_and_runtime_disable(monkeypatch):
+async def test_old_source_requires_installed_and_runtime_disable(
+    runtime_env, monkeypatch,
+):
     from infinitemarkets.services import cutover
 
     async def installed(_):
-        return SimpleNamespace(active=False)
+        return SimpleNamespace(active=False, ext_dir="/source")
+
+    async def contract(_):
+        return {"code_hash": "a" * 64, "git_commit": "b" * 40}
+
+    async def missing(_):
+        return None
+
+    repository_contract = cutover._source_contract
 
     monkeypatch.setattr(cutover, "get_installed_extension", installed)
+    monkeypatch.setattr(cutover, "_source_contract", contract)
+    monkeypatch.setattr(
+        cutover, "_source_code_hash", lambda _: "a" * 64,
+    )
     monkeypatch.setattr(
         cutover, "host_settings",
         SimpleNamespace(lnbits_deactivated_extensions={"nostrmarket"}),
     )
-    assert (await cutover.old_source_status())["disabled"] is True
+    status = await cutover.old_source_status()
+    assert status["disabled"] is True
+    assert status["source_contract"]["code_hash"] == "a" * 64
     monkeypatch.setattr(
         cutover, "host_settings", SimpleNamespace(lnbits_deactivated_extensions=set()),
     )
     assert (await cutover.old_source_status())["disabled"] is False
+    monkeypatch.setattr(
+        cutover, "host_settings",
+        SimpleNamespace(lnbits_deactivated_extensions={"nostrmarket"}),
+    )
+    monkeypatch.setattr(cutover, "_source_contract", missing)
+    assert (await cutover.old_source_status())["reason_code"] == "source-contract-missing"
+    monkeypatch.setattr(cutover, "_source_contract", contract)
+    monkeypatch.setattr(cutover, "_source_code_hash", lambda _: "b" * 64)
+    assert (await cutover.old_source_status())["reason_code"] == "source-contract-mismatch"
+    monkeypatch.setattr(cutover, "_source_code_hash", lambda _: None)
+    assert (await cutover.old_source_status())["reason_code"] == "source-unreadable"
+    row = await repository_contract("nostrmarket")
+    assert row["git_commit"] == "d941f0a3f94bea94ff6dc1f34a993f8a6aa5934f"
+    assert row["code_hash"] == (
+        "24759dc45d5d5b9c733031c2eb9142cd618eed3198bd779669bd2ac3ce659d51"
+    )
 
 
 async def test_old_evidence_is_bounded_and_owner_scoped(runtime_env, monkeypatch):
@@ -186,7 +218,10 @@ async def test_old_evidence_is_bounded_and_owner_scoped(runtime_env, monkeypatch
         )
 
     async def installed(_):
-        return SimpleNamespace(active=False)
+        return SimpleNamespace(active=False, ext_dir="/source")
+
+    async def contract(_):
+        return {"code_hash": "a" * 64, "git_commit": "b" * 40}
 
     payment = SimpleNamespace(
         payment_hash=invoice, wallet_id=runtime_env["wallet"].id, amount=5000,
@@ -201,6 +236,8 @@ async def test_old_evidence_is_bounded_and_owner_scoped(runtime_env, monkeypatch
         return SimpleNamespace(paid=None)
 
     monkeypatch.setattr(cutover, "get_installed_extension", installed)
+    monkeypatch.setattr(cutover, "_source_contract", contract)
+    monkeypatch.setattr(cutover, "_source_code_hash", lambda _: "a" * 64)
     monkeypatch.setattr(
         cutover, "host_settings",
         SimpleNamespace(lnbits_deactivated_extensions={"nostrmarket"}),

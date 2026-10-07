@@ -451,7 +451,7 @@ async def execute_catalog_import(
         sort_keys=True, separators=(",", ":")
     ).encode()).hexdigest()
     liability_hash = hashlib.sha256(json.dumps(
-        sorted(liability_summary), separators=(",", ",")
+        sorted(liability_summary), separators=(",", ":")
     ).encode()).hexdigest()
     commitment = {
         "version": 1, "phase": "provisional", "source": source_kind,

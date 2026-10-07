@@ -1367,3 +1367,28 @@ async def m011_cutover(db: Connection):
         "state TEXT NOT NULL CHECK (state IN ('held', 'consumed', 'released')), "
         f"created_at {int_t} NOT NULL, updated_at {int_t} NOT NULL)"
     )
+
+
+async def m012_cutover_source_contracts(db: Connection):
+    s = db.references_schema
+    int_t = db.big_int
+    await db.execute(
+        f"CREATE TABLE {s}cutover_source_contracts ("
+        "id TEXT PRIMARY KEY, source_id TEXT NOT NULL, "
+        "git_commit TEXT, code_hash TEXT NOT NULL, root_hint TEXT, "
+        f"created_at {int_t} NOT NULL, "
+        "CHECK (length(code_hash) = 64), "
+        "CHECK (git_commit IS NULL OR length(git_commit) = 40))"
+    )
+    await db.execute(
+        f"CREATE INDEX {s}cutover_source_contracts_source "
+        f"ON {s}cutover_source_contracts (source_id, created_at DESC)"
+    )
+    await db.execute(
+        f"INSERT INTO {s}cutover_source_contracts "
+        "(id, source_id, git_commit, code_hash, created_at) "
+        "VALUES ('d941f0a-nostrmarket', 'nostrmarket', "
+        "'d941f0a3f94bea94ff6dc1f34a993f8a6aa5934f', "
+        "'24759dc45d5d5b9c733031c2eb9142cd618eed3198bd779669bd2ac3ce659d51', 0)"
+        " ON CONFLICT (id) DO NOTHING"
+    )

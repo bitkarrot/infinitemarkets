@@ -5,10 +5,10 @@ milestone_name: milestone
 current_phase: 04
 current_phase_name: Release C — Migration and Cutover
 status: in_progress
-stopped_at: Phase 4 plan 04-01 committed; 04-02 read-only old-source comparison plus fail-closed import publication/checkout gates added; no independently attested restart/version, signed snapshot, stock holds or activation; cutover blocked
-last_updated: "2026-10-07T19:44:58Z"
+stopped_at: Phase 4 plan 04-01 committed; 04-02 gates plus pinned same-instance source fingerprint added; restart attestation, signed snapshot, stock holds and activation remain absent; cutover blocked
+last_updated: "2026-10-07T19:59:16Z"
 last_activity: 2026-10-07
-last_activity_desc: Closed direct publish, bulk, republish, projection/outbox, public listing/detail, checkout and variation-parent escapes around import_source_kind; demo PNGs now tracked for release packages. Old-extension disable/restart and installed source version are not attested; snapshot remains unverified
+last_activity_desc: Added audited nostrmarket code contract (commit d941f0a, SHA-256 source manifest) to old-source disabled status; unverified imports are excluded from publication, projections, public surfaces and checkout. Host restart/quiescence remains external and unattested
 progress:
   total_phases: 5
   completed_phases: 4
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-20)
 
 Phase: 4 (Release C — Migration and Cutover) — IN PROGRESS (15/18 plans complete; 04-02 next)
 Status: Phases 1, 2, 3 and 03.1 all complete; Phase 3 release gate verified (one operator-deferred item in 03-UAT: live plebeian.market smoke)
-Last activity: 2026-10-07 — fixed-source preview and in-transaction checkout gate tested locally; demo PNGs tracked to survive release packaging; no live deployment or cutover authorization
+Last activity: 2026-10-07 — source fingerprint contract and fail-closed gates tested locally; demo PNGs tracked to survive release packaging; no live deployment or cutover authorization
 
 Progress: [████████░░] 80% of roadmap phases (4/5)
 
