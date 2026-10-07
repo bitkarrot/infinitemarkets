@@ -603,6 +603,51 @@ async def abort_cutover_staging(
     return await cutover.abort_staging(await _mid(user), user, epoch_id)
 
 
+class LiabilityActionBody(_Strict):
+    action: str = Field(pattern="^(wait|partition|reconcile)$")
+
+
+@infinitemarkets_api_router.get("/migration/cutovers/{epoch_id}/liabilities")
+@problem_boundary
+async def list_cutover_liabilities(
+    epoch_id: str, user: User = Depends(check_user_exists),
+):
+    from .services import cutover
+
+    return await cutover.list_liabilities(await _mid(user), user, epoch_id)
+
+
+@infinitemarkets_api_router.post(
+    "/migration/cutovers/{epoch_id}/liabilities/{liability_id}"
+)
+@problem_boundary
+async def choose_liability_disposition(
+    request: Request,
+    epoch_id: str,
+    liability_id: str,
+    body: LiabilityActionBody,
+    user: User = Depends(check_user_exists),
+):
+    from .services import cutover
+
+    merchant_id = await _mid(user)
+    if body.action == "wait":
+        return await cutover.choose_wait(merchant_id, user, epoch_id, liability_id)
+    if body.action == "partition":
+        return await cutover.choose_partition(merchant_id, user, epoch_id, liability_id)
+    return await cutover.reconcile_liability(merchant_id, user, epoch_id, liability_id)
+
+
+@infinitemarkets_api_router.post("/migration/cutovers/{epoch_id}/complete")
+@problem_boundary
+async def complete_cutover(
+    request: Request, epoch_id: str, user: User = Depends(check_user_exists),
+):
+    from .services import cutover
+
+    return await cutover.complete_cutover(await _mid(user), user, epoch_id)
+
+
 @infinitemarkets_api_router.get("/migration/imports")
 @problem_boundary
 async def list_catalog_imports(user: User = Depends(check_user_exists)):

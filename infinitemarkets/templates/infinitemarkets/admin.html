@@ -1077,10 +1077,13 @@
                      @click="gmStageCutover(gmMigration.audit.id)"></q-btn>
               <div v-if="gmMigration.cutover" class="q-mt-md">
                 <p>Old-store move: {{ gmMigration.cutover.state }} ·
-                  Old invoices checked: No · Products available for sale: No</p>
+                  Old invoices checked: {{ gmMigration.cutover.snapshot_verified ?
+                    'Yes' : 'No' }} ·
+                  Products available for sale: {{ gmMigration.cutover.cutover_verified ?
+                    'Yes' : 'No' }}</p>
                 <p v-if="gmMigration.cutover.source" class="text-caption">
                   Old extension: {{ gmMigration.cutover.source.disabled ?
-                    'Disabled; old invoices still unchecked' :
+                    'Disabled' :
                     'Still running or cannot be checked' }}
                 </p>
                 <div class="row q-gutter-sm">
@@ -1088,11 +1091,17 @@
                          label="Record freeze request (does not disable)"
                          @click="gmCutoverAction('freeze-request')"></q-btn>
                   <q-btn v-if="gmMigration.cutover.state === 'freeze_requested'" outline
-                         label="Compare old invoices (preview only)" :loading="gmMigration.busy"
+                         label="Verify old invoices" :loading="gmMigration.busy"
                          @click="gmCheckOldSource"></q-btn>
-                  <q-btn v-if="['staged', 'freeze_requested'].includes(gmMigration.cutover.state)"
-                         outline color="negative" label="Stop preparation; keep stock blocked"
+                  <q-btn v-if="['staged', 'freeze_requested', 'snapshot_verified',
+                               'reconciling'].includes(gmMigration.cutover.state)"
+                         outline color="negative" label="Stop move; keep stock blocked"
                          @click="gmCutoverAction('abort')"></q-btn>
+                  <q-btn v-if="['snapshot_verified', 'reconciling']
+                               .includes(gmMigration.cutover.state)"
+                         outline color="positive" label="Finish move (requires all liabilities covered)"
+                         :loading="gmMigration.busy"
+                         @click="gmCutoverAction('complete')"></q-btn>
                 </div>
                 <q-banner v-if="gmMigration.sourceCheck" data-gm="migration-source-check"
                           class="bg-info text-white q-mt-md">
@@ -1101,8 +1110,40 @@
                   {{ gmMigration.sourceCheck.liability_count }} invoice items,
                   {{ gmMigration.sourceCheck.payable_quantity }} units still payable and
                   {{ gmMigration.sourceCheck.paid_quantity }} already paid.
-                  This preview is not a verified stock count or permission to sell.
                 </q-banner>
+                <q-list v-if="gmMigration.liabilities.length" dense bordered
+                        class="q-mt-md" data-gm="migration-liabilities">
+                  <q-item-label header>Old payable invoices</q-item-label>
+                  <q-item v-for="liability in gmMigration.liabilities"
+                          :key="liability.id">
+                    <q-item-section>
+                      <q-item-label>{{ liability.title }} ·
+                        qty {{ liability.quantity }} · {{ liability.status }}
+                        <template v-if="liability.partition_state !== 'none'">
+                          ({{ liability.partition_state }})
+                        </template>
+                      </q-item-label>
+                      <q-item-label caption>
+                        {{ liability.invoice_hash.slice(0, 16) }}…
+                      </q-item-label>
+                    </q-item-section>
+                    <q-item-section side
+                                    v-if="['payable', 'waiting', 'partitioned']
+                                         .includes(liability.status)">
+                      <div class="row q-gutter-xs">
+                        <q-btn v-if="liability.status === 'payable'" dense outline
+                               label="Wait" size="sm"
+                               @click="gmLiabilityAction(liability.id, 'wait')"></q-btn>
+                        <q-btn v-if="liability.status !== 'partitioned'" dense outline
+                               label="Hold stock" size="sm" :loading="gmMigration.busy"
+                               @click="gmLiabilityAction(liability.id, 'partition')"></q-btn>
+                        <q-btn dense outline label="Re-check payment" size="sm"
+                               :loading="gmMigration.busy"
+                               @click="gmLiabilityAction(liability.id, 'reconcile')"></q-btn>
+                      </div>
+                    </q-item-section>
+                  </q-item>
+                </q-list>
               </div>
             </div>
           </div>

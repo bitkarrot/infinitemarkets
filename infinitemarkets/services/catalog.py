@@ -19,7 +19,11 @@ import time
 import uuid
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
-from ..db import DomainTransaction
+from ..db import (
+    DomainTransaction,
+    released_product_clause,
+    released_product_select,
+)
 from ..security import (
     conflict,
     not_found,
@@ -188,7 +192,8 @@ async def _fetchall(table_name: str, merchant_id: str,
 
 async def _product_publishable(tx: DomainTransaction, product_id: str) -> bool:
     row = await tx.fetch_one(
-        f"SELECT draft, deleted_at, import_source_kind "
+        f"SELECT draft, deleted_at, import_source_kind, "
+        f"{released_product_select('products', tx.table)} "
         f"FROM {tx.table('products')} WHERE id = :i",
         {"i": product_id},
     )
@@ -196,7 +201,7 @@ async def _product_publishable(tx: DomainTransaction, product_id: str) -> bool:
         bool(row)
         and not row["draft"]
         and row["deleted_at"] is None
-        and row["import_source_kind"] is None
+        and (row["import_source_kind"] is None or row["import_released"])
     )
 
 
@@ -207,7 +212,7 @@ async def _collection_member_d_tags(
         f"SELECT p.d_tag FROM {tx.table('product_collections')} pc "
         f"JOIN {tx.table('products')} p ON p.id = pc.product_id "
         "WHERE pc.collection_id = :c AND p.deleted_at IS NULL AND NOT p.draft "
-        "AND p.import_source_kind IS NULL",
+        f"AND {released_product_clause('p', tx.table)}",
         {"c": collection_id},
     )
     return sorted(r["d_tag"] for r in rows)
@@ -291,13 +296,13 @@ async def _enqueue_product(
     ``published_at`` once (§6 — retries never change it)."""
     row = await tx.fetch_one(
         f"SELECT draft, deleted_at, d_tag, published_at, "
-        "import_source_kind "
+        f"import_source_kind, {released_product_select('products', tx.table)} "
         f"FROM {tx.table('products')} WHERE id = :i",
         {"i": product_id},
     )
     if (
         not row or row["draft"] or row["deleted_at"] is not None
-        or row["import_source_kind"] is not None
+        or (row["import_source_kind"] is not None and not row["import_released"])
     ):
         return None
     if row["published_at"] is None:
@@ -1077,13 +1082,21 @@ async def patch_product(merchant_id: str, user, product_id: str,
     now = _now()
     async with DomainTransaction() as tx:
         import_row = await tx.fetch_one(
-            f"SELECT import_source_kind FROM {tx.table('products')} "
+            f"SELECT import_source_kind, "
+            f"{released_product_select('products', tx.table)} "
+            f"FROM {tx.table('products')} "
             f"WHERE id = :i AND merchant_id = :m{tx.for_update}",
             {"i": product_id, "m": merchant_id},
         )
-        if (import_row and import_row["import_source_kind"] is not None
-                and (patch.get("draft") is False
-                     or patch.get("visibility") in ("on-sale", "pre-order"))):
+        if (
+            import_row
+            and import_row["import_source_kind"] is not None
+            and not import_row["import_released"]
+            and (
+                patch.get("draft") is False
+                or patch.get("visibility") in ("on-sale", "pre-order")
+            )
+        ):
             raise conflict("import-blocked", "Import requires verified cutover")
         if "product_type" in patch or "parent_product_id" in patch:
             # re-validate the resulting combination
@@ -1219,7 +1232,8 @@ async def bulk_products(
         params = {f"p{i}": product_id for i, product_id in enumerate(ids)}
         params["m"] = merchant_id
         rows = await tx.fetch_all(
-            f"SELECT * FROM {tx.table('products')} WHERE merchant_id = :m "
+            f"SELECT *, {released_product_select('products', tx.table)} "
+            f"FROM {tx.table('products')} WHERE merchant_id = :m "
             f"AND deleted_at IS NULL AND id IN ({placeholders})"
             f"{tx.for_update}",
             params,
@@ -1229,7 +1243,7 @@ async def bulk_products(
             raise not_found("one or more products not found")
         if action == "publish" or (action == "visibility" and value != "hidden"):
             if any(
-                row["import_source_kind"] is not None
+                row["import_source_kind"] is not None and not row["import_released"]
                 for row in rows
             ):
                 raise conflict("import-blocked", "Import requires verified cutover")
@@ -2095,7 +2109,19 @@ async def product_events(merchant_id: str, user, product_id: str,
     row = await _fetch("products", product_id, merchant_id)
     if row["deleted_at"] is not None:
         raise not_found("product not found")
-    if row["draft"] or row["import_source_kind"] is not None:
+    if row["import_source_kind"] is not None:
+        from ..db import db
+        from ..db import table as table_fn
+
+        async with db.connect() as conn:
+            released = await conn.fetchone(
+                f"SELECT {released_product_select('products', table_fn)} "
+                f"FROM {table_fn('products')} WHERE id = :i",
+                {"i": product_id},
+            )
+        if not released or not released["import_released"]:
+            return []
+    if row["draft"]:
         # drafts produce NO public events (§6.7)
         return []
     from ..db import db, table

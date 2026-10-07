@@ -37,7 +37,13 @@ import uuid
 from decimal import Decimal, InvalidOperation
 
 from .. import crypto
-from ..db import DomainTransaction, db, table
+from ..db import (
+    DomainTransaction,
+    db,
+    released_product_clause,
+    released_product_select,
+    table,
+)
 from ..security import ProblemError, conflict, not_found, unprocessable
 from ..settings import ExtSettings, ext_settings
 from . import fx
@@ -258,7 +264,8 @@ async def _resolve_items(
                 raise unprocessable("invalid-content", "Duplicate cart item")
             seen.add(d_tag)
             row = await conn.fetchone(
-                f"SELECT * FROM {table('products')} "
+                f"SELECT *, {released_product_select('products', table)} "
+                f"FROM {table('products')} "
                 "WHERE merchant_id = :m AND d_tag = :d",
                 {"m": merchant_id, "d": d_tag},
             )
@@ -273,8 +280,10 @@ async def _resolve_items(
             p = entry["product"]
             if p["product_type"] == "variation":
                 parent = await conn.fetchone(
-                    f"SELECT product_type, visibility, deleted_at FROM"
-                    f" {table('products')} WHERE id = :i",
+                    f"SELECT product_type, visibility, deleted_at, "
+                    f"import_source_kind, "
+                    f"{released_product_select('products', table)} "
+                    f"FROM {table('products')} WHERE id = :i",
                     {"i": p["parent_product_id"]},
                 )
                 if (
@@ -282,6 +291,8 @@ async def _resolve_items(
                     or parent["product_type"] != "variable"
                     or parent["visibility"] != "on-sale"
                     or parent["deleted_at"] is not None
+                    or (parent["import_source_kind"] is not None
+                        and not parent["import_released"])
                 ):
                     raise unprocessable(
                         "product-inactive", "Product unavailable",
@@ -292,7 +303,10 @@ async def _resolve_items(
 
 def _assert_purchasable(product: dict) -> None:
     """Section 8.1 step 5: v1 purchasability rules."""
-    if product["draft"] or product["import_source_kind"] is not None:
+    if product["draft"] or (
+        product["import_source_kind"] is not None
+        and not product.get("import_released")
+    ):
         raise unprocessable("product-inactive", "Product unavailable")
     if product["visibility"] != "on-sale":
         raise unprocessable(
@@ -319,7 +333,8 @@ async def _claim_product_capacity(
     tx: DomainTransaction, merchant_id: str, product_id: str, quantity: int,
 ) -> None:
     product = await tx.fetch_one(
-        f"SELECT * FROM {tx.table('products')} "
+        f"SELECT *, {released_product_select('products', tx.table)} "
+        f"FROM {tx.table('products')} "
         f"WHERE id = :p AND merchant_id = :m{tx.for_update}",
         {"p": product_id, "m": merchant_id},
     )
@@ -328,21 +343,23 @@ async def _claim_product_capacity(
     _assert_purchasable(dict(product))
     if product["product_type"] == "variation":
         parent = await tx.fetch_one(
-            f"SELECT * FROM {tx.table('products')} "
+            f"SELECT *, {released_product_select('products', tx.table)} "
+            f"FROM {tx.table('products')} "
             f"WHERE id = :p AND merchant_id = :m{tx.for_update}",
             {"p": product["parent_product_id"], "m": merchant_id},
         )
         if (not parent or parent["deleted_at"] is not None
                 or parent["product_type"] != "variable"
                 or parent["visibility"] != "on-sale" or parent["draft"]
-                or parent["import_source_kind"] is not None):
+                or (parent["import_source_kind"] is not None
+                    and not parent["import_released"])):
             raise unprocessable("product-inactive", "Product unavailable")
     rc = await tx.execute(
         f"UPDATE {tx.table('products')} SET stock_reserved = stock_reserved + :q "
         "WHERE id = :p AND merchant_id = :m AND deleted_at IS NULL "
         "AND draft = FALSE AND visibility = 'on-sale' AND nip99_status = 'active' "
         "AND recurring_frequency IS NULL AND product_type IN ('simple', 'variation') "
-        "AND import_source_kind IS NULL "
+        f"AND {released_product_clause('products', tx.table)} "
         "AND (stock_on_hand IS NULL OR stock_on_hand - stock_reserved >= :q)",
         {"q": quantity, "p": product_id, "m": merchant_id},
     )

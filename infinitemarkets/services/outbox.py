@@ -24,7 +24,12 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 
-from ..db import DomainTransaction, LeaseLostError
+from ..db import (
+    DomainTransaction,
+    LeaseLostError,
+    released_product_clause,
+    released_product_select,
+)
 
 
 def _now() -> int:
@@ -356,12 +361,14 @@ async def render_intent(row: dict, database=None) -> dict | None:
                 return None
         if agg == "products":
             p = await conn.fetchone(
-                f"SELECT * FROM {table('products')} WHERE id = :i",
+                f"SELECT *, {released_product_select('products', table)} "
+                f"FROM {table('products')} WHERE id = :i",
                 {"i": row["aggregate_id"]},
             )
             if (
                 not p or p["draft"] or p["deleted_at"] is not None
-                or p["import_source_kind"] is not None
+                or (p["import_source_kind"] is not None
+                    and not p["import_released"])
             ):
                 return None
             p = dict(p)
@@ -457,7 +464,8 @@ async def render_intent(row: dict, database=None) -> dict | None:
                 f"SELECT p.d_tag FROM {table('product_collections')} pc "
                 f"JOIN {table('products')} p ON p.id = pc.product_id "
                 "WHERE pc.collection_id = :c AND p.deleted_at IS NULL"
-                " AND NOT p.draft AND p.import_source_kind IS NULL", {"c": c["id"]})
+                f" AND NOT p.draft AND {released_product_clause('p', table)}",
+                {"c": c["id"]})
             if not members:
                 return None  # zero-member collections never publish
             ship = await conn.fetchall(
@@ -502,7 +510,8 @@ async def render_intent(row: dict, database=None) -> dict | None:
                 "ON pc.collection_id = cs.collection_id "
                 f"JOIN {table('products')} p ON p.id = pc.product_id "
                 "WHERE p.category_id = :c AND p.deleted_at IS NULL"
-                " AND p.import_source_kind IS NULL AND so.deleted_at IS NULL",
+                f" AND {released_product_clause('p', table)}"
+                " AND so.deleted_at IS NULL",
                 {"c": cat["id"]})
             for o in opts:
                 regions = json.loads(o["regions"]) if o["regions"] else []
@@ -516,10 +525,10 @@ async def render_intent(row: dict, database=None) -> dict | None:
                     "regions": countries + regions,
                 })
             digital = await conn.fetchone(
-                f"SELECT id FROM {table('products')} "
-                "WHERE category_id = :c AND format = 'digital'"
-                " AND deleted_at IS NULL AND NOT draft"
-                " AND import_source_kind IS NULL LIMIT 1",
+                f"SELECT id FROM {table('products')} p "
+                "WHERE p.category_id = :c AND p.format = 'digital'"
+                " AND p.deleted_at IS NULL AND NOT p.draft"
+                f" AND {released_product_clause('p', table)} LIMIT 1",
                 {"c": cat["id"]})
             if digital:
                 zones.append(events.digital_zone())

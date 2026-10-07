@@ -17,7 +17,12 @@ from fastapi import APIRouter, Request, Response
 from pydantic import BaseModel, Field
 
 from . import crypto
-from .db import db, table
+from .db import (
+    db,
+    released_product_clause,
+    released_product_select,
+    table,
+)
 from .security import (
     ProblemError,
     not_found,
@@ -109,12 +114,15 @@ async def public_merchant_products(
         "SELECT p.id, p.d_tag, p.title, p.amount_minor, p.currency, "
         "p.currency_decimals, p.format, p.visibility, p.stock_on_hand, "
         "p.stock_reserved, p.nip99_status, p.draft, p.deleted_at, "
+        "p.import_source_kind, "
+        f"{released_product_select('p', table)}, "
         "cat.name AS category_name, cat.public_slug AS category_slug "
         f"FROM {table('products')} p "
         f"JOIN {table('categories')} cat ON cat.id = p.category_id "
         "WHERE p.merchant_id = :m AND cat.deleted_at IS NULL "
         "AND p.deleted_at IS NULL AND NOT p.draft "
-        "AND p.parent_product_id IS NULL AND p.import_source_kind IS NULL "
+        "AND p.parent_product_id IS NULL "
+        f"AND {released_product_clause('p', table)} "
         "AND p.visibility != 'hidden'"
     )
     params = {"m": merchant["id"]}
@@ -201,7 +209,7 @@ async def public_collection(
             f"JOIN {table('product_collections')} pc ON pc.product_id = p.id "
             "WHERE pc.collection_id = :c AND p.deleted_at IS NULL"
             " AND NOT p.draft AND p.visibility != 'hidden'"
-            " AND p.import_source_kind IS NULL",
+            f" AND {released_product_clause('p', table)}",
             {"c": row["id"]},
         )
     member_dicts = []

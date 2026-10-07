@@ -23,6 +23,7 @@
           imports: [],
           audit: null,
           cutover: null,
+          liabilities: [],
           sourceCheck: null,
           preview: null,
           result: null,
@@ -43,6 +44,7 @@
       gmLoadImportAudit: async function (id) {
         try {
           this.gmMigration.cutover = null;
+          this.gmMigration.liabilities = [];
           this.gmMigration.sourceCheck = null;
           this.gmMigration.audit = await this.gmApi("GET", "/migration/imports/" + id);
         } catch (error) {
@@ -65,6 +67,17 @@
           this.gmMigration.cutover = await this.gmApi(
             "GET", "/migration/cutovers/" + id
           );
+          var reconciling = [
+            "snapshot_verified", "reconciling", "ready", "complete"
+          ].indexOf(this.gmMigration.cutover.state) !== -1;
+          if (reconciling) {
+            var list = await this.gmApi(
+              "GET", "/migration/cutovers/" + id + "/liabilities"
+            );
+            this.gmMigration.liabilities = list.liabilities;
+          } else {
+            this.gmMigration.liabilities = [];
+          }
         } catch (error) {
           this.gmMigration.error = this.gmProblemCopy(error.problem);
         }
@@ -77,6 +90,22 @@
           await this.gmLoadCutover(epoch.id);
         } catch (error) {
           this.gmMigration.error = this.gmProblemCopy(error.problem);
+        }
+      },
+      gmLiabilityAction: async function (liabilityId, action) {
+        var epoch = this.gmMigration.cutover;
+        try {
+          this.gmMigration.busy = true;
+          await this.gmApi(
+            "POST",
+            "/migration/cutovers/" + epoch.id + "/liabilities/" + liabilityId,
+            { action: action }
+          );
+          await this.gmLoadCutover(epoch.id);
+        } catch (error) {
+          this.gmMigration.error = this.gmProblemCopy(error.problem);
+        } finally {
+          this.gmMigration.busy = false;
         }
       },
       gmCheckOldSource: async function () {

@@ -17,7 +17,13 @@ import time
 import uuid
 
 from .. import crypto
-from ..db import DomainTransaction, db, table, topology_supported
+from ..db import (
+    DomainTransaction,
+    db,
+    released_product_clause,
+    table,
+    topology_supported,
+)
 from ..security import (
     ProblemError,
     audit_capture_warnings,
@@ -485,7 +491,7 @@ async def publish(merchant_id: str, user,
             rows = await tx.fetch_all(
                 f"SELECT id, revision FROM {tx.table(agg_table)} "
                 "WHERE merchant_id = :m AND deleted_at IS NULL"
-                + (" AND import_source_kind IS NULL"
+                + (f" AND {released_product_clause(agg_table, tx.table)}"
                    if agg_table == "products" else ""),
                 {"m": merchant_id},
             )
@@ -508,7 +514,7 @@ async def publish(merchant_id: str, user,
                 f"SELECT id, revision FROM {tx.table('products')} "
                 "WHERE category_id = :c AND merchant_id = :m"
                 " AND deleted_at IS NULL"
-                " AND import_source_kind IS NULL",
+                f" AND {released_product_clause('products', tx.table)}",
                 {"c": cat["id"], "m": merchant_id},
             )
             for r in prods:

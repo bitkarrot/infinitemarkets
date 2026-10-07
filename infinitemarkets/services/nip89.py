@@ -13,7 +13,12 @@ import re
 import time
 from decimal import Decimal
 
-from ..db import db, table
+from ..db import (
+    db,
+    released_product_clause,
+    released_product_select,
+    table,
+)
 from ..security import ProblemError
 from .catalog import D_TAG_RE
 
@@ -62,7 +67,8 @@ async def product_by_address(pubkey_hex: str, d_tag: str) -> dict | None:
         return None
     async with db.connect() as conn:
         row = await conn.fetchone(
-            f"SELECT * FROM {table('products')} "
+            f"SELECT *, {released_product_select('products', table)} "
+            f"FROM {table('products')} "
             "WHERE merchant_id = :m AND d_tag = :d",
             {"m": merchant["id"], "d": d_tag},
         )
@@ -103,7 +109,7 @@ async def product_detail(product: dict) -> dict:
             f"FROM {table('products')} "
             "WHERE parent_product_id = :p AND deleted_at IS NULL"
             " AND NOT draft AND visibility != 'hidden'"
-            " AND import_source_kind IS NULL",
+            f" AND {released_product_clause('products', table)}",
             {"p": pid},
         )
     return {
@@ -128,7 +134,8 @@ def availability_state(product: dict) -> str:
     if merchant.get("state") in ("deactivating", "inactive"):
         return "inactive"
     if (product.get("deleted_at") is not None or product.get("draft")
-            or product.get("import_source_kind") is not None):
+            or (product.get("import_source_kind") is not None
+                and not product.get("import_released"))):
         return "unavailable"
     if product.get("visibility") == "hidden":
         return "hidden"

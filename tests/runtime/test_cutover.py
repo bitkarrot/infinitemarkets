@@ -79,7 +79,8 @@ async def test_staging_requires_owned_legacy_import_and_never_authorizes_stock(
 
     async def disabled():
         return {"disabled": True, "reason_code": "snapshot-unverified",
-                "restart_checked_at": restart_at}
+                "restart_checked_at": restart_at,
+                "source_contract": {"code_hash": "a" * 64, "git_commit": "b" * 40}}
 
     async def evidence(_):
         return {"merchant_id": "old-merchant", "products": {"old-mug"},
@@ -91,7 +92,8 @@ async def test_staging_requires_owned_legacy_import_and_never_authorizes_stock(
     monkeypatch.setattr(cutover, "read_old_source_evidence", evidence)
     checked = await client.post(check_url, headers=headers)
     assert checked.status_code == 200, checked.text
-    assert checked.json()["snapshot_verified"] is False
+    assert checked.json()["state"] == "snapshot_verified"
+    assert checked.json()["snapshot_verified"] is True
     assert checked.json()["payable_quantity"] == 1
     assert "c" * 64 not in checked.text
     restart_at = requested.json()["freeze_requested_at"]
@@ -117,12 +119,347 @@ async def test_staging_requires_owned_legacy_import_and_never_authorizes_stock(
             f"SELECT COUNT(*) AS n FROM {table('liability_partitions')} "
             "WHERE epoch_id = :e", {"e": epoch_id},
         )
+        epoch = await conn.fetchone(
+            f"SELECT state, snapshot_hash, snapshot_json, snapshot_id "
+            f"FROM {table('cutover_epochs')} WHERE id = :e", {"e": epoch_id},
+        )
     assert row["draft"] and not row["import_authorized"]
-    assert row["status"] == "unverified" and holds["n"] == 0
+    assert row["status"] == "payable" and holds["n"] == 0
+    assert epoch["state"] == "blocked" and epoch["snapshot_hash"]
+    from nostr_sdk import Event
+
+    signed_snapshot = Event.from_json(epoch["snapshot_json"])
+    assert signed_snapshot.verify()
+    assert signed_snapshot.id().to_hex() == epoch["snapshot_id"]
+    snapshot = json.loads(signed_snapshot.content())
+    assert snapshot["phase"] == "verified"
+    assert snapshot["payable_quantity"] == 1
+    assert "c" * 64 not in epoch["snapshot_json"]
     restarted = await client.post(stage_url, headers=headers)
     assert restarted.status_code == 200
     assert restarted.json()["id"] != epoch_id
     assert restarted.json()["state"] == "staged"
+
+
+async def _verified_epoch(
+    runtime_env, monkeypatch, qty=1, invoice_state="payable", instance="original",
+):
+    """Import a nostrmarket catalog with one liability and drive a cutover
+    epoch to ``snapshot_verified`` with mocked disabled-source evidence."""
+    from infinitemarkets.services import cutover
+
+    client = runtime_env["client"]
+    headers = {"Origin": "https://shop.example",
+               "X-CSRF-Token": client.cookies.get("gm_csrf")}
+    merchant = await client.get(f"{API}/merchants/current")
+    if merchant.status_code == 404:
+        merchant = await client.post(
+            f"{API}/merchants", json={"wallet_id": runtime_env["wallet"].id},
+            headers=headers,
+        )
+        assert merchant.status_code == 201, merchant.text
+    else:
+        assert merchant.status_code == 200, merchant.text
+    source = {
+        "stalls": [{"id": "old-stall", "currency": "USD"}],
+        "products": [{"id": "old-mug", "stall_id": "old-stall",
+                      "name": "Old Mug", "price": 2, "quantity": qty}],
+        "orders": [{"id": "old-order", "invoice_id": "c" * 64, "paid": True,
+                    "items": [{"product_id": "old-mug", "quantity": qty}]}],
+    }
+    upload = {"file": ("old.json", json.dumps(source).encode(), "application/json")}
+    form = {"currency": "USD", "source_instance": instance}
+    preview = await client.post(
+        f"{API}/migration/legacy/nostrmarket/preview",
+        data=form, files=upload, headers=headers,
+    )
+    assert preview.status_code == 200, preview.text
+    form["source_hash"] = preview.json()["source_hash"]
+    imported = await client.post(
+        f"{API}/migration/legacy/nostrmarket/execute",
+        data=form, files=upload, headers=headers,
+    )
+    assert imported.status_code == 200, imported.text
+    import_id = imported.json()["import_id"]
+    stage = await client.post(
+        f"{API}/migration/imports/{import_id}/cutover", headers=headers,
+    )
+    assert stage.status_code == 200, stage.text
+    epoch_id = stage.json()["id"]
+    requested = await client.post(
+        f"{API}/migration/cutovers/{epoch_id}/freeze-request", headers=headers,
+    )
+    assert requested.status_code == 200
+    restart_at = requested.json()["freeze_requested_at"] + 1
+
+    async def disabled():
+        return {"disabled": True, "reason_code": "snapshot-unverified",
+                "restart_checked_at": restart_at,
+                "source_contract": {"code_hash": "a" * 64, "git_commit": "b" * 40}}
+
+    async def evidence(_):
+        return {"merchant_id": "old-merchant", "products": {"old-mug"},
+                "invoices": [{"invoice_id": "c" * 64, "order_id": "old-order",
+                              "items": [{"product_id": "old-mug", "quantity": qty}],
+                              "state": invoice_state}]}
+
+    monkeypatch.setattr(cutover, "old_source_status", disabled)
+    monkeypatch.setattr(cutover, "read_old_source_evidence", evidence)
+    checked = await client.post(
+        f"{API}/migration/cutovers/{epoch_id}/check-source", headers=headers,
+    )
+    assert checked.status_code == 200, checked.text
+    liabilities = await client.get(
+        f"{API}/migration/cutovers/{epoch_id}/liabilities",
+    )
+    assert liabilities.status_code == 200, liabilities.text
+    liability = liabilities.json()["liabilities"][0]
+    return client, headers, merchant.json()["id"], epoch_id, liability
+
+
+async def test_disposition_wait_partition_and_complete(runtime_env, monkeypatch):
+    from infinitemarkets.db import db, table
+
+    client, headers, merchant_id, epoch_id, liability = await _verified_epoch(
+        runtime_env, monkeypatch, qty=1, instance="t-disp",
+    )
+    liability_id = liability["id"]
+    assert liability["status"] == "payable"
+    action_url = f"{API}/migration/cutovers/{epoch_id}/liabilities/{liability_id}"
+    waited = await client.post(action_url, headers=headers, json={"action": "wait"})
+    assert waited.status_code == 200 and waited.json()["status"] == "waiting"
+    epoch = await client.get(f"{API}/migration/cutovers/{epoch_id}")
+    assert epoch.json()["state"] == "reconciling"
+
+    # partition beyond the physical stock baseline fails closed
+    async with db.connect() as conn:
+        await conn.execute(
+            f"UPDATE {table('products')} SET stock_on_hand = 0 "
+            "WHERE id = :p", {"p": liability["product_id"]},
+        )
+    partitioned = await client.post(
+        action_url, headers=headers, json={"action": "partition"},
+    )
+    assert partitioned.status_code == 409
+
+    async with db.connect() as conn:
+        await conn.execute(
+            f"UPDATE {table('products')} SET stock_on_hand = 5 "
+            "WHERE id = :p", {"p": liability["product_id"]},
+        )
+    partitioned = await client.post(
+        action_url, headers=headers, json={"action": "partition"},
+    )
+    assert partitioned.status_code == 200, partitioned.text
+    assert partitioned.json()["status"] == "partitioned"
+    assert partitioned.json()["partition_state"] == "held"
+    async with db.connect() as conn:
+        product = await conn.fetchone(
+            f"SELECT stock_on_hand, stock_reserved FROM {table('products')} "
+            "WHERE id = :p", {"p": liability["product_id"]},
+        )
+    assert (product["stock_on_hand"], product["stock_reserved"]) == (5, 1)
+
+    # double-partition is idempotent — no second hold
+    again = await client.post(action_url, headers=headers, json={"action": "partition"})
+    assert again.status_code == 200 and again.json()["partition_state"] == "held"
+    async with db.connect() as conn:
+        product = await conn.fetchone(
+            f"SELECT stock_reserved FROM {table('products')} WHERE id = :p",
+            {"p": liability["product_id"]},
+        )
+    assert product["stock_reserved"] == 1
+
+    completed = await client.post(
+        f"{API}/migration/cutovers/{epoch_id}/complete", headers=headers,
+    )
+    assert completed.status_code == 200, completed.text
+    assert completed.json()["state"] == "complete"
+    assert completed.json()["cutover_verified"] is True
+    # the payable hold survives completion
+    async with db.connect() as conn:
+        part = await conn.fetchone(
+            f"SELECT state FROM {table('liability_partitions')} WHERE epoch_id = :e",
+            {"e": epoch_id},
+        )
+        product = await conn.fetchone(
+            f"SELECT stock_reserved, import_authorized FROM {table('products')} "
+            "WHERE id = :p", {"p": liability["product_id"]},
+        )
+    assert part["state"] == "held" and product["stock_reserved"] == 1
+    assert product["import_authorized"]
+
+
+async def test_reconcile_paid_consumes_partition_once(runtime_env, monkeypatch):
+    from infinitemarkets.db import db, table
+    from infinitemarkets.services import cutover
+
+    client, headers, merchant_id, epoch_id, liability = await _verified_epoch(
+        runtime_env, monkeypatch, qty=1, instance="t-paid",
+    )
+    liability_id = liability["id"]
+    action_url = f"{API}/migration/cutovers/{epoch_id}/liabilities/{liability_id}"
+    async with db.connect() as conn:
+        await conn.execute(
+            f"UPDATE {table('products')} SET stock_on_hand = 5 "
+            "WHERE id = :p", {"p": liability["product_id"]},
+        )
+    assert (await client.post(
+        action_url, headers=headers, json={"action": "partition"},
+    )).status_code == 200
+
+    # unknown/pending status is not terminal — nothing moves
+    async def pending(_u, _h):
+        return None
+
+    monkeypatch.setattr(cutover, "_authoritative_payment_state", pending)
+    unchanged = await client.post(action_url, headers=headers, json={"action": "reconcile"})
+    assert unchanged.status_code == 200
+    assert unchanged.json()["status"] == "partitioned"
+    async with db.connect() as conn:
+        product = await conn.fetchone(
+            f"SELECT stock_on_hand, stock_reserved FROM {table('products')} "
+            "WHERE id = :p", {"p": liability["product_id"]},
+        )
+    assert (product["stock_on_hand"], product["stock_reserved"]) == (5, 1)
+
+    async def settled(_u, _h):
+        return True
+
+    monkeypatch.setattr(cutover, "_authoritative_payment_state", settled)
+    paid = await client.post(action_url, headers=headers, json={"action": "reconcile"})
+    assert paid.status_code == 200 and paid.json()["status"] == "paid"
+    async with db.connect() as conn:
+        product = await conn.fetchone(
+            f"SELECT stock_on_hand, stock_reserved FROM {table('products')} "
+            "WHERE id = :p", {"p": liability["product_id"]},
+        )
+        part = await conn.fetchone(
+            f"SELECT state FROM {table('liability_partitions')} WHERE epoch_id = :e",
+            {"e": epoch_id},
+        )
+    assert (product["stock_on_hand"], product["stock_reserved"]) == (4, 0)
+    assert part["state"] == "consumed"
+    # idempotent replay — no second decrement
+    replay = await client.post(action_url, headers=headers, json={"action": "reconcile"})
+    assert replay.status_code == 200 and replay.json()["status"] == "paid"
+    async with db.connect() as conn:
+        product = await conn.fetchone(
+            f"SELECT stock_on_hand FROM {table('products')} WHERE id = :p",
+            {"p": liability["product_id"]},
+        )
+    assert product["stock_on_hand"] == 4
+
+
+async def test_reconcile_unpaid_terminal_releases_hold(runtime_env, monkeypatch):
+    from infinitemarkets.db import db, table
+    from infinitemarkets.services import cutover
+
+    client, headers, merchant_id, epoch_id, liability = await _verified_epoch(
+        runtime_env, monkeypatch, qty=2, instance="t-unpaid",
+    )
+    liability_id = liability["id"]
+    action_url = f"{API}/migration/cutovers/{epoch_id}/liabilities/{liability_id}"
+    async with db.connect() as conn:
+        await conn.execute(
+            f"UPDATE {table('products')} SET stock_on_hand = 10 "
+            "WHERE id = :p", {"p": liability["product_id"]},
+        )
+    assert (await client.post(
+        action_url, headers=headers, json={"action": "partition"},
+    )).status_code == 200
+
+    async def expired(_u, _h):
+        return False
+
+    monkeypatch.setattr(cutover, "_authoritative_payment_state", expired)
+    released = await client.post(action_url, headers=headers, json={"action": "reconcile"})
+    assert released.status_code == 200
+    assert released.json()["status"] == "unpaid_terminal"
+    async with db.connect() as conn:
+        product = await conn.fetchone(
+            f"SELECT stock_on_hand, stock_reserved FROM {table('products')} "
+            "WHERE id = :p", {"p": liability["product_id"]},
+        )
+        part = await conn.fetchone(
+            f"SELECT state FROM {table('liability_partitions')} WHERE epoch_id = :e",
+            {"e": epoch_id},
+        )
+    assert (product["stock_on_hand"], product["stock_reserved"]) == (10, 0)
+    assert part["state"] == "released"
+    completed = await client.post(
+        f"{API}/migration/cutovers/{epoch_id}/complete", headers=headers,
+    )
+    assert completed.status_code == 200 and completed.json()["state"] == "complete"
+
+
+async def test_complete_rejects_uncovered_payable(runtime_env, monkeypatch):
+    client, headers, merchant_id, epoch_id, liability = await _verified_epoch(
+        runtime_env, monkeypatch, qty=1, instance="t-uncovered",
+    )
+    complete = await client.post(
+        f"{API}/migration/cutovers/{epoch_id}/complete", headers=headers,
+    )
+    assert complete.status_code == 409
+    waited = await client.post(
+        f"{API}/migration/cutovers/{epoch_id}/liabilities/{liability['id']}",
+        headers=headers, json={"action": "wait"},
+    )
+    assert waited.status_code == 200
+    complete = await client.post(
+        f"{API}/migration/cutovers/{epoch_id}/complete", headers=headers,
+    )
+    assert complete.status_code == 409
+
+
+async def test_complete_releases_products_and_reblocks_on_reactivation(
+    runtime_env, monkeypatch,
+):
+    from infinitemarkets.db import db, table
+    from infinitemarkets.services import cutover
+
+    client, headers, merchant_id, epoch_id, liability = await _verified_epoch(
+        runtime_env, monkeypatch, qty=1, instance="t-release",
+        invoice_state="paid",
+    )
+    assert liability["status"] == "paid"
+    completed = await client.post(
+        f"{API}/migration/cutovers/{epoch_id}/complete", headers=headers,
+    )
+    assert completed.status_code == 200 and completed.json()["state"] == "complete"
+
+    # released product can now publish and is purchasable
+    patch = await client.patch(
+        f"{API}/products/{liability['product_id']}",
+        headers=headers, json={"draft": False, "visibility": "on-sale"},
+    )
+    assert patch.status_code == 200, patch.text
+    async with db.connect() as conn:
+        product = await conn.fetchone(
+            f"SELECT d_tag, draft FROM {table('products')} WHERE id = :p",
+            {"p": liability["product_id"]},
+        )
+    assert not product["draft"]
+    current = await client.get(f"{API}/merchants/current")
+    pubkey = current.json()["pubkey"]
+    detail = await client.get(
+        f"/infinitemarkets/p/{pubkey}/{product['d_tag']}"
+    )
+    assert detail.status_code == 200, detail.status_code
+
+    # detected reactivation re-blocks the epoch and re-blocks the product
+    async def reactivated():
+        return {"disabled": False, "reason_code": "legacy-active"}
+
+    monkeypatch.setattr(cutover, "old_source_status", reactivated)
+    status = await client.get(f"{API}/migration/cutovers/{epoch_id}")
+    assert status.status_code == 200
+    assert status.json()["state"] == "blocked"
+    repatch = await client.patch(
+        f"{API}/products/{liability['product_id']}",
+        headers=headers, json={"visibility": "pre-order"},
+    )
+    assert repatch.status_code == 409
 
 
 async def test_old_source_requires_installed_and_runtime_disable(
