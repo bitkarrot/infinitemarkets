@@ -5,10 +5,10 @@ milestone_name: milestone
 current_phase: 04
 current_phase_name: Release C — Migration and Cutover
 status: in_progress
-stopped_at: Phase 4 plan 04-01 committed; 04-02 read-only old-source comparison and checkout claim recheck added; no independently attested restart/version, signed snapshot, stock holds or activation; cutover blocked
-last_updated: "2026-10-07T19:30:59Z"
+stopped_at: Phase 4 plan 04-01 committed; 04-02 read-only old-source comparison plus fail-closed import publication/checkout gates added; no independently attested restart/version, signed snapshot, stock holds or activation; cutover blocked
+last_updated: "2026-10-07T19:44:58Z"
 last_activity: 2026-10-07
-last_activity_desc: Guarded stock claim against stale product/parent state and unauthorized imported stock; restored demo PNGs tracked for future release packages. Old-extension disable/restart and installed source version are not attested; snapshot remains unverified
+last_activity_desc: Closed direct publish, bulk, republish, projection/outbox, public listing/detail, checkout and variation-parent escapes around import_source_kind; demo PNGs now tracked for release packages. Old-extension disable/restart and installed source version are not attested; snapshot remains unverified
 progress:
   total_phases: 5
   completed_phases: 4

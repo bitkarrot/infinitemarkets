@@ -292,9 +292,7 @@ async def _resolve_items(
 
 def _assert_purchasable(product: dict) -> None:
     """Section 8.1 step 5: v1 purchasability rules."""
-    if product["draft"] or (
-        product["import_source_kind"] is not None and not product["import_authorized"]
-    ):
+    if product["draft"] or product["import_source_kind"] is not None:
         raise unprocessable("product-inactive", "Product unavailable")
     if product["visibility"] != "on-sale":
         raise unprocessable(
@@ -328,8 +326,6 @@ async def _claim_product_capacity(
     if not product or product["deleted_at"] is not None:
         raise unprocessable("product-inactive", "Product unavailable")
     _assert_purchasable(dict(product))
-    if product["import_source_kind"] is not None:
-        raise unprocessable("product-inactive", "Product unavailable")
     if product["product_type"] == "variation":
         parent = await tx.fetch_one(
             f"SELECT * FROM {tx.table('products')} "

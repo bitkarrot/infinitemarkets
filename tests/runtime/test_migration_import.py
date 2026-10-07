@@ -567,6 +567,102 @@ async def test_imported_drafts_cannot_be_published(runtime_env):
     assert event_audit.json()["cutover_verified"] is False
 
 
+async def test_authorization_flag_alone_cannot_publish_imported_stock(runtime_env):
+    from infinitemarkets.db import DomainTransaction, db, table
+    from infinitemarkets.services import outbox
+
+    client = runtime_env["client"]
+    current = await client.get("/infinitemarkets/api/v1/merchants/current")
+    headers = {"Origin": "https://shop.example",
+               "X-CSRF-Token": client.cookies.get("gm_csrf")}
+    if current.status_code == 404:
+        merchant = await client.post(
+            "/infinitemarkets/api/v1/merchants", headers=headers,
+            json={"wallet_id": runtime_env["wallet"].id},
+        )
+        assert merchant.status_code == 201, merchant.text
+        merchant_data = merchant.json()
+    else:
+        assert current.status_code == 200, current.text
+        merchant_data = current.json()
+    merchant_id = merchant_data["id"]
+    pubkey = merchant_data["pubkey"]
+    category = await client.post(
+        "/infinitemarkets/api/v1/categories", headers=headers,
+        json={"name": "Blocked publication"},
+    )
+    assert category.status_code == 201, category.text
+    product = await client.post(
+        "/infinitemarkets/api/v1/products", headers=headers, json={
+            "category_id": category.json()["id"], "title": "Blocked source",
+            "amount_minor": 100, "currency": "SAT", "format": "digital",
+            "draft": True, "visibility": "hidden", "stock_on_hand": 1,
+        },
+    )
+    assert product.status_code == 201, product.text
+    product_id = product.json()["id"]
+    async with DomainTransaction() as tx:
+        await tx.execute(
+            f"UPDATE {tx.table('products')} SET draft = FALSE, "
+            "visibility = 'on-sale', import_source_kind = 'nostrmarket', "
+            "import_legacy_id = 'legacy-id', import_authorized = TRUE WHERE id = :p",
+            {"p": product_id},
+        )
+    api = "/infinitemarkets/api/v1/products"
+    assert (await client.patch(
+        f"{api}/{product_id}", headers=headers, json={"draft": False},
+    )).status_code == 409
+    assert (await client.post(
+        f"{api}/bulk", headers=headers,
+        json={"action": "publish", "product_ids": [product_id]},
+    )).status_code == 409
+    assert (await client.get(f"{api}/{product_id}/events")).json() == []
+    listing = await client.get(
+        f"/infinitemarkets/api/v1/public/merchants/{pubkey}/products"
+    )
+    assert listing.status_code == 200, listing.text
+    assert product.json()["d_tag"] not in json.dumps(listing.json())
+    detail = await client.get(
+        f"/infinitemarkets/api/v1/public/products/{pubkey}/{product.json()['d_tag']}"
+    )
+    assert detail.status_code == 404
+    page = await client.get(
+        f"/infinitemarkets/p/{pubkey}/{product.json()['d_tag']}"
+    )
+    assert page.status_code == 404
+    for kind in (30402, 30018):
+        assert await outbox.render_intent({
+            "merchant_id": merchant_id, "aggregate_type": "products",
+            "aggregate_id": product_id, "event_kind": kind,
+        }) is None
+    collection = await client.post(
+        "/infinitemarkets/api/v1/collections", headers=headers,
+        json={"title": "Blocked collection"},
+    )
+    assert collection.status_code == 201, collection.text
+    moved = await client.post(
+        f"{api}/bulk", headers=headers,
+        json={"action": "move-collection", "product_ids": [product_id],
+              "value": collection.json()["id"]},
+    )
+    assert moved.status_code == 200, moved.text
+    assert await outbox.render_intent({
+        "merchant_id": merchant_id, "aggregate_type": "collections",
+        "aggregate_id": collection.json()["id"], "event_kind": 30405,
+    }) is None
+    published = await client.post(
+        f"/infinitemarkets/api/v1/merchants/{merchant_id}/publish", headers=headers,
+    )
+    assert published.status_code == 200, published.text
+    async with db.connect() as conn:
+        row = await conn.fetchone(
+            f"SELECT COUNT(*) AS n FROM {table('outbox_events')} "
+            "WHERE aggregate_type = 'products' AND aggregate_id = :p",
+            {"p": product_id},
+        )
+    assert row["n"] == 0
+
+
 async def test_private_three_product_sample_import(runtime_env):
     from infinitemarkets.db import db, table
     from infinitemarkets.services import migration_import

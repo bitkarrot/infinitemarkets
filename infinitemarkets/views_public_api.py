@@ -114,7 +114,8 @@ async def public_merchant_products(
         f"JOIN {table('categories')} cat ON cat.id = p.category_id "
         "WHERE p.merchant_id = :m AND cat.deleted_at IS NULL "
         "AND p.deleted_at IS NULL AND NOT p.draft "
-        "AND p.parent_product_id IS NULL AND p.visibility != 'hidden'"
+        "AND p.parent_product_id IS NULL AND p.import_source_kind IS NULL "
+        "AND p.visibility != 'hidden'"
     )
     params = {"m": merchant["id"]}
     if request.query_params.get("collection"):
@@ -199,7 +200,8 @@ async def public_collection(
             f"SELECT p.* FROM {table('products')} p "
             f"JOIN {table('product_collections')} pc ON pc.product_id = p.id "
             "WHERE pc.collection_id = :c AND p.deleted_at IS NULL"
-            " AND NOT p.draft AND p.visibility != 'hidden'",
+            " AND NOT p.draft AND p.visibility != 'hidden'"
+            " AND p.import_source_kind IS NULL",
             {"c": row["id"]},
         )
     member_dicts = []

@@ -124,7 +124,7 @@ async def _nav_collections(merchant_id: str) -> list[dict]:
             f"JOIN {table('products')} p ON p.id = pc.product_id "
             "WHERE pc.collection_id = c.id AND p.deleted_at IS NULL"
             " AND NOT p.draft AND p.parent_product_id IS NULL"
-            " AND p.visibility != 'hidden'"
+            " AND p.import_source_kind IS NULL AND p.visibility != 'hidden'"
             ") ORDER BY c.title",
             {"m": merchant_id},
         )
@@ -365,7 +365,8 @@ async def _browse_products(request: Request, merchant: dict,
         f"JOIN {table('categories')} cat ON cat.id = p.category_id "
         "WHERE p.merchant_id = :merchant AND cat.deleted_at IS NULL "
         "AND p.deleted_at IS NULL AND NOT p.draft "
-        "AND p.parent_product_id IS NULL AND p.visibility != 'hidden'"
+        "AND p.parent_product_id IS NULL AND p.import_source_kind IS NULL "
+        "AND p.visibility != 'hidden'"
     )
     params = {"merchant": merchant["id"]}
     if collection_id:

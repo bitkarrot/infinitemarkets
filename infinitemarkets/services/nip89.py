@@ -102,7 +102,8 @@ async def product_detail(product: dict) -> dict:
             " stock_on_hand, stock_reserved, nip99_status "
             f"FROM {table('products')} "
             "WHERE parent_product_id = :p AND deleted_at IS NULL"
-            " AND NOT draft AND visibility != 'hidden'",
+            " AND NOT draft AND visibility != 'hidden'"
+            " AND import_source_kind IS NULL",
             {"p": pid},
         )
     return {
@@ -126,7 +127,8 @@ def availability_state(product: dict) -> str:
     merchant = product.get("_merchant") or {}
     if merchant.get("state") in ("deactivating", "inactive"):
         return "inactive"
-    if product.get("deleted_at") is not None or product.get("draft"):
+    if (product.get("deleted_at") is not None or product.get("draft")
+            or product.get("import_source_kind") is not None):
         return "unavailable"
     if product.get("visibility") == "hidden":
         return "hidden"

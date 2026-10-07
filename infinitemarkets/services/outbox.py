@@ -361,7 +361,7 @@ async def render_intent(row: dict, database=None) -> dict | None:
             )
             if (
                 not p or p["draft"] or p["deleted_at"] is not None
-                or (p["import_source_kind"] is not None and not p["import_authorized"])
+                or p["import_source_kind"] is not None
             ):
                 return None
             p = dict(p)
@@ -457,7 +457,7 @@ async def render_intent(row: dict, database=None) -> dict | None:
                 f"SELECT p.d_tag FROM {table('product_collections')} pc "
                 f"JOIN {table('products')} p ON p.id = pc.product_id "
                 "WHERE pc.collection_id = :c AND p.deleted_at IS NULL"
-                " AND NOT p.draft", {"c": c["id"]})
+                " AND NOT p.draft AND p.import_source_kind IS NULL", {"c": c["id"]})
             if not members:
                 return None  # zero-member collections never publish
             ship = await conn.fetchall(
@@ -502,7 +502,7 @@ async def render_intent(row: dict, database=None) -> dict | None:
                 "ON pc.collection_id = cs.collection_id "
                 f"JOIN {table('products')} p ON p.id = pc.product_id "
                 "WHERE p.category_id = :c AND p.deleted_at IS NULL"
-                " AND so.deleted_at IS NULL",
+                " AND p.import_source_kind IS NULL AND so.deleted_at IS NULL",
                 {"c": cat["id"]})
             for o in opts:
                 regions = json.loads(o["regions"]) if o["regions"] else []
@@ -518,7 +518,8 @@ async def render_intent(row: dict, database=None) -> dict | None:
             digital = await conn.fetchone(
                 f"SELECT id FROM {table('products')} "
                 "WHERE category_id = :c AND format = 'digital'"
-                " AND deleted_at IS NULL AND NOT draft LIMIT 1",
+                " AND deleted_at IS NULL AND NOT draft"
+                " AND import_source_kind IS NULL LIMIT 1",
                 {"c": cat["id"]})
             if digital:
                 zones.append(events.digital_zone())
