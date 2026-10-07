@@ -323,7 +323,7 @@ async def test_product_gallery_exposes_all_supported_images(runtime_env):
     merchant = await _merchant(runtime_env)
     images = [
         {"url": f"https://shop.example/images/view-{i}.png"}
-        for i in range(16)
+        for i in range(20)
     ]
     _, product = await _catalog_and_product(runtime_env, format="digital", images=images)
 
@@ -331,8 +331,8 @@ async def test_product_gallery_exposes_all_supported_images(runtime_env):
         f"/infinitemarkets/p/{merchant['pubkey']}/{product['d_tag']}"
     )
     assert resp.status_code == 200
-    assert resp.text.count('data-gallery-src=') == 16
-    assert 'aria-label="Product view 16"' in resp.text
+    assert resp.text.count('data-gallery-src=') == 20
+    assert 'aria-label="Product view 20"' in resp.text
     assert 'aria-pressed="true"' in resp.text
 
 

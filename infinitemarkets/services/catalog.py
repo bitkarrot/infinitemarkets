@@ -33,7 +33,7 @@ from .outbox import enqueue_intent
 TITLE_MAX = 200
 SUMMARY_MAX = 500
 DESC_MAX = 64 * 1024
-IMAGES_MAX = 16
+IMAGES_MAX = 20
 CURRENCY_RE = re.compile(r"^[A-Z0-9]{3,8}$")
 D_TAG_RE = re.compile(r"^[a-z0-9-]{8,64}$|^[0-9a-f]{8,64}$")
 COUNTRY_RE = re.compile(r"^[A-Z]{2}$")

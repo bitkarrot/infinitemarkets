@@ -181,7 +181,7 @@ async def test_product_validation_bounds(runtime_env):
         {"category_id": cid, "summary": "x" * 501},
         {"category_id": cid, "description_md": "x" * (64 * 1024 + 1)},
         {"category_id": cid, "images": [
-            f"https://x.example/{i}.png" for i in range(17)
+            f"https://x.example/{i}.png" for i in range(21)
         ]},
         {"category_id": cid, "images": ["http://insecure.example/x.png"]},
         {"category_id": cid, "currency": "usd"},        # lowercase
@@ -205,6 +205,31 @@ async def test_product_validation_bounds(runtime_env):
         )
         assert resp.status_code == 422, payload
         assert resp.json()["type"].startswith("urn:infinitemarkets:")
+
+
+async def test_product_image_incremental_limit(runtime_env):
+    cid = await _category(runtime_env)
+    client = runtime_env["client"]
+    headers = await _cookie(runtime_env)
+    created = await client.post(
+        f"{API}/products",
+        json={"category_id": cid, "title": "Image limit", "format": "digital",
+              "amount_minor": 1, "currency": "SAT", "draft": True},
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    product_id = created.json()["id"]
+    for i in range(20):
+        response = await client.post(
+            f"{API}/products/{product_id}/images",
+            json={"url": f"https://images.example/{i}.jpg"}, headers=headers,
+        )
+        assert response.status_code == 201, response.text
+    rejected = await client.post(
+        f"{API}/products/{product_id}/images",
+        json={"url": "https://images.example/extra.jpg"}, headers=headers,
+    )
+    assert rejected.status_code == 422
 
 
 async def test_product_crud_and_outbox_intent(runtime_env):

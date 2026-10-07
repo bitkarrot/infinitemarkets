@@ -17,7 +17,7 @@
     <div class="gallery{{ ' single' if product.images | length == 1 }}">
       {% if product.images | length > 1 %}
       <div class="thumbs" aria-label="Product views">
-        {% for img in product.images[:16] %}
+        {% for img in product.images[:20] %}
         <button type="button" class="thumb{{ ' active' if loop.first }}"
                 data-gallery-src="{{ img.url }}"
                 aria-label="Product view {{ loop.index }}"
