@@ -1890,6 +1890,27 @@ body { margin: 0; }
 @media (min-width: 1024px) {
   .gm-public[data-layout="gallery"] .card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+/* Storefront grid density — quad = compact 4-col desktop / 2-col mobile
+   catalog (merchant storefront profile opt-in). Declared after the
+   gallery rules so quad wins the equal-specificity grid conflict. */
+.gm-public[data-grid="quad"] .card-grid {
+  gap: 20px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (min-width: 1024px) {
+  .gm-public[data-grid="quad"] .card-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.gm-public .footer-logo {
+  display: block;
+  max-width: 160px;
+  max-height: 48px;
+  margin-bottom: 10px;
+  object-fit: contain;
+}
 .gm-public[data-layout="gallery"] .product-card {
   border: 0;
   border-radius: 0;

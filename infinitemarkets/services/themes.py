@@ -26,8 +26,9 @@ from urllib.parse import urlparse
 from ..db import db, table
 from ..security import unprocessable
 
-PRESETS = ("warm-market", "clean-minimal", "high-contrast")
+PRESETS = ("warm-market", "clean-minimal", "high-contrast", "lightnin-dark")
 LAYOUTS = ("editorial", "guided", "compact", "gallery")
+GRID_MODES = ("standard", "quad")
 FONT_STACKS = ("system", "serif", "mono")
 CORNERS = ("sharp", "rounded", "soft")
 
@@ -71,6 +72,21 @@ PRESET_TOKENS: dict[str, dict[str, str]] = {
         "--color-on-primary": "#111111",
         "--color-primary-hover": "#ffd166",
         "--color-accent": "#63d2ff",
+        "--color-focus": "#ffffff",
+    },
+    # Lightning Games storefront (charcoal #242833 + yellow CTA, measured
+    # from the reference shop). All gated pairs pass WCAG ≥4.5:1.
+    "lightnin-dark": {
+        "--color-bg": "#242833",
+        "--color-surface": "#2f3442",
+        "--color-surface-alt": "#384051",
+        "--color-border": "#454c5e",
+        "--color-text": "#d0d2d7",
+        "--color-text-muted": "#a9afbb",
+        "--color-primary": "#fce477",
+        "--color-on-primary": "#121212",
+        "--color-primary-hover": "#fdf0a6",
+        "--color-accent": "#fce477",
         "--color-focus": "#ffffff",
     },
 }
@@ -125,7 +141,7 @@ _GATED_PAIRS = (
 
 DEFAULT_THEME = {"preset": "warm-market", "layout": "editorial",
                  "brand": None, "advanced": None, "hero": None,
-                 "footer": None}
+                 "footer": None, "storefront": None}
 
 # Hero (storefront index intro) — bounded content fields, not tokens:
 # slogan/subtitle are length-capped; URLs may be #anchors, same-origin
@@ -305,7 +321,7 @@ def _validate_footer(footer: dict) -> dict:
     textContent by Jinja escaping regardless)."""
     if not isinstance(footer, dict):
         raise unprocessable("invalid-content", "footer must be an object")
-    unknown = set(footer) - {"tagline", "note"}
+    unknown = set(footer) - {"tagline", "note", "logo_url"}
     if unknown:
         raise unprocessable(
             "invalid-content", f"unknown footer fields: {sorted(unknown)}"
@@ -315,6 +331,36 @@ def _validate_footer(footer: dict) -> dict:
         value = str(footer.get(field) or "").strip()
         if value:
             out[field] = value[:limit]
+    logo = _validate_media_url(footer.get("logo_url"), "footer logo_url")
+    if logo:
+        out["logo_url"] = logo
+    return out
+
+
+def _validate_storefront(storefront: dict) -> dict:
+    """Storefront structure tier: gallery density + hero visibility.
+
+    ``grid="quad"`` renders four product columns on desktop and two on
+    mobile (the compact reference-shop grid). ``hero_hidden`` suppresses
+    the index hero entirely — the merchant opts out of the intro block."""
+    if not isinstance(storefront, dict):
+        raise unprocessable("invalid-content", "storefront must be an object")
+    unknown = set(storefront) - {"grid", "hero_hidden"}
+    if unknown:
+        raise unprocessable(
+            "invalid-content",
+            f"unknown storefront fields: {sorted(unknown)}",
+        )
+    out = {}
+    if storefront.get("grid") is not None:
+        if storefront["grid"] not in GRID_MODES:
+            raise unprocessable(
+                "invalid-content",
+                f"grid must be one of {GRID_MODES}",
+            )
+        out["grid"] = storefront["grid"]
+    if storefront.get("hero_hidden") is not None:
+        out["hero_hidden"] = storefront["hero_hidden"] is True
     return out
 
 
@@ -368,7 +414,7 @@ def validate_theme(payload: dict) -> dict:
         raise unprocessable("invalid-content", "theme must be an object")
     unknown = set(payload) - {
         "preset", "layout", "brand", "advanced", "advanced_opt_in",
-        "hero", "footer",
+        "hero", "footer", "storefront",
     }
     if unknown:
         raise unprocessable(
@@ -391,6 +437,8 @@ def validate_theme(payload: dict) -> dict:
         theme["hero"] = _validate_hero(payload["hero"])
     if payload.get("footer") is not None:
         theme["footer"] = _validate_footer(payload["footer"])
+    if payload.get("storefront") is not None:
+        theme["storefront"] = _validate_storefront(payload["storefront"])
     if payload.get("advanced") is not None:
         theme["advanced"] = _validate_advanced(
             payload["advanced"], bool(payload.get("advanced_opt_in"))
@@ -513,6 +561,17 @@ def emit_css(theme: dict | None) -> str:
 
 def theme_layout(theme: dict | None) -> str:
     return (theme or DEFAULT_THEME).get("layout", "editorial")
+
+
+def storefront_grid(theme: dict | None) -> str:
+    storefront = (theme or {}).get("storefront") or {}
+    grid = storefront.get("grid")
+    return grid if grid in GRID_MODES else "standard"
+
+
+def hero_hidden(theme: dict | None) -> bool:
+    storefront = (theme or {}).get("storefront") or {}
+    return storefront.get("hero_hidden") is True
 
 
 # --- persistence ------------------------------------------------------------------

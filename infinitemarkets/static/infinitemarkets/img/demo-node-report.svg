@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000" role="img" aria-label="Node Report 2026 book cover on a warm studio background">
+  <rect width="1000" height="1000" fill="#e5d8c4"/>
+  <path d="M0 714 1000 541v459H0Z" fill="#d7c8b2" opacity=".4"/>
+  <ellipse cx="524" cy="853" rx="336" ry="62" fill="#514f46" opacity=".17"/>
+  <g transform="rotate(-7 502 488)">
+    <path d="M241 131h520v689l-27 20H216V155Z" fill="#253438" opacity=".22"/>
+    <path d="M228 145h511v687H228Z" fill="#eee6d6"/>
+    <path d="M228 801h511v28H228Z" fill="#bbb3a1"/>
+    <path d="M205 116h520v688H205Z" fill="#143941"/>
+    <path d="M205 116h17v688h-17Z" fill="#38747a"/>
+    <path d="M243 157h444v608H243Z" fill="none" stroke="#9fbaac" stroke-opacity=".35" stroke-width="2"/>
+    <text x="269" y="208" font-family="DejaVu Sans,sans-serif" font-size="17" font-weight="bold" letter-spacing="2" fill="#b5d6c6">INFINITE MARKETS</text>
+    <path d="M269 238h391" stroke="#a2c3b1" stroke-width="2" opacity=".5"/>
+    <text x="264" y="352" font-family="DejaVu Sans,sans-serif" font-size="83" font-weight="bold" fill="#f6f0df">NODE</text>
+    <text x="264" y="441" font-family="DejaVu Sans,sans-serif" font-size="83" font-weight="bold" fill="#f6f0df">REPORT</text>
+    <text x="268" y="493" font-family="DejaVu Sans,sans-serif" font-size="18" letter-spacing="1" fill="#c6ddce">THE LIGHTNING NETWORK IN 2026</text>
+    <g stroke="#4c8080" stroke-width="1" opacity=".55">
+      <path d="M268 558h390M268 602h390M268 646h390M268 690h390"/>
+      <path d="M310 542v165M390 542v165M470 542v165M550 542v165M630 542v165"/>
+    </g>
+    <path d="M270 674 335 630 392 646 462 572 523 601 582 550 650 566" fill="none" stroke="#e4aa73" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <g fill="#f6d18e"><circle cx="270" cy="674" r="8"/><circle cx="335" cy="630" r="8"/><circle cx="392" cy="646" r="8"/><circle cx="462" cy="572" r="8"/><circle cx="523" cy="601" r="8"/><circle cx="582" cy="550" r="8"/><circle cx="650" cy="566" r="8"/></g>
+    <text x="269" y="748" font-family="DejaVu Sans,sans-serif" font-size="16" letter-spacing="1" fill="#d1e0d0">LIQUIDITY  /  ROUTING  /  FEES</text>
+  </g>
+</svg>

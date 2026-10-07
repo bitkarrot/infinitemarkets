@@ -328,6 +328,205 @@ def parse_shopify_csv(
     return list(products.values())
 
 
+NATIVE_FORMAT_MARKER = "infinitemarkets-products-v1"
+
+_NATIVE_HEADER = [
+    "row", "handle", "title", "description_md", "currency",
+    "amount_minor", "currency_decimals", "product_type", "parent_handle",
+    "variant_index", "sku", "option_1", "option_2", "option_3",
+    "stock_on_hand", "visibility", "draft", "images", "categories",
+    "import_source_kind", "import_source_instance", "import_legacy_id",
+]
+
+
+def _native_image_url(value: str) -> str:
+    """Native export image refs: https URLs or host-local /images/ paths."""
+    if len(value) > 2048 or any(ord(c) < 32 for c in value):
+        raise ValueError("invalid product image URL")
+    if value.startswith("/images/"):
+        if ".." in value or value.startswith("//"):
+            raise ValueError("invalid product image URL")
+        return value
+    try:
+        url = urlsplit(value)
+    except ValueError as exc:
+        raise ValueError("invalid product image URL") from exc
+    if url.scheme != "https" or not url.hostname or url.username or url.password:
+        raise ValueError("invalid product image URL")
+    return value
+
+
+def _native_int(value: str, field: str, row_num: int) -> int | None:
+    value = value.strip()
+    if not value:
+        return None
+    if len(value) > 19 or not value.isascii() or not value.isdecimal():
+        raise ValueError(f"row {row_num}: invalid {field}")
+    qty = int(value)
+    if qty > MAX_STOCK:
+        raise ValueError(f"row {row_num}: {field} exceeds limit")
+    return qty
+
+
+def _unescape_cell(value: str) -> str:
+    """Reverse the exporter's spreadsheet-formula escape on the
+    attacker-controlled text columns."""
+    if value.startswith("'") and len(value) > 1 \
+            and value[1] in "=+-@\t\r\x0b\x0c":
+        return value[1:]
+    return value
+
+
+def parse_native_csv(data: bytes) -> list[dict]:
+    """Parse the infinitemarkets-products-v1 export back into the shared
+    normalized product shape (per-handle variants/images/options)."""
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise ValueError("export CSV exceeds upload limit")
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise ValueError("export CSV must be UTF-8") from exc
+    reader = csv.reader(io.StringIO(text, newline=""), strict=True)
+    try:
+        preamble = next(reader)
+        header = next(reader)
+    except (StopIteration, csv.Error) as exc:
+        raise ValueError("invalid export CSV headers") from exc
+    if preamble != ["format", NATIVE_FORMAT_MARKER] or header != _NATIVE_HEADER:
+        raise ValueError("not an infinitemarkets-products-v1 export")
+    products: OrderedDict[str, dict] = OrderedDict()
+    variant_rows: OrderedDict[str, list[dict]] = OrderedDict()
+    count = 0
+    try:
+        for row in reader:
+            count += 1
+            if count > MAX_ROWS:
+                raise ValueError("export CSV exceeds row limit")
+            if len(row) != len(_NATIVE_HEADER):
+                raise ValueError(f"row {count + 2}: invalid column count")
+            if any(len(cell) > MAX_CELL_LENGTH for cell in row):
+                raise ValueError(f"row {count + 2}: cell exceeds limit")
+            fields = dict(zip(_NATIVE_HEADER, row))
+            kind = fields["row"]
+            handle = fields["handle"].strip() if kind == "product" \
+                else fields["parent_handle"].strip()
+            if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,199}", handle):
+                raise ValueError(f"row {count + 2}: invalid handle")
+            if kind == "product":
+                if handle in products:
+                    raise ValueError(f"row {count + 2}: duplicate handle")
+                currency = fields["currency"].strip().upper()
+                if currency not in currencies:
+                    raise ValueError(f"row {count + 2}: unsupported currency")
+                decimals = _native_int(
+                    fields["currency_decimals"], "currency_decimals",
+                    count + 2)
+                if decimals is None or decimals > 18:
+                    raise ValueError(f"row {count + 2}: invalid currency_decimals")
+                title = _unescape_cell(fields["title"].strip())
+                if not title or len(title) > 200:
+                    raise ValueError(f"row {count + 2}: invalid title")
+                images = []
+                for ref in fields["images"].split("|"):
+                    ref = ref.strip()
+                    if not ref:
+                        continue
+                    try:
+                        ref = _native_image_url(ref)
+                    except ValueError as exc:
+                        raise ValueError(
+                            f"row {count + 2}: invalid image URL") from exc
+                    if ref not in images:
+                        images.append(ref)
+                if len(images) > MAX_IMAGES:
+                    raise ValueError(f"row {count + 2}: image count exceeds limit")
+                if fields["product_type"] not in ("simple", "variable"):
+                    raise ValueError(f"row {count + 2}: invalid product type")
+                products[handle] = {
+                    "handle": handle, "title": title,
+                    "product_type": fields["product_type"],
+                    "description_md": _unescape_cell(
+                        fields["description_md"].strip())[:MAX_CELL_LENGTH],
+                    "currency": currency, "currency_decimals": decimals,
+                    "variants": [], "images": images,
+                    "stock_on_hand": _native_int(
+                        fields["stock_on_hand"], "stock_on_hand",
+                        count + 2) or 0,
+                    "inventory_unknown": True, "source_status": "",
+                    "draft": True, "visibility": "hidden",
+                    "amount_minor": _native_int(
+                        fields["amount_minor"], "amount_minor", count + 2),
+                }
+                variant_rows.setdefault(handle, [])
+            elif kind == "variant":
+                variant_rows.setdefault(handle, []).append(
+                    (count + 2, fields)
+                )
+            else:
+                raise ValueError(f"row {count + 2}: unknown row kind")
+    except csv.Error as exc:
+        raise ValueError("invalid export CSV row") from exc
+    if not products:
+        raise ValueError("export CSV has no products")
+    for handle, rows in variant_rows.items():
+        if handle not in products:
+            raise ValueError(f"variant references unknown product {handle!r}")
+        product = products[handle]
+        for row_num, fields in rows:
+            amount = _native_int(fields["amount_minor"], "amount_minor", row_num)
+            stock = _native_int(fields["stock_on_hand"], "stock_on_hand", row_num)
+            options = [
+                _unescape_cell(fields[f"option_{n}"].strip())[:200]
+                for n in (1, 2, 3)
+            ]
+            product["variants"].append({
+                "sku": _unescape_cell(fields["sku"].strip())[:200],
+                "options": options,
+                "amount_minor": amount,
+                "stock_on_hand": stock or 0,
+                "inventory_unknown": True,
+                "image": None,
+            })
+    for product in products.values():
+        if product["product_type"] == "variable" and not product["variants"]:
+            raise ValueError("export product missing variants")
+        if product["variants"]:
+            amounts = [v["amount_minor"] for v in product["variants"]
+                       if v["amount_minor"] is not None]
+            if product["amount_minor"] is None and amounts:
+                product["amount_minor"] = min(amounts)
+        if product["amount_minor"] is None:
+            raise ValueError("export product is missing a price")
+        if not product["variants"]:
+            product["variants"] = [{
+                "sku": "", "options": ["", "", ""],
+                "amount_minor": product["amount_minor"],
+                "stock_on_hand": product["stock_on_hand"],
+                "inventory_unknown": True, "image": None,
+            }]
+    return list(products.values())
+
+
+def preview_native_import(
+    merchant_id: str, data: bytes, *, source_instance: str,
+) -> dict:
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", source_instance):
+        raise ValueError("invalid source instance")
+    products = parse_native_csv(data)
+    from .. import crypto
+
+    source_hash = crypto.hmac_index(
+        ext_settings().privacy_key, "native-source", merchant_id,
+        hashlib.sha256(
+            source_instance.encode() + b"\0" + data
+        ).hexdigest(),
+    )
+    return {"source_hash": source_hash, "source_instance": source_instance,
+            "source_kind": "infinitemarkets", "products": products,
+            "liabilities": [], "source_completeness": "unknown",
+            "cutover_verified": False}
+
+
 def preview_shopify_import(
     data: bytes, *, currency: str, source_instance: str,
     image_selection: dict[str, list[str]] | None = None,
@@ -419,6 +618,13 @@ async def execute_catalog_import(
         )
         if any(p.get("image_selection_required") for p in preview["products"]):
             raise ValueError("Shopify product needs explicit image selection")
+        liabilities_raw = []
+    elif source_kind == "infinitemarkets":
+        if image_selection is not None or mapping is not None:
+            raise ValueError("CSV mapping and image selection are only for Shopify")
+        preview = preview_native_import(
+            merchant_id, data, source_instance=source_instance,
+        )
         liabilities_raw = []
     else:
         if image_selection is not None or mapping is not None:
@@ -529,9 +735,11 @@ async def execute_catalog_import(
         product_ids = {}
         for product in products:
             variants = product["variants"]
+            product_currency = product.get("currency") or currency
             parent_payload = {
                 "title": product["title"], "description_md": product["description_md"],
-                "currency": currency, "currency_decimals": product["currency_decimals"],
+                "currency": product_currency,
+                "currency_decimals": product["currency_decimals"],
                 "product_type": "variable" if len(variants) > 1 else "simple",
                 "amount_minor": min(v["amount_minor"] for v in variants),
                 "stock_on_hand": 0 if len(variants) > 1 else product["stock_on_hand"],
@@ -553,7 +761,8 @@ async def execute_catalog_import(
                     )
                     payload = {
                         "title": product["title"][:150] + " — " + label[:45],
-                        "currency": currency, "currency_decimals": product["currency_decimals"],
+                        "currency": product_currency,
+                        "currency_decimals": product["currency_decimals"],
                         "product_type": "variation", "parent_product_id": parent_id,
                         "amount_minor": variant["amount_minor"],
                         "stock_on_hand": variant["stock_on_hand"],
@@ -1005,10 +1214,19 @@ async def audit_import(merchant_id: str, user, import_id: str) -> dict:
 
 
 def _variant_specs(variant: dict) -> list[dict]:
+    """Variant specs: SKU plus one spec per option dimension.
+
+    ``"Name=Value"`` options preserve the dimension name as the spec key
+    (Shopify-style); bare values keep the positional ``Option N`` key."""
     specs = []
     if variant["sku"]:
         specs.append({"key": "SKU", "value": variant["sku"]})
     for index, option in enumerate(variant["options"], start=1):
-        if option:
+        if not option:
+            continue
+        name, sep, value = option.partition("=")
+        if sep and name.strip() and value.strip():
+            specs.append({"key": name.strip(), "value": value.strip()})
+        else:
             specs.append({"key": f"Option {index}", "value": option})
     return specs

@@ -496,11 +496,15 @@ async def _catalog_upload(request: Request, *, execute: bool, source_kind: str):
         if set(form.keys()) != expected or len(form.multi_items()) != len(expected):
             raise unprocessable("invalid-content", "unexpected import fields")
         upload = form["file"]
-        extensions = (".csv",) if source_kind == "shopify" else (".json", ".ndjson")
+        extensions = (
+            (".csv",) if source_kind in ("shopify", "infinitemarkets")
+            else (".json", ".ndjson")
+        )
         if (not isinstance(upload, UploadFile) or not upload.filename
                 or not upload.filename.lower().endswith(extensions)):
             raise unprocessable("invalid-content", "unsupported import file")
-        if source_kind != "shopify" and ({"image_selection", "mapping"} & set(form)):
+        if source_kind not in ("shopify", "infinitemarkets") and (
+                {"image_selection", "mapping"} & set(form)):
             raise unprocessable("invalid-content", "CSV options are only for Shopify")
         fields = tuple(form[name] for name in expected - {"file", "image_selection", "mapping"})
         if any(not isinstance(value, str) or len(value) > 100 for value in fields):
@@ -648,6 +652,38 @@ async def complete_cutover(
     return await cutover.complete_cutover(await _mid(user), user, epoch_id)
 
 
+@infinitemarkets_api_router.post("/migration/cutovers/{epoch_id}/attest")
+@problem_boundary
+async def attest_cutover(
+    request: Request, epoch_id: str, user: User = Depends(check_user_exists),
+):
+    """Merchant attestation for zero-liability non-nostrmarket imports."""
+    from .services import cutover
+
+    return await cutover.attest_no_liabilities(await _mid(user), user, epoch_id)
+
+
+@infinitemarkets_api_router.get("/migration/products/export")
+@problem_boundary
+async def export_products(user: User = Depends(check_user_exists)):
+    """Versioned merchant product CSV download (read-only; no CSRF —
+    this is a GET returning a file, not a mutation)."""
+    from .services import migration_export
+
+    csv_text = await migration_export.export_products_csv(
+        await _mid(user), user
+    )
+    return Response(
+        content=csv_text,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition":
+                'attachment; filename="infinitemarkets-products.csv"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
 @infinitemarkets_api_router.get("/migration/imports")
 @problem_boundary
 async def list_catalog_imports(user: User = Depends(check_user_exists)):
@@ -738,6 +774,106 @@ async def preview_legacy(
         )
     except ValueError as exc:
         raise unprocessable("invalid-content", str(exc)) from exc
+
+
+@infinitemarkets_api_router.post("/migration/native/dry-run")
+@infinitemarkets_api_router.post("/migration/native/validate")
+@infinitemarkets_api_router.post("/migration/native/preview")
+@problem_boundary
+async def preview_native(request: Request, user: User = Depends(check_user_exists)):
+    """Preview an infinitemarkets-products-v1 export reimport."""
+    from .services import migration_import
+
+    merchant_id = await _mid(user)
+    data, _, source_instance, _, _, _ = await _catalog_upload(
+        request, execute=False, source_kind="infinitemarkets"
+    )
+    try:
+        return migration_import.preview_native_import(
+            merchant_id, data, source_instance=source_instance,
+        )
+    except ValueError as exc:
+        raise unprocessable("invalid-content", str(exc)) from exc
+
+
+@infinitemarkets_api_router.post("/migration/native/execute")
+@problem_boundary
+async def execute_native(request: Request, user: User = Depends(check_user_exists)):
+    from .services import migration_import
+
+    merchant_id = await _mid(user)
+    data, currency, source_instance, source_hash, _, _ = await _catalog_upload(
+        request, execute=True, source_kind="infinitemarkets"
+    )
+    try:
+        return await migration_import.execute_catalog_import(
+            merchant_id, user, data, currency=currency,
+            source_instance=source_instance, expected_hash=source_hash,
+            source_kind="infinitemarkets",
+        )
+    except ValueError as exc:
+        raise unprocessable("invalid-content", str(exc)) from exc
+
+
+@infinitemarkets_api_router.post("/migration/media/upload")
+@problem_boundary
+async def upload_media(request: Request, user: User = Depends(check_user_exists)):
+    """Bounded merchant-uploaded media: manifest JSON + image bytes."""
+    from .services import migration_media
+
+    merchant_id = await _mid(user)
+    if not request.headers.get("content-type", "").startswith(
+            "multipart/form-data;"):
+        raise unprocessable("invalid-content", "multipart upload required")
+
+    async def bounded_stream():
+        received = 0
+        limit = migration_media.MAX_FILES_PER_REQUEST * (
+            migration_media.MAX_FILE_BYTES + 8192
+        )
+        async for chunk in request.stream():
+            received += len(chunk)
+            if received > limit:
+                raise unprocessable("invalid-content", "upload exceeds limit")
+            yield chunk
+
+    try:
+        form = await MultiPartParser(
+            request.headers, bounded_stream(),
+            max_files=migration_media.MAX_FILES_PER_REQUEST + 1,
+            max_fields=1,
+        ).parse()
+    except MultiPartException as exc:
+        raise unprocessable("invalid-content", "invalid upload form") from exc
+    try:
+        if set(form.keys()) - {"manifest"} == set():
+            raise unprocessable("invalid-content", "image files required")
+        manifest_field = form.get("manifest")
+        if not isinstance(manifest_field, str):
+            raise unprocessable("invalid-content", "manifest field required")
+        manifest = migration_media.parse_manifest(manifest_field)
+        files = []
+        for key, item in form.multi_items():
+            if key == "manifest":
+                continue
+            if not isinstance(item, UploadFile):
+                raise unprocessable("invalid-content", "invalid file field")
+            content = await item.read(migration_media.MAX_FILE_BYTES + 1)
+            files.append((item.filename or "image", content))
+        return await migration_media.upload_media(
+            merchant_id, user, manifest, files
+        )
+    finally:
+        await form.close()
+
+
+@infinitemarkets_api_router.post("/migration/media/relink")
+@problem_boundary
+async def relink_media(request: Request, user: User = Depends(check_user_exists)):
+    """Swap owned product image URLs to verified local media files."""
+    from .services import migration_media
+
+    return await migration_media.relink_media(await _mid(user), user)
 
 
 @infinitemarkets_api_router.post("/migration/legacy/{source_kind}/execute")

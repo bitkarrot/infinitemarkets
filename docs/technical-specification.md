@@ -1659,6 +1659,53 @@ merchant action. Default expiry remains 30 days.
    allowed only for explicitly partitioned inventory. External software cannot be
    detected; same-key reuse remains an additional operational trust boundary.
 
+### 13.1 Catalog export and attested activation (non-nostrmarket sources)
+
+`GET /api/v1/migration/products/export` returns the merchant's own catalog as
+`infinitemarkets-products-v1` CSV: a `format,infinitemarkets-products-v1` preamble
+row, a fixed header, one row per product (`row=product`) and per variation
+(`row=variant` with `parent_handle`, `variant_index`, `option_N` as `Name=Value`,
+`sku`). Images and categories are `|`-separated lists. Formula-injection cells are
+exported with a leading `'` guard. The export contains no keys, invoices, buyers,
+orders, reservations, or encrypted material; it is not proof of stock or settled
+orders.
+
+`POST /api/v1/migration/native/{preview,execute}` re-imports that format as blocked
+hidden drafts (`source_kind="infinitemarkets"`, zero liabilities). Only the
+exporter's `'` escape prefix is stripped on re-import.
+
+**Attested activation.** Shopify CSV and `infinitemarkets` sources have no
+same-instance wallet settlement surface, so they cannot produce payable-liability
+races; they also cannot prove the negative. `POST /api/v1/migration/cutovers/{id}/attest`
+records a merchant-signed attestation (Nostr kind-30078 bound to the import id and
+source hash) and completes the epoch when the import carries zero liability rows.
+Attestation is rejected for `nostrmarket` imports and any import with liabilities —
+those still require the §13 disable/restart/snapshot flow. The shared release
+predicate is unchanged: imported products also require `stock_counted_at` (the
+explicit physical count) before they can publish or sell.
+
+### 13.2 Owned media ingest
+
+`POST /api/v1/migration/media/upload` accepts multipart form with a `manifest` field
+(`{source-url: sha256}`) and ≤16 image files per request. The server never fetches
+URLs — the merchant supplies bytes; each file is accepted only when its sha256
+matches a manifest entry whose URL already belongs to one of the merchant's
+products, and the bytes sniff as JPEG/PNG/WebP. Verified files are stored
+content-addressed under the host data folder `images/infinitemarkets/<hmac merchant
+namespace>/<sha256>.<ext>` (outside the reinstallable extension package, served via
+the host's `/images` mount) with a sidecar `manifest.json` mapping. Per-file limit
+25 MB, merchant aggregate 400 MB. `POST /api/v1/migration/media/relink` swaps owned
+`product_images.url` values to the verified local paths in one transaction;
+unverified URLs keep their original reference.
+
+### 13.3 Storefront profile
+
+The merchant theme gains a `storefront` tier — `{grid: standard|quad,
+hero_hidden: bool}` — and `footer.logo_url`. `quad` renders the compact
+four-column desktop / two-column mobile grid; `hero_hidden` suppresses the index
+hero. The `lightnin-dark` preset mirrors the charcoal/yellow reference
+storefront; all gated contrast pairs pass ≥4.5:1.
+
 ---
 
 ## 14. Idempotency, transactions, and multi-worker behavior

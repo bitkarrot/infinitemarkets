@@ -815,8 +815,14 @@ async def test_old_source_comparison_rejects_missing_and_extra_invoices(runtime_
     assert incomplete_catalog.value.status == 409
 
 
-async def test_shopify_source_cannot_start_unverifiable_cutover(runtime_env):
+async def test_shopify_attested_activation_and_stock_gate(
+    runtime_env, monkeypatch,
+):
+    """Zero-liability Shopify imports activate via merchant attestation —
+    the release predicate still demands an explicit physical count."""
     from pathlib import Path
+
+    from infinitemarkets.db import db, table
 
     client = runtime_env["client"]
     await client.get(f"{API}/merchants/current")
@@ -824,7 +830,7 @@ async def test_shopify_source_cannot_start_unverifiable_cutover(runtime_env):
                "X-CSRF-Token": client.cookies.get("gm_csrf")}
     fixture = Path(__file__).resolve().parents[1] / "fixtures" / "shopify_products_sample.csv"
     upload = {"file": ("sample.csv", fixture.read_bytes(), "text/csv")}
-    form = {"currency": "USD", "source_instance": "shopify-not-verifiable"}
+    form = {"currency": "USD", "source_instance": "shopify-attested"}
     preview = await client.post(
         f"{API}/migration/shopify/preview", data=form, files=upload, headers=headers
     )
@@ -834,11 +840,167 @@ async def test_shopify_source_cannot_start_unverifiable_cutover(runtime_env):
         f"{API}/migration/shopify/execute", data=form, files=upload, headers=headers
     )
     assert imported.status_code == 200, imported.text
-    blocked = await client.post(
+    import_id = imported.json()["import_id"]
+    staged = await client.post(
+        f"{API}/migration/imports/{import_id}/cutover",
+        headers=headers,
+    )
+    assert staged.status_code == 200, staged.text
+    assert staged.json()["state"] == "staged"
+    epoch_id = staged.json()["id"]
+    attested = await client.post(
+        f"{API}/migration/cutovers/{epoch_id}/attest", headers=headers,
+    )
+    assert attested.status_code == 200, attested.text
+    assert attested.json()["state"] == "complete"
+    assert attested.json()["cutover_verified"] is True
+    # idempotent
+    again = await client.post(
+        f"{API}/migration/cutovers/{epoch_id}/attest", headers=headers,
+    )
+    assert again.status_code == 200 and again.json()["state"] == "complete"
+
+    # attested completion still does not sell without a physical count
+    async with db.connect() as conn:
+        product = await conn.fetchone(
+            f"SELECT p.id, p.stock_counted_at FROM {table('products')} p "
+            f"JOIN {table('import_rows')} r ON r.product_id = p.id "
+            f"WHERE r.import_id = :i LIMIT 1",
+            {"i": import_id},
+        )
+    publish = await client.patch(
+        f"{API}/products/{product['id']}",
+        json={"draft": False, "visibility": "on-sale"}, headers=headers,
+    )
+    assert publish.status_code == 409
+    count = await client.post(
+        f"{API}/products/{product['id']}/stock-count",
+        json={"quantity": 5}, headers=headers,
+    )
+    assert count.status_code == 200, count.text
+    publish = await client.patch(
+        f"{API}/products/{product['id']}",
+        json={"draft": False, "visibility": "on-sale"}, headers=headers,
+    )
+    assert publish.status_code == 200, publish.text
+
+
+async def test_attest_rejects_nostrmarket_and_liability_imports(
+    runtime_env, monkeypatch,
+):
+    """Attestation is for unverifiable zero-liability sources only."""
+    client = runtime_env["client"]
+    await client.get(f"{API}/merchants/current")
+    headers = {"Origin": "https://shop.example",
+               "X-CSRF-Token": client.cookies.get("gm_csrf")}
+    # nostrmarket import with a payable liability
+    source = {
+        "stalls": [{"id": "old-stall", "currency": "USD"}],
+        "products": [{"id": "old-mug", "stall_id": "old-stall",
+                      "name": "Old Mug", "price": 2, "quantity": 1}],
+        "orders": [{"id": "old-order", "invoice_id": "b" * 64, "paid": False,
+                    "items": [{"product_id": "old-mug", "quantity": 1}]}],
+    }
+    upload = {"file": ("old.json", json.dumps(source).encode(), "application/json")}
+    form = {"currency": "USD", "source_instance": "attest-guard"}
+    preview = await client.post(
+        f"{API}/migration/legacy/nostrmarket/preview",
+        data=form, files=upload, headers=headers,
+    )
+    assert preview.status_code == 200, preview.text
+    form["source_hash"] = preview.json()["source_hash"]
+    imported = await client.post(
+        f"{API}/migration/legacy/nostrmarket/execute",
+        data=form, files=upload, headers=headers,
+    )
+    assert imported.status_code == 200, imported.text
+    staged = await client.post(
         f"{API}/migration/imports/{imported.json()['import_id']}/cutover",
         headers=headers,
     )
-    assert blocked.status_code == 409
+    assert staged.status_code == 200
+    denied = await client.post(
+        f"{API}/migration/cutovers/{staged.json()['id']}/attest",
+        headers=headers,
+    )
+    assert denied.status_code == 409
+
+    # a staged zero-liability nostrmarket import still cannot attest — the
+    # same-instance source could mint new payable orders at any time
+    zero = {"products": [{"id": "p1", "stall_id": "s",
+                          "name": "Mug", "price": 1, "quantity": 1}],
+            "stalls": [{"id": "s", "currency": "USD"}], "orders": []}
+    upload = {"file": ("z.json", json.dumps(zero).encode(), "application/json")}
+    form = {"currency": "USD", "source_instance": "attest-nm-guard"}
+    preview = await client.post(
+        f"{API}/migration/legacy/nostrmarket/preview",
+        data=form, files=upload, headers=headers,
+    )
+    assert preview.status_code == 200, preview.text
+    form["source_hash"] = preview.json()["source_hash"]
+    imported = await client.post(
+        f"{API}/migration/legacy/nostrmarket/execute",
+        data=form, files=upload, headers=headers,
+    )
+    assert imported.status_code == 200, imported.text
+    staged = await client.post(
+        f"{API}/migration/imports/{imported.json()['import_id']}/cutover",
+        headers=headers,
+    )
+    assert staged.status_code == 200
+    denied = await client.post(
+        f"{API}/migration/cutovers/{staged.json()['id']}/attest",
+        headers=headers,
+    )
+    assert denied.status_code == 409
+
+    # an injected liability row blocks attestation on a Shopify epoch
+    import uuid as _uuid
+    from pathlib import Path
+
+    from infinitemarkets.db import db, table
+
+    form = {"currency": "USD", "source_instance": "attest-liab-guard"}
+    fixture = Path(__file__).resolve().parents[1] / "fixtures" / (
+        "shopify_products_sample.csv"
+    )
+    upload = {"file": ("s.csv", fixture.read_bytes(), "text/csv")}
+    preview = await client.post(
+        f"{API}/migration/shopify/preview", data=form, files=upload,
+        headers=headers,
+    )
+    assert preview.status_code == 200
+    form["source_hash"] = preview.json()["source_hash"]
+    imported = await client.post(
+        f"{API}/migration/shopify/execute", data=form, files=upload,
+        headers=headers,
+    )
+    assert imported.status_code == 200, imported.text
+    import_id = imported.json()["import_id"]
+    staged = await client.post(
+        f"{API}/migration/imports/{import_id}/cutover", headers=headers,
+    )
+    assert staged.status_code == 200
+    epoch_id = staged.json()["id"]
+    async with db.connect() as conn:
+        product = await conn.fetchone(
+            f"SELECT r.product_id, ci.merchant_id FROM {table('import_rows')} r "
+            f"JOIN {table('catalog_imports')} ci ON ci.id = r.import_id "
+            "WHERE r.import_id = :i LIMIT 1", {"i": import_id},
+        )
+        await conn.execute(
+            f"INSERT INTO {table('imported_liabilities')} "
+            "(id, merchant_id, import_id, product_id, invoice_hash, "
+            "order_hash, invoice_ref_enc, quantity, status, created_at) "
+            "VALUES (:i, :m, :b, :p, :h, :o, :e, 1, 'payable', :t)",
+            {"i": _uuid.uuid4().hex, "m": product["merchant_id"],
+             "b": import_id, "p": product["product_id"],
+             "h": "c" * 64, "o": "d" * 64, "e": b"test-enc", "t": 1},
+        )
+    denied = await client.post(
+        f"{API}/migration/cutovers/{epoch_id}/attest", headers=headers,
+    )
+    assert denied.status_code == 409
 
 
 async def test_complete_rejects_tampered_snapshot(runtime_env, monkeypatch):

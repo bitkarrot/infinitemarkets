@@ -55,6 +55,14 @@
       "--color-primary": "#ffb000", "--color-on-primary": "#111111",
       "--color-primary-hover": "#ffd166", "--color-accent": "#63d2ff",
       "--color-focus": "#ffffff"
+    },
+    "lightnin-dark": {
+      "--color-bg": "#242833", "--color-surface": "#2f3442",
+      "--color-surface-alt": "#384051", "--color-border": "#454c5e",
+      "--color-text": "#d0d2d7", "--color-text-muted": "#a9afbb",
+      "--color-primary": "#fce477", "--color-on-primary": "#121212",
+      "--color-primary-hover": "#fdf0a6", "--color-accent": "#fce477",
+      "--color-focus": "#ffffff"
     }
   };
   var CORNER_RADIUS = {
@@ -74,7 +82,8 @@
   var PRESET_NAMES = {
     "warm-market": "Warm Market",
     "clean-minimal": "Clean Minimal",
-    "high-contrast": "High Contrast"
+    "high-contrast": "High Contrast",
+    "lightnin-dark": "Lightnin' Dark"
   };
   var GATED_PAIRS = [
     ["--color-text", "--color-bg"],
@@ -234,7 +243,8 @@
               primary: {label: "", url: ""},
               secondary: {label: "", url: ""}
             },
-            footer: {tagline: "", note: ""}
+            footer: {tagline: "", note: "", logo_url: ""},
+            storefront: {grid: "standard", hero_hidden: false}
           },
           saving: false,
           themeError: null,
@@ -338,7 +348,12 @@
             },
             footer: {
               tagline: (t.footer || {}).tagline || "",
-              note: (t.footer || {}).note || ""
+              note: (t.footer || {}).note || "",
+              logo_url: (t.footer || {}).logo_url || ""
+            },
+            storefront: {
+              grid: (t.storefront || {}).grid || "standard",
+              hero_hidden: !!(t.storefront || {}).hero_hidden
             }
           };
         } catch (e) {
@@ -695,6 +710,7 @@
           brand: t.brand || {},
           hero: t.hero || {},
           footer: t.footer || {},
+          storefront: t.storefront || {},
           advanced_opt_in: !!t.advanced_opt_in
         };
         if (t.advanced_opt_in) {

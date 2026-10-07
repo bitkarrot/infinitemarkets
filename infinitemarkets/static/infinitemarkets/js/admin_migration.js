@@ -216,6 +216,7 @@
             form.append("source_hash", state.preview.source_hash);
           }
           var route = state.sourceKind === "shopify" ? "shopify" :
+            state.sourceKind === "infinitemarkets" ? "native" :
             "legacy/" + state.sourceKind;
           var response = await fetch(
             "/infinitemarkets/api/v1/migration/" + route + "/" + operation,

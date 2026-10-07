@@ -956,12 +956,13 @@
           <q-select v-model="gmMigration.sourceKind" outlined dense emit-value map-options
                     label="File format" class="q-mb-md"
                     :options="[{ label: 'Shopify CSV', value: 'shopify' },
+                               { label: 'Infinite Markets CSV', value: 'infinitemarkets' },
                                { label: 'nostrmarket JSON', value: 'nostrmarket' },
                                { label: 'NIP-15 signed events', value: 'nip15_events' }]"
                     @update:model-value="gmMigrationKindChanged"></q-select>
           <label for="gm-shopify-file" class="text-body2">Catalog file</label>
           <input id="gm-shopify-file" :key="gmMigration.sourceKind" type="file"
-                 :accept="gmMigration.sourceKind === 'shopify' ? '.csv,text/csv' : '.json,.ndjson,application/json'"
+                 :accept="['shopify', 'infinitemarkets'].includes(gmMigration.sourceKind) ? '.csv,text/csv' : '.json,.ndjson,application/json'"
                  class="block q-my-sm" @change="gmMigrationFileChanged">
           <q-input v-model="gmMigration.sourceInstance" outlined dense
                    label="Source store identifier" hint="A stable identifier for the source catalog"
@@ -987,6 +988,14 @@
                      :disable="!gmMigration.presetName || !gmMigration.mappingText"
                      @click="gmSaveCsvPreset"></q-btn>
             </div>
+          </div>
+          <div class="row q-gutter-sm q-mb-md">
+            <q-btn flat color="primary" icon="download" label="Export products (CSV)"
+                   href="/infinitemarkets/api/v1/migration/products/export"
+                   type="a" data-gm="export-products"></q-btn>
+            <span class="text-caption self-center">
+              The export is a catalog backup — not proof of stock or settled orders.
+            </span>
           </div>
           <div class="row q-gutter-sm">
             <q-btn color="primary" outline label="Validate file"
@@ -1064,11 +1073,15 @@
                 <q-item-section>{{ row.legacy_id }} · {{ row.content_hash }}</q-item-section>
               </q-item>
             </q-list>
-            <p v-if="gmMigration.audit.source_kind !== 'nostrmarket'" class="text-caption q-mt-md">
-              This source has no independently verified old-order snapshot; sales remain blocked.
-            </p>
-            <div v-else class="q-mt-md" data-gm="migration-freeze">
-              <q-banner class="bg-warning text-dark q-mb-md">
+            <q-banner v-if="gmMigration.audit.source_kind !== 'nostrmarket'"
+                      class="bg-info text-dark q-mt-md">
+              This source has no same-instance order settlement. To activate the
+              imported drafts you must attest that no outstanding payable orders exist
+              for it, then record a physical stock count per product.
+            </q-banner>
+            <div class="q-mt-md" data-gm="migration-freeze">
+              <q-banner v-if="gmMigration.audit.source_kind === 'nostrmarket'"
+                        class="bg-warning text-dark q-mb-md">
                 Pausing the old merchant does not stop invoice reissue or order restore.
                 Only an operator can disable nostrmarket for this entire LNbits instance
                 and restart it. These controls do not disable the old extension or approve sales.
@@ -1087,9 +1100,16 @@
                     'Still running or cannot be checked' }}
                 </p>
                 <div class="row q-gutter-sm">
-                  <q-btn v-if="gmMigration.cutover.state === 'staged'" outline
+                  <q-btn v-if="gmMigration.cutover.state === 'staged' &&
+                               gmMigration.audit.source_kind === 'nostrmarket'" outline
                          label="Record freeze request (does not disable)"
                          @click="gmCutoverAction('freeze-request')"></q-btn>
+                  <q-btn v-if="gmMigration.cutover.state === 'staged' &&
+                               gmMigration.audit.source_kind !== 'nostrmarket'" outline
+                         color="positive"
+                         label="Attest: no outstanding payable orders remain"
+                         :loading="gmMigration.busy"
+                         @click="gmCutoverAction('attest')"></q-btn>
                   <q-btn v-if="gmMigration.cutover.state === 'freeze_requested'" outline
                          label="Verify old invoices" :loading="gmMigration.busy"
                          @click="gmCheckOldSource"></q-btn>
@@ -1860,7 +1880,7 @@
               <div class="col-12 col-md-7">
                 <div class="text-subtitle2 q-mb-sm">Preset</div>
                 <div class="gm-choice-grid q-mb-md" role="radiogroup" aria-label="Theme preset">
-                  <q-card v-for="p in ['warm-market', 'clean-minimal', 'high-contrast']"
+                  <q-card v-for="p in ['warm-market', 'clean-minimal', 'high-contrast', 'lightnin-dark']"
                           :key="p" flat bordered class="cursor-pointer q-pa-sm gm-choice"
                           :class="{ 'gm-preset-active': gmSettings.theme.preset === p }"
                           role="radio" tabindex="0"
@@ -1891,6 +1911,19 @@
                   </q-card>
                 </div>
                 <div class="text-caption q-mb-md">{{ gmSettings.layoutNote }}</div>
+
+                <div class="text-subtitle2 q-mb-sm">Storefront structure</div>
+                <div class="row q-col-gutter-sm q-mb-md">
+                  <q-select v-model="gmSettings.theme.storefront.grid" dense
+                            outlined class="col-12 col-sm-6"
+                            label="Product grid density"
+                            :options="[{ value: 'standard', label: 'Standard' },
+                                       { value: 'quad', label: 'Compact — 4 columns desktop, 2 mobile' }]"
+                            emit-value map-options></q-select>
+                  <q-toggle v-model="gmSettings.theme.storefront.hero_hidden"
+                            dense class="col-12 col-sm-6 self-center"
+                            label="Hide the storefront intro (hero)"></q-toggle>
+                </div>
 
                 <q-expansion-item label="Brand Basics" class="q-mb-sm"
                                   data-gm="brand-basics">
@@ -1991,6 +2024,10 @@
                     <q-input v-model="gmSettings.theme.footer.note" dense
                              outlined maxlength="200"
                              label="Fine print line">
+                    </q-input>
+                    <q-input v-model="gmSettings.theme.footer.logo_url" dense
+                             outlined class="q-mt-sm"
+                             label="Footer logo image URL (https or /images/…)">
                     </q-input>
                   </div>
                 </q-expansion-item>

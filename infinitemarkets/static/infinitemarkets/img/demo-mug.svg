@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000" role="img" aria-label="Cream ceramic Plebeian Mug with a Lightning bolt, photographed on a warm tabletop">
+  <rect width="1000" height="1000" fill="#e9e0d2"/>
+  <path d="M0 698h1000v302H0Z" fill="#cab69b"/>
+  <path d="M0 698h1000" stroke="#ad9b83" stroke-width="3" opacity=".35"/>
+  <ellipse cx="530" cy="829" rx="348" ry="67" fill="#5e4d3c" opacity=".18"/>
+  <path d="M713 376c110-38 188 17 185 133-3 119-85 174-185 134l-6-66c84 28 124-13 125-77 2-64-40-91-119-63Z" fill="#eee7db" stroke="#aa9f90" stroke-width="9"/>
+  <path d="M728 442c63-17 104 11 104 64 0 59-45 88-106 71" fill="none" stroke="#b0a392" stroke-width="9" opacity=".42"/>
+  <path d="M256 346h466l-35 413c-5 47-91 80-199 80-110 0-197-33-201-80Z" fill="#f6efe3" stroke="#c4baaa" stroke-width="4"/>
+  <path d="M289 716c10 80 70 105 199 105 119 0 188-32 199-105l-2 29c-3 48-74 82-197 82-119 0-191-35-197-82Z" fill="#ded4c4" opacity=".75"/>
+  <ellipse cx="489" cy="352" rx="233" ry="56" fill="#e7dfd1" stroke="#fdfbf3" stroke-width="14"/>
+  <ellipse cx="489" cy="348" rx="201" ry="35" fill="#39271f"/>
+  <ellipse cx="489" cy="350" rx="161" ry="23" fill="none" stroke="#906848" stroke-width="4" opacity=".6"/>
+  <path d="M305 380c15 135 15 265 20 326" fill="none" stroke="#fffaf0" stroke-width="19" opacity=".54" stroke-linecap="round"/>
+  <path d="M665 377c-6 133-6 246-21 333" fill="none" stroke="#a89e90" stroke-width="14" opacity=".32" stroke-linecap="round"/>
+  <circle cx="488" cy="568" r="111" fill="#173d44"/>
+  <circle cx="488" cy="568" r="99" fill="none" stroke="#e0bc82" stroke-width="2"/>
+  <path d="M513 485 448 574h45l-30 79 74-101h-48Z" fill="#e9c58e"/>
+  <path d="M381 692h214" stroke="#36555a" stroke-width="2" opacity=".45"/>
+  <text x="488" y="721" text-anchor="middle" font-family="DejaVu Sans,sans-serif" font-size="22" font-weight="bold" letter-spacing="2" fill="#244248">PLEBEIAN MUG</text>
+</svg>

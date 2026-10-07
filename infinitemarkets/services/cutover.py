@@ -502,8 +502,9 @@ async def check_source(merchant_id: str, user, epoch_id: str) -> dict:
 
 async def stage_import(merchant_id: str, user, import_id: str) -> dict:
     audited = await migration_import.audit_import(merchant_id, user, import_id)
-    if audited["source_kind"] != "nostrmarket":
-        raise conflict("source-unverifiable", "Only same-instance nostrmarket can stage cutover")
+    if audited["source_kind"] not in (
+            "nostrmarket", "shopify", "infinitemarkets", "nip15_events"):
+        raise conflict("source-unverifiable", "Unsupported import source")
     now = int(time.time())
     async with DomainTransaction() as tx:
         await tx.fetch_one(
@@ -638,8 +639,17 @@ async def cutover_status(merchant_id: str, user, epoch_id: str) -> dict:
             {"m": merchant_id},
         )
         row = await _owned_epoch(tx, merchant_id, epoch_id)
+        source_kind = await tx.fetch_one(
+            f"SELECT ci.source_kind FROM {tx.table('catalog_imports')} ci "
+            f"WHERE ci.id = :i",
+            {"i": row["import_id"]},
+        )
+        nostrmarket_sourced = (
+            source_kind and source_kind["source_kind"] == "nostrmarket"
+        )
         if (row["state"] in ("snapshot_verified", "reconciling", "ready",
                              "complete")
+                and nostrmarket_sourced
                 and not (source["disabled"]
                          and source["reason_code"] == "snapshot-unverified")):
             # detected reactivation or a changed/missing source contract —
@@ -1060,14 +1070,21 @@ async def cutover_reconcile_pass(page_size: int = 50) -> dict:
     checked = reblocked = settled = released = errors = 0
     async with db.connect() as conn:
         epochs = await conn.fetchall(
-            f"SELECT e.id, e.merchant_id, e.state, e.import_id, m.user_id "
+            f"SELECT e.id, e.merchant_id, e.state, e.import_id, m.user_id, "
+            f"ci.source_kind "
             f"FROM {table('cutover_epochs')} e "
             f"JOIN {table('merchants')} m ON m.id = e.merchant_id "
+            f"JOIN {table('catalog_imports')} ci ON ci.id = e.import_id "
             "WHERE e.state IN ('snapshot_verified', 'reconciling', 'complete') "
             "ORDER BY e.created_at LIMIT 20",
         )
     for epoch_row in epochs:
         epoch = dict(epoch_row)
+        # Merchant-attested epochs (Shopify/native sources) have no
+        # same-instance settlement surface — reactivation gates only apply
+        # to the verifiable nostrmarket path.
+        if epoch["source_kind"] != "nostrmarket":
+            continue
         source = await old_source_status()
         if not (source["disabled"]
                 and source["reason_code"] == "snapshot-unverified"):
@@ -1244,6 +1261,108 @@ async def complete_cutover(merchant_id: str, user, epoch_id: str) -> dict:
             f"INSERT INTO {tx.table('cutover_events')} "
             "(id, epoch_id, state, reason_code, sequence, created_at) "
             "VALUES (:i, :e, 'complete', 'liabilities-covered', :n, :t)",
+            {"i": uuid.uuid4().hex, "e": epoch_id,
+             "n": await _next_event_sequence(tx, epoch_id), "t": now},
+        )
+        epoch["state"] = "complete"
+    return _public_epoch(epoch)
+
+
+async def attest_no_liabilities(merchant_id: str, user, epoch_id: str) -> dict:
+    """Merchant-attested completion for imports with no payable liabilities.
+
+    Only non-nostrmarket sources (Shopify CSV, infinitemarkets native CSV)
+    may attest: there is no same-instance wallet settlement surface for
+    those uploads, so nothing can race physical stock. Imports that do
+    carry liability rows, and all nostrmarket imports, still require the
+    full disable/restart/snapshot verification path.
+
+    The attestation is Nostr-signed with the merchant key, persisted as the
+    epoch's signed snapshot, and transitions the epoch straight to
+    ``complete``. The shared release predicate still requires an explicit
+    physical stock count per product before anything can publish or sell.
+    """
+    await catalog._merchant_owned(merchant_id, user)
+    now = int(time.time())
+    async with DomainTransaction() as tx:
+        await tx.fetch_one(
+            f"SELECT id FROM {tx.table('merchants')} WHERE id = :m{tx.for_update}",
+            {"m": merchant_id},
+        )
+        epoch = await _owned_epoch(tx, merchant_id, epoch_id)
+        if epoch["state"] == "complete":
+            return _public_epoch(epoch)
+        if epoch["state"] != "staged":
+            raise conflict(
+                "invalid-transition",
+                "Attestation requires a staged, unverified import",
+            )
+        source = await tx.fetch_one(
+            f"SELECT source_kind, source_hash FROM {tx.table('catalog_imports')} "
+            "WHERE id = :i AND merchant_id = :m",
+            {"i": epoch["import_id"], "m": merchant_id},
+        )
+        if not source:
+            raise conflict("import-changed", "Import record is missing")
+        if source["source_kind"] == "nostrmarket":
+            raise conflict(
+                "source-unverifiable",
+                "nostrmarket imports require source verification",
+            )
+        liabilities = await tx.fetch_one(
+            f"SELECT COUNT(*) AS n FROM {tx.table('imported_liabilities')} "
+            "WHERE import_id = :i AND merchant_id = :m",
+            {"i": epoch["import_id"], "m": merchant_id},
+        )
+        if liabilities["n"]:
+            raise conflict(
+                "legacy-liabilities",
+                "Attestation requires zero imported liabilities",
+            )
+        payload = {
+            "version": 1, "phase": "attested", "source": source["source_kind"],
+            "import_id": epoch["import_id"],
+            "import_source_hash": source["source_hash"],
+            "attestation": "no-outstanding-payable-liabilities",
+            "liability_count": 0, "created_at": now,
+        }
+        from nostr_sdk import EventBuilder, Kind, PublicKey, Tag
+
+        from ..keystore import MerchantKeyStore
+        from ..settings import ext_settings
+
+        keystore = MerchantKeyStore(ext_settings())
+        pubkey = await keystore.public_key(merchant_id)
+        builder = EventBuilder(
+            Kind(30078),
+            json.dumps(payload, sort_keys=True, separators=(",", ":")),
+        ).tags([Tag.parse(["d", "im-attest-" + epoch_id[:32]])])
+        signed = await keystore.sign_event(
+            merchant_id, builder.build(PublicKey.parse(pubkey))
+        )
+        if not signed.verify():
+            raise conflict(
+                "import-signature", "Attestation could not be verified"
+            )
+        rc = await tx.execute(
+            f"UPDATE {tx.table('cutover_epochs')} "
+            "SET state = 'complete', snapshot_json = :j, updated_at = :t "
+            "WHERE id = :i AND state = 'staged'",
+            {"i": epoch_id, "j": signed.as_json(), "t": now},
+        )
+        if rc != 1:
+            raise conflict("invalid-transition", "Attestation cannot complete")
+        await tx.execute(
+            f"UPDATE {tx.table('products')} SET import_authorized = TRUE "
+            f"WHERE merchant_id = :m AND id IN ("
+            f"SELECT product_id FROM {tx.table('import_rows')} "
+            "WHERE import_id = :i)",
+            {"m": merchant_id, "i": epoch["import_id"]},
+        )
+        await tx.execute(
+            f"INSERT INTO {tx.table('cutover_events')} "
+            "(id, epoch_id, state, reason_code, sequence, created_at) "
+            "VALUES (:i, :e, 'complete', 'liability-attestation', :n, :t)",
             {"i": uuid.uuid4().hex, "e": epoch_id,
              "n": await _next_event_sequence(tx, epoch_id), "t": now},
         )

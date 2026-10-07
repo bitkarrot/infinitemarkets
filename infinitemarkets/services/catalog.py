@@ -841,7 +841,8 @@ async def create_import_draft(
     payload: dict, source_instance: str, legacy_id: str,
     source_kind: str = "shopify",
 ) -> str:
-    if source_kind not in ("shopify", "nostrmarket", "nip15_events"):
+    if source_kind not in ("shopify", "nostrmarket", "nip15_events",
+                           "infinitemarkets"):
         raise unprocessable("invalid-content", "unsupported import source")
     _reject_unknown(payload, _PRODUCT_PAYLOAD_FIELDS)
     _validate_product_payload(payload)

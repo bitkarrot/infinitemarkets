@@ -22,7 +22,7 @@
     <span class="brand-mark" aria-hidden="true">{{ brand_initials or 'G' }}</span>
   {%- endif -%}
 {%- endmacro -%}
-<div class="gm-public" data-layout="{{ layout }}" data-shop="{{ shop_pubkey or '' }}">
+<div class="gm-public" data-layout="{{ layout }}" data-grid="{{ grid or 'standard' }}" data-shop="{{ shop_pubkey or '' }}">
   <a class="skip-link" href="#gm-main">Skip to content</a>
   <header class="store-header">
     <div class="store-header-inner">
@@ -66,6 +66,9 @@
   <footer class="store-footer">
     <div class="store-footer-inner">
       <div class="footer-about">
+        {% if footer_logo %}
+        <img class="footer-logo" src="{{ footer_logo }}" alt="" referrerpolicy="no-referrer">
+        {% endif %}
         <strong>{{ brand_name or 'Infinitemarkets' }}</strong>
         <p>{{ footer_tagline or 'Pay with any Lightning wallet. No account needed — every order gets its own private link to check its status.' }}</p>
       </div>

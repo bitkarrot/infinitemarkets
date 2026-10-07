@@ -101,6 +101,7 @@ def _brand_ctx(merchant: dict | None, theme: dict | None) -> dict:
         "brand_logo": brand.get("logo_url") or "",
         "footer_tagline": footer.get("tagline") or "",
         "footer_note": footer.get("note") or "",
+        "footer_logo": footer.get("logo_url") or "",
         "shop_pubkey": pubkey or "",
         "storefront_url": (
             f"/infinitemarkets/public/merchants/{pubkey}" if pubkey else ""
@@ -155,6 +156,7 @@ async def _store_ctx(merchant: dict, theme: dict | None) -> dict:
         # Every public document carries the merchant's layout so the
         # opt-in ``gallery`` look reaches chrome pages, not only product.
         "layout": theme_service.theme_layout(theme),
+        "grid": theme_service.storefront_grid(theme),
         "nav_collections": collections[:NAV_COLLECTIONS_MAX],
         "all_collections": collections,
         # D-06 + 03.1-D13: the buyer sign-in affordance renders while
@@ -601,8 +603,10 @@ async def merchant_page(request: Request, pubkey: str):
             "hero": hero,
             # the hero is the index-page intro — any browse state
             # (filter, sort, page) means the shopper is inside the
-            # catalog, so the marketing block steps aside.
-            "show_hero": not request.query_params,
+            # catalog, so the marketing block steps aside; a merchant
+            # storefront profile can also hide it entirely.
+            "show_hero": (not request.query_params
+                          and not theme_service.hero_hidden(theme)),
             "products": cards,
             "browse": browse,
             "theme_css": theme_service.emit_css(theme),
