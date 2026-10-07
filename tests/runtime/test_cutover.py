@@ -529,6 +529,34 @@ async def test_reconcile_pass_reblocks_and_settles(runtime_env, monkeypatch):
     assert epoch["state"] == "blocked"
 
 
+async def test_abort_during_reconcile_retains_holds(runtime_env, monkeypatch):
+    from infinitemarkets.db import db, table
+
+    client, headers, merchant_id, epoch_id, liability = await _verified_epoch(
+        runtime_env, monkeypatch, qty=1, instance="t-abort-holds",
+    )
+    action_url = f"{API}/migration/cutovers/{epoch_id}/liabilities/{liability['id']}"
+    assert (await client.post(
+        action_url, headers=headers, json={"action": "partition"},
+    )).status_code == 200
+    aborted = await client.post(
+        f"{API}/migration/cutovers/{epoch_id}/abort", headers=headers,
+    )
+    assert aborted.status_code == 200 and aborted.json()["state"] == "blocked"
+    async with db.connect() as conn:
+        part = await conn.fetchone(
+            f"SELECT state FROM {table('liability_partitions')} WHERE epoch_id = :e",
+            {"e": epoch_id},
+        )
+        product = await conn.fetchone(
+            f"SELECT stock_reserved, draft, visibility FROM {table('products')} "
+            "WHERE id = :p", {"p": liability["product_id"]},
+        )
+    # the payable hold survives abort; the invoice may still settle
+    assert part["state"] == "held" and product["stock_reserved"] == 1
+    assert product["draft"] and product["visibility"] == "hidden"
+
+
 async def test_old_source_requires_installed_and_runtime_disable(
     runtime_env, monkeypatch,
 ):
