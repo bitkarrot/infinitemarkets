@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>infinitemarkets — Architecture Guide</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body class="index">
+<div class="wrap">
+  <header>
+    <div class="kicker">infinitemarkets · architecture guide</div>
+    <h1>System Diagrams</h1>
+    <p>Color-rendered versions of the architecture diagrams from <code>docs/</code>,
+       with structured notes attached. This collection is the scaffold for a
+       long-form architecture guide and an eventual slideshow — each diagram's
+       content lives as structured data in <code>diagrams/*.js</code>.</p>
+  </header>
+  <div class="cards" id="cards"></div>
+  <footer class="note">
+    Sources of truth: <code>docs/technical-specification.md</code> (normative contract)
+    and <code>docs/architecture-overview.md</code> (as-built state).<br>
+    Diagram data files in <code>docs/viewer/diagrams/</code> carry per-diagram bullet
+    sections designed to expand into long-form chapters or slide decks.
+  </footer>
+</div>
+<script src="diagrams/registry.js"></script>
+<script>
+  const el = document.getElementById('cards');
+  window.DIAGRAMS.forEach(d => {
+    el.insertAdjacentHTML('beforeend', `
+      <a class="card" href="view.html?d=${d.id}">
+        <div class="num">${d.num} · ${d.kind.toUpperCase()}</div>
+        <h2>${d.title}</h2>
+        <div class="src">${d.source}</div>
+        <p>${d.summary}</p>
+        <div class="open">Open diagram →</div>
+      </a>`);
+  });
+</script>
+</body>
+</html>

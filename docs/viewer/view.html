@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diagram</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body class="viewer">
+
+<div id="hud">
+  <h1 id="hudTitle">Loading…</h1>
+  <p><span id="hudSrc"></span> — scroll to zoom, drag to pan · <a href="index.html">← all diagrams</a></p>
+</div>
+
+<div id="controls">
+  <button id="zin" title="Zoom in">+</button>
+  <button id="zout" title="Zoom out">&minus;</button>
+  <button id="fit" title="Fit whole diagram">Fit</button>
+  <button id="fitw" title="Fit width — pan up/down">Fit W</button>
+  <button id="fith" title="Fit height — pan left/right">Fit H</button>
+  <button id="actual" title="Actual size">1:1</button>
+  <button id="notesBtn" title="Toggle notes / long-form outline">Notes</button>
+  <span id="zoomPct">100%</span>
+</div>
+
+<div id="legend"></div>
+
+<div id="viewport">
+  <div id="canvas"><pre class="mermaid" id="src"></pre></div>
+</div>
+
+<aside id="notes">
+  <button id="closeNotes" title="Close">×</button>
+  <div class="notes-head">
+    <h2 id="notesTitle"></h2>
+    <p id="notesSrc"></p>
+  </div>
+  <div id="notesBody"></div>
+</aside>
+
+<script src="assets/mermaid.min.js"></script>
+<script src="diagrams/registry.js"></script>
+<script src="assets/viewer.js"></script>
+</body>
+</html>

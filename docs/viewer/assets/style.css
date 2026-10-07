@@ -1,0 +1,82 @@
+/* ---------- shared ---------- */
+html, body { height: 100%; margin: 0; background: #0b1020; color: #c9d4ea;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif; }
+a { color: #6bb3ff; }
+code { background: #16203a; padding: 1px 5px; border-radius: 4px; font-size: .92em; color: #d8e4fb; }
+
+/* ---------- diagram viewer ---------- */
+body.viewer { overflow: hidden; }
+#viewport { position: fixed; inset: 0; overflow: hidden; cursor: grab; }
+#viewport.dragging { cursor: grabbing; }
+#canvas { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+.mermaid { width: max-content; }
+.mermaid svg { display: block; max-width: none !important; }
+
+#hud { position: fixed; top: 14px; left: 16px; z-index: 10;
+  background: rgba(16, 22, 40, .88); border: 1px solid #2a3a5e; border-radius: 10px;
+  padding: 10px 14px; backdrop-filter: blur(6px); max-width: 560px; }
+#hud h1 { margin: 0 0 4px; font-size: 15px; font-weight: 600; color: #eef3ff; }
+#hud p { margin: 0; font-size: 12px; color: #8fa1c4; }
+#hud a { font-size: 12px; }
+
+#controls { position: fixed; top: 14px; right: 16px; z-index: 10; display: flex; gap: 6px; }
+#controls button, #controls a.btn { background: #1a2540; color: #dfe8fa; border: 1px solid #33507e;
+  border-radius: 8px; font-size: 14px; padding: 6px 12px; cursor: pointer; text-decoration: none;
+  display: inline-flex; align-items: center; }
+#controls button:hover, #controls a.btn:hover { background: #24355a; }
+#zoomPct { align-self: center; color: #9db0d4; font-size: 12px; min-width: 48px; text-align: center; }
+
+#legend { position: fixed; bottom: 14px; left: 16px; z-index: 10; display: flex; gap: 14px;
+  flex-wrap: wrap; max-width: 70vw;
+  background: rgba(16,22,40,.88); border: 1px solid #2a3a5e; border-radius: 10px;
+  padding: 8px 14px; font-size: 12px; }
+.sw { display: inline-block; width: 11px; height: 11px; border-radius: 3px;
+  margin-right: 6px; vertical-align: -1px; }
+
+/* mermaid label styling */
+.edgeLabel { color: #f2f6ff !important; background-color: rgba(18, 26, 46, .92) !important;
+  border: 1px solid #35476b; border-radius: 6px; padding: 3px 8px !important; font-size: 17px !important; }
+.edgeLabel p { margin: 0 !important; }
+.cluster-label { font-weight: 700; font-size: 22px !important; letter-spacing: .02em; }
+.nodeLabel, .cluster .nodeLabel { font-size: 19px !important; }
+
+/* ---------- notes / long-form panel ---------- */
+#notes { position: fixed; top: 0; right: 0; bottom: 0; width: 430px; z-index: 20;
+  background: rgba(13, 18, 34, .97); border-left: 1px solid #2a3a5e;
+  transform: translateX(102%); transition: transform .25s ease;
+  display: flex; flex-direction: column; }
+#notes.open { transform: translateX(0); }
+#notes .notes-head { padding: 18px 20px 10px; border-bottom: 1px solid #22304f; }
+#notes .notes-head h2 { margin: 0 0 4px; font-size: 17px; color: #eef3ff; }
+#notes .notes-head p { margin: 0; font-size: 12px; color: #8fa1c4; }
+#notesBody { overflow-y: auto; padding: 14px 20px 30px; }
+#notesBody h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em;
+  color: #6bb3ff; margin: 20px 0 8px; }
+#notesBody h3:first-child { margin-top: 4px; }
+#notesBody ul { margin: 0; padding-left: 18px; }
+#notesBody li { font-size: 13.5px; line-height: 1.55; margin-bottom: 7px; color: #c9d4ea; }
+#notesBody li b { color: #eef3ff; }
+#closeNotes { position: absolute; top: 12px; right: 14px; background: none; border: none;
+  color: #8fa1c4; font-size: 22px; cursor: pointer; }
+#closeNotes:hover { color: #eef3ff; }
+
+/* ---------- index / landing ---------- */
+body.index { overflow: auto; }
+.wrap { max-width: 960px; margin: 0 auto; padding: 48px 24px 80px; }
+.wrap > header { margin-bottom: 36px; }
+.wrap > header .kicker { font-size: 12px; text-transform: uppercase; letter-spacing: .12em;
+  color: #6bb3ff; margin-bottom: 8px; }
+.wrap > header h1 { margin: 0 0 10px; font-size: 30px; color: #eef3ff; }
+.wrap > header p { margin: 0; font-size: 15px; line-height: 1.6; color: #9db0d4; max-width: 720px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; }
+.card { display: block; text-decoration: none; background: #101a30; border: 1px solid #22304f;
+  border-radius: 14px; padding: 20px 22px; transition: border-color .15s, transform .15s; }
+.card:hover { border-color: #3d6bb3; transform: translateY(-2px); }
+.card .num { font-size: 12px; color: #6bb3ff; font-weight: 700; letter-spacing: .06em; }
+.card h2 { margin: 6px 0 8px; font-size: 18px; color: #eef3ff; }
+.card .src { font-size: 12px; color: #8fa1c4; margin-bottom: 10px; }
+.card p { margin: 0; font-size: 13.5px; line-height: 1.55; color: #9db0d4; }
+.card .open { margin-top: 14px; font-size: 13px; color: #6bb3ff; font-weight: 600; }
+footer.note { margin-top: 48px; padding-top: 20px; border-top: 1px solid #22304f;
+  font-size: 12.5px; color: #6b7c9e; line-height: 1.7; }
+footer.note code { font-size: 12px; }
