@@ -462,6 +462,73 @@ async def test_complete_releases_products_and_reblocks_on_reactivation(
     assert repatch.status_code == 409
 
 
+async def test_reconcile_pass_reblocks_and_settles(runtime_env, monkeypatch):
+    from infinitemarkets.db import db, table
+    from infinitemarkets.services import cutover
+
+    client, headers, merchant_id, epoch_id, liability = await _verified_epoch(
+        runtime_env, monkeypatch, qty=1, instance="t-pass",
+    )
+    async with db.connect() as conn:
+        await conn.execute(
+            f"UPDATE {table('products')} SET stock_on_hand = 3 "
+            "WHERE id = :p", {"p": liability["product_id"]},
+        )
+    action_url = f"{API}/migration/cutovers/{epoch_id}/liabilities/{liability['id']}"
+    assert (await client.post(
+        action_url, headers=headers, json={"action": "partition"},
+    )).status_code == 200
+
+    # payment lookup failure fails closed — nothing settles or releases
+    async def unavailable(_u, _h):
+        raise cutover.conflict("legacy-evidence", "unavailable")
+
+    monkeypatch.setattr(
+        cutover, "_authoritative_payment_state", unavailable
+    )
+    report = await cutover.cutover_reconcile_pass()
+    assert report["errors"] >= 1 and report["settled"] == 0
+    assert report["released"] == 0
+    async with db.connect() as conn:
+        product = await conn.fetchone(
+            f"SELECT stock_on_hand, stock_reserved FROM {table('products')} "
+            "WHERE id = :p", {"p": liability["product_id"]},
+        )
+    assert (product["stock_on_hand"], product["stock_reserved"]) == (3, 1)
+
+    async def settled(_u, _h):
+        return True
+
+    monkeypatch.setattr(cutover, "_authoritative_payment_state", settled)
+    report = await cutover.cutover_reconcile_pass()
+    assert report["settled"] >= 1 and report["errors"] == 0
+    async with db.connect() as conn:
+        product = await conn.fetchone(
+            f"SELECT stock_on_hand, stock_reserved FROM {table('products')} "
+            "WHERE id = :p", {"p": liability["product_id"]},
+        )
+        epoch = await conn.fetchone(
+            f"SELECT state FROM {table('cutover_epochs')} WHERE id = :e",
+            {"e": epoch_id},
+        )
+    assert (product["stock_on_hand"], product["stock_reserved"]) == (2, 0)
+    assert epoch["state"] == "reconciling"
+
+    # source reactivation re-blocks the epoch via the pass
+    async def reactivated():
+        return {"disabled": False, "reason_code": "legacy-active"}
+
+    monkeypatch.setattr(cutover, "old_source_status", reactivated)
+    report = await cutover.cutover_reconcile_pass()
+    assert report["reblocked"] >= 1
+    async with db.connect() as conn:
+        epoch = await conn.fetchone(
+            f"SELECT state FROM {table('cutover_epochs')} WHERE id = :e",
+            {"e": epoch_id},
+        )
+    assert epoch["state"] == "blocked"
+
+
 async def test_old_source_requires_installed_and_runtime_disable(
     runtime_env, monkeypatch,
 ):

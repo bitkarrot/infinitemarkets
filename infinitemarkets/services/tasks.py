@@ -251,7 +251,7 @@ async def reconciliation() -> None:
     checkout readiness), then every 60s under the task lease. The §9.3
     peer-relay refresh/no-route sweep rides the same lease every 15 min."""
     from ..db import DomainTransaction, db, table
-    from . import peer_relays, readiness, settlement
+    from . import cutover, peer_relays, readiness, settlement
 
     first = True
     started_at = None
@@ -266,6 +266,19 @@ async def reconciliation() -> None:
                 report = await _run_leased("reconciliation", token, settlement.reconcile)
                 if any(report.values()):
                     logger.debug(f"infinitemarkets reconcile: {report}")
+                try:
+                    cutover_report = await cutover.cutover_reconcile_pass()
+                    if (cutover_report["reblocked"] or cutover_report["settled"]
+                            or cutover_report["released"]
+                            or cutover_report["errors"]):
+                        logger.debug(
+                            f"infinitemarkets cutover reconcile: {cutover_report}"
+                        )
+                except Exception as exc:
+                    logger.warning(
+                        "infinitemarkets cutover reconcile failed:"
+                        f" {type(exc).__name__}"
+                    )
                 now_mono = _now()
                 if now_mono - last_peer_refresh >= PEER_RELAY_REFRESH_INTERVAL_S:
                     last_peer_refresh = now_mono

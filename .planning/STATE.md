@@ -5,10 +5,10 @@ milestone_name: milestone
 current_phase: 04
 current_phase_name: Release C — Migration and Cutover
 status: in_progress
-stopped_at: Phase 4 plan 04-01 committed; 04-02 gates plus pinned same-instance source fingerprint added; restart attestation, signed snapshot, stock holds and activation remain absent; cutover blocked
-last_updated: "2026-10-07T19:59:16Z"
+stopped_at: Phase 4 plan 04-02 liability reconciliation implemented — signed snapshot gates liability dispositions (wait/partition/reconcile); complete requires all covered; reactivation re-blocks; leased background pass rides the reconciliation worker. Activation pending physical-count + merchant review; 04-03/04 pending
+last_updated: "2026-10-07T21:00:00Z"
 last_activity: 2026-10-07
-last_activity_desc: Added audited nostrmarket code contract (commit d941f0a, SHA-256 source manifest) to old-source disabled status; unverified imports are excluded from publication, projections, public surfaces and checkout. Host restart/quiescence remains external and unattested
+last_activity_desc: 04-02 liability partitions and exactly-once paid/unpaid terminal transitions implemented; complete releases imported products via a shared epoch-state predicate; abort re-drafts and retains holds; leased cutover_reconcile_pass re-checks open liabilities and re-blocks on source reactivation or contract drift
 progress:
   total_phases: 5
   completed_phases: 4
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-20)
 
 ## Current Position
 
-Phase: 4 (Release C — Migration and Cutover) — IN PROGRESS (15/18 plans complete; 04-02 next)
+Phase: 4 (Release C — Migration and Cutover) — IN PROGRESS (04-01 complete; 04-02 core lifecycle implemented, hardening + remaining negative cases pending; 04-03/04 next)
 Status: Phases 1, 2, 3 and 03.1 all complete; Phase 3 release gate verified (one operator-deferred item in 03-UAT: live plebeian.market smoke)
 Last activity: 2026-10-07 — source fingerprint contract and fail-closed gates tested locally; demo PNGs tracked to survive release packaging; no live deployment or cutover authorization
 
@@ -103,7 +103,7 @@ Decisions are logged in PROJECT.md and the normative specification.
 - The new demo uses a fresh disposable database rather than migrating old demo orders and the previously hand-added images. If those records must remain visible, the old database requires a separate recovery plan.
 - Release B cannot claim production readiness without deployed egress controls and external-client evidence.
 - Release C requires a live scarce-stock payable-invoice cutover rehearsal.
-- 04-02 old-intake verification is not implemented: imported orders remain unverified, and no importer, signed upload, or declared stock count authorizes activation. The installed nostrmarket tables are empty; synthetic fixed-source fixtures are needed. PostgreSQL qualification is pending a configured profile.
+- 04-02 cutover lifecycle now implemented end-to-end: instance-wide disable + restart attestation, source-contract hash, signed snapshot, per-liability wait/partition/reconcile, completion gate, abort retaining holds, and a leased reconcile pass riding the 60s reconciliation worker. Remaining: physical-stock-count activation ceremony, more adversarial negatives (tampered snapshot, foreign wallet, unowned merchant), PostgreSQL qualification, and a real installed nostrmarket evidence pass.
 
 ### Roadmap Evolution
 
@@ -120,6 +120,6 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 ## Session Continuity
 
-Last session: 2026-10-07T06:41:01.000Z
-Stopped at: Phase 4 04-01 in progress — Shopify CSV import/API, blocked drafts and private three-product verification complete; legacy formats, cutover, export/media and release gate pending
-Resume file: .planning/phases/04-release-c-migration-and-cutover/04-01-PLAN.md
+Last session: 2026-10-07T21:00:00.000Z
+Stopped at: Phase 4 04-02 cutover lifecycle implemented (snapshot verification, liability wait/partition/reconcile, completion gate, leased background pass); activation ceremony, adversarial negatives, 04-03/04 pending
+Resume file: .planning/phases/04-release-c-migration-and-cutover/04-02-PLAN.md

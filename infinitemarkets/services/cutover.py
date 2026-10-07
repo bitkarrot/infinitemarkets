@@ -913,6 +913,100 @@ async def _authoritative_payment_state(user_id: str, payment_hash: str) -> bool 
     return status.paid
 
 
+async def _apply_terminal_status(
+    tx: DomainTransaction,
+    merchant_id: str,
+    epoch: dict,
+    liability: dict,
+    paid: bool,
+    now: int,
+) -> str:
+    """Exactly-once settle/release for one liability inside its tx.
+    Returns the new status."""
+    product = await tx.fetch_one(
+        f"SELECT id, stock_on_hand, stock_reserved "
+        f"FROM {tx.table('products')} "
+        f"WHERE id = :p AND merchant_id = :m{tx.for_update}",
+        {"p": liability["product_id"], "m": merchant_id},
+    )
+    if not product:
+        raise conflict("legacy-evidence", "Liability product is missing")
+    partition = await tx.fetch_one(
+        f"SELECT * FROM {tx.table('liability_partitions')} "
+        "WHERE liability_id = :l AND epoch_id = :e",
+        {"l": liability["id"], "e": epoch["id"]},
+    )
+    qty = liability["quantity"]
+    if paid:
+        if partition and partition["state"] == "held":
+            rc = await tx.execute(
+                f"UPDATE {tx.table('products')} SET "
+                "stock_on_hand = stock_on_hand - :q, "
+                "stock_reserved = stock_reserved - :q, updated_at = :t "
+                "WHERE id = :p AND stock_on_hand >= :q "
+                "AND stock_reserved >= :q",
+                {"p": product["id"], "q": qty, "t": now},
+            )
+            if rc != 1:
+                raise conflict(
+                    "insufficient-stock",
+                    "Physical stock cannot settle this old payment",
+                )
+            await tx.execute(
+                f"UPDATE {tx.table('liability_partitions')} "
+                "SET state = 'consumed', updated_at = :t "
+                "WHERE id = :i AND state = 'held'",
+                {"i": partition["id"], "t": now},
+            )
+        else:
+            rc = await tx.execute(
+                f"UPDATE {tx.table('products')} "
+                "SET stock_on_hand = stock_on_hand - :q, updated_at = :t "
+                "WHERE id = :p AND (stock_on_hand IS NULL OR stock_on_hand >= :q)",
+                {"p": product["id"], "q": qty, "t": now},
+            )
+            if rc != 1:
+                raise conflict(
+                    "insufficient-stock",
+                    "Physical stock cannot settle this old payment",
+                )
+        new_status, reason = "paid", "liability-paid"
+    else:
+        if partition and partition["state"] == "held":
+            rc = await tx.execute(
+                f"UPDATE {tx.table('products')} "
+                "SET stock_reserved = stock_reserved - :q, updated_at = :t "
+                "WHERE id = :p AND stock_reserved >= :q",
+                {"p": product["id"], "q": qty, "t": now},
+            )
+            if rc != 1:
+                raise conflict(
+                    "insufficient-stock",
+                    "Stock hold cannot be released cleanly",
+                )
+            await tx.execute(
+                f"UPDATE {tx.table('liability_partitions')} "
+                "SET state = 'released', updated_at = :t "
+                "WHERE id = :i AND state = 'held'",
+                {"i": partition["id"], "t": now},
+            )
+        new_status, reason = "unpaid_terminal", "liability-unpaid-terminal"
+    await tx.execute(
+        f"UPDATE {tx.table('imported_liabilities')} SET status = :s "
+        "WHERE id = :i",
+        {"i": liability["id"], "s": new_status},
+    )
+    await _mark_reconciling(tx, epoch, now)
+    await tx.execute(
+        f"INSERT INTO {tx.table('cutover_events')} "
+        "(id, epoch_id, state, reason_code, sequence, created_at) "
+        "VALUES (:i, :e, :s, :r, :n, :t)",
+        {"i": uuid.uuid4().hex, "e": epoch["id"], "s": epoch["state"],
+         "r": reason, "n": await _next_event_sequence(tx, epoch["id"]), "t": now},
+    )
+    return new_status
+
+
 async def reconcile_liability(
     merchant_id: str, user, epoch_id: str, liability_id: str
 ) -> dict:
@@ -957,89 +1051,116 @@ async def reconcile_liability(
         liability = await _owned_liability(tx, merchant_id, epoch_row, liability_id)
         if liability["status"] in LIABILITY_TERMINAL:
             return _liability_public(liability)
-        product = await tx.fetch_one(
-            f"SELECT id, stock_on_hand, stock_reserved "
-            f"FROM {tx.table('products')} "
-            f"WHERE id = :p AND merchant_id = :m{tx.for_update}",
-            {"p": liability["product_id"], "m": merchant_id},
+        liability["status"] = await _apply_terminal_status(
+            tx, merchant_id, epoch_row, liability, paid, now
         )
-        if not product:
-            raise conflict("legacy-evidence", "Liability product is missing")
-        partition = await tx.fetch_one(
-            f"SELECT * FROM {tx.table('liability_partitions')} "
-            "WHERE liability_id = :l AND epoch_id = :e",
-            {"l": liability_id, "e": epoch_id},
-        )
-        qty = liability["quantity"]
-        if paid:
-            if partition and partition["state"] == "held":
-                rc = await tx.execute(
-                    f"UPDATE {tx.table('products')} SET "
-                    "stock_on_hand = stock_on_hand - :q, "
-                    "stock_reserved = stock_reserved - :q, updated_at = :t "
-                    "WHERE id = :p AND stock_on_hand >= :q "
-                    "AND stock_reserved >= :q",
-                    {"p": product["id"], "q": qty, "t": now},
-                )
-                if rc != 1:
-                    raise conflict(
-                        "insufficient-stock",
-                        "Physical stock cannot settle this old payment",
-                    )
-                await tx.execute(
-                    f"UPDATE {tx.table('liability_partitions')} "
-                    "SET state = 'consumed', updated_at = :t "
-                    "WHERE id = :i AND state = 'held'",
-                    {"i": partition["id"], "t": now},
-                )
-            else:
-                rc = await tx.execute(
-                    f"UPDATE {tx.table('products')} "
-                    "SET stock_on_hand = stock_on_hand - :q, updated_at = :t "
-                    "WHERE id = :p AND (stock_on_hand IS NULL OR stock_on_hand >= :q)",
-                    {"p": product["id"], "q": qty, "t": now},
-                )
-                if rc != 1:
-                    raise conflict(
-                        "insufficient-stock",
-                        "Physical stock cannot settle this old payment",
-                    )
-            new_status, reason = "paid", "liability-paid"
-        else:
-            if partition and partition["state"] == "held":
-                rc = await tx.execute(
-                    f"UPDATE {tx.table('products')} "
-                    "SET stock_reserved = stock_reserved - :q, updated_at = :t "
-                    "WHERE id = :p AND stock_reserved >= :q",
-                    {"p": product["id"], "q": qty, "t": now},
-                )
-                if rc != 1:
-                    raise conflict(
-                        "insufficient-stock",
-                        "Stock hold cannot be released cleanly",
-                    )
-                await tx.execute(
-                    f"UPDATE {tx.table('liability_partitions')} "
-                    "SET state = 'released', updated_at = :t "
-                    "WHERE id = :i AND state = 'held'",
-                    {"i": partition["id"], "t": now},
-                )
-            new_status, reason = "unpaid_terminal", "liability-unpaid-terminal"
-        await tx.execute(
-            f"UPDATE {tx.table('imported_liabilities')} SET status = :s "
-            "WHERE id = :i",
-            {"i": liability_id, "s": new_status},
-        )
-        await _mark_reconciling(tx, epoch_row, now)
-        await tx.execute(
-            f"INSERT INTO {tx.table('cutover_events')} "
-            "(id, epoch_id, state, reason_code, sequence, created_at) "
-            "VALUES (:i, :e, :s, :r, :n, :t)",
-            {"i": uuid.uuid4().hex, "e": epoch_id, "s": epoch_row["state"],
-             "r": reason, "n": await _next_event_sequence(tx, epoch_id), "t": now},
-        )
-        liability["status"] = new_status
     return _liability_public(liability)
+
+
+async def cutover_reconcile_pass(page_size: int = 50) -> dict:
+    """Leased background pass (rides the ``reconciliation`` task lease):
+    re-checks open liabilities on snapshot-verified epochs and re-blocks
+    any verified epoch whose old source is no longer attested-disabled.
+    Bounded pages; every payment lookup error fails closed for that row."""
+    checked = reblocked = settled = released = errors = 0
+    async with db.connect() as conn:
+        epochs = await conn.fetchall(
+            f"SELECT e.id, e.merchant_id, e.state, e.import_id, m.user_id "
+            f"FROM {table('cutover_epochs')} e "
+            f"JOIN {table('merchants')} m ON m.id = e.merchant_id "
+            "WHERE e.state IN ('snapshot_verified', 'reconciling', 'complete') "
+            "ORDER BY e.created_at LIMIT 20",
+        )
+    for epoch_row in epochs:
+        epoch = dict(epoch_row)
+        source = await old_source_status()
+        if not (source["disabled"]
+                and source["reason_code"] == "snapshot-unverified"):
+            reason = (
+                "source-reactivated" if not source["disabled"]
+                else "source-contract-" + str(source["reason_code"])
+            )[:64]
+            now = int(time.time())
+            async with DomainTransaction() as tx:
+                await tx.fetch_one(
+                    f"SELECT id FROM {tx.table('merchants')} "
+                    f"WHERE id = :m{tx.for_update}",
+                    {"m": epoch["merchant_id"]},
+                )
+                rc = await tx.execute(
+                    f"UPDATE {tx.table('cutover_epochs')} "
+                    "SET state = 'blocked', updated_at = :t "
+                    "WHERE id = :i AND state IN ('snapshot_verified', "
+                    "'reconciling', 'ready', 'complete')",
+                    {"i": epoch["id"], "t": now},
+                )
+                if rc == 1:
+                    await tx.execute(
+                        f"INSERT INTO {tx.table('cutover_events')} "
+                        "(id, epoch_id, state, reason_code, sequence, created_at) "
+                        "VALUES (:i, :e, 'blocked', :r, :n, :t)",
+                        {"i": uuid.uuid4().hex, "e": epoch["id"], "r": reason,
+                         "n": await _next_event_sequence(tx, epoch["id"]),
+                         "t": now},
+                    )
+                    reblocked += 1
+            continue
+        if epoch["state"] == "complete":
+            continue
+        async with db.connect() as conn:
+            liabilities = await conn.fetchall(
+                f"SELECT * FROM {table('imported_liabilities')} "
+                "WHERE import_id = :i AND merchant_id = :m "
+                "AND status IN ('payable', 'waiting', 'partitioned') "
+                "ORDER BY created_at, id LIMIT :n",
+                {"i": epoch["import_id"], "m": epoch["merchant_id"],
+                 "n": page_size},
+            )
+        for row in liabilities:
+            liability = dict(row)
+            try:
+                paid = await _authoritative_payment_state(
+                    epoch["user_id"], _decrypt_invoice_ref(liability)
+                )
+            except ProblemError:
+                errors += 1
+                continue
+            if paid is None:
+                continue
+            now = int(time.time())
+            async with DomainTransaction() as tx:
+                await tx.fetch_one(
+                    f"SELECT id FROM {tx.table('merchants')} "
+                    f"WHERE id = :m{tx.for_update}",
+                    {"m": epoch["merchant_id"]},
+                )
+                locked_epoch = await tx.fetch_one(
+                    f"SELECT * FROM {tx.table('cutover_epochs')} "
+                    f"WHERE id = :i AND merchant_id = :m{tx.for_update}",
+                    {"i": epoch["id"], "m": epoch["merchant_id"]},
+                )
+                if (not locked_epoch or locked_epoch["state"] not in (
+                        "snapshot_verified", "reconciling", "complete")):
+                    continue
+                live = await _owned_liability(
+                    tx, epoch["merchant_id"], dict(locked_epoch),
+                    liability["id"],
+                )
+                if live["status"] in LIABILITY_TERMINAL:
+                    continue
+                status = await _apply_terminal_status(
+                    tx, epoch["merchant_id"], dict(locked_epoch),
+                    live, paid, now,
+                )
+                if status == "paid":
+                    settled += 1
+                else:
+                    released += 1
+                checked += 1
+    return {
+        "epochs_checked": len(epochs), "reblocked": reblocked,
+        "settled": settled, "released": released, "errors": errors,
+    }
 
 
 async def complete_cutover(merchant_id: str, user, epoch_id: str) -> dict:
