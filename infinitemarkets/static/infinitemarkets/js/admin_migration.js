@@ -11,10 +11,17 @@
       return {
         gmMigration: {
           file: null,
+          sourceKind: "shopify",
           sourceInstance: "",
+          mappingText: "",
+          presetName: "",
+          selectedPreset: null,
+          presets: [],
           currency: "",
           selections: {},
           selectionDirty: false,
+          imports: [],
+          audit: null,
           preview: null,
           result: null,
           error: null,
@@ -23,6 +30,48 @@
       };
     },
     methods: {
+      gmLoadImports: async function () {
+        try {
+          this.gmMigration.imports = await this.gmApi("GET", "/migration/imports");
+          this.gmMigration.presets = await this.gmApi("GET", "/migration/csv-presets");
+        } catch (error) {
+          this.gmMigration.error = this.gmProblemCopy(error.problem);
+        }
+      },
+      gmLoadImportAudit: async function (id) {
+        try {
+          this.gmMigration.audit = await this.gmApi("GET", "/migration/imports/" + id);
+        } catch (error) {
+          this.gmMigration.error = this.gmProblemCopy(error.problem);
+        }
+      },
+      gmChooseCsvPreset: function (id) {
+        var preset = this.gmMigration.presets.find(function (item) {
+          return item.id === id;
+        });
+        this.gmMigration.mappingText = preset ? JSON.stringify(preset.mapping) : "";
+        this.gmMigration.selectionDirty = true;
+      },
+      gmSaveCsvPreset: async function () {
+        var state = this.gmMigration;
+        try {
+          var mapping = JSON.parse(state.mappingText);
+          await this.gmApi("POST", "/migration/csv-presets", {
+            name: state.presetName, mapping: mapping
+          });
+          state.presets = await this.gmApi("GET", "/migration/csv-presets");
+          state.error = null;
+        } catch (error) {
+          state.error = error.problem ? this.gmProblemCopy(error.problem) :
+            "Enter a valid column mapping as JSON before saving.";
+        }
+      },
+      gmMigrationKindChanged: function () {
+        this.gmMigration.file = null;
+        this.gmMigration.preview = null;
+        this.gmMigration.selections = {};
+        this.gmMigration.selectionDirty = false;
+      },
       gmMigrationFileChanged: function (event) {
         this.gmMigration.file = event.target.files[0] || null;
         this.gmMigration.preview = null;
@@ -58,11 +107,16 @@
           if (Object.keys(state.selections).length) {
             form.append("image_selection", JSON.stringify(state.selections));
           }
+          if (state.sourceKind === "shopify" && state.mappingText.trim()) {
+            form.append("mapping", JSON.stringify(JSON.parse(state.mappingText)));
+          }
           if (operation === "execute") {
             form.append("source_hash", state.preview.source_hash);
           }
+          var route = state.sourceKind === "shopify" ? "shopify" :
+            "legacy/" + state.sourceKind;
           var response = await fetch(
-            "/infinitemarkets/api/v1/migration/shopify/" + operation,
+            "/infinitemarkets/api/v1/migration/" + route + "/" + operation,
             {
               method: "POST",
               credentials: "same-origin",
@@ -74,13 +128,15 @@
           if (!response.ok) {
             throw new Error(result.detail || result.title || "Import failed");
           }
-          if (operation === "preview") {
+          if (operation !== "execute") {
             state.preview = result;
             state.selectionDirty = false;
             state.result = null;
           } else {
             state.result = result;
             state.preview = null;
+            this.gmLoadImports();
+            this.gmLoadImportAudit(result.import_id);
             if (this.gmLoadCatalog) this.gmLoadCatalog();
           }
         } catch (error) {
@@ -88,9 +144,6 @@
         } finally {
           state.busy = false;
         }
-      },
-      gmPreviewShopify: function () {
-        this.gmShopifyUpload("preview");
       },
       gmExecuteShopify: function () {
         this.gmShopifyUpload("execute");

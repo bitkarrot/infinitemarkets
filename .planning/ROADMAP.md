@@ -165,7 +165,7 @@ Plans:
 
 Plans:
 
-- [ ] 04-01: File-only import preview/validation/dry-run/execute/audit, persisted CSV mapping and signed provisional import commitment; nostrmarket JSON/Nostr events + classic/modern Shopify CSV land as blocked drafts (no image fetch, unknown stock=0)
+- [x] 04-01: File-only import preview/validation/dry-run/execute/audit, persisted CSV mapping and signed provisional import commitment; nostrmarket JSON/Nostr events + classic/modern Shopify CSV land as blocked drafts (no image fetch, unknown stock=0)
 - [ ] 04-02: Verified old-intake freeze and complete invoice snapshot for a supported same-instance source; per-invoice wait/partition/terminal reconciliation, durable holds and guarded activation (unverifiable external sources stay drafts)
 - [ ] 04-03: Merchant product CSV export, opt-in owned-media upload/relink, and merchant-configurable compact dark storefront profile without changing checkout
 - [ ] 04-04: Scarce-stock two-part rehearsal, export/media/visual verification and evidence-backed Release-C gate
@@ -180,4 +180,4 @@ Plans:
 | 2. Release A — Safe Web Commerce | 4/4 | Complete    | 2026-09-27 |
 | 3. Release B — Gamma NIP-17 Orders | 4/4 | Complete    | 2026-09-29 |
 | 03.1. Buyer accounts (INSERTED) | 3/3 | Complete   | 2026-10-05 |
-| 4. Release C — Migration and Cutover | 0/4 | Planned | - |
+| 4. Release C — Migration and Cutover | 1/4 | In progress | - |

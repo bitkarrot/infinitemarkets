@@ -948,25 +948,53 @@
       <section v-show="gm.view === 'migration'" data-gm-surface="migration">
         <h1 class="text-h6 q-mb-md">Product migration</h1>
         <q-banner class="bg-warning text-dark q-mb-md">
-          Shopify products import as hidden drafts. A CSV stock quantity does not verify
-          physical inventory or old payable orders; importing never authorizes sales.
+          Imported products stay hidden and blocked. Uploaded stock and order status do not
+          verify physical inventory or old payable invoices; importing never authorizes sales.
         </q-banner>
         <q-card flat bordered class="q-pa-md">
-          <div class="text-subtitle1 q-mb-md">Import Shopify CSV</div>
-          <label for="gm-shopify-file" class="text-body2">Shopify product export (CSV)</label>
-          <input id="gm-shopify-file" type="file" accept=".csv,text/csv"
+          <div class="text-subtitle1 q-mb-md">Import product file</div>
+          <q-select v-model="gmMigration.sourceKind" outlined dense emit-value map-options
+                    label="File format" class="q-mb-md"
+                    :options="[{ label: 'Shopify CSV', value: 'shopify' },
+                               { label: 'nostrmarket JSON', value: 'nostrmarket' },
+                               { label: 'NIP-15 signed events', value: 'nip15_events' }]"
+                    @update:model-value="gmMigrationKindChanged"></q-select>
+          <label for="gm-shopify-file" class="text-body2">Catalog file</label>
+          <input id="gm-shopify-file" :key="gmMigration.sourceKind" type="file"
+                 :accept="gmMigration.sourceKind === 'shopify' ? '.csv,text/csv' : '.json,.ndjson,application/json'"
                  class="block q-my-sm" @change="gmMigrationFileChanged">
           <q-input v-model="gmMigration.sourceInstance" outlined dense
-                   label="Source store identifier" hint="A stable name for this Shopify store"
+                   label="Source store identifier" hint="A stable identifier for the source catalog"
                    class="q-mb-md"></q-input>
           <q-input v-model="gmMigration.currency" outlined dense
                    label="Source currency (three-letter code)"
                    hint="Choose the currency used for prices in the export"
                    class="q-mb-md"></q-input>
+          <div v-if="gmMigration.sourceKind === 'shopify'" class="q-mb-md">
+            <q-select v-model="gmMigration.selectedPreset" dense outlined clearable
+                      label="Saved column mapping (optional)"
+                      :options="gmMigration.presets.map(p => ({ label: p.name, value: p.id }))"
+                      emit-value map-options @update:model-value="gmChooseCsvPreset"></q-select>
+            <q-input v-model="gmMigration.mappingText" outlined dense type="textarea"
+                     label="Custom CSV column mapping (JSON, optional)"
+                     hint="Map handle, title and price to header names; preview before import"
+                     @update:model-value="gmMigration.selectionDirty = true"
+                     class="q-mt-sm"></q-input>
+            <div class="row q-gutter-sm q-mt-sm">
+              <q-input v-model="gmMigration.presetName" outlined dense
+                       label="Mapping name" class="col"></q-input>
+              <q-btn outline color="primary" label="Save column mapping"
+                     :disable="!gmMigration.presetName || !gmMigration.mappingText"
+                     @click="gmSaveCsvPreset"></q-btn>
+            </div>
+          </div>
           <div class="row q-gutter-sm">
-            <q-btn color="primary" outline label="Preview import"
+            <q-btn color="primary" outline label="Validate file"
                    :loading="gmMigration.busy" :disable="!gmMigration.file"
-                   @click="gmPreviewShopify"></q-btn>
+                   @click="gmShopifyUpload('validate')"></q-btn>
+            <q-btn color="primary" outline label="Preview / dry-run"
+                   :loading="gmMigration.busy" :disable="!gmMigration.file"
+                   @click="gmShopifyUpload('dry-run')"></q-btn>
             <q-btn color="primary" unelevated label="Import as blocked drafts"
                    :loading="gmMigration.busy" :disable="!gmMigration.preview || gmMigration.selectionDirty || gmMigration.preview.products.some(p => p.image_selection_required)"
                    @click="gmExecuteShopify"></q-btn>
@@ -980,6 +1008,10 @@
           </q-banner>
           <div v-if="gmMigration.preview" class="q-mt-md" data-gm="migration-preview">
             <div class="text-subtitle2">{{ gmMigration.preview.products.length }} products to review</div>
+            <p v-if="gmMigration.preview.liabilities" class="text-caption">
+              {{ gmMigration.preview.liabilities.length }} uploaded obligations remain unverified.
+              This file cannot prove the old order list is complete.
+            </p>
             <q-list bordered separator class="q-mt-sm">
               <q-item v-for="product in gmMigration.preview.products" :key="product.handle">
                 <q-item-section>
@@ -999,6 +1031,37 @@
                     </div>
                   </div>
                 </q-item-section>
+              </q-item>
+            </q-list>
+          </div>
+        </q-card>
+        <q-card flat bordered class="q-pa-md q-mt-md" data-gm="migration-audit">
+          <h2 class="text-subtitle1 q-my-none">Import history</h2>
+          <p class="text-caption">A signed import record proves what was uploaded, not that
+            old invoices have been settled or that stock has been counted.</p>
+          <q-list bordered separator v-if="gmMigration.imports.length">
+            <q-item v-for="entry in gmMigration.imports" :key="entry.id">
+              <q-item-section>
+                <q-item-label>{{ entry.source_kind }} · {{ entry.source_instance }}</q-item-label>
+                <q-item-label caption>{{ entry.product_count }} blocked products ·
+                  {{ entry.liability_count }} unverified obligations</q-item-label>
+              </q-item-section>
+              <q-item-section side>
+                <q-btn flat dense label="View audit" @click="gmLoadImportAudit(entry.id)"></q-btn>
+              </q-item-section>
+            </q-item>
+          </q-list>
+          <p v-else class="text-caption">No imports yet.</p>
+          <div v-if="gmMigration.audit" class="q-mt-md">
+            <div class="text-subtitle2">Import {{ gmMigration.audit.id }}</div>
+            <p>State: {{ gmMigration.audit.state }} · Cutover verified: No</p>
+            <p class="text-caption">Signed commitment: {{ gmMigration.audit.commitment_id }}<br>
+              Source hash: {{ gmMigration.audit.source_hash }}</p>
+            <p class="text-caption">{{ gmMigration.audit.rows.length }} product mappings ·
+              {{ gmMigration.audit.liabilities.length }} unverified obligations</p>
+            <q-list dense bordered v-if="gmMigration.audit.rows.length">
+              <q-item v-for="row in gmMigration.audit.rows" :key="row.product_id">
+                <q-item-section>{{ row.legacy_id }} · {{ row.content_hash }}</q-item-section>
               </q-item>
             </q-list>
           </div>

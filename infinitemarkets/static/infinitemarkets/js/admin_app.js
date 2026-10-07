@@ -170,6 +170,7 @@
            only the active surface's data is fetched. */
         if (view === "orders" && this.gmLoadOrders) this.gmLoadOrders();
         if (view === "catalog" && this.gmLoadCatalog) this.gmLoadCatalog();
+        if (view === "migration" && this.gmLoadImports) this.gmLoadImports();
         if (view === "publications" && this.gmLoadPublications) {
           this.gmLoadPublications();
         }

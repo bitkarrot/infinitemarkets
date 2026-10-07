@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 04
 current_phase_name: Release C — Migration and Cutover
 status: in_progress
-stopped_at: Phase 4 plan 04-01 in progress; Shopify CSV draft-import slice and three-product private verification pass, remaining 04-01 tasks and plans 04-02/03/04 pending
-last_updated: "2026-10-07T06:41:01.000Z"
+stopped_at: Phase 4 plan 04-01 verified with three formats, signed provisional audit and disposable browser import smoke; 04-02 verified freeze and stock partition pending, cutover remains blocked
+last_updated: "2026-10-07T07:16:33Z"
 last_activity: 2026-10-07
-last_activity_desc: Three-product Shopify sample prepared privately and verified via authenticated draft import; cutover gate remains closed
+last_activity_desc: File-only import verified on SQLite (403 runtime passed, 3 skipped before final focused checks; 39 targeted and browser wizard passed); PostgreSQL not configured
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 18
-  completed_plans: 14
-  percent: 78
+  completed_plans: 15
+  percent: 83
 ---
 
 # Project State
@@ -24,13 +24,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-20)
 
 **Core value:** A merchant can sell one authoritative inventory safely through LNbits-backed web and Nostr flows without duplicate invoices, double allocation, or relay delivery being mistaken for payment truth.
-**Current focus:** Phase 4 — Release C: Migration and Cutover (04-01 Shopify import slice implemented; 04-01 remainder and 04-02/03/04 pending)
+**Current focus:** Phase 4 — Release C: Migration and Cutover (04-01 import verified; 04-02 evidence-backed cutover next; 04-03/04 pending)
 
 ## Current Position
 
-Phase: 4 (Release C — Migration and Cutover) — IN PROGRESS (14/18 plans complete; 04-01 not yet complete)
+Phase: 4 (Release C — Migration and Cutover) — IN PROGRESS (15/18 plans complete; 04-02 next)
 Status: Phases 1, 2, 3 and 03.1 all complete; Phase 3 release gate verified (one operator-deferred item in 03-UAT: live plebeian.market smoke)
-Last activity: 2026-10-07 — private three-product Shopify fixture verified through authenticated import; blocked drafts and provisional signature implemented; no live deployment
+Last activity: 2026-10-07 — authenticated three-format import, signed provisional audit, browser import smoke and SQLite regressions verified; no live deployment or cutover authorization
 
 Progress: [████████░░] 80% of roadmap phases (4/5)
 
@@ -103,6 +103,7 @@ Decisions are logged in PROJECT.md and the normative specification.
 - The new demo uses a fresh disposable database rather than migrating old demo orders and the previously hand-added images. If those records must remain visible, the old database requires a separate recovery plan.
 - Release B cannot claim production readiness without deployed egress controls and external-client evidence.
 - Release C requires a live scarce-stock payable-invoice cutover rehearsal.
+- 04-02 old-intake verification is not implemented: imported orders remain unverified, and no importer, signed upload, or declared stock count authorizes activation. The installed nostrmarket tables are empty; synthetic fixed-source fixtures are needed. PostgreSQL qualification is pending a configured profile.
 
 ### Roadmap Evolution
 

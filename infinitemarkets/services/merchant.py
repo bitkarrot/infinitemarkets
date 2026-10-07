@@ -484,7 +484,9 @@ async def publish(merchant_id: str, user,
         ):
             rows = await tx.fetch_all(
                 f"SELECT id, revision FROM {tx.table(agg_table)} "
-                "WHERE merchant_id = :m AND deleted_at IS NULL",
+                "WHERE merchant_id = :m AND deleted_at IS NULL"
+                + (" AND (import_source_kind IS NULL OR import_authorized = TRUE)"
+                   if agg_table == "products" else ""),
                 {"m": merchant_id},
             )
             for r in rows:
@@ -505,7 +507,8 @@ async def publish(merchant_id: str, user,
             prods = await tx.fetch_all(
                 f"SELECT id, revision FROM {tx.table('products')} "
                 "WHERE category_id = :c AND merchant_id = :m"
-                " AND deleted_at IS NULL",
+                " AND deleted_at IS NULL"
+                " AND (import_source_kind IS NULL OR import_authorized = TRUE)",
                 {"c": cat["id"], "m": merchant_id},
             )
             for r in prods:

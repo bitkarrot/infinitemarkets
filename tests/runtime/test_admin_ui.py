@@ -68,6 +68,18 @@ async def test_admin_shell_document(runtime_env):
     assert len(revisions) == 1
 
 
+async def test_migration_admin_surface(runtime_env):
+    html = (await runtime_env["client"].get("/infinitemarkets/")).text
+    assert 'data-gm-nav="migration"' in html
+    assert 'data-gm-surface="migration"' in html
+    assert 'data-gm="migration-audit"' in html
+    assert "importing never authorizes sales" in html
+    js = await runtime_env["client"].get(f"{JS}/admin_migration.js")
+    assert js.status_code == 200
+    assert "/migration/imports" in js.text
+    assert "/migration/csv-presets" in js.text
+
+
 async def test_admin_verbatim_copy(runtime_env):
     """UI-SPEC copy strings render verbatim in the document."""
     resp = await runtime_env["client"].get("/infinitemarkets/")

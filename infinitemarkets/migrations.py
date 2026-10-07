@@ -1265,6 +1265,7 @@ async def m009_categories(db: Connection):
 async def m010_import_drafts(db: Connection):
     s = db.references_schema
     int_t = db.big_int
+    blob_t = db.blob
     for column in ("import_source_kind", "import_source_instance", "import_legacy_id"):
         await db.execute(f"ALTER TABLE {s}products ADD COLUMN {column} TEXT")
     await db.execute(
@@ -1289,6 +1290,7 @@ async def m010_import_drafts(db: Connection):
         "source_hash TEXT NOT NULL, source_currency TEXT NOT NULL, "
         "commitment_json TEXT NOT NULL, commitment_id TEXT NOT NULL, "
         "state TEXT NOT NULL, product_count INTEGER NOT NULL, "
+        "liability_count INTEGER NOT NULL DEFAULT 0, "
         f"created_at {int_t} NOT NULL, "
         "UNIQUE (merchant_id, source_kind, source_instance, source_hash))"
     )
@@ -1299,5 +1301,29 @@ async def m010_import_drafts(db: Connection):
         "product_id TEXT NOT NULL "
         f"REFERENCES {s}products(id) ON DELETE RESTRICT, "
         "legacy_id TEXT NOT NULL, content_hash TEXT NOT NULL, "
+        "normalized_json TEXT NOT NULL, "
         "UNIQUE (import_id, legacy_id))"
+    )
+    await db.execute(
+        f"CREATE TABLE {s}csv_presets ("
+        "id TEXT PRIMARY KEY, merchant_id TEXT NOT NULL "
+        f"REFERENCES {s}merchants(id) ON DELETE RESTRICT, "
+        "name TEXT NOT NULL, mapping_json TEXT NOT NULL, "
+        f"created_at {int_t} NOT NULL, "
+        "UNIQUE (merchant_id, name))"
+    )
+    await db.execute(
+        f"CREATE TABLE {s}imported_liabilities ("
+        "id TEXT PRIMARY KEY, merchant_id TEXT NOT NULL "
+        f"REFERENCES {s}merchants(id) ON DELETE RESTRICT, "
+        "import_id TEXT NOT NULL "
+        f"REFERENCES {s}catalog_imports(id) ON DELETE RESTRICT, "
+        "product_id TEXT NOT NULL "
+        f"REFERENCES {s}products(id) ON DELETE RESTRICT, "
+        "invoice_hash TEXT NOT NULL, order_hash TEXT NOT NULL, "
+        f"invoice_ref_enc {blob_t} NOT NULL, "
+        "quantity INTEGER NOT NULL CHECK (quantity > 0), "
+        "status TEXT NOT NULL DEFAULT 'unverified', "
+        f"created_at {int_t} NOT NULL, "
+        "UNIQUE (import_id, invoice_hash, product_id))"
     )

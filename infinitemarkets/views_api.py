@@ -108,6 +108,11 @@ class PatchNotificationsBody(_Strict):
     notify_events: dict | None = None
 
 
+class CsvPresetBody(_Strict):
+    name: str = Field(min_length=1, max_length=64)
+    mapping: dict[str, str]
+
+
 class ImportCategoryBody(_Strict):
     category_id: str = Field(min_length=32, max_length=32)
 
@@ -460,7 +465,7 @@ async def delete_merchant(
     return await merchant_service.begin_deactivation(merchant_id, user)
 
 
-async def _shopify_upload(request: Request, *, execute: bool):
+async def _catalog_upload(request: Request, *, execute: bool, source_kind: str):
     from .services.migration_import import MAX_UPLOAD_BYTES
 
     if not request.headers.get("content-type", "").startswith("multipart/form-data;"):
@@ -476,7 +481,7 @@ async def _shopify_upload(request: Request, *, execute: bool):
 
     try:
         form = await MultiPartParser(
-            request.headers, bounded_stream(), max_files=1, max_fields=4,
+            request.headers, bounded_stream(), max_files=1, max_fields=5,
         ).parse()
     except MultiPartException as exc:
         raise unprocessable("invalid-content", "invalid import form") from exc
@@ -486,12 +491,18 @@ async def _shopify_upload(request: Request, *, execute: bool):
             expected.add("source_hash")
         if "image_selection" in form:
             expected.add("image_selection")
+        if "mapping" in form:
+            expected.add("mapping")
         if set(form.keys()) != expected or len(form.multi_items()) != len(expected):
             raise unprocessable("invalid-content", "unexpected import fields")
         upload = form["file"]
-        if not isinstance(upload, UploadFile) or not upload.filename.lower().endswith(".csv"):
-            raise unprocessable("invalid-content", "Shopify CSV file required")
-        fields = tuple(form[name] for name in expected - {"file", "image_selection"})
+        extensions = (".csv",) if source_kind == "shopify" else (".json", ".ndjson")
+        if (not isinstance(upload, UploadFile) or not upload.filename
+                or not upload.filename.lower().endswith(extensions)):
+            raise unprocessable("invalid-content", "unsupported import file")
+        if source_kind != "shopify" and ({"image_selection", "mapping"} & set(form)):
+            raise unprocessable("invalid-content", "CSV options are only for Shopify")
+        fields = tuple(form[name] for name in expected - {"file", "image_selection", "mapping"})
         if any(not isinstance(value, str) or len(value) > 100 for value in fields):
             raise unprocessable("invalid-content", "invalid import fields")
         selection = None
@@ -503,12 +514,61 @@ async def _shopify_upload(request: Request, *, execute: bool):
                 selection = json.loads(raw_selection)
             except ValueError as exc:
                 raise unprocessable("invalid-content", "invalid image selection") from exc
+        mapping = None
+        if "mapping" in form:
+            raw_mapping = form["mapping"]
+            if not isinstance(raw_mapping, str) or len(raw_mapping) > 4096:
+                raise unprocessable("invalid-content", "invalid CSV mapping")
+            try:
+                mapping = json.loads(raw_mapping)
+            except ValueError as exc:
+                raise unprocessable("invalid-content", "invalid CSV mapping") from exc
         data = await upload.read(MAX_UPLOAD_BYTES + 1)
         if len(data) > MAX_UPLOAD_BYTES:
             raise unprocessable("invalid-content", "import exceeds upload limit")
-        return data, form["currency"], form["source_instance"], form.get("source_hash"), selection
+        return (data, form["currency"], form["source_instance"],
+                form.get("source_hash"), selection, mapping)
     finally:
         await form.close()
+
+
+@infinitemarkets_api_router.get("/migration/csv-presets")
+@problem_boundary
+async def list_import_presets(user: User = Depends(check_user_exists)):
+    from .services import migration_import
+
+    return await migration_import.list_csv_presets(await _mid(user), user)
+
+
+@infinitemarkets_api_router.post("/migration/csv-presets")
+@problem_boundary
+async def save_import_preset(
+    request: Request, body: CsvPresetBody, user: User = Depends(check_user_exists),
+):
+    from .services import migration_import
+
+    try:
+        return await migration_import.save_csv_preset(
+            await _mid(user), user, body.name, body.mapping
+        )
+    except ValueError as exc:
+        raise unprocessable("invalid-content", str(exc)) from exc
+
+
+@infinitemarkets_api_router.get("/migration/imports")
+@problem_boundary
+async def list_catalog_imports(user: User = Depends(check_user_exists)):
+    from .services import migration_import
+
+    return await migration_import.list_imports(await _mid(user), user)
+
+
+@infinitemarkets_api_router.get("/migration/imports/{import_id}")
+@problem_boundary
+async def get_catalog_import(import_id: str, user: User = Depends(check_user_exists)):
+    from .services import migration_import
+
+    return await migration_import.audit_import(await _mid(user), user, import_id)
 
 
 @infinitemarkets_api_router.post("/migration/products/{product_id}/category")
@@ -524,19 +584,21 @@ async def recategorize_import(
     )
 
 
+@infinitemarkets_api_router.post("/migration/shopify/dry-run")
+@infinitemarkets_api_router.post("/migration/shopify/validate")
 @infinitemarkets_api_router.post("/migration/shopify/preview")
 @problem_boundary
 async def preview_shopify(request: Request, user: User = Depends(check_user_exists)):
     from .services import migration_import
 
-    await _mid(user)
-    data, currency, source_instance, _, selection = await _shopify_upload(
-        request, execute=False
+    merchant_id = await _mid(user)
+    data, currency, source_instance, _, selection, mapping = await _catalog_upload(
+        request, execute=False, source_kind="shopify"
     )
     try:
         return migration_import.preview_shopify_import(
             data, currency=currency, source_instance=source_instance,
-            image_selection=selection,
+            image_selection=selection, mapping=mapping, merchant_id=merchant_id,
         )
     except ValueError as exc:
         raise unprocessable("invalid-content", str(exc)) from exc
@@ -548,14 +610,61 @@ async def execute_shopify(request: Request, user: User = Depends(check_user_exis
     from .services import migration_import
 
     merchant_id = await _mid(user)
-    data, currency, source_instance, source_hash, selection = await _shopify_upload(
-        request, execute=True
+    data, currency, source_instance, source_hash, selection, mapping = await _catalog_upload(
+        request, execute=True, source_kind="shopify"
     )
     try:
         return await migration_import.execute_shopify_import(
             merchant_id, user, data, currency=currency,
             source_instance=source_instance, expected_hash=source_hash,
-            image_selection=selection,
+            image_selection=selection, mapping=mapping,
+        )
+    except ValueError as exc:
+        raise unprocessable("invalid-content", str(exc)) from exc
+
+
+@infinitemarkets_api_router.post("/migration/legacy/{source_kind}/dry-run")
+@infinitemarkets_api_router.post("/migration/legacy/{source_kind}/validate")
+@infinitemarkets_api_router.post("/migration/legacy/{source_kind}/preview")
+@problem_boundary
+async def preview_legacy(
+    request: Request, source_kind: str, user: User = Depends(check_user_exists),
+):
+    from .services import migration_import
+
+    if source_kind not in ("nostrmarket", "nip15_events"):
+        raise unprocessable("invalid-content", "unsupported legacy format")
+    merchant_id = await _mid(user)
+    data, currency, source_instance, _, _, _ = await _catalog_upload(
+        request, execute=False, source_kind=source_kind
+    )
+    try:
+        return migration_import.preview_legacy_import(
+            merchant_id, data, source_kind=source_kind, currency=currency,
+            source_instance=source_instance,
+        )
+    except ValueError as exc:
+        raise unprocessable("invalid-content", str(exc)) from exc
+
+
+@infinitemarkets_api_router.post("/migration/legacy/{source_kind}/execute")
+@problem_boundary
+async def execute_legacy(
+    request: Request, source_kind: str, user: User = Depends(check_user_exists),
+):
+    from .services import migration_import
+
+    if source_kind not in ("nostrmarket", "nip15_events"):
+        raise unprocessable("invalid-content", "unsupported legacy format")
+    merchant_id = await _mid(user)
+    data, currency, source_instance, source_hash, _, _ = await _catalog_upload(
+        request, execute=True, source_kind=source_kind
+    )
+    try:
+        return await migration_import.execute_catalog_import(
+            merchant_id, user, data, currency=currency,
+            source_instance=source_instance, expected_hash=source_hash,
+            source_kind=source_kind,
         )
     except ValueError as exc:
         raise unprocessable("invalid-content", str(exc)) from exc

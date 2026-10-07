@@ -834,7 +834,10 @@ def _product_out(row: dict) -> dict:
 async def create_import_draft(
     tx: DomainTransaction, merchant_id: str, category_id: str,
     payload: dict, source_instance: str, legacy_id: str,
+    source_kind: str = "shopify",
 ) -> str:
+    if source_kind not in ("shopify", "nostrmarket", "nip15_events"):
+        raise unprocessable("invalid-content", "unsupported import source")
     _reject_unknown(payload, _PRODUCT_PAYLOAD_FIELDS)
     _validate_product_payload(payload)
     if payload.get("draft") is not True or payload.get("visibility") != "hidden":
@@ -857,7 +860,7 @@ async def create_import_draft(
     ]
     values = [
         product_id, merchant_id, category_id, _gen_d_tag(), product_type, "physical",
-        parent_id, "shopify", source_instance, legacy_id, 0, now, now,
+        parent_id, source_kind, source_instance, legacy_id, 0, now, now,
     ]
     for field, value in fields.items():
         columns.append(field)

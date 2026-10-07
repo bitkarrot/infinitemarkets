@@ -40,6 +40,28 @@ test('admin shell mounts with all five surfaces', async ({page}) => {
   ).toBeVisible({timeout: 20_000})
 })
 
+test('migration wizard dry-runs and stages Shopify drafts without publication', async ({page}) => {
+  await page.goto('/infinitemarkets/')
+  await page.locator('[data-gm-nav="migration"]').click()
+  const migration = page.locator('[data-gm-surface="migration"]')
+  await expect(migration).toBeVisible()
+  await migration.locator('#gm-shopify-file').setInputFiles(
+    path.resolve(__dirname, '../fixtures/shopify_products_sample.csv')
+  )
+  await migration.getByLabel('Source store identifier').fill('e2e-' + crypto.randomUUID())
+  await migration.getByLabel('Source currency (three-letter code)').fill('USD')
+  await migration.getByRole('button', {name: 'Preview / dry-run'}).click()
+  await expect(migration.locator('[data-gm="migration-preview"]')).toContainText(
+    '2 products to review'
+  )
+  await migration.getByRole('button', {name: 'Import as blocked drafts'}).click()
+  await expect(migration).toContainText('Imported 2 products as blocked drafts.')
+  await expect(migration.locator('[data-gm="migration-audit"]')).toContainText(
+    'Cutover verified: No'
+  )
+})
+
+
 test('messages workspace: folders, empty state, health strip', async ({
   page
 }) => {
