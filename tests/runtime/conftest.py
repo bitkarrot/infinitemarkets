@@ -270,6 +270,7 @@ async def keystore_env(tmp_path_factory):
             m008_buyer_accounts,
             m009_categories,
             m010_import_drafts,
+            m011_cutover,
         )
 
         async with gdb.db.connect() as conn:
@@ -283,6 +284,7 @@ async def keystore_env(tmp_path_factory):
             await m008_buyer_accounts(conn)
             await m009_categories(conn)
             await m010_import_drafts(conn)
+            await m011_cutover(conn)
         yield {
             "db": gdb.db,
             "keystore": keystore,

@@ -1064,6 +1064,35 @@
                 <q-item-section>{{ row.legacy_id }} · {{ row.content_hash }}</q-item-section>
               </q-item>
             </q-list>
+            <p v-if="gmMigration.audit.source_kind !== 'nostrmarket'" class="text-caption q-mt-md">
+              This source has no independently verified old-order snapshot; sales remain blocked.
+            </p>
+            <div v-else class="q-mt-md" data-gm="migration-freeze">
+              <q-banner class="bg-warning text-dark q-mb-md">
+                Pausing the old merchant does not stop invoice reissue or order restore.
+                Only an operator can disable nostrmarket for this entire LNbits instance
+                and restart it. These controls do not disable the old extension or approve sales.
+              </q-banner>
+              <q-btn outline color="primary" label="Prepare to move old products"
+                     @click="gmStageCutover(gmMigration.audit.id)"></q-btn>
+              <div v-if="gmMigration.cutover" class="q-mt-md">
+                <p>Old-store move: {{ gmMigration.cutover.state }} ·
+                  Old invoices checked: No · Products available for sale: No</p>
+                <p v-if="gmMigration.cutover.source" class="text-caption">
+                  Old extension: {{ gmMigration.cutover.source.disabled ?
+                    'Disabled; old invoices still unchecked' :
+                    'Still running or cannot be checked' }}
+                </p>
+                <div class="row q-gutter-sm">
+                  <q-btn v-if="gmMigration.cutover.state === 'staged'" outline
+                         label="Record freeze request (does not disable)"
+                         @click="gmCutoverAction('freeze-request')"></q-btn>
+                  <q-btn v-if="['staged', 'freeze_requested'].includes(gmMigration.cutover.state)"
+                         outline color="negative" label="Stop preparation; keep stock blocked"
+                         @click="gmCutoverAction('abort')"></q-btn>
+                </div>
+              </div>
+            </div>
           </div>
         </q-card>
       </section>

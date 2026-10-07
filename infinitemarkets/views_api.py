@@ -555,6 +555,44 @@ async def save_import_preset(
         raise unprocessable("invalid-content", str(exc)) from exc
 
 
+@infinitemarkets_api_router.post("/migration/imports/{import_id}/cutover")
+@problem_boundary
+async def stage_cutover(
+    request: Request, import_id: str, user: User = Depends(check_user_exists),
+):
+    from .services import cutover
+
+    return await cutover.stage_import(await _mid(user), user, import_id)
+
+
+@infinitemarkets_api_router.get("/migration/cutovers/{epoch_id}")
+@problem_boundary
+async def get_cutover(epoch_id: str, user: User = Depends(check_user_exists)):
+    from .services import cutover
+
+    return await cutover.cutover_status(await _mid(user), user, epoch_id)
+
+
+@infinitemarkets_api_router.post("/migration/cutovers/{epoch_id}/freeze-request")
+@problem_boundary
+async def request_cutover_freeze(
+    request: Request, epoch_id: str, user: User = Depends(check_user_exists),
+):
+    from .services import cutover
+
+    return await cutover.request_freeze(await _mid(user), user, epoch_id)
+
+
+@infinitemarkets_api_router.post("/migration/cutovers/{epoch_id}/abort")
+@problem_boundary
+async def abort_cutover_staging(
+    request: Request, epoch_id: str, user: User = Depends(check_user_exists),
+):
+    from .services import cutover
+
+    return await cutover.abort_staging(await _mid(user), user, epoch_id)
+
+
 @infinitemarkets_api_router.get("/migration/imports")
 @problem_boundary
 async def list_catalog_imports(user: User = Depends(check_user_exists)):

@@ -22,6 +22,7 @@
           selectionDirty: false,
           imports: [],
           audit: null,
+          cutover: null,
           preview: null,
           result: null,
           error: null,
@@ -40,7 +41,36 @@
       },
       gmLoadImportAudit: async function (id) {
         try {
+          this.gmMigration.cutover = null;
           this.gmMigration.audit = await this.gmApi("GET", "/migration/imports/" + id);
+        } catch (error) {
+          this.gmMigration.error = this.gmProblemCopy(error.problem);
+        }
+      },
+      gmStageCutover: async function (id) {
+        try {
+          this.gmMigration.cutover = await this.gmApi(
+            "POST", "/migration/imports/" + id + "/cutover", {}
+          );
+          await this.gmLoadCutover(this.gmMigration.cutover.id);
+        } catch (error) {
+          this.gmMigration.error = this.gmProblemCopy(error.problem);
+        }
+      },
+      gmLoadCutover: async function (id) {
+        try {
+          this.gmMigration.cutover = await this.gmApi(
+            "GET", "/migration/cutovers/" + id
+          );
+        } catch (error) {
+          this.gmMigration.error = this.gmProblemCopy(error.problem);
+        }
+      },
+      gmCutoverAction: async function (action) {
+        var epoch = this.gmMigration.cutover;
+        try {
+          await this.gmApi("POST", "/migration/cutovers/" + epoch.id + "/" + action, {});
+          await this.gmLoadCutover(epoch.id);
         } catch (error) {
           this.gmMigration.error = this.gmProblemCopy(error.problem);
         }

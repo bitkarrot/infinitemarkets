@@ -1327,3 +1327,43 @@ async def m010_import_drafts(db: Connection):
         f"created_at {int_t} NOT NULL, "
         "UNIQUE (import_id, invoice_hash, product_id))"
     )
+
+
+async def m011_cutover(db: Connection):
+    s = db.references_schema
+    int_t = db.big_int
+    await db.execute(
+        f"CREATE TABLE {s}cutover_epochs ("
+        "id TEXT PRIMARY KEY, merchant_id TEXT NOT NULL "
+        f"REFERENCES {s}merchants(id) ON DELETE RESTRICT, "
+        "import_id TEXT NOT NULL "
+        f"REFERENCES {s}catalog_imports(id) ON DELETE RESTRICT, "
+        "epoch_number INTEGER NOT NULL CHECK (epoch_number > 0), "
+        "state TEXT NOT NULL CHECK (state IN ('staged', 'freeze_requested', "
+        "'snapshot_verified', 'reconciling', 'ready', 'complete', 'blocked')), "
+        "source_merchant_id TEXT, snapshot_hash TEXT, "
+        "snapshot_json TEXT, snapshot_id TEXT, "
+        f"freeze_requested_at {int_t}, freeze_checked_at {int_t}, "
+        f"created_at {int_t} NOT NULL, updated_at {int_t} NOT NULL, "
+        "UNIQUE (merchant_id, import_id, epoch_number))"
+    )
+    await db.execute(
+        f"CREATE TABLE {s}cutover_events ("
+        "id TEXT PRIMARY KEY, epoch_id TEXT NOT NULL "
+        f"REFERENCES {s}cutover_epochs(id) ON DELETE RESTRICT, "
+        "state TEXT NOT NULL, reason_code TEXT NOT NULL, "
+        "sequence INTEGER NOT NULL, "
+        f"created_at {int_t} NOT NULL, UNIQUE (epoch_id, sequence))"
+    )
+    await db.execute(
+        f"CREATE TABLE {s}liability_partitions ("
+        "id TEXT PRIMARY KEY, epoch_id TEXT NOT NULL "
+        f"REFERENCES {s}cutover_epochs(id) ON DELETE RESTRICT, "
+        "liability_id TEXT NOT NULL UNIQUE "
+        f"REFERENCES {s}imported_liabilities(id) ON DELETE RESTRICT, "
+        "product_id TEXT NOT NULL "
+        f"REFERENCES {s}products(id) ON DELETE RESTRICT, "
+        "quantity INTEGER NOT NULL CHECK (quantity > 0), "
+        "state TEXT NOT NULL CHECK (state IN ('held', 'consumed', 'released')), "
+        f"created_at {int_t} NOT NULL, updated_at {int_t} NOT NULL)"
+    )

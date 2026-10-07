@@ -73,6 +73,8 @@ async def test_migration_admin_surface(runtime_env):
     assert 'data-gm-nav="migration"' in html
     assert 'data-gm-surface="migration"' in html
     assert 'data-gm="migration-audit"' in html
+    assert 'data-gm="migration-freeze"' in html
+    assert "These controls do not disable the old extension" in html
     assert "importing never authorizes sales" in html
     js = await runtime_env["client"].get(f"{JS}/admin_migration.js")
     assert js.status_code == 200

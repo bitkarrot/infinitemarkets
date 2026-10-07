@@ -62,6 +62,41 @@ test('migration wizard dry-runs and stages Shopify drafts without publication', 
 })
 
 
+test('legacy move preparation never claims to stop the old extension', async ({page}) => {
+  await page.goto('/infinitemarkets/')
+  await page.locator('[data-gm-nav="migration"]').click()
+  const migration = page.locator('[data-gm-surface="migration"]')
+  await migration.getByLabel('File format').click()
+  await page.getByText('nostrmarket JSON', {exact: true}).last().click()
+  await migration.locator('#gm-shopify-file').setInputFiles({
+    name: 'old.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify({
+      stalls: [{id: 'old-stall', currency: 'USD'}],
+      products: [{id: 'old-poster', stall_id: 'old-stall', name: 'Poster', price: 4}],
+      orders: []
+    }))
+  })
+  await migration.getByLabel('Source store identifier').fill('e2e-old-' + crypto.randomUUID())
+  await migration.getByLabel('Source currency (three-letter code)').fill('USD')
+  await migration.getByRole('button', {name: 'Preview / dry-run'}).click()
+  await expect(migration.locator('[data-gm="migration-preview"]')).toContainText(
+    '1 products to review'
+  )
+  await migration.getByRole('button', {name: 'Import as blocked drafts'}).click()
+  await expect(migration.locator('[data-gm="migration-audit"]')).toContainText(
+    'Cutover verified: No'
+  )
+  await migration.getByRole('button', {name: 'Prepare to move old products'}).click()
+  const freeze = migration.locator('[data-gm="migration-freeze"]')
+  await expect(freeze).toContainText('Old invoices checked: No')
+  await expect(freeze).toContainText('Still running or cannot be checked')
+  await freeze.getByRole('button', {name: 'Record freeze request (does not disable)'}).click()
+  await expect(freeze).toContainText('freeze_requested')
+  await expect(freeze).toContainText('Products available for sale: No')
+})
+
+
 test('messages workspace: folders, empty state, health strip', async ({
   page
 }) => {

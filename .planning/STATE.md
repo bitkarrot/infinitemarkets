@@ -5,10 +5,10 @@ milestone_name: milestone
 current_phase: 04
 current_phase_name: Release C — Migration and Cutover
 status: in_progress
-stopped_at: Phase 4 plan 04-01 verified with three formats, signed provisional audit and disposable browser import smoke; 04-02 verified freeze and stock partition pending, cutover remains blocked
-last_updated: "2026-10-07T07:16:33Z"
+stopped_at: Phase 4 plan 04-01 committed; 04-02 staging, freeze-request and audit groundwork in progress, source-wide disable/restart plus authoritative snapshot and settlement still pending; cutover blocked
+last_updated: "2026-10-07T07:30:44Z"
 last_activity: 2026-10-07
-last_activity_desc: File-only import verified on SQLite (403 runtime passed, 3 skipped before final focused checks; 39 targeted and browser wizard passed); PostgreSQL not configured
+last_activity_desc: Import wizard passed browser smoke; 04-02 staging schema and owner-scoped APIs added, no snapshot verification or activation endpoints; operator chose full old-extension disable and restart as freeze policy
 progress:
   total_phases: 5
   completed_phases: 4
