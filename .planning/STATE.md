@@ -5,10 +5,10 @@ milestone_name: milestone
 current_phase: 04
 current_phase_name: Release C — Migration and Cutover
 status: in_progress
-stopped_at: Phase 4 plan 04-01 committed; 04-02 staging, freeze-request and audit groundwork in progress, source-wide disable/restart plus authoritative snapshot and settlement still pending; cutover blocked
-last_updated: "2026-10-07T07:30:44Z"
+stopped_at: Phase 4 plan 04-01 committed; 04-02 fixed-source read-only comparison preview added, but no independently attested restart/version, signed snapshot, stock holds or activation; cutover blocked
+last_updated: "2026-10-07T08:04:00Z"
 last_activity: 2026-10-07
-last_activity_desc: Import wizard passed browser smoke; 04-02 staging schema and owner-scoped APIs added, no snapshot verification or activation endpoints; operator chose full old-extension disable and restart as freeze policy
+last_activity_desc: Added bounded same-instance nostrmarket order and wallet payment comparison preview; old-extension disable/restart and installed source version are not attested, so snapshot remains unverified and imported stock remains blocked
 progress:
   total_phases: 5
   completed_phases: 4

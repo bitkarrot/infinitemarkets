@@ -583,6 +583,16 @@ async def request_cutover_freeze(
     return await cutover.request_freeze(await _mid(user), user, epoch_id)
 
 
+@infinitemarkets_api_router.post("/migration/cutovers/{epoch_id}/check-source")
+@problem_boundary
+async def check_cutover_source(
+    request: Request, epoch_id: str, user: User = Depends(check_user_exists),
+):
+    from .services import cutover
+
+    return await cutover.check_source(await _mid(user), user, epoch_id)
+
+
 @infinitemarkets_api_router.post("/migration/cutovers/{epoch_id}/abort")
 @problem_boundary
 async def abort_cutover_staging(

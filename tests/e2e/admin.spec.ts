@@ -94,6 +94,11 @@ test('legacy move preparation never claims to stop the old extension', async ({p
   await freeze.getByRole('button', {name: 'Record freeze request (does not disable)'}).click()
   await expect(freeze).toContainText('freeze_requested')
   await expect(freeze).toContainText('Products available for sale: No')
+  await freeze.getByRole('button', {name: 'Compare old invoices (preview only)'}).click()
+  await expect(migration.locator('.bg-negative')).toContainText(
+    'Old extension must be disabled before inspection'
+  )
+  await expect(migration.locator('[data-gm="migration-source-check"]')).toHaveCount(0)
 })
 
 

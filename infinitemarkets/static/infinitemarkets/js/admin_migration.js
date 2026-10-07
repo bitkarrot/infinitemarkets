@@ -23,6 +23,7 @@
           imports: [],
           audit: null,
           cutover: null,
+          sourceCheck: null,
           preview: null,
           result: null,
           error: null,
@@ -42,6 +43,7 @@
       gmLoadImportAudit: async function (id) {
         try {
           this.gmMigration.cutover = null;
+          this.gmMigration.sourceCheck = null;
           this.gmMigration.audit = await this.gmApi("GET", "/migration/imports/" + id);
         } catch (error) {
           this.gmMigration.error = this.gmProblemCopy(error.problem);
@@ -49,6 +51,7 @@
       },
       gmStageCutover: async function (id) {
         try {
+          this.gmMigration.sourceCheck = null;
           this.gmMigration.cutover = await this.gmApi(
             "POST", "/migration/imports/" + id + "/cutover", {}
           );
@@ -69,10 +72,26 @@
       gmCutoverAction: async function (action) {
         var epoch = this.gmMigration.cutover;
         try {
+          this.gmMigration.sourceCheck = null;
           await this.gmApi("POST", "/migration/cutovers/" + epoch.id + "/" + action, {});
           await this.gmLoadCutover(epoch.id);
         } catch (error) {
           this.gmMigration.error = this.gmProblemCopy(error.problem);
+        }
+      },
+      gmCheckOldSource: async function () {
+        var state = this.gmMigration;
+        state.busy = true;
+        state.error = null;
+        state.sourceCheck = null;
+        try {
+          state.sourceCheck = await this.gmApi(
+            "POST", "/migration/cutovers/" + state.cutover.id + "/check-source", {}
+          );
+        } catch (error) {
+          state.error = this.gmProblemCopy(error.problem);
+        } finally {
+          state.busy = false;
         }
       },
       gmChooseCsvPreset: function (id) {

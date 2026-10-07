@@ -8,7 +8,9 @@ pytestmark = pytest.mark.runtime
 API = "/infinitemarkets/api/v1"
 
 
-async def test_staging_requires_owned_legacy_import_and_never_authorizes_stock(runtime_env):
+async def test_staging_requires_owned_legacy_import_and_never_authorizes_stock(
+    runtime_env, monkeypatch,
+):
     from infinitemarkets.db import db, table
     from infinitemarkets.security import ProblemError
     from infinitemarkets.services import cutover
@@ -70,10 +72,30 @@ async def test_staging_requires_owned_legacy_import_and_never_authorizes_stock(r
     assert [event["state"] for event in status.json()["events"]] == [
         "staged", "freeze_requested"
     ]
+    check_url = f"{API}/migration/cutovers/{epoch_id}/check-source"
+    assert (await client.post(check_url, headers=headers)).status_code == 409
+
+    async def disabled():
+        return {"disabled": True, "reason_code": "snapshot-unverified"}
+
+    async def evidence(_):
+        return {"merchant_id": "old-merchant", "products": {"old-mug"},
+                "invoices": [{"invoice_id": "c" * 64, "order_id": "old-order",
+                              "items": [{"product_id": "old-mug", "quantity": 1}],
+                              "state": "payable"}]}
+
+    monkeypatch.setattr(cutover, "old_source_status", disabled)
+    monkeypatch.setattr(cutover, "read_old_source_evidence", evidence)
+    checked = await client.post(check_url, headers=headers)
+    assert checked.status_code == 200, checked.text
+    assert checked.json()["snapshot_verified"] is False
+    assert checked.json()["payable_quantity"] == 1
+    assert "c" * 64 not in checked.text
     aborted = await client.post(
         f"{API}/migration/cutovers/{epoch_id}/abort", headers=headers
     )
     assert aborted.status_code == 200 and aborted.json()["state"] == "blocked"
+    assert (await client.post(check_url, headers=headers)).status_code == 409
     assert (await client.post(
         f"{API}/migration/cutovers/{epoch_id}/abort", headers=headers
     )).json() == aborted.json()
@@ -113,6 +135,189 @@ async def test_old_source_requires_installed_and_runtime_disable(monkeypatch):
         cutover, "host_settings", SimpleNamespace(lnbits_deactivated_extensions=set()),
     )
     assert (await cutover.old_source_status())["disabled"] is False
+
+
+async def test_old_evidence_is_bounded_and_owner_scoped(runtime_env, monkeypatch):
+    from lnbits.core.crud.wallets import create_wallet
+    from lnbits.db import Database
+
+    from infinitemarkets.security import ProblemError
+    from infinitemarkets.services import cutover
+
+    source = Database("ext_nostrmarket")
+    user_id = runtime_env["user_id"]
+    old_pubkey = "d" * 64
+    invoice = "e" * 64
+    async with source.connect() as conn:
+        await conn.execute(
+            "CREATE TABLE nostrmarket.merchants (id TEXT, user_id TEXT, "
+            "public_key TEXT, meta TEXT)"
+        )
+        await conn.execute(
+            "CREATE TABLE nostrmarket.stalls (id TEXT, merchant_id TEXT, wallet TEXT)"
+        )
+        await conn.execute(
+            "CREATE TABLE nostrmarket.products (id TEXT, merchant_id TEXT, stall_id TEXT)"
+        )
+        await conn.execute(
+            "CREATE TABLE nostrmarket.orders (id TEXT, merchant_id TEXT, "
+            "merchant_public_key TEXT, stall_id TEXT, invoice_id TEXT, order_items TEXT)"
+        )
+        await conn.execute(
+            "INSERT INTO nostrmarket.merchants (id, user_id, public_key, meta) "
+            "VALUES ('old-merchant', :u, :p, :meta)",
+            {"u": user_id, "p": old_pubkey, "meta": '{"active":false}'},
+        )
+        await conn.execute(
+            "INSERT INTO nostrmarket.stalls (id, merchant_id, wallet) "
+            "VALUES ('old-stall', 'old-merchant', :wallet)",
+            {"wallet": runtime_env["wallet"].id},
+        )
+        await conn.execute(
+            "INSERT INTO nostrmarket.products (id, merchant_id, stall_id) "
+            "VALUES ('old-poster', 'old-merchant', 'old-stall')"
+        )
+        await conn.execute(
+            "INSERT INTO nostrmarket.orders "
+            "(id, merchant_id, merchant_public_key, stall_id, invoice_id, order_items) "
+            "VALUES ('old-order', 'old-merchant', :p, 'old-stall', :invoice, :items)",
+            {"p": old_pubkey, "invoice": invoice,
+             "items": json.dumps([{"product_id": "old-poster", "quantity": 1}])},
+        )
+
+    async def installed(_):
+        return SimpleNamespace(active=False)
+
+    payment = SimpleNamespace(
+        payment_hash=invoice, wallet_id=runtime_env["wallet"].id, amount=5000,
+        extra={"tag": "nostrmarket", "merchant_pubkey": old_pubkey,
+               "order_id": "old-order"},
+    )
+
+    async def pages(**_):
+        return SimpleNamespace(data=[payment], total=1)
+
+    async def status(_):
+        return SimpleNamespace(paid=None)
+
+    monkeypatch.setattr(cutover, "get_installed_extension", installed)
+    monkeypatch.setattr(
+        cutover, "host_settings",
+        SimpleNamespace(lnbits_deactivated_extensions={"nostrmarket"}),
+    )
+    monkeypatch.setattr(cutover, "get_payments_paginated", pages)
+    monkeypatch.setattr(cutover, "check_payment_status", status)
+    evidence = await cutover.read_old_source_evidence(user_id)
+    assert evidence["merchant_id"] == "old-merchant"
+    assert evidence["products"] == {"old-poster"}
+    assert evidence["invoices"] == [{
+        "invoice_id": invoice, "order_id": "old-order",
+        "items": [{"product_id": "old-poster", "quantity": 1}], "state": "payable",
+    }]
+    payment.extra["order_id"] = "missing-order"
+    with pytest.raises(ProblemError) as missing:
+        await cutover.read_old_source_evidence(user_id)
+    assert missing.value.status == 409
+    assert invoice not in str(missing.value)
+    payment.extra["order_id"] = "old-order"
+    second = await create_wallet(user_id=user_id, wallet_name="Second old wallet")
+    extra_payment = SimpleNamespace(
+        payment_hash="a" * 64, wallet_id=second.id, amount=5000,
+        extra={"tag": "nostrmarket", "merchant_pubkey": old_pubkey,
+               "order_id": "missing-order"},
+    )
+
+    async def multiple_wallet_pages(**kwargs):
+        return SimpleNamespace(
+            data=[extra_payment if kwargs["wallet_id"] == second.id else payment], total=1
+        )
+
+    monkeypatch.setattr(cutover, "get_payments_paginated", multiple_wallet_pages)
+    with pytest.raises(ProblemError) as extra_wallet:
+        await cutover.read_old_source_evidence(user_id)
+    assert extra_wallet.value.status == 409
+    extra_payment.payment_hash = invoice
+    extra_payment.extra["order_id"] = "old-order"
+    with pytest.raises(ProblemError) as wrong_wallet:
+        await cutover.read_old_source_evidence(user_id)
+    assert wrong_wallet.value.status == 409
+
+    async def unowned(_):
+        return SimpleNamespace(user="other", can_view_payments=True)
+
+    monkeypatch.setattr(cutover, "get_wallet", unowned)
+    with pytest.raises(ProblemError) as denied:
+        await cutover.read_old_source_evidence(user_id)
+    assert denied.value.status == 409
+
+    async def owned(wallet_id):
+        return SimpleNamespace(id=wallet_id, user=user_id, can_view_payments=True)
+
+    async def excessive(**_):
+        return SimpleNamespace(data=[], total=5001)
+
+    monkeypatch.setattr(cutover, "get_wallet", owned)
+    monkeypatch.setattr(cutover, "get_payments_paginated", excessive)
+    with pytest.raises(ProblemError) as overflow:
+        await cutover.read_old_source_evidence(user_id)
+    assert overflow.value.status == 409
+    async with source.connect() as conn:
+        await conn.execute(
+            "UPDATE nostrmarket.merchants SET meta = :meta WHERE id = 'old-merchant'",
+            {"meta": '{"active":true}'},
+        )
+    async def legitimate(**kwargs):
+        if kwargs["wallet_id"] == runtime_env["wallet"].id:
+            return SimpleNamespace(data=[payment], total=1)
+        return SimpleNamespace(data=[], total=0)
+
+    monkeypatch.setattr(cutover, "get_payments_paginated", legitimate)
+    assert (await cutover.read_old_source_evidence(user_id))["invoices"][0]["state"] == "payable"
+
+
+async def test_old_source_comparison_rejects_missing_and_extra_invoices(runtime_env):
+    from infinitemarkets import crypto
+    from infinitemarkets.security import ProblemError
+    from infinitemarkets.services import cutover
+    from infinitemarkets.settings import ext_settings
+
+    merchant_id = "new-merchant"
+    invoice = "f" * 64
+    source = {
+        "merchant_id": "old-merchant", "products": {"old-poster"},
+        "invoices": [{"invoice_id": invoice, "order_id": "old-order",
+                      "items": [{"product_id": "old-poster", "quantity": 1}],
+                      "state": "payable"}],
+    }
+    key = ext_settings().privacy_key
+    audit = {
+        "id": "import-1", "source_kind": "nostrmarket",
+        "rows": [{"legacy_id": "old-poster", "product_id": "new-product"}],
+        "liabilities": [{"product_id": "new-product", "quantity": 1,
+                         "invoice_hash": crypto.hmac_index(
+                             key, "legacy-invoice", merchant_id, invoice),
+                         "order_hash": crypto.hmac_index(
+                             key, "legacy-order", merchant_id, "old-order")}],
+    }
+    checked = cutover.compare_old_source(merchant_id, audit, source)
+    assert checked["payable_quantity"] == 1
+    assert checked["paid_quantity"] == 0
+    assert checked["source_product_count"] == 1
+    assert invoice not in json.dumps(checked)
+    missing = {**source, "invoices": []}
+    with pytest.raises(ProblemError) as incomplete:
+        cutover.compare_old_source(merchant_id, audit, missing)
+    assert incomplete.value.status == 409
+    extra = {**source, "invoices": source["invoices"] + [
+        {**source["invoices"][0], "invoice_id": "b" * 64},
+    ]}
+    with pytest.raises(ProblemError) as unclaimed:
+        cutover.compare_old_source(merchant_id, audit, extra)
+    assert unclaimed.value.status == 409
+    wrong_product = {**source, "products": {"old-poster", "unimported"}}
+    with pytest.raises(ProblemError) as incomplete_catalog:
+        cutover.compare_old_source(merchant_id, audit, wrong_product)
+    assert incomplete_catalog.value.status == 409
 
 
 async def test_shopify_source_cannot_start_unverifiable_cutover(runtime_env):

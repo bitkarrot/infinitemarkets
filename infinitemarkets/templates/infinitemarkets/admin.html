@@ -1087,10 +1087,22 @@
                   <q-btn v-if="gmMigration.cutover.state === 'staged'" outline
                          label="Record freeze request (does not disable)"
                          @click="gmCutoverAction('freeze-request')"></q-btn>
+                  <q-btn v-if="gmMigration.cutover.state === 'freeze_requested'" outline
+                         label="Compare old invoices (preview only)" :loading="gmMigration.busy"
+                         @click="gmCheckOldSource"></q-btn>
                   <q-btn v-if="['staged', 'freeze_requested'].includes(gmMigration.cutover.state)"
                          outline color="negative" label="Stop preparation; keep stock blocked"
                          @click="gmCutoverAction('abort')"></q-btn>
                 </div>
+                <q-banner v-if="gmMigration.sourceCheck" data-gm="migration-source-check"
+                          class="bg-info text-white q-mt-md">
+                  Old records matched this upload at the time of the check:
+                  {{ gmMigration.sourceCheck.source_product_count }} products,
+                  {{ gmMigration.sourceCheck.liability_count }} invoice items,
+                  {{ gmMigration.sourceCheck.payable_quantity }} units still payable and
+                  {{ gmMigration.sourceCheck.paid_quantity }} already paid.
+                  This preview is not a verified stock count or permission to sell.
+                </q-banner>
               </div>
             </div>
           </div>
