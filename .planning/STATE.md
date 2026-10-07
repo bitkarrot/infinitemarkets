@@ -4,11 +4,11 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 04
 current_phase_name: Release C — Migration and Cutover
-status: planned
-stopped_at: Phase 4 re-planned for Shopify CSV/media/export and verified cutover; next step is execute-phase 4
-last_updated: "2026-10-07T05:45:46.000Z"
+status: in_progress
+stopped_at: Phase 4 plan 04-01 in progress; Shopify CSV draft-import slice and three-product private verification pass, remaining 04-01 tasks and plans 04-02/03/04 pending
+last_updated: "2026-10-07T06:41:01.000Z"
 last_activity: 2026-10-07
-last_activity_desc: Shopify reference archived; Phase 4 expanded to four plans with product export and optional owned-media migration
+last_activity_desc: Three-product Shopify sample prepared privately and verified via authenticated draft import; cutover gate remains closed
 progress:
   total_phases: 5
   completed_phases: 4
@@ -24,13 +24,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-20)
 
 **Core value:** A merchant can sell one authoritative inventory safely through LNbits-backed web and Nostr flows without duplicate invoices, double allocation, or relay delivery being mistaken for payment truth.
-**Current focus:** Phase 4 — Release C: Migration and Cutover (planned — 4 plans 04-01/02/03/04, next: execute-phase)
+**Current focus:** Phase 4 — Release C: Migration and Cutover (04-01 Shopify import slice implemented; 04-01 remainder and 04-02/03/04 pending)
 
 ## Current Position
 
-Phase: 4 (Release C — Migration and Cutover) — PLANNED (CONTEXT+RESEARCH+4 plans written), next step is execute-phase
-Status: Phases 1, 2, 3 and 03.1 all complete (14/18 plans); Phase 3 release gate verified (one operator-deferred item in 03-UAT: live plebeian.market smoke)
-Last activity: 2026-10-07 — Shopify assets/screens archived; Phase 4 import/export/media/cutover plans revised
+Phase: 4 (Release C — Migration and Cutover) — IN PROGRESS (14/18 plans complete; 04-01 not yet complete)
+Status: Phases 1, 2, 3 and 03.1 all complete; Phase 3 release gate verified (one operator-deferred item in 03-UAT: live plebeian.market smoke)
+Last activity: 2026-10-07 — private three-product Shopify fixture verified through authenticated import; blocked drafts and provisional signature implemented; no live deployment
 
 Progress: [████████░░] 80% of roadmap phases (4/5)
 
@@ -119,6 +119,6 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 ## Session Continuity
 
-Last session: 2026-10-07T00:00:00.000Z
-Stopped at: 03.1-03 complete — phase 03.1 fully landed (foundation, magic-link/link/merge, surfaces + e2e)
-Resume file: .planning/ROADMAP.md (phase 03.1 done; next phase per roadmap)
+Last session: 2026-10-07T06:41:01.000Z
+Stopped at: Phase 4 04-01 in progress — Shopify CSV import/API, blocked drafts and private three-product verification complete; legacy formats, cutover, export/media and release gate pending
+Resume file: .planning/phases/04-release-c-migration-and-cutover/04-01-PLAN.md
