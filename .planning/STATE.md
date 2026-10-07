@@ -5,7 +5,7 @@ milestone_name: milestone
 current_phase: 04
 current_phase_name: Release C — Migration and Cutover
 status: in_progress
-stopped_at: Phase 4 plan 04-02 liability reconciliation implemented — signed snapshot gates liability dispositions (wait/partition/reconcile); complete requires all covered; reactivation re-blocks; leased background pass rides the reconciliation worker. Activation pending physical-count + merchant review; 04-03/04 pending
+stopped_at: Phase 4 plan 04-02 complete pending hardening — liability dispositions, leased reconcile pass, reactivation re-block, and explicit physical-count activation gate all implemented and tested under SQLite. 04-03 export/media + storefront styling next
 last_updated: "2026-10-07T21:00:00Z"
 last_activity: 2026-10-07
 last_activity_desc: 04-02 liability partitions and exactly-once paid/unpaid terminal transitions implemented; complete releases imported products via a shared epoch-state predicate; abort re-drafts and retains holds; leased cutover_reconcile_pass re-checks open liabilities and re-blocks on source reactivation or contract drift
@@ -103,7 +103,7 @@ Decisions are logged in PROJECT.md and the normative specification.
 - The new demo uses a fresh disposable database rather than migrating old demo orders and the previously hand-added images. If those records must remain visible, the old database requires a separate recovery plan.
 - Release B cannot claim production readiness without deployed egress controls and external-client evidence.
 - Release C requires a live scarce-stock payable-invoice cutover rehearsal.
-- 04-02 cutover lifecycle now implemented end-to-end: instance-wide disable + restart attestation, source-contract hash, signed snapshot, per-liability wait/partition/reconcile, completion gate, abort retaining holds, and a leased reconcile pass riding the 60s reconciliation worker. Remaining: physical-stock-count activation ceremony, more adversarial negatives (tampered snapshot, foreign wallet, unowned merchant), PostgreSQL qualification, and a real installed nostrmarket evidence pass.
+- 04-02 cutover lifecycle implemented end-to-end: instance-wide disable + restart attestation, source-contract hash, signed snapshot, per-liability wait/partition/reconcile, completion gate, physical-count activation, abort retaining holds, and a leased reconcile pass riding the 60s reconciliation worker. Remaining: more adversarial negatives (tampered snapshot, foreign wallet, unowned merchant), PostgreSQL qualification, and a real installed nostrmarket evidence pass.
 
 ### Roadmap Evolution
 
