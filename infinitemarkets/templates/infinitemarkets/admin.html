@@ -83,6 +83,11 @@
           <q-item-section avatar><q-icon name="inventory_2"></q-icon></q-item-section>
           <q-item-section>Categories</q-item-section>
         </q-item>
+        <q-item clickable :active="gm.view === 'migration'"
+                @click="gmNav('migration')" data-gm-nav="migration">
+          <q-item-section avatar><q-icon name="move_to_inbox"></q-icon></q-item-section>
+          <q-item-section>Migration</q-item-section>
+        </q-item>
         <q-item clickable :active="gm.view === 'publications'"
                 @click="gmNav('publications')" data-gm-nav="publications">
           <q-item-section avatar><q-icon name="rss_feed"></q-icon></q-item-section>
@@ -938,6 +943,66 @@
             </template>
           </q-tab-panel>
         </q-tab-panels>
+      </section>
+
+      <section v-show="gm.view === 'migration'" data-gm-surface="migration">
+        <h1 class="text-h6 q-mb-md">Product migration</h1>
+        <q-banner class="bg-warning text-dark q-mb-md">
+          Shopify products import as hidden drafts. A CSV stock quantity does not verify
+          physical inventory or old payable orders; importing never authorizes sales.
+        </q-banner>
+        <q-card flat bordered class="q-pa-md">
+          <div class="text-subtitle1 q-mb-md">Import Shopify CSV</div>
+          <label for="gm-shopify-file" class="text-body2">Shopify product export (CSV)</label>
+          <input id="gm-shopify-file" type="file" accept=".csv,text/csv"
+                 class="block q-my-sm" @change="gmMigrationFileChanged">
+          <q-input v-model="gmMigration.sourceInstance" outlined dense
+                   label="Source store identifier" hint="A stable name for this Shopify store"
+                   class="q-mb-md"></q-input>
+          <q-input v-model="gmMigration.currency" outlined dense
+                   label="Source currency (three-letter code)"
+                   hint="Choose the currency used for prices in the export"
+                   class="q-mb-md"></q-input>
+          <div class="row q-gutter-sm">
+            <q-btn color="primary" outline label="Preview import"
+                   :loading="gmMigration.busy" :disable="!gmMigration.file"
+                   @click="gmPreviewShopify"></q-btn>
+            <q-btn color="primary" unelevated label="Import as blocked drafts"
+                   :loading="gmMigration.busy" :disable="!gmMigration.preview || gmMigration.selectionDirty || gmMigration.preview.products.some(p => p.image_selection_required)"
+                   @click="gmExecuteShopify"></q-btn>
+          </div>
+          <q-banner v-if="gmMigration.error" class="bg-negative text-white q-mt-md">
+            {{ gmMigration.error }}
+          </q-banner>
+          <q-banner v-if="gmMigration.result" class="bg-positive text-white q-mt-md">
+            Imported {{ gmMigration.result.product_count }} products as blocked drafts.
+            Review categories, physical stock and old payable orders before cutover.
+          </q-banner>
+          <div v-if="gmMigration.preview" class="q-mt-md" data-gm="migration-preview">
+            <div class="text-subtitle2">{{ gmMigration.preview.products.length }} products to review</div>
+            <q-list bordered separator class="q-mt-sm">
+              <q-item v-for="product in gmMigration.preview.products" :key="product.handle">
+                <q-item-section>
+                  <q-item-label>{{ product.title }}</q-item-label>
+                  <q-item-label caption>
+                    {{ product.variants.length }} variant(s) · {{ product.images.length }} images ·
+                    {{ product.inventory_unknown ? 'Inventory unknown — zero available' :
+                       product.stock_on_hand + ' units declared (unverified)' }}
+                  </q-item-label>
+                  <div v-if="product.image_selection_required" class="q-mt-sm">
+                    <p class="text-caption">Choose at most 20 images, including all variant images,
+                      then preview again before importing.</p>
+                    <div v-for="url in product.images" :key="url" class="row items-center">
+                      <q-checkbox :model-value="(gmMigration.selections[product.handle] || []).includes(url)"
+                                  :label="url.split('/').pop().split('?')[0] + (product.variants.some(v => v.image === url) ? ' (variant image)' : '')"
+                                  @update:model-value="gmToggleImportImage(product.handle, url, $event)"></q-checkbox>
+                    </div>
+                  </div>
+                </q-item-section>
+              </q-item>
+            </q-list>
+          </div>
+        </q-card>
       </section>
 
       <!-- ================= B2: publication health ================= -->
@@ -2550,6 +2615,7 @@
 <script src="/infinitemarkets/static/infinitemarkets/js/admin_app.js?v={{ asset_revision }}"></script>
 <script src="/infinitemarkets/static/infinitemarkets/js/admin_orders.js?v={{ asset_revision }}"></script>
 <script src="/infinitemarkets/static/infinitemarkets/js/admin_catalog.js?v={{ asset_revision }}"></script>
+<script src="/infinitemarkets/static/infinitemarkets/js/admin_migration.js?v={{ asset_revision }}"></script>
 <script src="/infinitemarkets/static/infinitemarkets/js/admin_publications.js?v={{ asset_revision }}"></script>
 <script src="/infinitemarkets/static/infinitemarkets/js/admin_messages.js?v={{ asset_revision }}"></script>
 <script src="/infinitemarkets/static/infinitemarkets/js/admin_settings.js?v={{ asset_revision }}"></script>

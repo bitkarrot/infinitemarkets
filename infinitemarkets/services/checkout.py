@@ -1069,6 +1069,7 @@ async def begin_saga(
                     f"UPDATE {tx.table('products')}"
                     " SET stock_reserved = stock_reserved + :q"
                     " WHERE id = :p AND deleted_at IS NULL"
+                    " AND (import_source_kind IS NULL OR import_authorized = TRUE)"
                     " AND (stock_on_hand IS NULL"
                     " OR stock_on_hand - stock_reserved >= :q)",
                     {"q": item["quantity"], "p": item["product_id"]},

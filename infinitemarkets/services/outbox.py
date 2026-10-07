@@ -359,7 +359,10 @@ async def render_intent(row: dict, database=None) -> dict | None:
                 f"SELECT * FROM {table('products')} WHERE id = :i",
                 {"i": row["aggregate_id"]},
             )
-            if not p or p["draft"] or p["deleted_at"] is not None:
+            if (
+                not p or p["draft"] or p["deleted_at"] is not None
+                or (p["import_source_kind"] is not None and not p["import_authorized"])
+            ):
                 return None
             p = dict(p)
             merchant = await conn.fetchone(

@@ -9,12 +9,15 @@ are RFC 9457 problem details.
 from __future__ import annotations
 
 import functools
+import json
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Request, Response
 from lnbits.core.models import User
 from lnbits.decorators import check_user_exists
 from pydantic import BaseModel, Field
+from starlette.datastructures import UploadFile
+from starlette.formparsers import MultiPartException, MultiPartParser
 
 from .security import (
     ProblemError,
@@ -103,6 +106,10 @@ class TestNotificationBody(_Strict):
 class PatchNotificationsBody(_Strict):
     notify_emails: list[str] | None = None
     notify_events: dict | None = None
+
+
+class ImportCategoryBody(_Strict):
+    category_id: str = Field(min_length=32, max_length=32)
 
 
 class BulkProductsBody(_Strict):
@@ -451,6 +458,107 @@ async def delete_merchant(
     merchant_id: str, user: User = Depends(check_user_exists)
 ):
     return await merchant_service.begin_deactivation(merchant_id, user)
+
+
+async def _shopify_upload(request: Request, *, execute: bool):
+    from .services.migration_import import MAX_UPLOAD_BYTES
+
+    if not request.headers.get("content-type", "").startswith("multipart/form-data;"):
+        raise unprocessable("invalid-content", "multipart upload required")
+
+    async def bounded_stream():
+        received = 0
+        async for chunk in request.stream():
+            received += len(chunk)
+            if received > MAX_UPLOAD_BYTES:
+                raise unprocessable("invalid-content", "import exceeds upload limit")
+            yield chunk
+
+    try:
+        form = await MultiPartParser(
+            request.headers, bounded_stream(), max_files=1, max_fields=4,
+        ).parse()
+    except MultiPartException as exc:
+        raise unprocessable("invalid-content", "invalid import form") from exc
+    try:
+        expected = {"file", "currency", "source_instance"}
+        if execute:
+            expected.add("source_hash")
+        if "image_selection" in form:
+            expected.add("image_selection")
+        if set(form.keys()) != expected or len(form.multi_items()) != len(expected):
+            raise unprocessable("invalid-content", "unexpected import fields")
+        upload = form["file"]
+        if not isinstance(upload, UploadFile) or not upload.filename.lower().endswith(".csv"):
+            raise unprocessable("invalid-content", "Shopify CSV file required")
+        fields = tuple(form[name] for name in expected - {"file", "image_selection"})
+        if any(not isinstance(value, str) or len(value) > 100 for value in fields):
+            raise unprocessable("invalid-content", "invalid import fields")
+        selection = None
+        if "image_selection" in form:
+            raw_selection = form["image_selection"]
+            if not isinstance(raw_selection, str) or len(raw_selection) > 128000:
+                raise unprocessable("invalid-content", "invalid image selection")
+            try:
+                selection = json.loads(raw_selection)
+            except ValueError as exc:
+                raise unprocessable("invalid-content", "invalid image selection") from exc
+        data = await upload.read(MAX_UPLOAD_BYTES + 1)
+        if len(data) > MAX_UPLOAD_BYTES:
+            raise unprocessable("invalid-content", "import exceeds upload limit")
+        return data, form["currency"], form["source_instance"], form.get("source_hash"), selection
+    finally:
+        await form.close()
+
+
+@infinitemarkets_api_router.post("/migration/products/{product_id}/category")
+@problem_boundary
+async def recategorize_import(
+    request: Request, product_id: str, body: ImportCategoryBody,
+    user: User = Depends(check_user_exists),
+):
+    from .services import catalog
+
+    return await catalog.recategorize_import_draft(
+        await _mid(user), user, product_id, body.category_id
+    )
+
+
+@infinitemarkets_api_router.post("/migration/shopify/preview")
+@problem_boundary
+async def preview_shopify(request: Request, user: User = Depends(check_user_exists)):
+    from .services import migration_import
+
+    await _mid(user)
+    data, currency, source_instance, _, selection = await _shopify_upload(
+        request, execute=False
+    )
+    try:
+        return migration_import.preview_shopify_import(
+            data, currency=currency, source_instance=source_instance,
+            image_selection=selection,
+        )
+    except ValueError as exc:
+        raise unprocessable("invalid-content", str(exc)) from exc
+
+
+@infinitemarkets_api_router.post("/migration/shopify/execute")
+@problem_boundary
+async def execute_shopify(request: Request, user: User = Depends(check_user_exists)):
+    from .services import migration_import
+
+    merchant_id = await _mid(user)
+    data, currency, source_instance, source_hash, selection = await _shopify_upload(
+        request, execute=True
+    )
+    try:
+        return await migration_import.execute_shopify_import(
+            merchant_id, user, data, currency=currency,
+            source_instance=source_instance, expected_hash=source_hash,
+            image_selection=selection,
+        )
+    except ValueError as exc:
+        raise unprocessable("invalid-content", str(exc)) from exc
 
 
 # --- section 5.2 category routes ---------------------------------------------------

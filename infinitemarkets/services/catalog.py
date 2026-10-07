@@ -188,10 +188,16 @@ async def _fetchall(table_name: str, merchant_id: str,
 
 async def _product_publishable(tx: DomainTransaction, product_id: str) -> bool:
     row = await tx.fetch_one(
-        f"SELECT draft, deleted_at FROM {tx.table('products')} WHERE id = :i",
+        f"SELECT draft, deleted_at, import_source_kind, import_authorized "
+        f"FROM {tx.table('products')} WHERE id = :i",
         {"i": product_id},
     )
-    return bool(row) and not row["draft"] and row["deleted_at"] is None
+    return (
+        bool(row)
+        and not row["draft"]
+        and row["deleted_at"] is None
+        and (row["import_source_kind"] is None or row["import_authorized"])
+    )
 
 
 async def _collection_member_d_tags(
@@ -200,7 +206,8 @@ async def _collection_member_d_tags(
     rows = await tx.fetch_all(
         f"SELECT p.d_tag FROM {tx.table('product_collections')} pc "
         f"JOIN {tx.table('products')} p ON p.id = pc.product_id "
-        "WHERE pc.collection_id = :c AND p.deleted_at IS NULL AND NOT p.draft",
+        "WHERE pc.collection_id = :c AND p.deleted_at IS NULL AND NOT p.draft "
+        "AND (p.import_source_kind IS NULL OR p.import_authorized = TRUE)",
         {"c": collection_id},
     )
     return sorted(r["d_tag"] for r in rows)
@@ -283,11 +290,15 @@ async def _enqueue_product(
     """Enqueue a 30402 intent when publishable; also assigns
     ``published_at`` once (§6 — retries never change it)."""
     row = await tx.fetch_one(
-        f"SELECT draft, deleted_at, d_tag, published_at "
+        f"SELECT draft, deleted_at, d_tag, published_at, "
+        "import_source_kind, import_authorized "
         f"FROM {tx.table('products')} WHERE id = :i",
         {"i": product_id},
     )
-    if not row or row["draft"] or row["deleted_at"] is not None:
+    if (
+        not row or row["draft"] or row["deleted_at"] is not None
+        or (row["import_source_kind"] is not None and not row["import_authorized"])
+    ):
         return None
     if row["published_at"] is None:
         await tx.execute(
@@ -820,6 +831,47 @@ def _product_out(row: dict) -> dict:
     return row
 
 
+async def create_import_draft(
+    tx: DomainTransaction, merchant_id: str, category_id: str,
+    payload: dict, source_instance: str, legacy_id: str,
+) -> str:
+    _reject_unknown(payload, _PRODUCT_PAYLOAD_FIELDS)
+    _validate_product_payload(payload)
+    if payload.get("draft") is not True or payload.get("visibility") != "hidden":
+        raise unprocessable("import-blocked", "import products must be hidden drafts")
+    product_type = payload.get("product_type", "simple")
+    parent_id = await _validate_variation(
+        tx, merchant_id, product_type, payload.get("parent_product_id")
+    )
+    fields = _sanitize_product_fields(payload)
+    if fields.get("currency_decimals") is None:
+        from .fx import default_currency_decimals
+
+        fields["currency_decimals"] = default_currency_decimals(fields.get("currency"))
+    product_id = uuid.uuid4().hex
+    now = _now()
+    columns = [
+        "id", "merchant_id", "category_id", "d_tag", "product_type", "format",
+        "parent_product_id", "import_source_kind", "import_source_instance",
+        "import_legacy_id", "revision", "created_at", "updated_at",
+    ]
+    values = [
+        product_id, merchant_id, category_id, _gen_d_tag(), product_type, "physical",
+        parent_id, "shopify", source_instance, legacy_id, 0, now, now,
+    ]
+    for field, value in fields.items():
+        columns.append(field)
+        values.append(value)
+    placeholders = ", ".join(f":p{i}" for i in range(len(values)))
+    await tx.execute(
+        f"INSERT INTO {tx.table('products')} ({', '.join(columns)}) "
+        f"VALUES ({placeholders})",
+        {f"p{i}": value for i, value in enumerate(values)},
+    )
+    await _replace_product_details(tx, product_id, payload, merchant_id)
+    return product_id
+
+
 async def create_product(merchant_id: str, user, payload: dict) -> dict:
     merchant = await _merchant_owned(merchant_id, user)
     _reject_unknown(payload, _PRODUCT_PAYLOAD_FIELDS)
@@ -891,6 +943,48 @@ async def create_product(merchant_id: str, user, payload: dict) -> dict:
         await _enqueue_stall_if_enabled(
             tx, merchant_id, payload["category_id"], merchant["pubkey"]
         )
+    return await get_product(merchant_id, user, product_id)
+
+
+async def recategorize_import_draft(
+    merchant_id: str, user, product_id: str, category_id: str,
+) -> dict:
+    await _merchant_owned(merchant_id, user)
+    async with DomainTransaction() as tx:
+        product = await tx.fetch_one(
+            f"SELECT id, draft, stock_reserved, import_source_kind, product_type "
+            f"FROM {tx.table('products')} WHERE id = :i AND merchant_id = :m "
+            f"AND deleted_at IS NULL{tx.for_update}",
+            {"i": product_id, "m": merchant_id},
+        )
+        if not product:
+            raise not_found("product not found")
+        if (
+            not product["import_source_kind"] or not product["draft"]
+            or product["stock_reserved"] or product["product_type"] == "variation"
+        ):
+            raise conflict("import-blocked", "Only unreserved imported drafts can move")
+        children = await tx.fetch_all(
+            f"SELECT id, draft, stock_reserved FROM {tx.table('products')} "
+            "WHERE parent_product_id = :i AND merchant_id = :m "
+            f"AND deleted_at IS NULL{tx.for_update}",
+            {"i": product_id, "m": merchant_id},
+        )
+        if any(not child["draft"] or child["stock_reserved"] for child in children):
+            raise conflict("import-blocked", "Imported variants must remain unreserved drafts")
+        category = await tx.fetch_one(
+            f"SELECT id, import_review FROM {tx.table('categories')} "
+            "WHERE id = :c AND merchant_id = :m AND deleted_at IS NULL",
+            {"c": category_id, "m": merchant_id},
+        )
+        if not category or category["import_review"]:
+            raise unprocessable("invalid-content", "Choose a live merchant category")
+        for target_id in [product_id, *(child["id"] for child in children)]:
+            await tx.execute(
+                f"UPDATE {tx.table('products')} SET category_id = :c, "
+                "revision = revision + 1, updated_at = :t WHERE id = :i",
+                {"c": category_id, "t": _now(), "i": target_id},
+            )
     return await get_product(merchant_id, user, product_id)
 
 
@@ -979,6 +1073,17 @@ async def patch_product(merchant_id: str, user, product_id: str,
 
     now = _now()
     async with DomainTransaction() as tx:
+        import_row = await tx.fetch_one(
+            f"SELECT import_source_kind, import_authorized FROM {tx.table('products')} "
+            f"WHERE id = :i AND merchant_id = :m{tx.for_update}",
+            {"i": product_id, "m": merchant_id},
+        )
+        if (
+            import_row and import_row["import_source_kind"] is not None
+            and not import_row["import_authorized"]
+        ):
+            if patch.get("draft") is False or patch.get("visibility") in ("on-sale", "pre-order"):
+                raise conflict("import-blocked", "Import requires verified cutover")
         if "product_type" in patch or "parent_product_id" in patch:
             # re-validate the resulting combination
             parent_id = await _validate_variation(
@@ -1121,6 +1226,12 @@ async def bulk_products(
         by_id = {row["id"]: row for row in rows}
         if len(by_id) != len(ids):
             raise not_found("one or more products not found")
+        if action == "publish" or (action == "visibility" and value != "hidden"):
+            if any(
+                row["import_source_kind"] is not None and not row["import_authorized"]
+                for row in rows
+            ):
+                raise conflict("import-blocked", "Import requires verified cutover")
 
         if action == "delete":
             for product_id in ids:
@@ -1983,7 +2094,7 @@ async def product_events(merchant_id: str, user, product_id: str,
     row = await _fetch("products", product_id, merchant_id)
     if row["deleted_at"] is not None:
         raise not_found("product not found")
-    if row["draft"]:
+    if row["draft"] or (row["import_source_kind"] is not None and not row["import_authorized"]):
         # drafts produce NO public events (§6.7)
         return []
     from ..db import db, table

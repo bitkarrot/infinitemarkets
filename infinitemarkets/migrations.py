@@ -1260,3 +1260,44 @@ async def m009_categories(db: Connection):
         f"UPDATE {s}protocol_addresses SET domain_type = 'categories' "
         "WHERE domain_type = 'catalogs'"
     )
+
+
+async def m010_import_drafts(db: Connection):
+    s = db.references_schema
+    int_t = db.big_int
+    for column in ("import_source_kind", "import_source_instance", "import_legacy_id"):
+        await db.execute(f"ALTER TABLE {s}products ADD COLUMN {column} TEXT")
+    await db.execute(
+        f"ALTER TABLE {s}products ADD COLUMN import_authorized BOOLEAN NOT NULL DEFAULT FALSE"
+    )
+    await db.execute(
+        f"CREATE UNIQUE INDEX ux_products_import_identity ON {s}products"
+        "(merchant_id, import_source_kind, import_source_instance, import_legacy_id)"
+    )
+    await db.execute(
+        f"ALTER TABLE {s}categories ADD COLUMN import_review BOOLEAN NOT NULL DEFAULT FALSE"
+    )
+    await db.execute(
+        f"CREATE UNIQUE INDEX ux_categories_import_review ON {s}categories"
+        "(merchant_id) WHERE import_review = TRUE"
+    )
+    await db.execute(
+        f"CREATE TABLE {s}catalog_imports ("
+        "id TEXT PRIMARY KEY, merchant_id TEXT NOT NULL "
+        f"REFERENCES {s}merchants(id) ON DELETE RESTRICT, "
+        "source_kind TEXT NOT NULL, source_instance TEXT NOT NULL, "
+        "source_hash TEXT NOT NULL, source_currency TEXT NOT NULL, "
+        "commitment_json TEXT NOT NULL, commitment_id TEXT NOT NULL, "
+        "state TEXT NOT NULL, product_count INTEGER NOT NULL, "
+        f"created_at {int_t} NOT NULL, "
+        "UNIQUE (merchant_id, source_kind, source_instance, source_hash))"
+    )
+    await db.execute(
+        f"CREATE TABLE {s}import_rows ("
+        "id TEXT PRIMARY KEY, import_id TEXT NOT NULL "
+        f"REFERENCES {s}catalog_imports(id) ON DELETE RESTRICT, "
+        "product_id TEXT NOT NULL "
+        f"REFERENCES {s}products(id) ON DELETE RESTRICT, "
+        "legacy_id TEXT NOT NULL, content_hash TEXT NOT NULL, "
+        "UNIQUE (import_id, legacy_id))"
+    )
