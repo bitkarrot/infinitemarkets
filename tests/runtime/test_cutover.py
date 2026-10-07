@@ -75,8 +75,11 @@ async def test_staging_requires_owned_legacy_import_and_never_authorizes_stock(
     check_url = f"{API}/migration/cutovers/{epoch_id}/check-source"
     assert (await client.post(check_url, headers=headers)).status_code == 409
 
+    restart_at = requested.json()["freeze_requested_at"] + 1
+
     async def disabled():
-        return {"disabled": True, "reason_code": "snapshot-unverified"}
+        return {"disabled": True, "reason_code": "snapshot-unverified",
+                "restart_checked_at": restart_at}
 
     async def evidence(_):
         return {"merchant_id": "old-merchant", "products": {"old-mug"},
@@ -91,6 +94,9 @@ async def test_staging_requires_owned_legacy_import_and_never_authorizes_stock(
     assert checked.json()["snapshot_verified"] is False
     assert checked.json()["payable_quantity"] == 1
     assert "c" * 64 not in checked.text
+    restart_at = requested.json()["freeze_requested_at"]
+    assert (await client.post(check_url, headers=headers)).status_code == 409
+    restart_at = requested.json()["freeze_requested_at"] + 1
     aborted = await client.post(
         f"{API}/migration/cutovers/{epoch_id}/abort", headers=headers
     )

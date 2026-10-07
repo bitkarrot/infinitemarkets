@@ -114,8 +114,10 @@ async def old_source_status() -> dict:
         return {"disabled": True, "reason_code": "source-unreadable"}
     if digest != contract["code_hash"]:
         return {"disabled": True, "reason_code": "source-contract-mismatch"}
+    restart_checked_at = getattr(host_settings, "server_startup_time", None)
     return {
         "disabled": True, "reason_code": "snapshot-unverified",
+        "restart_checked_at": restart_checked_at,
         "source_contract": {
             "code_hash": digest, "git_commit": contract["git_commit"],
         },
@@ -350,7 +352,8 @@ async def check_source(merchant_id: str, user, epoch_id: str) -> dict:
     await catalog._merchant_owned(merchant_id, user)
     async with db.connect() as conn:
         epoch = await conn.fetchone(
-            f"SELECT import_id, state FROM {table('cutover_epochs')} "
+            f"SELECT import_id, state, freeze_requested_at "
+            f"FROM {table('cutover_epochs')} "
             "WHERE id = :i AND merchant_id = :m",
             {"i": epoch_id, "m": merchant_id},
         )
@@ -358,8 +361,20 @@ async def check_source(merchant_id: str, user, epoch_id: str) -> dict:
         raise not_found("cutover not found")
     if epoch["state"] != "freeze_requested":
         raise conflict("invalid-transition", "Old source cannot be checked in this state")
-    if not (await old_source_status())["disabled"]:
+    source_status = await old_source_status()
+    if not source_status["disabled"]:
         raise conflict("legacy-active", "Old extension must be disabled before inspection")
+    if (source_status["reason_code"] != "snapshot-unverified"
+            or source_status.get("restart_checked_at") is None):
+        raise conflict("legacy-source", "Old source contract is not verified")
+    if (epoch["freeze_requested_at"] is not None
+            and source_status["restart_checked_at"] is not None
+            and not (epoch["freeze_requested_at"]
+                     < source_status["restart_checked_at"])):
+        raise conflict(
+            "legacy-source",
+            "LNbits must be restarted after the freeze request before inspection",
+        )
     audited = await migration_import.audit_import(merchant_id, user, epoch["import_id"])
     evidence = await read_old_source_evidence(user.id)
     comparison = compare_old_source(merchant_id, audited, evidence)
@@ -369,8 +384,12 @@ async def check_source(merchant_id: str, user, epoch_id: str) -> dict:
             "WHERE id = :i AND merchant_id = :m",
             {"i": epoch_id, "m": merchant_id},
         )
+    final_status = await old_source_status()
     if (not current or current["state"] != "freeze_requested"
-            or not (await old_source_status())["disabled"]):
+            or not final_status["disabled"]
+            or final_status["reason_code"] != "snapshot-unverified"
+            or final_status.get("restart_checked_at")
+            != source_status["restart_checked_at"]):
         raise conflict("legacy-evidence", "Old source changed during inspection")
     return {**comparison, "epoch_id": epoch_id, "checked_at": int(time.time())}
 
