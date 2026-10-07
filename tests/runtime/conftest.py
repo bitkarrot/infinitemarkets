@@ -160,18 +160,21 @@ async def _runtime_app(data_folder: Path, ext_root: Path):
         )
         if exists:
             await conn.execute(
-                "DELETE FROM installed_extensions WHERE id = :id",
-                {"id": "infinitemarkets"},
+                "DELETE FROM installed_extensions WHERE id IN (:a, :b)",
+                {"a": "infinitemarkets", "b": "nostrmarket"},
             )
             await conn.execute(
-                "DELETE FROM dbversions WHERE db = :id", {"id": "infinitemarkets"}
+                "DELETE FROM dbversions WHERE db IN (:a, :b)",
+                {"a": "infinitemarkets", "b": "nostrmarket"},
             )
             await conn.execute(
-                'DELETE FROM extensions WHERE extension = :id',
-                {"id": "infinitemarkets"},
+                'DELETE FROM extensions WHERE extension IN (:a, :b)',
+                {"a": "infinitemarkets", "b": "nostrmarket"},
             )
     settings.lnbits_installed_extensions_ids.discard("infinitemarkets")
     settings.lnbits_deactivated_extensions.discard("infinitemarkets")
+    settings.lnbits_installed_extensions_ids.discard("nostrmarket")
+    settings.lnbits_deactivated_extensions.discard("nostrmarket")
 
     os.chdir(host_checkout_dir())
     try:

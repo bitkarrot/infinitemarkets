@@ -631,19 +631,26 @@ async def test_old_evidence_is_bounded_and_owner_scoped(runtime_env, monkeypatch
     invoice = "e" * 64
     async with source.connect() as conn:
         await conn.execute(
-            "CREATE TABLE nostrmarket.merchants (id TEXT, user_id TEXT, "
-            "public_key TEXT, meta TEXT)"
+            "CREATE TABLE IF NOT EXISTS nostrmarket.merchants "
+            "(id TEXT, user_id TEXT, public_key TEXT, meta TEXT)"
         )
         await conn.execute(
-            "CREATE TABLE nostrmarket.stalls (id TEXT, merchant_id TEXT, wallet TEXT)"
+            "CREATE TABLE IF NOT EXISTS nostrmarket.stalls "
+            "(id TEXT, merchant_id TEXT, wallet TEXT)"
         )
         await conn.execute(
-            "CREATE TABLE nostrmarket.products (id TEXT, merchant_id TEXT, stall_id TEXT)"
+            "CREATE TABLE IF NOT EXISTS nostrmarket.products "
+            "(id TEXT, merchant_id TEXT, stall_id TEXT)"
         )
         await conn.execute(
-            "CREATE TABLE nostrmarket.orders (id TEXT, merchant_id TEXT, "
-            "merchant_public_key TEXT, stall_id TEXT, invoice_id TEXT, order_items TEXT)"
+            "CREATE TABLE IF NOT EXISTS nostrmarket.orders "
+            "(id TEXT, merchant_id TEXT, merchant_public_key TEXT, "
+            "stall_id TEXT, invoice_id TEXT, order_items TEXT)"
         )
+        await conn.execute("DELETE FROM nostrmarket.orders")
+        await conn.execute("DELETE FROM nostrmarket.products")
+        await conn.execute("DELETE FROM nostrmarket.stalls")
+        await conn.execute("DELETE FROM nostrmarket.merchants")
         await conn.execute(
             "INSERT INTO nostrmarket.merchants (id, user_id, public_key, meta) "
             "VALUES ('old-merchant', :u, :p, :meta)",
@@ -832,3 +839,212 @@ async def test_shopify_source_cannot_start_unverifiable_cutover(runtime_env):
         headers=headers,
     )
     assert blocked.status_code == 409
+
+
+async def test_complete_rejects_tampered_snapshot(runtime_env, monkeypatch):
+    from infinitemarkets.db import db, table
+
+    client, headers, merchant_id, epoch_id, liability = await _verified_epoch(
+        runtime_env, monkeypatch, qty=1, instance="t-tamper",
+        invoice_state="paid",
+    )
+    async with db.connect() as conn:
+        await conn.execute(
+            f"UPDATE {table('cutover_epochs')} SET snapshot_json = :j "
+            "WHERE id = :e",
+            {"e": epoch_id, "j": '{"id":"forged","content":"{}"}'},
+        )
+    complete = await client.post(
+        f"{API}/migration/cutovers/{epoch_id}/complete", headers=headers,
+    )
+    assert complete.status_code == 409
+
+
+async def test_complete_rejects_fresh_restart_marker(runtime_env, monkeypatch):
+    from infinitemarkets.services import cutover
+
+    client, headers, merchant_id, epoch_id, liability = await _verified_epoch(
+        runtime_env, monkeypatch, qty=1, instance="t-restart",
+        invoice_state="paid",
+    )
+
+    async def restarted_again():
+        return {"disabled": True, "reason_code": "snapshot-unverified",
+                "restart_checked_at": 9999999999,
+                "source_contract": {"code_hash": "a" * 64, "git_commit": "b" * 40}}
+
+    monkeypatch.setattr(cutover, "old_source_status", restarted_again)
+    complete = await client.post(
+        f"{API}/migration/cutovers/{epoch_id}/complete", headers=headers,
+    )
+    assert complete.status_code == 409
+
+
+async def test_liability_actions_reject_foreign_and_lookup_errors(
+    runtime_env, monkeypatch,
+):
+    from infinitemarkets.security import ProblemError
+    from infinitemarkets.services import cutover
+
+    client, headers, merchant_id, epoch_id, liability = await _verified_epoch(
+        runtime_env, monkeypatch, qty=1, instance="t-foreign",
+    )
+    foreign = SimpleNamespace(id="unrelated-owner")
+    for action in (cutover.list_liabilities, cutover.choose_wait,
+                   cutover.choose_partition, cutover.reconcile_liability,
+                   cutover.complete_cutover):
+        args = (merchant_id, foreign, epoch_id)
+        if action not in (cutover.list_liabilities, cutover.complete_cutover):
+            args = args + (liability["id"],)
+        with pytest.raises(ProblemError) as denied:
+            await action(*args)
+        assert denied.value.status == 404
+
+    async def lookup_error(_u, _h):
+        raise ProblemError(
+            409, "legacy-evidence", "Old payment status is unavailable",
+        )
+
+    monkeypatch.setattr(cutover, "_authoritative_payment_state", lookup_error)
+    reconcile = await client.post(
+        f"{API}/migration/cutovers/{epoch_id}/liabilities/{liability['id']}",
+        headers=headers, json={"action": "reconcile"},
+    )
+    assert reconcile.status_code == 409
+    listed = await client.get(
+        f"{API}/migration/cutovers/{epoch_id}/liabilities"
+    )
+    assert listed.json()["liabilities"][0]["status"] == "payable"
+
+
+async def test_real_nostrmarket_source_evidence(runtime_env, monkeypatch):
+    """Real same-instance evidence: the actual nostrmarket source tree
+    (contract hash), its real schema, and a real wallet invoice."""
+    import importlib
+    import shutil
+    import sys
+    from pathlib import Path
+
+    real_source = Path("/home/exedev/lnbits/lnbits/extensions/nostrmarket")
+    if not real_source.is_dir():
+        pytest.skip("real nostrmarket checkout not present")
+
+    from lnbits.core.db import db as core_db
+    from lnbits.core.helpers import run_migration
+    from lnbits.core.services.payments import create_invoice
+    from lnbits.db import Database
+    from lnbits.settings import settings as host_settings
+    from lnbits.wallets import get_funding_source
+
+    from infinitemarkets.services import cutover
+
+    # 1) Copy the real source files (the live checkout's .venv/__pycache__
+    # are not part of the attested tree and would fail the hash anyway)
+    ext_dir = runtime_env["tmp"] / "extroot" / "extensions" / "nostrmarket"
+    for src in real_source.rglob("*"):
+        rel = src.relative_to(real_source)
+        if src.is_symlink() or ".venv" in rel.parts or "__pycache__" in rel.parts:
+            continue
+        if not src.is_file():
+            continue
+        if src.suffix != ".py" and src.name != "config.json":
+            continue
+        dst = ext_dir / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(src, dst)
+
+    # 2) Register it as installed-but-deactivated
+    async with core_db.connect() as conn:
+        await conn.execute(
+            "INSERT INTO installed_extensions "
+            "(id, version, name, active, meta) "
+            "VALUES ('nostrmarket', '0.0.0', 'nostrmarket', FALSE, '{}') "
+            "ON CONFLICT (id) DO UPDATE SET active = FALSE"
+        )
+    monkeypatch.setattr(
+        host_settings, "lnbits_deactivated_extensions",
+        host_settings.lnbits_deactivated_extensions | {"nostrmarket"},
+    )
+
+    status = await cutover.old_source_status()
+    assert status["disabled"] is True
+    assert status["source_contract"]["code_hash"] == (
+        "24759dc45d5d5b9c733031c2eb9142cd618eed3198bd779669bd2ac3ce659d51"
+    )
+
+    # 3) Run the real migrations against a dedicated ext DB
+    sys.path.insert(0, str(runtime_env["tmp"] / "extroot" / "extensions"))
+    try:
+        nm_migrations = importlib.import_module("nostrmarket.migrations")
+    finally:
+        sys.path.pop(0)
+    source_db = Database("ext_nostrmarket")
+    async with source_db.connect() as conn:
+        # the ext DB file is shared across module boots; drop any prior
+        # synthetic/real tables so the real migrations run cleanly
+        for name in ("orders", "products", "zones", "stalls", "merchants",
+                     "direct_messages"):
+            await conn.execute(
+                f"DROP TABLE IF EXISTS nostrmarket.{name}"  # noqa: S608
+            )
+        await run_migration(conn, nm_migrations, "nostrmarket")
+
+    # 4) Seed the real schema
+    old_pubkey = "d" * 64
+    async with source_db.connect() as conn:
+        await conn.execute(
+            "INSERT INTO nostrmarket.merchants "
+            "(user_id, id, private_key, public_key, meta) VALUES "
+            "(:u, 'old-merchant', :pk, :pub, :meta)",
+            {"u": runtime_env["user_id"], "pk": "1" * 64,
+             "pub": old_pubkey, "meta": '{"active":false}'},
+        )
+        await conn.execute(
+            "INSERT INTO nostrmarket.stalls "
+            "(merchant_id, id, wallet, name) VALUES "
+            "('old-merchant', 'old-stall', :w, 'Old Stall')",
+            {"w": runtime_env["wallet"].id},
+        )
+        await conn.execute(
+            "INSERT INTO nostrmarket.products "
+            "(merchant_id, id, stall_id, name, price, quantity) VALUES "
+            "('old-merchant', 'old-poster', 'old-stall', 'Poster', 1, 2)",
+        )
+
+    # 5) A real invoice against the merchant's wallet
+    payment = await create_invoice(
+        wallet_id=runtime_env["wallet"].id, amount=10,
+        memo="old-order", unhashed_description=b"old-order",
+        extra={"tag": "nostrmarket", "merchant_pubkey": old_pubkey,
+               "order_id": "old-order"},
+    )
+    invoice_hash = payment.payment_hash
+    async with source_db.connect() as conn:
+        await conn.execute(
+            "INSERT INTO nostrmarket.orders "
+            "(merchant_id, id, event_id, event_created_at, public_key, "
+            "merchant_public_key, order_items, total, shipping_id, stall_id, "
+            "invoice_id, paid) VALUES "
+            "('old-merchant', 'old-order', 'e1', 1, 'buyer', :pub, :items, "
+            "10, 'zone', 'old-stall', :inv, FALSE)",
+            {"pub": old_pubkey, "inv": invoice_hash,
+             "items": json.dumps([{"product_id": "old-poster", "quantity": 2}])},
+        )
+
+    evidence = await cutover.read_old_source_evidence(runtime_env["user_id"])
+    assert evidence["merchant_id"] == "old-merchant"
+    assert evidence["products"] == {"old-poster"}
+    assert evidence["invoices"][0]["invoice_id"] == invoice_hash.lower()
+    assert evidence["invoices"][0]["state"] == "payable"
+
+    # 6) Real payment settles -> paid evidence on re-read
+    source_wallet = get_funding_source()
+    paid = await source_wallet.pay_invoice(payment.bolt11, 0)
+    assert paid.ok is True
+    evidence = await cutover.read_old_source_evidence(runtime_env["user_id"])
+    assert evidence["invoices"][0]["state"] == "paid"
+
+    # 7) The wallet-ledger resolver resolves the real invoice to "paid"
+    assert await cutover._authoritative_payment_state(
+        runtime_env["user_id"], invoice_hash
+    ) is True

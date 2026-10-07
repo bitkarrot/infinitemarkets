@@ -892,17 +892,12 @@ async def _authoritative_payment_state(user_id: str, payment_hash: str) -> bool 
             or not wallet.can_view_payments):
         raise conflict("legacy-wallet", "Old source wallets are unavailable")
     try:
-        payment_row = await core_db.fetchone(
-            "SELECT * FROM apipayments WHERE wallet_id = :w "
-            "AND payment_hash = :h",
-            {"w": wallet.source_wallet_id, "h": payment_hash},
-        )
-        if (not payment_row or not isinstance(payment_row["extra"], str)
-                or '"nostrmarket"' not in payment_row["extra"]):
-            raise conflict("legacy-evidence", "Old payment identity is incomplete")
-        from lnbits.core.models import Payment
+        from lnbits.core.crud.payments import get_wallet_payment
 
-        payment = Payment(**dict(payment_row))
+        payment = await get_wallet_payment(wallet_id, payment_hash)
+        if (not payment or not isinstance(payment.extra, dict)
+                or payment.extra.get("tag") != "nostrmarket"):
+            raise conflict("legacy-evidence", "Old payment identity is incomplete")
         status = await check_payment_status(payment)
     except ProblemError:
         raise
@@ -1192,7 +1187,7 @@ async def complete_cutover(merchant_id: str, user, epoch_id: str) -> dict:
                     snapshot_restart = json.loads(
                         signed_snapshot.content()
                     ).get("restart_checked_at")
-            except (RuntimeError, TypeError, ValueError):
+            except Exception:  # noqa: BLE001 — NostrSdkError and parse errors
                 snapshot_restart = None
         if (snapshot_restart is None
                 or snapshot_restart != source_status.get("restart_checked_at")):

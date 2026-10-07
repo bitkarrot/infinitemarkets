@@ -1381,7 +1381,7 @@ async def m012_cutover_source_contracts(db: Connection):
         "CHECK (git_commit IS NULL OR length(git_commit) = 40))"
     )
     await db.execute(
-        f"CREATE INDEX {s}cutover_source_contracts_source "
+        f"CREATE INDEX ix_cutover_source_contracts_source "
         f"ON {s}cutover_source_contracts (source_id, created_at DESC)"
     )
     await db.execute(
