@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 04
 current_phase_name: Release C — Migration and Cutover
-status: ready-to-plan
-stopped_at: all executed phases complete; tracking docs reconciled 2026-10-06; ad-hoc v0.1–v0.2 work committed and deployed
-last_updated: "2026-10-07T00:00:00.000Z"
+status: planned
+stopped_at: Phase 4 re-planned for Shopify CSV/media/export and verified cutover; next step is execute-phase 4
+last_updated: "2026-10-07T05:45:46.000Z"
 last_activity: 2026-10-07
-last_activity_desc: bookkeeping — 03.1 marked complete, GAM requirements closed, UI-review recommendations resolved, ad-hoc v0.1–v0.2 work documented
+last_activity_desc: Shopify reference archived; Phase 4 expanded to four plans with product export and optional owned-media migration
 progress:
   total_phases: 5
   completed_phases: 4
-  total_plans: 17
+  total_plans: 18
   completed_plans: 14
-  percent: 82
+  percent: 78
 ---
 
 # Project State
@@ -24,13 +24,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-20)
 
 **Core value:** A merchant can sell one authoritative inventory safely through LNbits-backed web and Nostr flows without duplicate invoices, double allocation, or relay delivery being mistaken for payment truth.
-**Current focus:** Phase 4 — Release C: Migration and Cutover (planned — 3 plans 04-01/02/03, next: execute-phase)
+**Current focus:** Phase 4 — Release C: Migration and Cutover (planned — 4 plans 04-01/02/03/04, next: execute-phase)
 
 ## Current Position
 
-Phase: 4 (Release C — Migration and Cutover) — PLANNED (CONTEXT+RESEARCH+3 plans written), next step is execute-phase
-Status: Phases 1, 2, 3 and 03.1 all complete (14/17 plans); Phase 3 release gate verified (one operator-deferred item in 03-UAT: live plebeian.market smoke)
-Last activity: 2026-10-06 — tracking docs reconciled; ad-hoc v0.1–v0.2 work documented
+Phase: 4 (Release C — Migration and Cutover) — PLANNED (CONTEXT+RESEARCH+4 plans written), next step is execute-phase
+Status: Phases 1, 2, 3 and 03.1 all complete (14/18 plans); Phase 3 release gate verified (one operator-deferred item in 03-UAT: live plebeian.market smoke)
+Last activity: 2026-10-07 — Shopify assets/screens archived; Phase 4 import/export/media/cutover plans revised
 
 Progress: [████████░░] 80% of roadmap phases (4/5)
 

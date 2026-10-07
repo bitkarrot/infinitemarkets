@@ -73,6 +73,7 @@
 - [ ] **LEG-03**: Merchant can preview, validate, dry-run, execute, and audit JSON/Nostr legacy catalog import without arbitrary path/URL/database access or private-key leakage. Import sources include nostrmarket JSON/Nostr events AND e-commerce CSV exports (Shopify first; column-mapping extensible to WooCommerce) — file upload only, never URL fetch.
 - [ ] **LEG-04**: Merchant can initiate and verify an external old-intake freeze, reconcile/wait/partition every still-payable legacy invoice quantity, and release imported stock only after a complete authoritative post-freeze snapshot with every payable unit verified terminal or durably held, independent of key strategy. Unverifiable sources remain blocked drafts; a local cancel/expiry flag or operator assertion is not proof an invoice cannot settle.
 - [ ] **LEG-05**: Release C passes a scarce-stock cutover rehearsal proving the web/Gamma freeze guard and shared conditional stock writer cannot allocate the same physical unit to an old unpaid invoice and a new order; a separate real-transaction contention test must actually reach the stock writer. *(NIP-15 fixture criterion removed — LEG-01/02 dropped in the Phase-4 scope amendment.)*
+- [ ] **LEG-06**: Merchant can export products to a safe, round-trippable CSV and review/import both classic and modern Shopify product CSVs (including variants and image-only rows). CSV image URLs are references only; optional merchant-uploaded media backup can be validated, stored in managed data storage and relinked without arbitrary server-side URL fetching. Products lacking verified stock remain drafts with zero sellable stock; overflow beyond 20 images requires explicit merchant selection.
 
 ## v2 Requirements
 
@@ -157,13 +158,14 @@ A requirement is complete only when implementation (or Phase 0 probe/model), aut
 | LEG-03 | Phase 4 | Pending |
 | LEG-04 | Phase 4 | Pending |
 | LEG-05 | Phase 4 | Pending |
+| LEG-06 | Phase 4 | Pending |
 
 **Coverage:**
 
-- v1 requirements: 45 total
-- Mapped to phases: 45
+- v1 requirements: 46 total
+- Mapped to phases: 46
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-09-20*
-*Last updated: 2026-10-05 — ACC-01..05 minted for Phase 03.1 Buyer Accounts*
+*Last updated: 2026-10-07 — LEG-06 added for product export and two-stage Shopify media migration*

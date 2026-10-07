@@ -1,0 +1,4 @@
+URL handle,Title,Description,Vendor,Type,Tags,Status,Published on online store,Option1 name,Option1 value,SKU,Price,Inventory tracker,Inventory quantity
+ceramic-mug,Ceramic Mug,A sample ceramic mug,Demo Merchant,Home,"mug, kitchen",draft,false,Default Title,Default Title,MUG-001,19.00,shopify,7
+cotton-tshirt,Cotton T-Shirt,A sample cotton shirt,Demo Merchant,Apparel,"shirt, cotton",draft,false,Size,Small,TSHIRT-S,24.50,shopify,3
+cotton-tshirt,,,,,,,,Size,Medium,TSHIRT-M,24.50,shopify,5

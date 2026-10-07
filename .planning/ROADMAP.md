@@ -153,20 +153,22 @@ Plans:
 **Goal:** Merchants can import existing catalogs and migrate onto the canonical commerce model without turning legacy payable invoices into duplicate stock allocation — live legacy-protocol interop is out of scope.
 **Mode:** mvp
 **Depends on:** Phase 3
-**Requirements:** LEG-03, LEG-04, LEG-05
+**Requirements:** LEG-03, LEG-04, LEG-05, LEG-06
 **Success Criteria** (what must be TRUE):
 
-1. Merchant can preview, validate, dry-run, execute, and audit file-only imports into blocked drafts without arbitrary fetch/database access or secret leakage.
-2. For a verifiable source, cutover requires externally disabled old intake, complete authoritative post-freeze invoice evidence, and either verified terminal status or a durable partition for every still-payable legacy liability; unknown/unverifiable sources stay blocked, regardless of key strategy.
-3. A scarce-stock rehearsal proves both the web/Gamma freeze guard and the shared conditional stock writer (under real contention) prevent a payable old invoice and a new order from allocating the same physical unit. No unsupported external-source cutover is claimed.
+1. Merchant can preview, validate, dry-run, execute, and audit file-only imports into blocked drafts without arbitrary fetch/database access or secret leakage; classic/new Shopify CSV formats, variants, image-only rows, missing stock and >20 images are handled explicitly.
+2. Merchant can export a safe, round-trippable product CSV; an optional, verified merchant-uploaded media stage can relink CDN URLs to owned files without fetching arbitrary URLs or requiring Blossom. This shop can opt into a compact dark gallery profile based on archived screenshots without changing Lightning checkout or other merchants' themes.
+3. For a verifiable source, cutover requires externally disabled old intake, complete authoritative post-freeze invoice evidence, and either verified terminal status or a durable partition for every still-payable legacy liability; unknown/unverifiable sources stay blocked, regardless of key strategy.
+4. A scarce-stock rehearsal proves both the web/Gamma freeze guard and the shared conditional stock writer (under real contention) prevent a payable old invoice and a new order from allocating the same physical unit. No unsupported external-source cutover is claimed.
 
-**Plans:** 3 plans
+**Plans:** 4 plans
 
 Plans:
 
-- [ ] 04-01: File-only import preview/validation/dry-run/execute/audit, persisted CSV mapping and signed provisional import commitment; nostrmarket JSON/Nostr events + Shopify CSV land as blocked drafts in a review category (never auto-published)
-- [ ] 04-02: Verified old-intake freeze and complete invoice snapshot for a supported same-instance source; per-invoice wait/partition/terminal reconciliation, durable holds and guarded activation across web, Gamma and publication (unverifiable external sources stay drafts)
-- [ ] 04-03: Scarce-stock two-part rehearsal (policy guard + real transactional contention) and evidence-backed Release-C gate
+- [ ] 04-01: File-only import preview/validation/dry-run/execute/audit, persisted CSV mapping and signed provisional import commitment; nostrmarket JSON/Nostr events + classic/modern Shopify CSV land as blocked drafts (no image fetch, unknown stock=0)
+- [ ] 04-02: Verified old-intake freeze and complete invoice snapshot for a supported same-instance source; per-invoice wait/partition/terminal reconciliation, durable holds and guarded activation (unverifiable external sources stay drafts)
+- [ ] 04-03: Merchant product CSV export, opt-in owned-media upload/relink, and merchant-configurable compact dark storefront profile without changing checkout
+- [ ] 04-04: Scarce-stock two-part rehearsal, export/media/visual verification and evidence-backed Release-C gate
 
 ## Progress
 
@@ -178,4 +180,4 @@ Plans:
 | 2. Release A — Safe Web Commerce | 4/4 | Complete    | 2026-09-27 |
 | 3. Release B — Gamma NIP-17 Orders | 4/4 | Complete    | 2026-09-29 |
 | 03.1. Buyer accounts (INSERTED) | 3/3 | Complete   | 2026-10-05 |
-| 4. Release C — Migration and Cutover | 0/3 | Not started | - |
+| 4. Release C — Migration and Cutover | 0/4 | Planned | - |
