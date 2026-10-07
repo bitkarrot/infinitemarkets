@@ -24,7 +24,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-20)
 
 **Core value:** A merchant can sell one authoritative inventory safely through LNbits-backed web and Nostr flows without duplicate invoices, double allocation, or relay delivery being mistaken for payment truth.
-**Current focus:** Phase 4 — Release C: Migration and Cutover (next: plan-phase)
+**Current focus:** Phase 4 (Planned) — Release C: Migration and Cutover (planned — 3 plans (04-01/02/03), next: execute-phase)
 
 ## Current Position
 
@@ -107,7 +107,7 @@ Decisions are logged in PROJECT.md and the normative specification.
 ### Roadmap Evolution
 
 - Phase 03.1 inserted after Phase 3: Buyer accounts — email magic-link sign-in and Nostr identity linking
-- Phase 4 edited: scope amended to import-only: LEG-01/LEG-02 (NIP-15 projections + NIP-04 legacy messaging) dropped; Phase 4 renamed Release C — Migration and Cutover
+- Phase 4 (Planned) edited: scope amended to import-only: LEG-01/LEG-02 (NIP-15 projections + NIP-04 legacy messaging) dropped; Phase 4 renamed Release C — Migration and Cutover
 
 ## Deferred Items
 
