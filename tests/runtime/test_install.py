@@ -202,6 +202,20 @@ async def test_static_probe_mounted(runtime_env):
     assert "infinitemarkets" in resp.text
 
 
+async def test_demo_product_images_are_packaged_and_served(runtime_env):
+    from tools.package_release import tracked_files
+
+    packaged = set(tracked_files())
+    for name in ("demo-node-report.png", "demo-mug.png"):
+        asset = f"infinitemarkets/static/infinitemarkets/img/{name}"
+        assert asset in packaged
+        response = await runtime_env["client"].get(
+            f"/infinitemarkets/static/{asset.removeprefix('infinitemarkets/static/')}"
+        )
+        assert response.status_code == 200
+        assert response.content.startswith(b"\x89PNG\r\n\x1a\n")
+
+
 async def test_deactivation_404s_routes(runtime_env):
     """Host deactivation drops the extension's routes (middleware 404)."""
     from lnbits.core.models.extensions import Extension
