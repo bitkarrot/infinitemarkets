@@ -309,7 +309,9 @@ async def test_old_evidence_is_bounded_and_owner_scoped(runtime_env, monkeypatch
         return SimpleNamespace(data=[], total=0)
 
     monkeypatch.setattr(cutover, "get_payments_paginated", legitimate)
-    assert (await cutover.read_old_source_evidence(user_id))["invoices"][0]["state"] == "payable"
+    with pytest.raises(ProblemError) as reactivated:
+        await cutover.read_old_source_evidence(user_id)
+    assert reactivated.value.status == 409
 
 
 async def test_old_source_comparison_rejects_missing_and_extra_invoices(runtime_env):

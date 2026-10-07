@@ -189,6 +189,7 @@ async def read_old_source_evidence(user_id: str) -> dict:
     except (TypeError, ValueError) as exc:
         raise conflict("legacy-evidence", "Old merchant settings are incomplete") from exc
     if (not isinstance(config, dict)
+            or config.get("active") is not False
             or not isinstance(merchant["public_key"], str)
             or not re.fullmatch(r"[0-9a-fA-F]{64}", merchant["public_key"])
             or not 0 < len(stalls) <= 64 or not 0 < len(products) <= 5000
