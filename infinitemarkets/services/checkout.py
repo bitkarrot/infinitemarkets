@@ -317,6 +317,45 @@ def _assert_purchasable(product: dict) -> None:
         raise unprocessable("product-inactive", "Product unavailable")
 
 
+async def _claim_product_capacity(
+    tx: DomainTransaction, merchant_id: str, product_id: str, quantity: int,
+) -> None:
+    product = await tx.fetch_one(
+        f"SELECT * FROM {tx.table('products')} "
+        f"WHERE id = :p AND merchant_id = :m{tx.for_update}",
+        {"p": product_id, "m": merchant_id},
+    )
+    if not product or product["deleted_at"] is not None:
+        raise unprocessable("product-inactive", "Product unavailable")
+    _assert_purchasable(dict(product))
+    if product["import_source_kind"] is not None:
+        raise unprocessable("product-inactive", "Product unavailable")
+    if product["product_type"] == "variation":
+        parent = await tx.fetch_one(
+            f"SELECT * FROM {tx.table('products')} "
+            f"WHERE id = :p AND merchant_id = :m{tx.for_update}",
+            {"p": product["parent_product_id"], "m": merchant_id},
+        )
+        if (not parent or parent["deleted_at"] is not None
+                or parent["product_type"] != "variable"
+                or parent["visibility"] != "on-sale" or parent["draft"]
+                or parent["import_source_kind"] is not None):
+            raise unprocessable("product-inactive", "Product unavailable")
+    rc = await tx.execute(
+        f"UPDATE {tx.table('products')} SET stock_reserved = stock_reserved + :q "
+        "WHERE id = :p AND merchant_id = :m AND deleted_at IS NULL "
+        "AND draft = FALSE AND visibility = 'on-sale' AND nip99_status = 'active' "
+        "AND recurring_frequency IS NULL AND product_type IN ('simple', 'variation') "
+        "AND import_source_kind IS NULL "
+        "AND (stock_on_hand IS NULL OR stock_on_hand - stock_reserved >= :q)",
+        {"q": quantity, "p": product_id, "m": merchant_id},
+    )
+    if rc != 1:
+        raise unprocessable(
+            "insufficient-stock", "Insufficient stock", "requested quantity is not available",
+        )
+
+
 async def _resolve_shipping(
     merchant_id: str, d_tag: str, address: dict,
 ) -> dict:
@@ -1062,25 +1101,20 @@ async def begin_saga(
     # Step 1: conditional claim + CAS + held reservations + projection.
     try:
         async with DomainTransaction() as tx:
+            locked = await tx.fetch_one(
+                f"SELECT id FROM {tx.table('merchants')} "
+                f"WHERE id = :m{tx.for_update}", {"m": merchant["id"]},
+            )
+            if not locked:
+                raise unprocessable("product-inactive", "Product unavailable")
             await order_service.transition_order(
                 tx, order_id=order_id, from_state="received",
                 to_state="invoice_pending", actor="system", now=now,
             )
             for item in sorted(items, key=lambda i: i["product_id"]):
-                rc = await tx.execute(
-                    f"UPDATE {tx.table('products')}"
-                    " SET stock_reserved = stock_reserved + :q"
-                    " WHERE id = :p AND deleted_at IS NULL"
-                    " AND (import_source_kind IS NULL OR import_authorized = TRUE)"
-                    " AND (stock_on_hand IS NULL"
-                    " OR stock_on_hand - stock_reserved >= :q)",
-                    {"q": item["quantity"], "p": item["product_id"]},
+                await _claim_product_capacity(
+                    tx, merchant["id"], item["product_id"], item["quantity"],
                 )
-                if rc != 1:
-                    raise unprocessable(
-                        "insufficient-stock", "Insufficient stock",
-                        "requested quantity is not available",
-                    )
                 held = await tx.fetch_one(
                     f"SELECT COUNT(*) AS n FROM {tx.table('inventory_reservations')}"
                     " WHERE product_id = :p AND state = 'held'", {"p": item["product_id"]},

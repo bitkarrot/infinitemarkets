@@ -5,10 +5,10 @@ milestone_name: milestone
 current_phase: 04
 current_phase_name: Release C — Migration and Cutover
 status: in_progress
-stopped_at: Phase 4 plan 04-01 committed; 04-02 fixed-source read-only comparison preview added, but no independently attested restart/version, signed snapshot, stock holds or activation; cutover blocked
-last_updated: "2026-10-07T08:04:00Z"
+stopped_at: Phase 4 plan 04-01 committed; 04-02 read-only old-source comparison and checkout claim recheck added; no independently attested restart/version, signed snapshot, stock holds or activation; cutover blocked
+last_updated: "2026-10-07T19:30:59Z"
 last_activity: 2026-10-07
-last_activity_desc: Added bounded same-instance nostrmarket order and wallet payment comparison preview; old-extension disable/restart and installed source version are not attested, so snapshot remains unverified and imported stock remains blocked
+last_activity_desc: Guarded stock claim against stale product/parent state and unauthorized imported stock; restored demo PNGs tracked for future release packages. Old-extension disable/restart and installed source version are not attested; snapshot remains unverified
 progress:
   total_phases: 5
   completed_phases: 4
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-20)
 
 Phase: 4 (Release C — Migration and Cutover) — IN PROGRESS (15/18 plans complete; 04-02 next)
 Status: Phases 1, 2, 3 and 03.1 all complete; Phase 3 release gate verified (one operator-deferred item in 03-UAT: live plebeian.market smoke)
-Last activity: 2026-10-07 — authenticated three-format import, signed provisional audit, browser import smoke and SQLite regressions verified; no live deployment or cutover authorization
+Last activity: 2026-10-07 — fixed-source preview and in-transaction checkout gate tested locally; demo PNGs tracked to survive release packaging; no live deployment or cutover authorization
 
 Progress: [████████░░] 80% of roadmap phases (4/5)
 

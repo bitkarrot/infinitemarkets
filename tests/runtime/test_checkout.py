@@ -697,6 +697,131 @@ async def test_stock_rejection_does_not_leave_recoverable_received_order(runtime
     assert row["state"] == "rejected"
 
 
+@pytest.mark.parametrize(
+    ("column", "value"),
+    [
+        ("draft", True), ("visibility", "hidden"),
+        ("nip99_status", "deleted"), ("recurring_frequency", "monthly"),
+        ("import_source_kind", "shopify"),
+    ],
+)
+async def test_claim_rechecks_product_after_quote(runtime_env, monkeypatch, column, value):
+    checkout = _svcs()["checkout"]
+    db_module = importlib.import_module("infinitemarkets.db")
+    client = runtime_env["client"]
+    headers = {"Origin": ORIGIN, "X-CSRF-Token": client.cookies.get("gm_csrf")}
+    response = await client.post(f"{API}/products", headers=headers, json={
+        "category_id": runtime_env["category_id"], "title": f"stale {column}",
+        "amount_minor": 100, "currency": "SAT", "format": "digital",
+        "visibility": "on-sale", "stock_on_hand": 1,
+    })
+    assert response.status_code == 201, response.text
+    product = response.json()
+    original = checkout.begin_saga
+
+    async def stale_quote(**kwargs):
+        async with db_module.DomainTransaction() as tx:
+            await tx.execute(
+                f"UPDATE {tx.table('products')} SET {column} = :value WHERE id = :id",
+                {"id": product["id"], "value": value},
+            )
+        return await original(**kwargs)
+
+    monkeypatch.setattr(checkout, "begin_saga", stale_quote)
+    with pytest.raises(checkout.ProblemError) as error:
+        await checkout.checkout(
+            payload=await _payload(runtime_env, [{"d_tag": product["d_tag"], "quantity": 1}]),
+            idempotency_key=uuid.uuid4().hex * 2, client_scope=f"stale-{column}",
+        )
+    assert error.value.status == 422
+    async with db_module.db.connect() as conn:
+        row = await conn.fetchone(
+            f"SELECT stock_reserved FROM {db_module.table('products')} WHERE id = :p",
+            {"p": product["id"]},
+        )
+    assert row["stock_reserved"] == 0
+
+
+async def test_import_marker_cannot_sell_without_cutover_epoch(runtime_env):
+    checkout = _svcs()["checkout"]
+    db_module = importlib.import_module("infinitemarkets.db")
+    client = runtime_env["client"]
+    headers = {"Origin": ORIGIN, "X-CSRF-Token": client.cookies.get("gm_csrf")}
+    response = await client.post(f"{API}/products", headers=headers, json={
+        "category_id": runtime_env["category_id"], "title": "unverified import",
+        "amount_minor": 100, "currency": "SAT", "format": "digital",
+        "visibility": "on-sale", "stock_on_hand": 3,
+    })
+    assert response.status_code == 201, response.text
+    product = response.json()
+    async with db_module.DomainTransaction() as tx:
+        await tx.execute(
+            f"UPDATE {tx.table('products')} SET import_source_kind = 'nostrmarket', "
+            "import_legacy_id = 'old-product', import_authorized = TRUE WHERE id = :p",
+            {"p": product["id"]},
+        )
+    with pytest.raises(checkout.ProblemError) as error:
+        await checkout.checkout(
+            payload=await _payload(runtime_env, [{"d_tag": product["d_tag"], "quantity": 1}]),
+            idempotency_key=uuid.uuid4().hex * 2, client_scope="unverified-import",
+        )
+    assert error.value.status == 422
+    async with db_module.db.connect() as conn:
+        row = await conn.fetchone(
+            f"SELECT stock_reserved FROM {db_module.table('products')} WHERE id = :p",
+            {"p": product["id"]},
+        )
+    assert row["stock_reserved"] == 0
+
+
+@pytest.mark.parametrize("imported_parent", [False, True])
+async def test_claim_rechecks_variation_parent_after_quote(
+    runtime_env, monkeypatch, imported_parent,
+):
+    checkout = _svcs()["checkout"]
+    db_module = importlib.import_module("infinitemarkets.db")
+    client = runtime_env["client"]
+    headers = {"Origin": ORIGIN, "X-CSRF-Token": client.cookies.get("gm_csrf")}
+    parent = await client.post(f"{API}/products", headers=headers, json={
+        "category_id": runtime_env["category_id"], "title": "stale parent",
+        "product_type": "variable", "visibility": "on-sale",
+    })
+    assert parent.status_code == 201, parent.text
+    child = await client.post(f"{API}/products", headers=headers, json={
+        "category_id": runtime_env["category_id"], "title": "stale variation",
+        "product_type": "variation", "parent_product_id": parent.json()["id"],
+        "amount_minor": 100, "currency": "SAT", "format": "digital",
+        "visibility": "on-sale", "stock_on_hand": 1,
+    })
+    assert child.status_code == 201, child.text
+    original = checkout.begin_saga
+
+    async def stale_parent(**kwargs):
+        async with db_module.DomainTransaction() as tx:
+            if imported_parent:
+                await tx.execute(
+                    f"UPDATE {tx.table('products')} "
+                    "SET import_source_kind = 'nostrmarket', "
+                    "import_legacy_id = 'legacy-parent', import_authorized = TRUE "
+                    "WHERE id = :p", {"p": parent.json()["id"]},
+                )
+            else:
+                await tx.execute(
+                    f"UPDATE {tx.table('products')} SET visibility = 'hidden' WHERE id = :p",
+                    {"p": parent.json()["id"]},
+                )
+        return await original(**kwargs)
+
+    monkeypatch.setattr(checkout, "begin_saga", stale_parent)
+    with pytest.raises(checkout.ProblemError) as error:
+        await checkout.checkout(
+            payload=await _payload(runtime_env, [{"d_tag": child.json()["d_tag"],
+                                                  "quantity": 1}]),
+            idempotency_key=uuid.uuid4().hex * 2, client_scope="stale-parent",
+        )
+    assert error.value.status == 422
+
+
 @pytest.mark.parametrize("cap", ["open", "held"])
 async def test_checkout_caps_are_transactional(runtime_env, monkeypatch, cap):
     checkout = _svcs()["checkout"]
