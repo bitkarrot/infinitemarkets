@@ -4,6 +4,29 @@
   "short_description": "NIP-99 catalog and Lightning checkout with one authoritative inventory.",
   "tile": "/infinitemarkets/static/infinitemarkets/img/infinite-markets-blue.png",
   "min_lnbits_version": "1.6.0",
+  "contributors": [
+    {
+      "name": "bitkarrot",
+      "uri": "https://github.com/bitkarrot",
+      "role": "Creator"
+    }
+  ],
+  "license": "MIT",
+  "description_md": "https://raw.githubusercontent.com/bitkarrot/infinitemarkets/main/description.md",
+  "images": [
+    { "uri": "https://raw.githubusercontent.com/bitkarrot/infinitemarkets/main/infinitemarkets/static/infinitemarkets/img/screenshots/store-home.jpg" },
+    { "uri": "https://raw.githubusercontent.com/bitkarrot/infinitemarkets/main/infinitemarkets/static/infinitemarkets/img/screenshots/store-product.jpg" },
+    { "uri": "https://raw.githubusercontent.com/bitkarrot/infinitemarkets/main/infinitemarkets/static/infinitemarkets/img/screenshots/store-dark.jpg" },
+    { "uri": "https://raw.githubusercontent.com/bitkarrot/infinitemarkets/main/infinitemarkets/static/infinitemarkets/img/screenshots/store-mobile.jpg" },
+    { "uri": "https://raw.githubusercontent.com/bitkarrot/infinitemarkets/main/infinitemarkets/static/infinitemarkets/img/screenshots/store-gallery.jpg" },
+    { "uri": "https://raw.githubusercontent.com/bitkarrot/infinitemarkets/main/infinitemarkets/static/infinitemarkets/img/screenshots/store-embed.jpg" },
+    { "uri": "https://raw.githubusercontent.com/bitkarrot/infinitemarkets/main/infinitemarkets/static/infinitemarkets/img/screenshots/admin-orders.jpg" },
+    { "uri": "https://raw.githubusercontent.com/bitkarrot/infinitemarkets/main/infinitemarkets/static/infinitemarkets/img/screenshots/admin-categories.jpg" },
+    { "uri": "https://raw.githubusercontent.com/bitkarrot/infinitemarkets/main/infinitemarkets/static/infinitemarkets/img/screenshots/admin-publications.jpg" },
+    { "uri": "https://raw.githubusercontent.com/bitkarrot/infinitemarkets/main/infinitemarkets/static/infinitemarkets/img/screenshots/admin-messages.jpg" },
+    { "uri": "https://raw.githubusercontent.com/bitkarrot/infinitemarkets/main/infinitemarkets/static/infinitemarkets/img/screenshots/admin-appearance.jpg" },
+    { "uri": "https://raw.githubusercontent.com/bitkarrot/infinitemarkets/main/infinitemarkets/static/infinitemarkets/img/screenshots/admin-embed.jpg" }
+  ],
   "permissions": [
     {
       "id": "payments",
