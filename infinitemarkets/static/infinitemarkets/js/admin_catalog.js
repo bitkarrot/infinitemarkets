@@ -165,7 +165,7 @@
         parents.forEach(function (p) {
           var kids = children[p.id] || [];
           rows.push(decorate(p, { _variantCount: kids.length }));
-          if (self.expandedProducts.includes(p.id)) {
+          if (self.gmCatalog.expandedProducts.includes(p.id)) {
             kids.forEach(function (v) {
               rows.push(decorate(v, {
                 _variantOf: (byId[p.id].title || "") ||
@@ -300,9 +300,10 @@
         ed.saving = false;
       },
       gmToggleVariants: function (id) {
-        var i = this.expandedProducts.indexOf(id);
-        if (i >= 0) this.expandedProducts.splice(i, 1);
-        else this.expandedProducts.push(id);
+        var list = this.gmCatalog.expandedProducts;
+        var i = list.indexOf(id);
+        if (i >= 0) list.splice(i, 1);
+        else list.push(id);
       },
       gmDryRun: async function (row) {
         /* GET /products/{id}/events — rendered unsigned JSON viewer. */

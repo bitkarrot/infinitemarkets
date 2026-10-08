@@ -676,8 +676,8 @@
                     </q-td>
                     <q-td key="title" :props="props" data-col="title">
                       <q-btn v-if="props.row._variantCount" flat dense round
-                             size="sm" :icon="expandedProducts.includes(props.row.id) ? 'expand_more' : 'chevron_right'"
-                             :aria-label="(expandedProducts.includes(props.row.id) ? 'Collapse' : 'Expand') + ' options'"
+                             size="sm" :icon="gmCatalog.expandedProducts.includes(props.row.id) ? 'expand_more' : 'chevron_right'"
+                             :aria-label="(gmCatalog.expandedProducts.includes(props.row.id) ? 'Collapse' : 'Expand') + ' options'"
                              @click="gmToggleVariants(props.row.id)"></q-btn>
                       <span v-if="props.row._isVariant" class="text-grey-7"
                             aria-hidden="true">↳ </span>
