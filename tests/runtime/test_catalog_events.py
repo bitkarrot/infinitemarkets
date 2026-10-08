@@ -182,6 +182,8 @@ async def test_identity_and_handler_events_have_no_labels():
         "profile_json": json.dumps({
             "about": "Handmade goods",
             "picture": "https://cdn.example/avatar.png",
+            "nip05": "shop@example.com",
+            "lud16": "shop@wallet.example",
         }),
         "recommended_app_d": "infinitemarkets",
     }
@@ -191,6 +193,8 @@ async def test_identity_and_handler_events_have_no_labels():
     assert content["name"] == "shop"
     assert content["about"] == "Handmade goods"
     assert content["picture"] == "https://cdn.example/avatar.png"
+    assert content["nip05"] == "shop@example.com"
+    assert content["lud16"] == "shop@wallet.example"
     assert not any(t[0] in ("L", "l") for t in profile["tags"])
 
     rec = events.handler_recommendation_event(merchant, pubkey=PUBKEY)

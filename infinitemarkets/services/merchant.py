@@ -272,6 +272,20 @@ def _validate_profile(profile: dict) -> None:
             "picture must be an https URL of 500 characters or fewer",
         )
 
+    from lnbits.helpers import is_valid_email_address
+
+    for key in ("nip05", "lud16"):
+        value = profile.get(key)
+        if value is not None and (
+            not isinstance(value, str)
+            or len(value) > 200
+            or not is_valid_email_address(value)
+        ):
+            raise unprocessable(
+                "invalid-profile", "Invalid profile",
+                f"{key} must be a name@domain address of 200 characters or fewer",
+            )
+
 
 async def patch_merchant(merchant_id: str, user, patch: dict,
                          settings: ExtSettings | None = None) -> dict:

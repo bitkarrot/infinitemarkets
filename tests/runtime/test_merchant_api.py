@@ -272,6 +272,8 @@ async def test_profile_identity_fields(runtime_env):
         "about": "Handmade goods from the shop.",
         "picture": "https://cdn.example/avatar.png",
         "website": "https://shop.example",
+        "nip05": "shop@example.com",
+        "lud16": "shop@wallet.example",
     }
     resp = await runtime_env["client"].patch(
         f"{API}/merchants/{mid}",
@@ -283,14 +285,21 @@ async def test_profile_identity_fields(runtime_env):
     assert saved["about"] == profile["about"]
     assert saved["picture"] == profile["picture"]
     assert saved["website"] == profile["website"]
+    assert saved["nip05"] == profile["nip05"]
+    assert saved["lud16"] == profile["lud16"]
 
-    resp = await runtime_env["client"].patch(
-        f"{API}/merchants/{mid}",
-        json={"profile_json": {"picture": "http://insecure.example/a.png"}},
-        headers=headers,
-    )
-    assert resp.status_code == 422
-    assert resp.json()["type"] == "urn:infinitemarkets:invalid-profile"
+    for bad in (
+        {"picture": "http://insecure.example/a.png"},
+        {"nip05": "not-an-address"},
+        {"lud16": "not-an-address"},
+    ):
+        resp = await runtime_env["client"].patch(
+            f"{API}/merchants/{mid}",
+            json={"profile_json": bad},
+            headers=headers,
+        )
+        assert resp.status_code == 422, resp.text
+        assert resp.json()["type"] == "urn:infinitemarkets:invalid-profile"
 
 
 async def test_publish_enqueues_outbox_intents(runtime_env):

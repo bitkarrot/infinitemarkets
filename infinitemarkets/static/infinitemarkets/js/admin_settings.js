@@ -193,6 +193,8 @@
           profileJson: {},
           profileAvatar: "",
           profileBio: "",
+          profileNip05: "",
+          profileLud16: "",
           identitySaving: false,
           nsecInput: "",
           nsecNote: NSEC_NOTE,
@@ -339,6 +341,8 @@
           self.gmSettings.profileJson = profile;
           self.gmSettings.profileAvatar = profile.picture || "";
           self.gmSettings.profileBio = profile.about || "";
+          self.gmSettings.profileNip05 = profile.nip05 || "";
+          self.gmSettings.profileLud16 = profile.lud16 || "";
           self.gmSettings.specRevision = m.spec_revision || "";
           var t = m.theme || {};
           var h = t.hero || {};
@@ -380,9 +384,22 @@
         var self = this;
         var avatar = (self.gmSettings.profileAvatar || "").trim();
         var bio = (self.gmSettings.profileBio || "").trim();
+        var nip05 = (self.gmSettings.profileNip05 || "").trim();
+        var lud16 = (self.gmSettings.profileLud16 || "").trim();
+        var addressPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (avatar && !/^https:\/\//.test(avatar)) {
           self.gmSettings.error =
             "Use an https:// image address for the avatar.";
+          return;
+        }
+        if (nip05 && !addressPattern.test(nip05)) {
+          self.gmSettings.error =
+            "Use a name@domain address for the Nostr address.";
+          return;
+        }
+        if (lud16 && !addressPattern.test(lud16)) {
+          self.gmSettings.error =
+            "Use a name@domain address for the Lightning address.";
           return;
         }
         if (bio.length > 2000) {
@@ -390,10 +407,13 @@
           return;
         }
         var profile = Object.assign({}, self.gmSettings.profileJson || {});
-        if (avatar) profile.picture = avatar;
-        else delete profile.picture;
-        if (bio) profile.about = bio;
-        else delete profile.about;
+        var fields = {
+          picture: avatar, about: bio, nip05: nip05, lud16: lud16
+        };
+        Object.keys(fields).forEach(function (key) {
+          if (fields[key]) profile[key] = fields[key];
+          else delete profile[key];
+        });
         self.gmSettings.identitySaving = true;
         try {
           var m = await self.gmApi(

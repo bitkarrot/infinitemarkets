@@ -125,8 +125,11 @@ async def test_settings_key_reveal(runtime_env):
     assert 'aria-label="Show private key"' in html
     assert 'label="Store secret key (nsec)"' in html
     assert 'Keep this key secret' in html
+    assert 'Merchant Nostr Profile' in html
     assert 'label="Avatar URL (https)"' in html
     assert 'label="Bio"' in html
+    assert 'label="Nostr address (NIP-05)"' in html
+    assert 'label="Lightning address (LUD-16)"' in html
     assert 'label="View Nostr profile"' in html
     assert 'label="Save identity"' in html
     js = (await runtime_env["client"].get(f"{JS}/admin_settings.js")).text
@@ -134,6 +137,8 @@ async def test_settings_key_reveal(runtime_env):
     assert 'nsecReveal' in js
     assert 'profileAvatar' in js
     assert 'profileBio' in js
+    assert 'profileNip05' in js
+    assert 'profileLud16' in js
     assert "nsec1" not in html + js
 
 

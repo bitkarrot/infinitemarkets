@@ -1525,11 +1525,19 @@
               <div class="col-12">
                 <q-card flat bordered>
                   <q-card-section>
-                    <div class="text-subtitle2 q-mb-sm">Identity</div>
+                    <div class="text-subtitle2 q-mb-sm">Merchant Nostr Profile</div>
                     <q-input v-model="gmSettings.displayName" outlined dense
                              label="Display name" class="q-mb-sm"></q-input>
                     <q-input v-model="gmSettings.profileAvatar" outlined dense
                              label="Avatar URL (https)" class="q-mb-sm"
+                             autocomplete="off" spellcheck="false"></q-input>
+                    <q-input v-model="gmSettings.profileNip05" outlined dense
+                             label="Nostr address (NIP-05)" class="q-mb-sm"
+                             placeholder="shop@example.com"
+                             autocomplete="off" spellcheck="false"></q-input>
+                    <q-input v-model="gmSettings.profileLud16" outlined dense
+                             label="Lightning address (LUD-16)" class="q-mb-sm"
+                             placeholder="shop@wallet.example"
                              autocomplete="off" spellcheck="false"></q-input>
                     <q-input v-model="gmSettings.profileBio" outlined dense
                              type="textarea" autogrow label="Bio"

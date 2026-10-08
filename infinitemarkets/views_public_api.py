@@ -92,7 +92,7 @@ async def public_merchant(pubkey: str, request: Request, response: Response):
         "profile": {
             k: v
             for k, v in profile.items()
-            if k in ("about", "website", "picture", "banner", "nip05")
+            if k in ("about", "website", "picture", "banner", "nip05", "lud16")
         },
         "state": "active" if merchant["state"] == "active" else "draft",
     }

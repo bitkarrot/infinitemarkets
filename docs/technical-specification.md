@@ -236,7 +236,7 @@ into bounded typed models at the boundary—never interpolated into SQL.
 | pubkey | TEXT NOT NULL UNIQUE | 64-hex schnorr pubkey |
 | key_ref | TEXT NOT NULL | key-store handle, not key material |
 | display_name | TEXT | |
-| profile_json | TEXT | kind-0 profile object; `about` ≤2000 chars, `picture` an HTTPS URL ≤500 chars |
+| profile_json | TEXT | kind-0 profile object; `about` ≤2000 chars, `picture` an HTTPS URL ≤500 chars, `nip05`/`lud16` name@domain addresses ≤200 chars |
 | payment_preference | TEXT NOT NULL DEFAULT 'manual' | `manual` only in v1 |
 | recommended_app_d | TEXT | random `d` for 31990; 31989 uses fixed `d="30402"` |
 | wallet_id_enc / wallet_id_hash | BLOB/TEXT NOT NULL | encrypted LNbits wallet id + keyed lookup |
@@ -858,9 +858,11 @@ min ≤ max; countries non-empty.
 ### 6.4 Merchant profile — kind 0
 
 Standard profile content plus `["payment_preference", "manual"]` tag. The merchant
-settings editor manages `display_name` → `name`, `about`, and `picture`; `picture`
-is limited to HTTPS image URLs. `ecash`/`lud16` MUST NOT be advertised in v1
-(extension only honors `manual`).
+settings editor manages `display_name` → `name`, `about`, `picture`, `nip05`, and
+`lud16`. `picture` is limited to HTTPS image URLs; `nip05`/`lud16` use
+`name@domain` syntax. Publishing a `lud16` value is profile metadata only and
+does not change the extension's `manual` payment preference; `ecash` MUST NOT
+be advertised in v1.
 
 Enabling the Release-B Gamma order channel requires 1–3 normalized `wss://` inbox
 relays and publishes replaceable kind `10050` with one `["relay","wss://…"]` tag per
