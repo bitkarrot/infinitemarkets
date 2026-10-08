@@ -118,19 +118,55 @@
         });
       },
       gmProductRows: function () {
-        return this.gmCatalog.products.map(function (p) {
+        /* Variations are rows of their parent product, not standalone
+           entries — nest them under the parent so a sized product reads
+           as one listing with options. */
+        var children = {};
+        var parents = [];
+        var byId = {};
+        this.gmCatalog.products.forEach(function (p) {
+          byId[p.id] = p;
+          if (p.product_type === "variation" && p.parent_product_id) {
+            (children[p.parent_product_id] =
+              children[p.parent_product_id] || []).push(p);
+          }
+        });
+        this.gmCatalog.products.forEach(function (p) {
+          if (p.product_type !== "variation" ||
+              !p.parent_product_id ||
+              !byId[p.parent_product_id] ||
+              byId[p.parent_product_id].product_type !== "variable") {
+            parents.push(p);
+          }
+        });
+
+        function decorate(p, opts) {
           var stock =
             p.stock_on_hand === null || p.stock_on_hand === undefined
               ? "Unlimited"
               : String((p.stock_on_hand || 0) - (p.stock_reserved || 0));
-          return Object.assign({}, p, {
+          return Object.assign({}, p, opts || {}, {
             _stock: stock,
             _price:
               (p.amount_minor === null || p.amount_minor === undefined
                 ? "—"
                 : p.amount_minor + " " + (p.currency || "SAT"))
           });
+        }
+
+        var rows = [];
+        parents.forEach(function (p) {
+          var kids = children[p.id] || [];
+          rows.push(decorate(p, { _variantCount: kids.length }));
+          kids.forEach(function (v) {
+            rows.push(decorate(v, {
+              _variantOf: (byId[p.id].title || "") ||
+                byId[p.id].d_tag,
+              _isVariant: true
+            }));
+          });
         });
+        return rows;
       }
     },
     methods: {

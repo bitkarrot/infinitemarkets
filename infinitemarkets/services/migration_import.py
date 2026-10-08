@@ -77,6 +77,8 @@ def _description(value: str) -> str:
 
 
 def _image_url(value: str) -> str:
+    """Imported image references are hotlinks, never fetched server-side —
+    so any HTTPS URL is allowed (Shopify CDN, Blossom, owned media)."""
     if len(value) > 2048 or any(ord(c) < 32 for c in value):
         raise ValueError("invalid Shopify image URL")
     try:
@@ -87,10 +89,13 @@ def _image_url(value: str) -> str:
         raise ValueError("invalid Shopify image URL") from exc
     if (
         url.scheme != "https"
-        or host not in ("cdn.shopify.com", "burst.shopifycdn.com")
+        or not host
+        or "." not in host
         or url.username
         or url.password
         or port not in (None, 443)
+        or re.fullmatch(r"[0-9.]+", host)  # IPv4 literal
+        or ":" in host  # IPv6 literal
     ):
         raise ValueError("invalid Shopify image URL")
     return value

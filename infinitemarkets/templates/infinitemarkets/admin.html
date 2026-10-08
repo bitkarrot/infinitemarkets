@@ -675,7 +675,15 @@
                       <q-checkbox v-model="props.selected"></q-checkbox>
                     </q-td>
                     <q-td key="title" :props="props" data-col="title">
+                      <span v-if="props.row._isVariant" class="text-grey-7"
+                            aria-hidden="true">↳ </span>
                       {{ props.row.title || props.row.d_tag }}
+                      <q-badge v-if="props.row._isVariant" color="info"
+                               text-color="dark" class="q-ml-xs"
+                               label="Option"></q-badge>
+                      <q-badge v-if="props.row._variantCount" color="secondary"
+                               text-color="white" class="q-ml-xs"
+                               :label="props.row._variantCount + ' options'"></q-badge>
                       <q-badge v-if="props.row.draft" color="warning"
                                text-color="dark" class="q-ml-xs"
                                label="Draft — never published"></q-badge>
