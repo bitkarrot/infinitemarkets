@@ -1035,7 +1035,7 @@
           </div>
           <div class="row q-gutter-sm">
             <q-btn color="primary" outline label="Preview products"
-                   :loading="gmMigration.busy" :disable="!gmMigration.file || (gmMigration.sourceKind !== 'infinitemarkets' && !gmMigration.currency)"
+                   :loading="gmMigration.busy" :disable="!gmMigration.file || (gmMigration.sourceKind === 'shopify' && !gmMigration.currency)"
                    @click="gmShopifyUpload('preview')"></q-btn>
             <q-btn color="primary" unelevated label="Import as drafts"
                    :loading="gmMigration.busy" :disable="!gmMigration.preview || gmMigration.selectionDirty || gmMigration.preview.products.some(p => p.image_selection_required)"

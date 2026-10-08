@@ -75,6 +75,7 @@ async def test_migration_admin_surface(runtime_env):
     assert 'data-gm="migration-history"' in html
     assert 'data-gm="migration-preview"' in html
     assert "Review and publish them" in html
+    assert "gmMigration.sourceKind === 'shopify' && !gmMigration.currency" in html
     js = await runtime_env["client"].get(f"{JS}/admin_migration.js")
     assert js.status_code == 200
     assert "/migration/imports" in js.text
