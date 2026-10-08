@@ -40,6 +40,39 @@ test('admin shell mounts with all five surfaces', async ({page}) => {
   ).toBeVisible({timeout: 20_000})
 })
 
+test('catalog header keeps its title clear of actions at narrow widths', async ({page}) => {
+  await page.goto('/infinitemarkets/')
+  await page.locator('[data-gm-nav="catalog"]').click()
+  const header = page.locator('.gm-catalog-head')
+  const title = header.locator('h1')
+  for (const width of [1440, 1280, 1120, 1024, 900, 768, 390]) {
+    await page.setViewportSize({width, height: 900})
+    await page.evaluate(() => new Promise(resolve =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve))
+    ))
+    await expect(title).toBeVisible()
+    const fits = await title.evaluate(el => el.scrollWidth <= el.clientWidth)
+    expect(fits, `Catalog title clipped at ${width}px`).toBe(true)
+    const heading = await title.evaluate(el => {
+      const range = document.createRange()
+      range.selectNodeContents(el)
+      return range.getBoundingClientRect().toJSON()
+    })
+    for (const button of await header.locator('.q-btn').all()) {
+      const action = await button.boundingBox()
+      expect(action, `Catalog action hidden at ${width}px`).not.toBeNull()
+      expect(action!.x + action!.width).toBeLessThanOrEqual(width + 1)
+      expect(
+        heading!.x + heading!.width <= action!.x ||
+        action!.x + action!.width <= heading!.x ||
+        heading!.y + heading!.height <= action!.y ||
+        action!.y + action!.height <= heading!.y,
+        `Catalog title overlaps an action at ${width}px`
+      ).toBe(true)
+    }
+  }
+})
+
 test('migration wizard dry-runs and stages Shopify drafts without publication', async ({page}) => {
   await page.goto('/infinitemarkets/')
   await page.locator('[data-gm-nav="migration"]').click()
