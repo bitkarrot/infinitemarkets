@@ -657,6 +657,13 @@ async def test_private_three_product_sample_import(runtime_env):
     )
     assert len(preview["products"]) == 3
     assert [p["stock_on_hand"] for p in preview["products"]] == [100, 100, 100]
+    hoodie_preview = next(p for p in preview["products"]
+                          if p["handle"] == "moonscape-hooded-blanket-sherpa")
+    assert hoodie_preview["variants"][0]["amount_minor"] == 9800
+    assert hoodie_preview["currency"] == "USD"
+    assert hoodie_preview["images"] and all(
+        ".blossom.band/" in url for url in hoodie_preview["images"]
+    )
     upload = {"file": ("shopify.csv", data, "text/csv")}
     await client.get("/infinitemarkets/api/v1/merchants/current")
     headers = {
@@ -674,7 +681,7 @@ async def test_private_three_product_sample_import(runtime_env):
     assert result["product_count"] == 3
     async with db.connect() as conn:
         rows = await conn.fetchall(
-            f"SELECT p.id, p.draft, p.visibility, p.stock_on_hand "
+            f"SELECT p.id, p.draft, p.visibility, p.stock_on_hand, p.import_legacy_id "
             f"FROM {table('products')} p JOIN {table('import_rows')} r "
             "ON r.product_id = p.id WHERE r.import_id = :i",
             {"i": result["import_id"]},
@@ -690,17 +697,29 @@ async def test_private_three_product_sample_import(runtime_env):
         )
     assert sorted(row["stock_on_hand"] for row in variants) == [33, 33, 34]
     assert all(row["draft"] for row in variants)
-    parent = next(row for row in rows if row["stock_on_hand"] == 0)
+    hoodie = next(row for row in rows
+                  if row["import_legacy_id"] == "moonscape-hooded-blanket-sherpa")
     published = await client.patch(
-        f"/infinitemarkets/api/v1/products/{parent['id']}",
+        f"/infinitemarkets/api/v1/products/{hoodie['id']}",
         json={"draft": False, "visibility": "on-sale"}, headers=headers,
     )
     assert published.status_code == 200, published.text
     async with db.connect() as conn:
-        options = await conn.fetchall(
-            f"SELECT stock_on_hand, draft, visibility FROM {table('products')} "
-            "WHERE parent_product_id = :p", {"p": parent["id"]},
+        parents = await conn.fetchall(
+            f"SELECT id, draft, visibility FROM {table('products')} "
+            f"WHERE id IN (SELECT product_id FROM {table('import_rows')} "
+            "WHERE import_id = :i)", {"i": result["import_id"]},
         )
-    assert sorted(option["stock_on_hand"] for option in options) == [33, 33, 34]
-    assert all(not option["draft"] and option["visibility"] == "on-sale"
-               for option in options)
+        options = await conn.fetchall(
+            f"SELECT draft, visibility FROM {table('products')} "
+            "WHERE parent_product_id IN (SELECT product_id "
+            f"FROM {table('import_rows')} WHERE import_id = :i)",
+            {"i": result["import_id"]},
+        )
+    assert sum(not row["draft"] and row["visibility"] == "on-sale"
+               for row in parents) == 1
+    assert next(row for row in parents if row["id"] == hoodie["id"])["draft"] == 0
+    assert all(row["draft"] and row["visibility"] == "hidden"
+               for row in parents if row["id"] != hoodie["id"])
+    assert len(options) == 3
+    assert all(row["draft"] and row["visibility"] == "hidden" for row in options)
