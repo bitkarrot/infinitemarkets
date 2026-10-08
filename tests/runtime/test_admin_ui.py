@@ -56,6 +56,9 @@ async def test_admin_shell_document(runtime_env):
     for nav in ("orders", "catalog", "publications", "messages",
                 "settings"):
         assert f'data-gm-nav="{nav}"' in html, nav
+    assert '<q-item-section>Catalog</q-item-section>' in html
+    assert '<h1 class="text-h6 q-my-none col">Catalog</h1>' in html
+    assert '<q-tab name="categories" label="Categories"></q-tab>' in html
     assert 'data-gm-surface="messages"' in html
     # Every module script loads.
     revisions = set()
@@ -66,6 +69,9 @@ async def test_admin_shell_document(runtime_env):
         assert match, mod
         revisions.add(match.group(1))
     assert len(revisions) == 1
+    about = await runtime_env["client"].get(f"{JS}/admin_about.js")
+    assert about.status_code == 200
+    assert 'title: "Catalog: products & categories"' in about.text
 
 
 async def test_migration_admin_surface(runtime_env):

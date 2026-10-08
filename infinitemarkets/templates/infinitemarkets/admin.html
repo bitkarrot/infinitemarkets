@@ -81,7 +81,7 @@
         <q-item clickable :active="gm.view === 'catalog'"
                 @click="gmNav('catalog')" data-gm-nav="catalog">
           <q-item-section avatar><q-icon name="inventory_2"></q-icon></q-item-section>
-          <q-item-section>Categories</q-item-section>
+          <q-item-section>Catalog</q-item-section>
         </q-item>
         <q-item clickable :active="gm.view === 'migration'"
                 @click="gmNav('migration')" data-gm-nav="migration">
@@ -487,7 +487,7 @@
       <!-- ================= B3: catalog ================= -->
       <section v-show="gm.view === 'catalog'" data-gm-surface="catalog">
         <div class="row items-center q-mb-md gm-catalog-head">
-          <h1 class="text-h6 q-my-none col">Categories</h1>
+          <h1 class="text-h6 q-my-none col">Catalog</h1>
           <q-btn unelevated color="primary" label="New product"
                  @click="gmNewProduct"></q-btn>
           <q-btn outline color="primary" label="New category"
