@@ -90,6 +90,10 @@ Decisions are logged in PROJECT.md and the normative specification.
 - [Phase 2]: Cookie auth wins when a request carries both cookie and bearer headers — prevents bearer bypass of Origin/CSRF (02-01)
 - [Phase 2]: Kind-5 tombstone intents carry the bumped aggregate revision so supersession retires stale pending publishes; product intents enqueue AFTER collection republishes so dependency edges bind to live rows (02-01)
 
+### Pending Todos
+
+- [ ] Select shipping countries and zones by name (`.planning/todos/pending/2026-10-08-select-shipping-countries-and-zones-by-name.md`).
+
 ### Release Closeout Gates
 
 - [x] Current implementation CI passed lint and Linux x86_64/ARM64 SQLite/PostgreSQL qualification: run 36352552899 on `021c402`.
