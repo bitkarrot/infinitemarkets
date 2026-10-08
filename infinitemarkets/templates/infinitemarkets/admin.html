@@ -1535,6 +1535,32 @@
                              @click="gmCopy(gm.merchant.pubkey)"></q-btn>
                     </div>
                     <div class="q-mt-sm">
+                      <q-btn v-if="!gmSettings.nsecReveal" color="primary" outline dense
+                             icon="vpn_key" label="Show private key"
+                             aria-label="Show private key"
+                             :loading="gmSettings.nsecRevealing"
+                             @click="gmTogglePrivateKey"></q-btn>
+                      <q-btn v-else color="grey-8" flat dense icon="visibility_off"
+                             label="Hide private key"
+                             aria-label="Hide private key"
+                             @click="gmTogglePrivateKey"></q-btn>
+                    </div>
+                    <div v-if="gmSettings.nsecReveal" class="q-mt-sm">
+                      <q-input :model-value="gmSettings.nsecReveal" readonly outlined dense
+                               type="text" label="Store secret key (nsec)"
+                               autocomplete="off" spellcheck="false">
+                        <template v-slot:append>
+                          <q-btn flat dense round icon="content_copy"
+                                 aria-label="Copy private key"
+                                 @click="gmCopy(gmSettings.nsecReveal)"></q-btn>
+                        </template>
+                      </q-input>
+                      <div class="text-caption text-warning q-mt-xs">
+                        Keep this key secret — anyone holding it can publish as
+                        your store.
+                      </div>
+                    </div>
+                    <div class="q-mt-sm">
                       <q-btn color="primary" outline dense icon="open_in_new"
                              label="View public storefront"
                              :href="'/infinitemarkets/public/merchants/' + gm.merchant.pubkey"

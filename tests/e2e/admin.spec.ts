@@ -836,6 +836,13 @@ test('settings surface: identity, relays, notifications, appearance', async ({
     page.getByRole('button', {name: 'Save relay configuration'})
   ).toBeVisible()
 
+  await settings.getByRole('button', {name: 'Show private key'}).click()
+  const secret = settings.getByLabel('Store secret key (nsec)')
+  await expect(secret).toHaveValue(/^nsec1/)
+  await expect(settings.getByText(/Keep this key secret/)).toBeVisible()
+  await settings.getByRole('button', {name: 'Hide private key'}).click()
+  await expect(secret).toHaveCount(0)
+
   await page.getByRole('tab', {name: 'Notifications'}).click()
   await expect(
     page.getByText('Notification addresses', {exact: true})

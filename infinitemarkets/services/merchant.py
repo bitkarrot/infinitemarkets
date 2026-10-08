@@ -461,6 +461,16 @@ async def import_nsec(merchant_id: str, user, nsec_bech32: str,
     return _public_merchant(row)
 
 
+async def export_nsec(merchant_id: str, user,
+                      settings: ExtSettings | None = None) -> dict:
+    """Return the owner's nsec after an explicit merchant action."""
+    settings = settings or ext_settings()
+    await get_merchant_row(merchant_id, str(user.id))
+    return {
+        "nsec": await _keystore(settings).export_key(merchant_id),
+    }
+
+
 async def publish(merchant_id: str, user,
                   settings: ExtSettings | None = None) -> dict:
     """Enqueue republication intents for all merchant aggregates and move

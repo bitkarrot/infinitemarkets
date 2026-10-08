@@ -297,6 +297,38 @@ async def test_key_import_replaces_identity(runtime_env):
     assert "nsec" not in resp.text
 
 
+async def test_key_export_reveals_nsec_to_owner(runtime_env):
+    current = await runtime_env["client"].get(f"{API}/merchants/current")
+    if current.status_code == 404:
+        created = await runtime_env["client"].post(
+            f"{API}/merchants",
+            json={"wallet_id": runtime_env["wallet"].id},
+            headers=await _cookie(runtime_env),
+        )
+        assert created.status_code == 201, created.text
+        runtime_env["merchant_id"] = created.json()["id"]
+        current = created
+    assert current.status_code in (200, 201)
+    mid = runtime_env["merchant_id"]
+    assert "nsec1" not in current.text
+
+    resp = await runtime_env["client"].post(
+        f"{API}/merchants/{mid}/keys/export",
+        headers=await _cookie(runtime_env),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["cache-control"] == "no-store"
+    nsec = resp.json()["nsec"]
+    assert nsec.startswith("nsec1")
+
+    from nostr_sdk import Keys
+
+    assert Keys.parse(nsec).public_key().to_hex() == current.json()["pubkey"]
+
+    current = await runtime_env["client"].get(f"{API}/merchants/current")
+    assert nsec not in current.text
+
+
 async def test_idempotency_key_accepted_and_shape_validated(runtime_env):
     """§14: admin mutations accept Idempotency-Key; malformed keys are
     rejected with a problem detail."""
@@ -321,10 +353,18 @@ async def test_idempotency_key_accepted_and_shape_validated(runtime_env):
 
 
 async def test_foreign_merchant_is_404(runtime_env):
+    foreign = uuid.uuid4().hex
+    headers = await _cookie(runtime_env)
     resp = await runtime_env["client"].patch(
-        f"{API}/merchants/{uuid.uuid4().hex}",
+        f"{API}/merchants/{foreign}",
         json={"display_name": "not mine"},
-        headers=await _cookie(runtime_env),
+        headers=headers,
+    )
+    assert resp.status_code == 404
+
+    resp = await runtime_env["client"].post(
+        f"{API}/merchants/{foreign}/keys/export",
+        headers=headers,
     )
     assert resp.status_code == 404
 

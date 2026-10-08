@@ -106,6 +106,17 @@ async def test_product_actions_precede_title(runtime_env):
     assert actions < title < delete
 
 
+async def test_settings_key_reveal(runtime_env):
+    html = (await runtime_env["client"].get("/infinitemarkets/")).text
+    assert 'aria-label="Show private key"' in html
+    assert 'label="Store secret key (nsec)"' in html
+    assert 'Keep this key secret' in html
+    js = (await runtime_env["client"].get(f"{JS}/admin_settings.js")).text
+    assert '"/keys/export"' in js
+    assert 'nsecReveal' in js
+    assert "nsec1" not in html + js
+
+
 async def test_migration_admin_surface(runtime_env):
     html = (await runtime_env["client"].get("/infinitemarkets/")).text
     assert 'data-gm-nav="migration"' in html

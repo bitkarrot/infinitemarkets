@@ -620,6 +620,7 @@ POST   /merchants                          create merchant (generates or imports
 GET    /merchants/current                  current user's merchant + relay health summary + operational warnings (incl. unreachable inbox)
 PATCH  /merchants/{id}                     profile, payment_preference, wallet_id, toggles
 POST   /merchants/{id}/keys/import         body: {nsec} — over TLS only; see §11; request-body logging disabled
+POST   /merchants/{id}/keys/export         owner-initiated nsec reveal — no-store response; see §11
 POST   /merchants/{id}/publish             enqueue republication of all aggregates
 GET    /merchants/{id}/relay-health        per-relay connection/ACK summary
 GET|PATCH /merchants/{id}/notifications    notify_emails + per-event toggles (§8.8)
@@ -1562,6 +1563,7 @@ sessions re-open under the §9.2 backoff rather than on the 5s reconcile cadence
 ```python
 generate(merchant_id) -> pubkey
 import_key(merchant_id, nsec_bech32) -> pubkey
+export_key(merchant_id) -> nsec_bech32
 public_key(merchant_id) -> pubkey
 sign_event(merchant_id, event_dict) -> signed_event
 nip17_wrap(merchant_id, unsigned_rumor, recipient_pubkey) -> signed_gift_wrap
@@ -1572,7 +1574,9 @@ delete(merchant_id)
 rewrap(old_version, new_version)
 ```
 
-Application services MUST NOT receive raw private keys or raw conversation keys.
+Application services MUST NOT receive raw private keys or raw conversation keys except
+the owner-initiated `export_key` response. No routine merchant, admin-list, or public
+projection may include private key material.
 `nip17_wrap` is called once per delivery copy and owns ephemeral wrapper-key generation,
 independent past-timestamp randomization, seal signing, and NIP-44 operations. All
 cryptographic methods validate input lengths before allocation/decode.
@@ -1596,7 +1600,10 @@ cryptographic methods validate input lengths before allocation/decode.
   secp256k1/chacha code.
 - Decrypted keys/messages/addresses are never logged or returned publicly. Raw nsecs
   are not cached in application services or attached to long-lived SDK clients; decrypt
-  only inside a key-store operation and release references promptly. Python cannot
+  only inside a key-store operation and release references promptly. The only supported
+  private-key response is the authenticated merchant's explicit `POST /keys/export`,
+  which sends `Cache-Control: no-store` and omits the nsec from routine projections.
+  Python cannot
   guarantee physical memory zeroization, which is documented as residual risk.
 
 ### 11.3 Sensitive-field encryption at rest

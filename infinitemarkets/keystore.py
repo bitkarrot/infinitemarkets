@@ -198,6 +198,18 @@ class MerchantKeyStore:
         finally:
             del keys
 
+    async def export_key(self, merchant_id: str) -> str:
+        """Return the merchant nsec to the owner after an explicit request."""
+        nsec = await self._load_nsec(merchant_id)
+        try:
+            keys = Keys.parse(nsec.hex())
+            try:
+                return keys.secret_key().to_bech32()
+            finally:
+                del keys
+        finally:
+            del nsec
+
     async def sign_event(self, merchant_id: str, unsigned: UnsignedEvent):
         """Sign ``unsigned`` with the merchant key; key is released on exit."""
         keys = await self._keys(merchant_id)

@@ -196,6 +196,18 @@ async def import_key(
     return {"pubkey": merchant["pubkey"], "merchant_id": merchant["id"]}
 
 
+@infinitemarkets_api_router.post("/merchants/{merchant_id}/keys/export")
+@problem_boundary
+async def export_key(
+    request: Request,
+    response: Response,
+    merchant_id: str,
+    user: User = Depends(check_user_exists),
+):
+    response.headers["Cache-Control"] = "no-store"
+    return await merchant_service.export_nsec(merchant_id, user)
+
+
 @infinitemarkets_api_router.post("/merchants/{merchant_id}/publish")
 @problem_boundary
 async def publish_merchant(

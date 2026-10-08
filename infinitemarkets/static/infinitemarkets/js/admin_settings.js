@@ -192,6 +192,8 @@
           displayName: "",
           nsecInput: "",
           nsecNote: NSEC_NOTE,
+          nsecReveal: "",
+          nsecRevealing: false,
           importing: false,
           relays: [],
           blossom: [],
@@ -388,6 +390,7 @@
             { nsec: nsec }
           );
           self.gmSettings.nsecInput = "";
+          self.gmSettings.nsecReveal = "";
           self.gmSettings.notice = "Key imported.";
           await self.gmLoad();
         } catch (e) {
@@ -395,6 +398,25 @@
           self.gmSettings.nsecInput = "";
         }
         self.gmSettings.importing = false;
+      },
+      gmTogglePrivateKey: async function () {
+        var self = this;
+        if (self.gmSettings.nsecReveal) {
+          self.gmSettings.nsecReveal = "";
+          return;
+        }
+        self.gmSettings.nsecRevealing = true;
+        try {
+          var res = await self.gmApi(
+            "POST",
+            "/merchants/" + self.gmMerchantId() + "/keys/export"
+          );
+          self.gmSettings.nsecReveal = res.nsec || "";
+        } catch (e) {
+          self.gmSettings.nsecReveal = "";
+          self.gmSettings.error = self.gmProblemCopy(e.problem);
+        }
+        self.gmSettings.nsecRevealing = false;
       },
       gmChangeWallet: async function (walletId) {
         var self = this;

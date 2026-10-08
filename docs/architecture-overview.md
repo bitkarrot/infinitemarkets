@@ -101,9 +101,10 @@ in the Publications admin tab; relay delivery is never treated as state truth.
 | `1059` (inbound) | NIP-17 gift-wrapped buyer orders | **Live (Release B)** — the inbox listener maintains cursors in `inbox_events` on `direction=inbox|both` relays |
 
 **What's never exposed:** orders, invoices, buyers' data, or internal state.
-The nsec lives in `merchant_keys`, is used only for event signing, and is
-never sent anywhere except the one-time TLS POST on nsec import. Blossom/media
-endpoints are merchant-configurable but config-only today (no uploads yet).
+The nsec lives in `merchant_keys`, is used only for event signing, and leaves
+the keystore only for the one-time TLS nsec import or an authenticated
+merchant's explicit **Show private key** export. Blossom/media endpoints are
+merchant-configurable but config-only today (no uploads yet).
 
 ## 3. How listings and orders flow within LNbits
 
