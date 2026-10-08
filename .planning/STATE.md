@@ -92,7 +92,7 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 ### Pending Todos
 
-- [ ] Select shipping countries and zones by name (`.planning/todos/pending/2026-10-08-select-shipping-countries-and-zones-by-name.md`).
+- None. Country-name and EU-zone shipping picker completed (`.planning/todos/completed/2026-10-08-select-shipping-countries-and-zones-by-name.md`).
 
 ### Release Closeout Gates
 
