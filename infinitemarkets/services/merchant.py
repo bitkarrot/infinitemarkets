@@ -261,16 +261,17 @@ def _validate_profile(profile: dict) -> None:
         raise unprocessable(
             "invalid-profile", "Invalid profile", "about must be 2000 characters or fewer"
         )
-    picture = profile.get("picture")
-    if picture is not None and (
-        not isinstance(picture, str)
-        or len(picture) > 500
-        or not picture.startswith("https://")
-    ):
-        raise unprocessable(
-            "invalid-profile", "Invalid profile",
-            "picture must be an https URL of 500 characters or fewer",
-        )
+    for key in ("picture", "banner"):
+        value = profile.get(key)
+        if value is not None and (
+            not isinstance(value, str)
+            or len(value) > 500
+            or not value.startswith("https://")
+        ):
+            raise unprocessable(
+                "invalid-profile", "Invalid profile",
+                f"{key} must be an https URL of 500 characters or fewer",
+            )
 
     from lnbits.helpers import is_valid_email_address
 

@@ -192,6 +192,7 @@
           displayName: "",
           profileJson: {},
           profileAvatar: "",
+          profileBanner: "",
           profileBio: "",
           profileNip05: "",
           profileLud16: "",
@@ -340,6 +341,7 @@
           }
           self.gmSettings.profileJson = profile;
           self.gmSettings.profileAvatar = profile.picture || "";
+          self.gmSettings.profileBanner = profile.banner || "";
           self.gmSettings.profileBio = profile.about || "";
           self.gmSettings.profileNip05 = profile.nip05 || "";
           self.gmSettings.profileLud16 = profile.lud16 || "";
@@ -383,6 +385,7 @@
       gmSaveIdentity: async function () {
         var self = this;
         var avatar = (self.gmSettings.profileAvatar || "").trim();
+        var banner = (self.gmSettings.profileBanner || "").trim();
         var bio = (self.gmSettings.profileBio || "").trim();
         var nip05 = (self.gmSettings.profileNip05 || "").trim();
         var lud16 = (self.gmSettings.profileLud16 || "").trim();
@@ -390,6 +393,11 @@
         if (avatar && !/^https:\/\//.test(avatar)) {
           self.gmSettings.error =
             "Use an https:// image address for the avatar.";
+          return;
+        }
+        if (banner && !/^https:\/\//.test(banner)) {
+          self.gmSettings.error =
+            "Use an https:// image address for the header image.";
           return;
         }
         if (nip05 && !addressPattern.test(nip05)) {
@@ -408,7 +416,8 @@
         }
         var profile = Object.assign({}, self.gmSettings.profileJson || {});
         var fields = {
-          picture: avatar, about: bio, nip05: nip05, lud16: lud16
+          picture: avatar, banner: banner, about: bio,
+          nip05: nip05, lud16: lud16
         };
         Object.keys(fields).forEach(function (key) {
           if (fields[key]) profile[key] = fields[key];

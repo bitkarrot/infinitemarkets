@@ -1531,6 +1531,9 @@
                     <q-input v-model="gmSettings.profileAvatar" outlined dense
                              label="Avatar URL (https)" class="q-mb-sm"
                              autocomplete="off" spellcheck="false"></q-input>
+                    <q-input v-model="gmSettings.profileBanner" outlined dense
+                             label="Header image URL (https)" class="q-mb-sm"
+                             autocomplete="off" spellcheck="false"></q-input>
                     <q-input v-model="gmSettings.profileNip05" outlined dense
                              label="Nostr address (NIP-05)" class="q-mb-sm"
                              placeholder="shop@example.com"
@@ -1542,20 +1545,20 @@
                     <q-input v-model="gmSettings.profileBio" outlined dense
                              type="textarea" autogrow label="Bio"
                              maxlength="2000" class="q-mb-sm"></q-input>
-                    <q-btn color="primary" outline dense label="Save identity"
-                           :loading="gmSettings.identitySaving"
-                           @click="gmSaveIdentity"></q-btn>
+                    <div class="row items-center q-gutter-sm">
+                      <q-btn color="primary" outline dense label="Save identity"
+                             :loading="gmSettings.identitySaving"
+                             @click="gmSaveIdentity"></q-btn>
+                      <q-btn v-if="gm.merchant.npub" color="primary" flat dense
+                             icon="open_in_new" label="View Nostr profile"
+                             :href="'https://nostr.at/' + gm.merchant.npub"
+                             target="_blank" rel="noopener"></q-btn>
+                    </div>
                     <div class="q-mt-md text-caption">Store pubkey (public)</div>
                     <div class="row items-center q-gutter-sm">
                       <code>{{ gmTrunc(gm.merchant.pubkey, 12, 8) }}</code>
                       <q-btn color="primary" flat dense label="Copy pubkey"
                              @click="gmCopy(gm.merchant.pubkey)"></q-btn>
-                    </div>
-                    <div class="q-mt-sm" v-if="gm.merchant.npub">
-                      <q-btn color="primary" flat dense icon="open_in_new"
-                             label="View Nostr profile"
-                             :href="'https://nostr.at/' + gm.merchant.npub"
-                             target="_blank" rel="noopener"></q-btn>
                     </div>
                     <div class="q-mt-sm">
                       <q-btn v-if="!gmSettings.nsecReveal" color="primary" outline dense
@@ -1582,12 +1585,6 @@
                         Keep this key secret — anyone holding it can publish as
                         your store.
                       </div>
-                    </div>
-                    <div class="q-mt-sm">
-                      <q-btn color="primary" outline dense icon="open_in_new"
-                             label="View public storefront"
-                             :href="'/infinitemarkets/public/merchants/' + gm.merchant.pubkey"
-                             target="_blank" rel="noopener"></q-btn>
                     </div>
                     <div class="q-mt-sm">
                       <q-badge outline label="Payment preference: manual"></q-badge>

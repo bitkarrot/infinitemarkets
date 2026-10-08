@@ -271,6 +271,7 @@ async def test_profile_identity_fields(runtime_env):
     profile = {
         "about": "Handmade goods from the shop.",
         "picture": "https://cdn.example/avatar.png",
+        "banner": "https://cdn.example/header.png",
         "website": "https://shop.example",
         "nip05": "shop@example.com",
         "lud16": "shop@wallet.example",
@@ -284,12 +285,14 @@ async def test_profile_identity_fields(runtime_env):
     saved = json.loads(resp.json()["profile_json"])
     assert saved["about"] == profile["about"]
     assert saved["picture"] == profile["picture"]
+    assert saved["banner"] == profile["banner"]
     assert saved["website"] == profile["website"]
     assert saved["nip05"] == profile["nip05"]
     assert saved["lud16"] == profile["lud16"]
 
     for bad in (
         {"picture": "http://insecure.example/a.png"},
+        {"banner": "http://insecure.example/header.png"},
         {"nip05": "not-an-address"},
         {"lud16": "not-an-address"},
     ):

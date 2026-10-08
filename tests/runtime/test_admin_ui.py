@@ -127,15 +127,20 @@ async def test_settings_key_reveal(runtime_env):
     assert 'Keep this key secret' in html
     assert 'Merchant Nostr Profile' in html
     assert 'label="Avatar URL (https)"' in html
+    assert 'label="Header image URL (https)"' in html
     assert 'label="Bio"' in html
     assert 'label="Nostr address (NIP-05)"' in html
     assert 'label="Lightning address (LUD-16)"' in html
     assert 'label="View Nostr profile"' in html
     assert 'label="Save identity"' in html
+    assert 'label="View public storefront"' not in html
+    assert html.index('label="Save identity"') < html.index('label="View Nostr profile"')
+    assert html.index('label="View Nostr profile"') < html.index('Store pubkey (public)')
     js = (await runtime_env["client"].get(f"{JS}/admin_settings.js")).text
     assert '"/keys/export"' in js
     assert 'nsecReveal' in js
     assert 'profileAvatar' in js
+    assert 'profileBanner' in js
     assert 'profileBio' in js
     assert 'profileNip05' in js
     assert 'profileLud16' in js
