@@ -33,13 +33,12 @@ Features are taken from the corrected contract and completed audit. They are gro
 - Durable encrypted inbox and order-message history.
 - Deployed relay egress controls and independent Gamma client interoperability.
 
-### Release C — Legacy Interop
+### Release C — Catalog Portability
 
-- Literal NIP-15 `30017`/`30018` and NIP-04 type 0/1/2 DTOs.
-- Explicit restrictions for opaque-address physical orders.
-- Preview/execute/dry-run/cutover migration.
-- Freeze and reconciliation/partition of still-payable legacy inventory liabilities.
-- External NIP-15 client and scarce-stock cutover rehearsal.
+- File-only import is not legacy NIP-04 ordering or a transfer of invoice state.
+- File-only CSV/JSON catalog preview and import as hidden drafts.
+- Merchant review/edit and explicit publication through Catalog, including imported options.
+- Product CSV export and optional merchant-supplied media relink; no old-order, freeze, or cutover workflow.
 
 ## Differentiators
 

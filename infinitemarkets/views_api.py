@@ -466,7 +466,7 @@ async def delete_merchant(
 
 
 async def _catalog_upload(request: Request, *, execute: bool, source_kind: str):
-    from .services.migration_import import MAX_UPLOAD_BYTES
+    from .services.migration_import import MAX_UPLOAD_BYTES, infer_legacy_currency
 
     if not request.headers.get("content-type", "").startswith("multipart/form-data;"):
         raise unprocessable("invalid-content", "multipart upload required")
@@ -487,7 +487,7 @@ async def _catalog_upload(request: Request, *, execute: bool, source_kind: str):
         raise unprocessable("invalid-content", "invalid import form") from exc
     try:
         required = {"file"}
-        if source_kind != "infinitemarkets":
+        if source_kind == "shopify":
             required.add("currency")
         if execute:
             required.add("source_hash")
@@ -531,7 +531,22 @@ async def _catalog_upload(request: Request, *, execute: bool, source_kind: str):
         if len(data) > MAX_UPLOAD_BYTES:
             raise unprocessable("invalid-content", "import exceeds upload limit")
         source_instance = form.get("source_instance") or source_kind + "-catalog"
-        return (data, form.get("currency") or "SAT", source_instance,
+        currency = form.get("currency")
+        if source_kind not in ("shopify", "infinitemarkets"):
+            try:
+                inferred = infer_legacy_currency(data, source_kind)
+            except ValueError as exc:
+                raise unprocessable("invalid-content", str(exc)) from exc
+            currency = currency or inferred
+            if not currency:
+                raise unprocessable(
+                    "invalid-content", "currency is required when the file has none"
+                )
+            if inferred and inferred != currency.upper():
+                raise unprocessable(
+                    "invalid-content", "catalog currency does not match selection"
+                )
+        return (data, (currency or "SAT").upper(), source_instance,
                 form.get("source_hash"), selection, mapping)
     finally:
         await form.close()

@@ -19,7 +19,7 @@ A merchant can sell one authoritative inventory safely through LNbits-backed web
 - [ ] Pass every P0-01 through P0-14 conformance criterion with reproducible artifacts.
 - [ ] Deliver Release A catalog publication and safe public web checkout on LNbits.
 - [ ] Deliver Release B Gamma NIP-17 order messaging with recipient-specific relay routing.
-- [ ] Deliver Release C literal NIP-15/NIP-04 compatibility and inventory-safe migration.
+- [ ] Deliver Release C catalog import/export: CSV/JSON products land as hidden drafts for merchant review and ordinary publication; no cutover or previous-order workflow.
 - [ ] Preserve one canonical domain model and one inventory/payment authority across all adapters.
 - [ ] Enforce key custody, privacy, authentication, transaction, recovery, and deployment gates from the normative specification.
 
@@ -37,7 +37,7 @@ A merchant can sell one authoritative inventory safely through LNbits-backed web
 
 - The architecture pivoted from a WASM proposal to a standard Python LNbits extension because durable tasks, direct relay connections, real migrations, and transactional inventory are required while the merchant UI is closed.
 - A standalone GPT-6 Astra Max audit reviewed the contract against pinned LNbits, Nostr NIPs, Infinitemarkets, `nostrmarket`, `nostrclient`, and release-source SDK evidence. The audit found the architecture viable but required 13 contract corrections before Phase 0.
-- Those corrections are incorporated into `docs/technical-specification.md`: SDK qualification, cancellation/invoice races, partial outbox retries, SMTP/token persistence, NIP-89 routing, NIP-15 DTOs, migration liabilities, worker storage, host boundaries, FX conversion, release scoping, and the plural runtime name.
+- The qualification-era corrections were incorporated into `docs/technical-specification.md`. Its current §13 supersedes the old migration-liability design: import only products, review hidden drafts, publish through Catalog. Invoice and stock safety within Infinite Markets remains unchanged.
 - `nostr-sdk==0.44.8` is only the host-resolved Phase 0 candidate. Exact wheel hashes, native provenance, and executable security/FFI/ACK behavior must be recorded before implementation.
 - Deterministic local relays are authoritative tests. `wss://nostr.net` is allowed only as an optional ephemeral, non-sensitive public-relay smoke target.
 - Relay fact (owner, 2026-09-22): `relay.nostr.band` is defunct; `relay.nostr.net` replaces it in the starter default relay set.
@@ -64,8 +64,8 @@ A merchant can sell one authoritative inventory safely through LNbits-backed web
 | Phase 0 precedes runtime implementation | Plausible host/SDK assumptions need executable evidence | Pending validation |
 | Direct qualified `nostr-sdk` transport is baseline | NIP-17 requires per-recipient targets and positive ACK evidence | Pending validation |
 | LNbits is settlement authority | Avoid a second payment truth source | Pending validation |
-| Release sequence is A web, B Gamma, C legacy interop | Later protocol compatibility must not block the safe first vertical slice | Pending validation |
-| Migration accounts for payable inventory liabilities under every key strategy | A new pubkey does not partition physical stock | Pending validation |
+| Release sequence is A web, B Gamma, C catalog portability | Later imports must not block safe web/Gamma checkout | Implemented; local tests passed |
+| Catalog imports are merchant-approved drafts, not a transfer of inventory authority | Old orders are ignored; merchants handle overlap with another store before publishing | Implemented; local tests passed |
 | SMTP failures are boolean/unclassified in v1 | The pinned host helper erases SMTP failure categories | Pending validation |
 | External relay smoke uses `wss://nostr.net` only with ephemeral synthetic events | Useful interoperability signal without becoming a production dependency | Pending validation |
 | Public checkout uses bounded Editorial/Guided/Compact presets with responsive fallback | Preserve merchant choice without changing checkout semantics or mobile safety | Pending validation |

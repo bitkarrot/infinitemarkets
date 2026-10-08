@@ -9,7 +9,7 @@
 - As a merchant, I can manage multiple protected product categories, wallet-backed inventory, and see whether each product/collection publication was acknowledged.
 - As a web buyer, I can receive a server-priced Lightning invoice and privately follow order state without exposing an order token in URLs or logs.
 - As a Nostr buyer, I can exchange Gamma order messages through my declared inbox relays without public fallback routing.
-- As a migrating merchant, I can preview and cut over a legacy catalog without allocating stock already promised by an old payable invoice.
+- As a merchant, I can upload a CSV or JSON product catalog, review hidden drafts, and publish only the products I approve; prior orders are outside the import.
 - As an auditor, I can reproduce state, transaction, crypto, relay, notification, and release claims from recorded evidence.
 
 ## v1 Requirements
@@ -70,10 +70,10 @@
 
 - [x] ~~**LEG-01**: Merchant can publish literal NIP-15 `30017`/`30018` projections~~ — **Dropped** (Phase-4 scope amendment: import-only, no live legacy interop).
 - [x] ~~**LEG-02**: Legacy buyer literal NIP-04 type 0/1/2 message exchange~~ — **Dropped** (Phase-4 scope amendment).
-- [ ] **LEG-03**: Merchant can preview, validate, dry-run, execute, and audit JSON/Nostr legacy catalog import without arbitrary path/URL/database access or private-key leakage. Import sources include nostrmarket JSON/Nostr events AND e-commerce CSV exports (Shopify first; column-mapping extensible to WooCommerce) — file upload only, never URL fetch.
-- [ ] **LEG-04**: Merchant can initiate and verify an external old-intake freeze, reconcile/wait/partition every still-payable legacy invoice quantity, and release imported stock only after a complete authoritative post-freeze snapshot with every payable unit verified terminal or durably held, independent of key strategy. Unverifiable sources remain blocked drafts; a local cancel/expiry flag or operator assertion is not proof an invoice cannot settle.
-- [ ] **LEG-05**: Release C passes a scarce-stock cutover rehearsal proving the web/Gamma freeze guard and shared conditional stock writer cannot allocate the same physical unit to an old unpaid invoice and a new order; a separate real-transaction contention test must actually reach the stock writer. *(NIP-15 fixture criterion removed — LEG-01/02 dropped in the Phase-4 scope amendment.)*
-- [ ] **LEG-06**: Merchant can export products to a safe, round-trippable CSV and review/import both classic and modern Shopify product CSVs (including variants and image-only rows). CSV image URLs are references only; optional merchant-uploaded media backup can be validated, stored in managed data storage and relinked without arbitrary server-side URL fetching. Products lacking verified stock remain drafts with zero sellable stock; overflow beyond 20 images requires explicit merchant selection.
+- [ ] **LEG-03**: Merchant can preview and import Shopify CSV, native CSV, nostrmarket JSON and signed NIP-15 event files without arbitrary URL/path/database access or private-key leakage. Only the file and a currency where absent are required; source naming and Shopify mapping are optional. Imports are hidden drafts with merchant-scoped records. Old orders and payment status are ignored.
+- [x] ~~**LEG-04**: Old-intake freeze, payable-invoice reconciliation and activation gate~~ — **Dropped**. No cutover, attestation, physical stock-count or old-order audit is part of catalog import; old-store inventory coordination is operator-managed.
+- [x] ~~**LEG-05**: Scarce-stock old/new cutover rehearsal~~ — **Dropped**. Normal checkout contention and stock-reservation tests remain required for published products.
+- [ ] **LEG-06**: Merchant can export products as safe, round-trippable CSV and review/import classic/modern Shopify CSV (including options and image-only rows). Optional merchant-supplied media can be validated and relinked without server-side URL fetches; >20 images require explicit selection. Products import as hidden drafts and only become available after explicit Catalog publication. Variable parents and their imported options publish together.
 
 ## v2 Requirements
 
@@ -156,8 +156,8 @@ A requirement is complete only when implementation (or Phase 0 probe/model), aut
 | LEG-01 | Phase 4 | Dropped — Phase-4 scope amendment |
 | LEG-02 | Phase 4 | Dropped — Phase-4 scope amendment |
 | LEG-03 | Phase 4 | Pending |
-| LEG-04 | Phase 4 | Pending |
-| LEG-05 | Phase 4 | Pending |
+| LEG-04 | Phase 4 | Dropped — catalog-only scope |
+| LEG-05 | Phase 4 | Dropped — catalog-only scope |
 | LEG-06 | Phase 4 | Pending |
 
 **Coverage:**
@@ -168,4 +168,4 @@ A requirement is complete only when implementation (or Phase 0 probe/model), aut
 
 ---
 *Requirements defined: 2026-09-20*
-*Last updated: 2026-10-07 — LEG-06 added for product export and two-stage Shopify media migration*
+*Last updated: 2026-10-08 — Release C is catalog-only draft import/export; LEG-04/05 dropped*

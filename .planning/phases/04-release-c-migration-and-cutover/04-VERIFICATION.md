@@ -1,5 +1,7 @@
 # Phase 04 — Migration & Cutover Verification
 
+**Historical verification, superseded 2026-10-08:** The original cutover experiment and its results below describe code that was later removed. They are not evidence that current imports perform an old-invoice audit. Current CSV/JSON product imports create hidden drafts for merchant review and ordinary Catalog publication; no cutover/stock-count gate remains. See `docs/technical-specification.md` §13.
+
 Date: 2026-10-07. Scope: LEG-03..06. Local qualification only — **no live
 cutover, deployment, or push of the freeze gate has occurred.**
 

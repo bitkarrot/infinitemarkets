@@ -28,7 +28,7 @@
 ### Deferred Ideas (OUT OF SCOPE)
 
 - NIP-17 order intake, kind-10050 inbox discovery, NIP-42, egress controls — Release B (Phase 3).
-- Literal NIP-15/NIP-04 compatibility, `nostrmarket` migration, single-writer cutover — Release C (Phase 4).
+- Historical Phase-2 forecast of NIP-15/NIP-04 compatibility and cutover for Release C — superseded: current Phase 4 imports CSV/JSON catalogs as hidden drafts and publishes only after merchant review; no old-order gate.
 - NIP-37 drafts sync, preorders/subscriptions purchasing, automated refunds, multi-shop, transport adapters (`nostrclient`/`nostrrelay`) — deferred per spec decisions 13/14/5/26.
 - Windows support — out of the platform claim (Dependabot disposition).
 </user_constraints>

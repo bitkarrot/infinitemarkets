@@ -30,6 +30,10 @@ delivery is never mistaken for payment truth.
   modal mode, and a chrome-free iframe embed
 - Email notifications for order events with per-address test sends
 - Publications outbox with per-relay delivery evidence and a prune control
+- CSV/JSON product catalog upload with preview; imports land as hidden drafts for
+  merchant review and normal Catalog publication (including size options).
+  There is no old-order reconciliation, cutover, or physical stock-count gate;
+  overlapping inventory with another store is the operator's responsibility
 
 ## Links
 

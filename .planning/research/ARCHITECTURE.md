@@ -35,7 +35,7 @@ This document condenses the corrected normative architecture. `docs/technical-sp
 1. Phase 0 proves host/SDK/schema/state contracts with isolated probes and fixtures.
 2. Release A builds the first end-to-end web vertical slice and hardens it.
 3. Release B adds encrypted Gamma transport over the stable domain/payment core.
-4. Release C adds lossy legacy projections and a liability-aware migration boundary.
+4. Release C adds file-only product catalog import/export; the merchant reviews hidden drafts and explicitly publishes products. Old orders are outside the import.
 
 ## Adapter Policy
 

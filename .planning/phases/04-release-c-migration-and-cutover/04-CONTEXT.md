@@ -1,5 +1,7 @@
 # Phase 4: Release C — Migration and Cutover - Context
 
+**Historical context, superseded 2026-10-08:** The current extension offers file-only catalog import into hidden drafts, with merchant review and normal Catalog publication. No cutover, old-order invoice audit, attestation, or stock-count release gate exists. See `.planning/ROADMAP.md` and `docs/technical-specification.md` §13. The decisions below document the prior design only.
+
 **Gathered:** 2026-10-07
 **Status:** Ready for planning
 

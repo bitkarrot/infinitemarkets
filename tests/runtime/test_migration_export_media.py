@@ -1,6 +1,5 @@
-"""04-03: native product CSV export + reimport, owned-media upload/relink,
-merchant storefront profile (grid density, hero visibility, footer logo),
-and attested activation for non-nostrmarket imports."""
+"""Native product CSV export and draft reimport, owned-media upload/relink,
+and merchant storefront profile (grid density, hero visibility, footer logo)."""
 
 from __future__ import annotations
 
@@ -39,7 +38,8 @@ async def _merchant(runtime_env):
     return (await client.get(f"{API}/merchants/current")).json()
 
 
-async def test_export_reimport_and_activation(runtime_env):
+@pytest.mark.parametrize("publish_mode", ["patch", "bulk"])
+async def test_export_reimport_and_activation(runtime_env, publish_mode):
     """Native export → CSV → reimport as drafts → publish directly.
     Formula injection is escaped."""
     client = runtime_env["client"]
@@ -110,9 +110,9 @@ async def test_export_reimport_and_activation(runtime_env):
         ("Size=L", "3"), ("Size=M", "4")
     }
 
-    # Re-import into the same merchant using the default catalog identifier.
+    # Re-import into the same merchant with a stable catalog identifier.
     upload = {"file": ("export.csv", text.encode(), "text/csv")}
-    form = {}
+    form = {} if publish_mode == "patch" else {"source_instance": "bulk-test-catalog"}
     preview = await client.post(
         f"{API}/migration/native/preview", data=form, files=upload,
         headers=headers,
@@ -130,12 +130,27 @@ async def test_export_reimport_and_activation(runtime_env):
         f"{API}/migration/imports/{import_id}", headers=headers
     )
     assert audit.status_code == 200, audit.text
-    imported_id = audit.json()["rows"][0]["product_id"]
-    published = await client.patch(
-        f"{API}/products/{imported_id}",
-        json={"draft": False, "visibility": "on-sale"},
-        headers=headers,
+    imported_id = next(
+        row["product_id"] for row in audit.json()["rows"]
+        if row["legacy_id"] == parent["handle"]
     )
+    if publish_mode == "patch":
+        published = await client.patch(
+            f"{API}/products/{imported_id}",
+            json={"draft": False, "visibility": "on-sale"}, headers=headers,
+        )
+    else:
+        visible = await client.post(
+            f"{API}/products/bulk",
+            json={"action": "visibility", "value": "on-sale",
+                  "product_ids": [imported_id]}, headers=headers,
+        )
+        assert visible.status_code == 200, visible.text
+        published = await client.post(
+            f"{API}/products/bulk",
+            json={"action": "publish", "product_ids": [imported_id]},
+            headers=headers,
+        )
     assert published.status_code == 200, published.text
     from infinitemarkets.db import db, table
 
@@ -148,8 +163,10 @@ async def test_export_reimport_and_activation(runtime_env):
         not child["draft"] and child["visibility"] == "on-sale"
         for child in children
     )
+    detail = await client.get(f"{API}/products/{imported_id}")
+    assert detail.status_code == 200
     page = await client.get(
-        f"/infinitemarkets/p/{merchant['pubkey']}/{published.json()['d_tag']}"
+        f"/infinitemarkets/p/{merchant['pubkey']}/{detail.json()['d_tag']}"
     )
     assert page.status_code == 200
     assert page.text.count('name="variation"') == 2

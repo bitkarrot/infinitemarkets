@@ -8,6 +8,8 @@ review_type: direct-source-grounded
 
 # Phase 4 Plan Review — Direct Source-Grounded Review
 
+**Historical plan review, superseded 2026-10-08:** The cutover/liability plans evaluated below are not part of the current extension. Current imports are hidden drafts, merchant-reviewed and published via Catalog; old orders and invoices are not reconciled. See `docs/technical-specification.md` §13.
+
 This is a direct review by the current model, **not** an independent cross-AI review. Claude and Codex CLIs could not authenticate, so there is no cross-review consensus. The existing plans are not ready for execution unchanged.
 
 ## Summary and risk

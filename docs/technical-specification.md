@@ -502,12 +502,14 @@ token so an expired worker cannot continue after a pause.
 UNIQUE(scope_hash, bucket, window_start). Rate limits are database-backed so they
 apply across workers. Raw IP addresses are never stored.
 
-### 4.17 `settings` and `migration_jobs`
+### 4.17 `settings` and catalog imports
 
 `settings`: key/value per merchant (e.g., `spec_revision`, feature toggles).
-`migration_jobs`: `id`, `merchant_id`, `strategy`, `state`
-(`preview|validated|executing|awaiting_cutover|done|aborted`), `manifest_json`,
-`created_at`, `updated_at`.
+`catalog_imports`: merchant-scoped source kind/identifier, catalog fingerprint,
+signed import commitment, `imported_drafts` state, product count, and creation time.
+`import_rows` links imported catalog handles to local products for review and
+deduplication. Historical database migrations retain obsolete cutover tables for
+upgrade compatibility; no current import operation reads or writes them.
 
 ### 4.18 `email_queue`
 
@@ -741,12 +743,27 @@ with no third-party scripts.
 
 ### 5.5 Migration
 
+Under `/infinitemarkets/api/v1` (authenticated, CSRF-protected multipart upload):
+
 ```text
-POST  /import/nostrmarket/preview     body: {strategy: json|nostr, payload}
-POST  /import/nostrmarket/execute     body: {job_id, confirmations:{…}}
-GET   /import/{job_id}
-POST  /import/{job_id}/cutover        final step; performs single-writer switch §13
+POST  /migration/shopify/preview
+POST  /migration/shopify/execute
+POST  /migration/native/preview
+POST  /migration/native/execute
+POST  /migration/legacy/{nostrmarket|nip15_events}/preview
+POST  /migration/legacy/{nostrmarket|nip15_events}/execute
+GET   /migration/imports
+GET   /migration/imports/{import_id}
+GET   /migration/products/export
 ```
+
+Preview takes a local CSV/JSON `file`: Shopify requires `currency`, JSON
+uses its own currency when unambiguous and otherwise requires a selection,
+while native CSV carries currency. Execute also takes the preview's
+`source_hash`. A source identifier and Shopify mapping are optional advanced
+controls. Imported products start as hidden drafts. The merchant reviews
+and publishes them through ordinary Catalog actions; no cutover,
+invoice-status audit, or stock-count step is available.
 
 ### 5.6 Error model
 
@@ -1635,31 +1652,35 @@ merchant action. Default expiry remains 30 days.
 
 ---
 
-## 13. Migration from `nostrmarket`
+## 13. Catalog import and merchant review
 
-1. **Preview** accepts authenticated local JSON (10 MiB maximum) or validated Nostr
-   events; it never fetches a user-supplied URL/path or opens another extension database
-   by arbitrary name. Build `{stalls, products, zones, quantities, ids, keys: pubkey-only}`.
-   Treat all fields as untrusted; private keys are never accepted by the preview path.
-2. **Execute** imports using §3.1's id-preservation/mapping rules. Any collision or
-   invalid legacy id is explicit in the manifest; unresolved conflicts block execution.
-3. **Dry run** renders all 30402/30405/30406/30017/30018 events and runs §6
-   validators + golden fixture harness.
-4. **Inventory-authority cutover (every key strategy):** freeze new old-system order
-   intake, then inventory every old nonterminal order and still-payable invoice. The
-   existing `nostrmarket` active toggle helps freeze new structured orders but does not
-   neutralize invoices already issued. For each product, either wait/reconcile every
-   liability or reserve/partition equivalent units as `legacy_liability_qty` before
-   fixing imported available stock. The signed cutover manifest records each liability,
-   product mapping, partition, and operator confirmation; a new key alone is not safe.
-5. **Cutover:** after liabilities are accounted, flip publish flags and enqueue
-   aggregates. Old settlement handling remains active for already-issued invoices while
-   new old-system orders remain disabled. Expired/released liability stock transfers to
-   infinitemarkets only through an audited inventory adjustment. Parallel operation is
-   allowed only for explicitly partitioned inventory. External software cannot be
-   detected; same-key reuse remains an additional operational trust boundary.
+1. Upload a Shopify CSV, an `infinitemarkets-products-v1` CSV, a nostrmarket JSON
+   catalog, or signed NIP-15 event dump for preview (10 MiB maximum). Import does
+   not fetch user-supplied URLs or read another extension's database. For non-native
+   sources, Shopify requires a currency selection. JSON sources use a single
+   embedded currency when present, otherwise require a selection. Source
+   identifier and Shopify mapping are optional. Native CSV carries currency.
+2. Preview validates product fields, prices, options, image references, and limits.
+   The catalog fingerprint binds the preview to execution and merchant/source. For
+   legacy JSON the fingerprint includes products, not old orders or payment status;
+   duplicate catalog imports are idempotent and product collisions are rejected.
+3. Execute creates hidden draft products in an Imported — review category and
+   records a signed import commitment and merchant-scoped import history. It does
+   not import previous orders or reconcile previous invoices.
+4. The merchant reviews products (including draft page preview, images, prices,
+   stock and variations) in Catalog, edits them if needed, and explicitly publishes
+   via normal Catalog actions (visibility `on-sale`, draft cleared). Publishing
+   an imported variable parent makes its draft options available too. Drafts and
+   hidden products remain unavailable.
+   Normal checkout reservation/settlement guards still apply after publication.
 
-### 13.1 Catalog export and attested activation (non-nostrmarket sources)
+The extension does **not** offer a cutover, attestation, freeze, physical-count,
+legacy-liability, or old-order-status workflow. An operator moving physical stock
+from another store must independently ensure old sales cannot double-allocate it;
+publication in this extension does not verify the previous store's invoices.
+Historical cutover tables remain only so installed databases retain their schema.
+
+### 13.1 Catalog export and native reimport
 
 `GET /api/v1/migration/products/export` returns the merchant's own catalog as
 `infinitemarkets-products-v1` CSV: a `format,infinitemarkets-products-v1` preamble
@@ -1670,19 +1691,12 @@ exported with a leading `'` guard. The export contains no keys, invoices, buyers
 orders, reservations, or encrypted material; it is not proof of stock or settled
 orders.
 
-`POST /api/v1/migration/native/{preview,execute}` re-imports that format as blocked
-hidden drafts (`source_kind="infinitemarkets"`, zero liabilities). Only the
-exporter's `'` escape prefix is stripped on re-import.
-
-**Attested activation.** Shopify CSV and `infinitemarkets` sources have no
-same-instance wallet settlement surface, so they cannot produce payable-liability
-races; they also cannot prove the negative. `POST /api/v1/migration/cutovers/{id}/attest`
-records a merchant-signed attestation (Nostr kind-30078 bound to the import id and
-source hash) and completes the epoch when the import carries zero liability rows.
-Attestation is rejected for `nostrmarket` imports and any import with liabilities —
-those still require the §13 disable/restart/snapshot flow. The shared release
-predicate is unchanged: imported products also require `stock_counted_at` (the
-explicit physical count) before they can publish or sell.
+`POST /api/v1/migration/native/{preview,execute}` re-imports that format as
+hidden drafts (`source_kind="infinitemarkets"`) without an additional currency
+field. Only the exporter's `'` escape prefix is stripped on re-import. Review
+and publish from Catalog; native and Shopify imports use the same draft workflow
+as legacy JSON imports. Existing import records are retained for provenance,
+not activation authorization.
 
 ### 13.2 Owned media ingest
 
@@ -1830,9 +1844,10 @@ pages load no third-party scripts.
 - **Release B** (full Gamma merchant): kind-10050 publication/discovery, NIP-17
   sender+receiver copies, type 1–4 messages, kind-17 receipts, egress controls, and
   external-client conformance.
-- **Release C** (migration): audited legacy JSON/Nostr/CSV import and scarce-stock
-  cutover rehearsal. Live NIP-15 30017/30018 publication and NIP-04 ordering
-  are not current release gates.
+- **Release C** (catalog portability): merchant-scoped CSV/JSON import into hidden
+  drafts, product preview/edit, ordinary publication, export and optional managed
+  media relink. No old-invoice reconciliation or cutover rehearsal is claimed.
+  NIP-15/NIP-04 ordering interop is not a Release-C gate.
 
 ---
 
@@ -1928,9 +1943,10 @@ revisit only through a spec revision.
     use a URL fragment removed immediately; API requests use a redacted header (§5.4).
 18. **Third-party shipping.** Rejected in v1 because mutable third-party pricing cannot
     be quoted authoritatively; only same-merchant FK-backed references are accepted.
-19. **Migration single-writer.** A new key is identity separation, not inventory
-    separation. Every migration freezes old intake and reconciles or partitions every
-    still-payable inventory liability before imported stock becomes sellable (§13).
+19. **Catalog import boundary.** Importing does not transfer old orders, invoices,
+    or stock authority. Products are hidden drafts until merchant publication, but
+    the extension does not verify another store's outstanding sales. Operators must
+    independently avoid selling the same physical stock on two systems (§13).
 20. **Collection ambiguity.** Every published product belongs to at least one 30405
     collection, satisfying the pinned Gamma required-component interpretation (§6.1).
 21. **Email transport.** v1 uses host SMTP and interprets `send_email` only as boolean
@@ -1998,10 +2014,10 @@ extension.
 Release A reruns applicable host/domain/security assertions through the real category and product services,
 checkout, settlement, worker and notification implementation. Release B additionally
 requires deployed SSRF/egress controls, recipient-gated relay evidence, and an independent
-Gamma client flow. Release C requires an audited legacy import and a cutover
-rehearsal with an old payable invoice against scarce stock; live NIP-15 fixture
-publication is not a release gate. Release-B/C evidence is not a prerequisite
-for Release A.
+Gamma client flow. Release C verifies file-only catalog imports as hidden
+drafts, ordinary merchant-controlled publication, export, and media handling;
+no previous-order reconciliation or cutover rehearsal is a release gate.
+Release-B/C evidence is not a prerequisite for Release A.
 
 Recommended OpenGSD sequence in the implementation repository:
 

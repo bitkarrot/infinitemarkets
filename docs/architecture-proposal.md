@@ -2,7 +2,7 @@
 
 ## Architecture and Implementation Proposal
 
-**Status:** Historical supporting rationale; current category schema and Release C scope are defined by `technical-specification.md` and `.planning/REQUIREMENTS.md`
+**Status:** Historical supporting rationale; superseded migration sketches are not extension behavior. Current catalog-only draft import and merchant publication are defined by `technical-specification.md` §13 and `.planning/REQUIREMENTS.md`; no cutover, old-order reconciliation, or physical-count workflow exists.
 **Extension ID:** `infinitemarkets`
 **Implementation:** Standard Python LNbits extension
 **Primary protocol:** Infinitemarkets marketplace protocol
@@ -40,7 +40,7 @@ The new extension will:
 4. Accept both Infinitemarkets NIP-17 orders and legacy NIP-15 NIP-04 orders.
 5. Use LNbits wallets to create Lightning invoices and LNbits payment events as the authoritative source of payment settlement.
 6. Maintain durable Nostr subscriptions and relay reconnection through Python background tasks.
-7. Support migration from an existing `nostrmarket` catalog without allowing two extensions to remain simultaneous inventory authorities.
+7. Import product catalogs as drafts from supported files and let merchants review and publish them; coordination with another store's inventory is outside this extension.
 8. Keep payment, transport, signing, and storage behind interfaces so the protocol core can later run outside LNbits or be partly compiled to WASM.
 
 The extension will be a new commerce system, not a thin NIP-99 publisher. The distinction matters because Infinitemarkets includes merchant preferences, collections, shipping, encrypted order communication, payment requests, payment receipts, and order-status messages in addition to product listings.
@@ -276,7 +276,7 @@ When Infinitemarkets and NIP-15 differ, the internal model should preserve the r
 
 ### 5.3 Exactly one writer per catalog
 
-One extension must own inventory, invoice creation, and publication for a merchant catalog. Migration from `nostrmarket` must include an explicit cutover.
+Within Infinite Markets, one extension owns inventory and invoice creation for its published catalog. Imports from any source are hidden drafts until merchant review and explicit publication; the extension does not coordinate an old storefront's stock or invoices.
 
 ### 5.4 Payment truth comes from LNbits
 
@@ -1180,73 +1180,58 @@ Public order lookups use high-entropy, revocable tokens in a redacted header, ne
 request path or query. The magic link uses `/infinitemarkets/order#<token>`; page code
 removes the fragment before polling.
 
-### 19.5 Migration routes
+### 19.5 Catalog import routes
 
 ```text
-POST   /infinitemarkets/api/v1/import/nostrmarket/preview
-POST   /infinitemarkets/api/v1/import/nostrmarket/execute
-POST   /infinitemarkets/api/v1/import/nostr/preview
-POST   /infinitemarkets/api/v1/import/nostr/execute
-GET    /infinitemarkets/api/v1/import/{job_id}
+POST   /infinitemarkets/api/v1/migration/shopify/{preview,execute}
+POST   /infinitemarkets/api/v1/migration/native/{preview,execute}
+POST   /infinitemarkets/api/v1/migration/legacy/{nostrmarket|nip15_events}/{preview,execute}
+GET    /infinitemarkets/api/v1/migration/imports
+GET    /infinitemarkets/api/v1/migration/imports/{import_id}
+GET    /infinitemarkets/api/v1/migration/products/export
 ```
 
-Migration must separate preview, validation, execution, and cutover confirmation.
+Uploads are authenticated multipart file submissions, not server-side fetches or
+cross-extension database reads. Preview and execute bind to a catalog fingerprint;
+only execute creates hidden drafts. Import history records provenance, not
+publication authorization.
 
 ---
 
-## 20. Migration from `nostrmarket`
+## 20. Catalog import and publication
 
-### 20.1 Migration strategies
+### 20.1 Sources
 
-#### Strategy A: Local migration API
+Shopify CSV, native Infinite Markets CSV, nostrmarket JSON catalog, and signed
+NIP-15 event dumps are supported as local files. The importer reads product
+records only; old orders and payment state are neither migrated nor used to
+gate sales. Shopify requires a currency choice; JSON can supply one itself or
+request a selection when absent. Native CSV contains currency per product.
+Optional advanced controls cover source identifiers and Shopify column mapping.
+Merchant keys and wallet ownership are not imported from another extension.
 
-Add or use a read-only export path capable of returning:
-
-- merchant public profile;
-- stalls;
-- products;
-- zones;
-- quantities;
-- event IDs and timestamps.
-
-Private keys should not be returned through a general catalog export. Key import must be a separate explicit operation.
-
-#### Strategy B: Nostr reconstruction
-
-Subscribe to the merchant's published kinds `0`, `30017`, and `30018`, then reconstruct the public catalog. This cannot recover unpublished products, local order history, wallet assignments, or private keys.
-
-#### Strategy C: JSON export/import
-
-Provide an explicit export file from `nostrmarket` and import it into the new extension. This is operationally simple and keeps cross-extension runtime coupling low.
-
-### 20.2 Recommended migration flow
+### 20.2 Merchant workflow
 
 ```mermaid
-flowchart TB
-    Export[Read old catalog]
-    Preview[Validate and preview mapping]
-    Resolve[Resolve IDs, wallet and key strategy]
-    Import[Import canonical records]
-    DryRun[Build and validate all protocol events]
-    Cutover{Merchant confirms cutover}
-    Publish[Publish Gamma and NIP-15 events]
-    Disable[Disable old merchant publication]
-
-    Export --> Preview --> Resolve --> Import --> DryRun --> Cutover
-    Cutover -->|Confirm| Publish --> Disable
-    Cutover -->|Cancel| Preview
+flowchart LR
+    File[Upload CSV or JSON] --> Preview[Preview catalog]
+    Preview --> Import[Import hidden drafts]
+    Import --> Review[Review and edit in Catalog]
+    Review --> Publish[Merchant publishes approved products]
 ```
 
-### 20.3 Single-writer rule
+A variable product is one parent with child options; publishing an imported
+parent through Catalog also publishes its imported draft options. Drafts and
+hidden products are not publicly sellable. Normal checkout reservation,
+settlement, and stock enforcement apply once published.
 
-Every key strategy requires an inventory-authority cutover. Freeze old new-order intake,
-inventory all old nonterminal orders and still-payable invoices, and wait/reconcile them
-or reserve/partition equivalent `legacy_liability_qty` before imported stock becomes
-sellable. A new merchant pubkey separates identity, not physical inventory. Old
-settlement handling remains active for already-issued invoices while new old-system
-orders stay disabled; released liability moves through an audited adjustment. Parallel
-operation is safe only for explicitly partitioned inventory. A warning alone is
-insufficient when two extensions can allocate the same unit.
+### 20.3 Old storefront boundary
+
+The extension provides no cutover, invoice reconciliation, attestation, or
+physical stock-count workflow. Import and publication do not disable the old
+store or establish that its invoices cannot settle. An operator who uses the
+same physical inventory in both systems must manage that risk outside the
+extension before publishing products.
 
 ---
 
@@ -1452,7 +1437,7 @@ Deliverables:
 - Execute SDK security, FFI, NIP-44/NIP-59, targeted ACK and ephemeral external-smoke probes from technical specification §22.
 - Build valid/invalid event fixtures, literal NIP-15 DTOs, and executable state/schema recovery models.
 - Qualify host invoice/listener/task/transaction/SMTP/auth/audit/FX boundaries on SQLite and the claimed PostgreSQL topology.
-- Freeze `infinitemarkets` identifiers, reverse-domain labels, release-scoped claims, and migration-liability procedure.
+- Freeze `infinitemarkets` identifiers, reverse-domain labels, release-scoped claims, and the catalog import/draft publication boundary.
 
 Acceptance criteria:
 
@@ -1617,26 +1602,26 @@ Acceptance criteria:
 - Responses use the order's originating protocol.
 - NIP-15 paid/shipped projection reflects richer internal states correctly.
 
-### Phase 8: Migration from `nostrmarket`
+### Phase 8: Catalog import (revised scope)
 
-**Objective:** Move existing merchants without address or inventory corruption.
+**Objective:** Let merchants review products from supported CSV/JSON files before
+publishing them through the ordinary catalog workflow.
 
 Deliverables:
 
-- JSON/local API/Nostr import preview.
-- Merchant, stall, product, zone, ID, and quantity mapping.
-- Wallet selection validation.
-- Separate key import decision.
-- Dry-run event generation.
-- Explicit cutover confirmation.
-- Detection and warning/blocking of duplicate active writers where possible.
+- Merchant-scoped file preview and catalog fingerprint.
+- Shopify CSV, native CSV, nostrmarket JSON, and signed NIP-15 event parsing.
+- Hidden drafts with parent/variation relationships and optional media relink.
+- Catalog editing and explicit publication, plus export and import history.
 
 Acceptance criteria:
 
-- Existing product IDs remain stable unless the preview identifies a collision.
-- No wallet or private key changes occur without explicit confirmation.
-- Imported products publish valid Gamma and NIP-15 events.
-- The migration procedure defines how the old merchant is deactivated.
+- Existing product handles are mapped or rejected on collision; wallet keys,
+  invoices and previous orders are never imported.
+- A draft or hidden imported product cannot be bought until the merchant
+  publishes it; normal stock reservation and settlement remain in force.
+- Old-store deactivation and inventory coordination are not provided by the
+  extension. The operator must manage overlapping physical inventory externally.
 
 ### Phase 9: Operational and security readiness
 
@@ -1784,7 +1769,7 @@ The normative choices are frozen in `technical-specification.md` §21. In summar
 7. Late payment/cancellation and refund attestation follow the explicit manual exception machine.
 8. SQLite is single-process; PostgreSQL is the multi-worker target; both claimed profiles require Phase 0 transaction/fencing evidence.
 9. NIP-89 uses the declared local 30402 naddr handler.
-10. Migration safety is based on inventory liabilities and a single writer, never merely a new key.
+10. Catalog import produces hidden drafts; the merchant reviews and publishes them. No old-store inventory or invoice safety claim is made.
 
 Anything still requiring measurement—SDK binaries, float-boundary precision, host audit settings, egress enforcement, external-client interoperability—is an explicit acceptance gate, not an implementation-time design choice.
 
@@ -1803,7 +1788,7 @@ The project is successful when an LNbits merchant can:
 7. Confirm settlement from LNbits and publish the correct order and stock updates.
 8. Receive a NIP-15 order through the compatibility channel against the same inventory.
 9. Inspect relay delivery, payment, reservation, and order state without reading logs.
-10. Migrate an existing `nostrmarket` catalog with stable IDs and an explicit single-writer cutover.
+10. Upload a supported product catalog, review hidden drafts, and explicitly publish approved products without an extension-managed old-store transition.
 
 The implementation is not complete merely because it publishes kinds `30402`, `30405`, and `30406`. Completion requires merchant preferences, encrypted order communication, reliable settlement, inventory safety, NIP-15 compatibility behavior, and tested cross-client interoperability.
 

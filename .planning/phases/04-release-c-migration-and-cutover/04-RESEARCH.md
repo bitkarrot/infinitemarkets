@@ -1,5 +1,7 @@
 # Phase 4: Release C — Migration and Cutover — Research
 
+**Historical research, superseded 2026-10-08:** Current behavior is catalog-only CSV/JSON import as hidden drafts, review and ordinary publication; no old-order/cutover workflow exists. Source findings below are preserved as historical evidence, not instructions. See `docs/technical-specification.md` §13.
+
 **Gathered:** 2026-10-07 · verified against the codebase, not recalled
 
 ## Verified schema facts

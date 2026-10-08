@@ -60,12 +60,17 @@
       },
       gmMigrationKindChanged: function () {
         this.gmMigration.file = null;
+        this.gmMigration.currency = "";
         this.gmMigration.preview = null;
+        this.gmMigration.result = null;
         this.gmMigration.selections = {};
         this.gmMigration.selectionDirty = false;
       },
       gmMigrationFileChanged: function (event) {
         this.gmMigration.file = event.target.files[0] || null;
+        if (this.gmMigration.sourceKind !== "shopify") {
+          this.gmMigration.currency = "";
+        }
         this.gmMigration.preview = null;
         this.gmMigration.result = null;
         this.gmMigration.selections = {};
@@ -94,10 +99,12 @@
         try {
           var form = new FormData();
           form.append("file", state.file);
-          if (state.sourceKind !== "infinitemarkets") {
-            if (!state.currency || !state.currency.trim()) {
-              throw new Error("Select the currency used in this catalog.");
-            }
+          if (state.sourceKind === "shopify" &&
+              (!state.currency || !state.currency.trim())) {
+            throw new Error("Select the currency used in this catalog.");
+          }
+          if (state.sourceKind !== "infinitemarkets" && state.currency &&
+              state.currency.trim()) {
             form.append("currency", state.currency.trim().toUpperCase());
           }
           if (state.sourceInstance.trim()) {

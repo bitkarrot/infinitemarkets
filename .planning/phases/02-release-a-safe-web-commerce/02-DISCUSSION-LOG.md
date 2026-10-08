@@ -71,5 +71,5 @@ Discussion therefore focused on execution approach, not scope.
 ## Deferred Ideas
 
 - NIP-17 intake / kind-10050 / NIP-42 / egress controls → Phase 3 (Release B).
-- NIP-15/NIP-04 literal interop, nostrmarket migration, cutover → Phase 4 (Release C).
+- Historical Phase-2 discussion of NIP-15/NIP-04 interop and cutover → Phase 4 (Release C); superseded by catalog-only draft import and merchant publication, with no old-order workflow.
 - NIP-37 drafts, preorders/subscriptions, automated refunds, multi-shop, transport adapters — per spec decisions.

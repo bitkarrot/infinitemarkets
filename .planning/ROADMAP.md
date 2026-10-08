@@ -2,7 +2,7 @@
 
 ## Overview
 
-The project advances through four gated vertical stages. GSD Phase 1 executes the normative contract's Phase 0 conformance profile without production runtime code. Phase 2 delivers safe Gamma/NIP-99 catalog publication and LNbits-backed web commerce. Phase 3 adds private Gamma NIP-17 orders after the commerce core is stable. Phase 4 adds import-only catalog migration and a verified, inventory-liability-safe cutover boundary; live NIP-15/NIP-04 interop is out of scope.
+The project advances through four gated vertical stages. GSD Phase 1 executes the normative contract's Phase 0 conformance profile without production runtime code. Phase 2 delivers safe Gamma/NIP-99 catalog publication and LNbits-backed web commerce. Phase 3 adds private Gamma NIP-17 orders after the commerce core is stable. Phase 4 adds file-based catalog import/export into hidden drafts for merchant review and ordinary publication; no old-order reconciliation or cutover is provided.
 
 ## Phases
 
@@ -15,7 +15,7 @@ The project advances through four gated vertical stages. GSD Phase 1 executes th
 - [x] **Phase 1: Conformance Profile (Contract Phase 0)** - Prove host, SDK, schema, state, security, and protocol assumptions before runtime implementation. (completed 2026-09-20)
 - [x] **Phase 2: Release A — Safe Web Commerce** - Ship catalog publication and LNbits-backed public checkout as the first production vertical slice. (completed 2026-09-27)
 - [x] **Phase 3: Release B — Gamma NIP-17 Orders** - Add encrypted recipient-specific Gamma order messaging and external-client conformance. (completed 2026-09-29)
-- [ ] **Phase 4: Release C — Migration and Cutover** - Import existing catalogs as drafts and verify old-invoice liabilities before releasing imported stock; no live legacy-protocol interop.
+- [ ] **Phase 4: Release C — Catalog Import and Export** - Import file-based catalogs as hidden drafts for merchant review and publication; no extension-managed cutover.
 
 ## Phase Details
 
@@ -148,27 +148,28 @@ Plans:
 
 - [x] 03.1-03: two-method modal + widened render gate + profile link cards + orders note + /_e2e/mailbox harness + buyer e2e flows
 
-### Phase 4: Release C — Migration and Cutover
+### Phase 4: Release C — Catalog Import and Export
 
-**Goal:** Merchants can import existing catalogs and migrate onto the canonical commerce model without turning legacy payable invoices into duplicate stock allocation — live legacy-protocol interop is out of scope.
+**Goal:** Merchants upload product files, preview them, review hidden drafts in Catalog and publish only approved products through the normal workflow. No old-store order or invoice status is consulted.
 **Mode:** mvp
 **Depends on:** Phase 3
-**Requirements:** LEG-03, LEG-04, LEG-05, LEG-06
+**Requirements:** LEG-03, LEG-06 (LEG-04/05 dropped)
 **Success Criteria** (what must be TRUE):
 
-1. Merchant can preview, validate, dry-run, execute, and audit file-only imports into blocked drafts without arbitrary fetch/database access or secret leakage; classic/new Shopify CSV formats, variants, image-only rows, missing stock and >20 images are handled explicitly.
-2. Merchant can export a safe, round-trippable product CSV; an optional, verified merchant-uploaded media stage can relink CDN URLs to owned files without fetching arbitrary URLs or requiring Blossom. This shop can opt into a compact dark gallery profile based on archived screenshots without changing Lightning checkout or other merchants' themes.
-3. For a verifiable source, cutover requires externally disabled old intake, complete authoritative post-freeze invoice evidence, and either verified terminal status or a durable partition for every still-payable legacy liability; unknown/unverifiable sources stay blocked, regardless of key strategy.
-4. A scarce-stock rehearsal proves both the web/Gamma freeze guard and the shared conditional stock writer (under real contention) prevent a payable old invoice and a new order from allocating the same physical unit. No unsupported external-source cutover is claimed.
+1. Merchant can preview and execute bounded CSV/JSON file imports without arbitrary fetch/database access or secret leakage; Shopify variants and image-only rows are supported, and imported products remain hidden drafts until the merchant publishes them.
+2. Merchant can export a round-trippable product CSV and optionally upload/relink owned media; currency is requested only for formats without currency, and source identifiers/Shopify mapping are optional.
+3. Variable parents and imported draft options become visible together on approval; normal checkout stock reservation, publication and settlement still enforce local inventory safety.
+4. Documentation clearly states the extension does not inspect old orders or offer cutover, attestation, old-store freeze, or a physical-count activation gate. Operators handle any overlapping old-store stock independently.
 
-**Plans:** 4 plans
+**Plans:** Historical plan files remain in `.planning/phases/04-release-c-migration-and-cutover/` as execution records. Their cutover designs are superseded by the catalog-only scope.
 
 Plans:
 
-- [x] 04-01: File-only import preview/validation/dry-run/execute/audit, persisted CSV mapping and signed provisional import commitment; nostrmarket JSON/Nostr events + classic/modern Shopify CSV land as blocked drafts (no image fetch, unknown stock=0)
-- [ ] 04-02: Verified old-intake freeze and complete invoice snapshot for a supported same-instance source; per-invoice wait/partition/terminal reconciliation, durable holds and guarded activation (unverifiable external sources stay drafts)
-- [ ] 04-03: Merchant product CSV export, opt-in owned-media upload/relink, and merchant-configurable compact dark storefront profile without changing checkout
-- [ ] 04-04: Scarce-stock two-part rehearsal, export/media/visual verification and evidence-backed Release-C gate
+- [x] 04-01: File-only catalog preview, import records, Shopify/JSON/native parsing and signed commitment; current behavior creates ordinary hidden drafts.
+- [x] 04-02: Historical cutover implementation, subsequently removed; not a current phase gate.
+- [x] 04-03: Product CSV export, media upload/relink, storefront profile and native CSV reimport.
+- [x] 04-04: Superseded rehearsal plan; no longer a current release criterion.
+- [ ] Current closeout: verify reviewed catalog-only workflow, tests and live deployment without publishing imported products.
 
 ## Progress
 
@@ -180,4 +181,4 @@ Plans:
 | 2. Release A — Safe Web Commerce | 4/4 | Complete    | 2026-09-27 |
 | 3. Release B — Gamma NIP-17 Orders | 4/4 | Complete    | 2026-09-29 |
 | 03.1. Buyer accounts (INSERTED) | 3/3 | Complete   | 2026-10-05 |
-| 4. Release C — Migration and Cutover | 1/4 | In progress | - |
+| 4. Release C — Catalog Import and Export | Catalog workflow implemented; closeout pending | In progress | - |

@@ -997,7 +997,8 @@
           <q-select v-if="gmMigration.sourceKind !== 'infinitemarkets'"
                     v-model="gmMigration.currency" outlined dense use-input fill-input
                     hide-selected clearable new-value-mode="add-unique" input-debounce="0"
-                    label="Currency used in the file" hint="Select the price currency before previewing; Shopify files do not include one."
+                    :label="gmMigration.sourceKind === 'shopify' ? 'Currency (required)' : 'Currency (if not in file)'"
+                    :hint="gmMigration.sourceKind === 'shopify' ? 'Shopify CSV does not include a currency.' : 'Leave blank to use the currency in the JSON file.'"
                     :options="['SAT', 'USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CHF', 'BRL', 'MXN', 'INR', 'KRW', 'PLN', 'SEK', 'NOK', 'DKK', 'NZD', 'SGD', 'HKD', 'ZAR']"
                     @update:model-value="gmMigration.selectionDirty = true"
                     class="q-mb-md"></q-select>

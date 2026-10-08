@@ -84,7 +84,7 @@
 - Paid-relay subscription/expiry tracking beyond re-prompt-on-rejection.
 - nostrrelay formal qualification (reference deployment only).
 - Real-sats conformance payment.
-- NIP-15/NIP-04 literal interop, nostrmarket migration, cutover rehearsal — Release C (Phase 4).
+- Historical Phase-3 forecast of NIP-15/NIP-04 interop and cutover rehearsal for Release C — superseded: current Phase 4 is file-only catalog import as hidden drafts, merchant review and normal publication, with no old-order audit.
 - NIP-37 draft sync, subscriptions/preorders, automated refunds, transport adapters — v2 per STATE.md deferred table.
 </user_constraints>
 

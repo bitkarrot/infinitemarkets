@@ -1,11 +1,9 @@
 # infinitemarkets — Architecture Overview (as built)
 
-**Status:** Implementation-state document — now covers Releases A and B plus the post-03.1 surfaces in section 4. It describes what is
-actually wired today. `technical-specification.md` remains the normative
-contract — where the two differ, the spec describes the target and this file
-describes the current build. Items marked *Release B/C* are planned surfaces
-whose schema or configuration already exists but whose behavior is not yet
-implemented.
+**Status:** Implementation-state document covering Releases A/B and catalog
+import/export. `technical-specification.md` is the normative contract. Imported
+products are hidden drafts until explicitly published from Catalog; the
+extension has no cutover or old-order reconciliation workflow.
 
 ## 1. Component diagram
 
@@ -99,7 +97,7 @@ in the Publications admin tab; relay delivery is never treated as state truth.
 | `0` | Merchant profile (name, about, picture) | profile save |
 | `31990` | NIP-89 handler info — tells clients this merchant serves `/p/{naddr}` product pages | publish |
 | `5` | Tombstone / deletion request | product/collection/shipping delete |
-| `30017` / `30018` | Literal NIP-15 stall + product | *Release C* — builders exist, not emitted yet |
+| `30017` / `30018` | Optional NIP-15 stall + product projection | Only when a category has NIP-15 publication enabled and the merchant republishes |
 | `1059` (inbound) | NIP-17 gift-wrapped buyer orders | **Live (Release B)** — the inbox listener maintains cursors in `inbox_events` on `direction=inbox|both` relays |
 
 **What's never exposed:** orders, invoices, buyers' data, or internal state.
@@ -115,6 +113,14 @@ signed NIP-99 events to relays. The database is authoritative; relay events
 are projections of it. Nostr clients read the relay copies; buyers read the
 public pages/API, which serve public-safe projections (`nip89.py` filters out
 draft, hidden, deleted, and merchant-internal fields — never raw rows).
+
+**Catalog import.** `migration_import.py` validates local CSV/JSON uploads and
+creates merchant-scoped hidden drafts with a signed import record. Prior orders
+and invoice status are ignored. The admin Migration tab previews file content;
+Catalog offers draft-page preview, editing, and ordinary publication. Imported
+variable products publish their draft options with the parent. No cutover or
+physical-count workflow runs; existing cutover schema is retained only for
+older databases.
 
 **Orders.** Buyer checks out on the public product page → `checkout.py`
 reserves inventory inside a transaction → calls LNbits `create_invoice`

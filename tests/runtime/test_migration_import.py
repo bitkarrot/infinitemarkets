@@ -480,7 +480,7 @@ async def test_imported_drafts_publish_after_review(runtime_env):
     }
     legacy_data = json.dumps(legacy).encode()
     legacy_api = "/infinitemarkets/api/v1/migration/legacy/nostrmarket"
-    legacy_form = {"currency": "USD", "source_instance": "old-store"}
+    legacy_form = {"source_instance": "old-store"}
     legacy_upload = {"file": ("legacy.json", legacy_data, "application/json")}
     first = await client.post(
         f"{legacy_api}/preview", data=legacy_form, files=legacy_upload, headers=headers
@@ -488,11 +488,35 @@ async def test_imported_drafts_publish_after_review(runtime_env):
     assert first.status_code == 200, first.text
     assert first.json()["liabilities"] == []
     assert "buyer@example.com" not in first.text and "b" * 64 not in first.text
+    legacy["orders"][0]["paid"] = False
+    legacy["orders"][0]["secret"] = "ignored"
+    changed_orders = json.dumps(legacy).encode()
+    same_catalog = await client.post(
+        f"{legacy_api}/preview", data=legacy_form,
+        files={"file": ("legacy.json", changed_orders, "application/json")},
+        headers=headers,
+    )
+    assert same_catalog.status_code == 200, same_catalog.text
+    assert same_catalog.json()["source_hash"] == first.json()["source_hash"]
     legacy_form["source_hash"] = first.json()["source_hash"]
     imported = await client.post(
         f"{legacy_api}/execute", data=legacy_form, files=legacy_upload, headers=headers
     )
     assert imported.status_code == 200, imported.text
+    repeated_legacy = await client.post(
+        f"{legacy_api}/execute", data=legacy_form,
+        files={"file": ("legacy.json", changed_orders, "application/json")},
+        headers=headers,
+    )
+    assert repeated_legacy.status_code == 200, repeated_legacy.text
+    assert repeated_legacy.json()["already_imported"]
+    legacy["stalls"][0].pop("currency")
+    missing_currency = await client.post(
+        f"{legacy_api}/preview", data={"source_instance": "old-store"},
+        files={"file": ("legacy.json", json.dumps(legacy).encode(), "application/json")},
+        headers=headers,
+    )
+    assert missing_currency.status_code == 422
     audited = await client.get(
         f"/infinitemarkets/api/v1/migration/imports/{imported.json()['import_id']}"
     )

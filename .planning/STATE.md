@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 current_phase: 04
-current_phase_name: Release C — Migration and Cutover
+current_phase_name: Release C — Catalog Import and Export
 status: in_progress
-stopped_at: Phase 4 plan 04-02 complete pending hardening — liability dispositions, leased reconcile pass, reactivation re-block, and explicit physical-count activation gate all implemented and tested under SQLite. 04-03 export/media + storefront styling next
-last_updated: "2026-10-07T21:00:00Z"
-last_activity: 2026-10-07
-last_activity_desc: 04-02 liability partitions and exactly-once paid/unpaid terminal transitions implemented; complete releases imported products via a shared epoch-state predicate; abort re-drafts and retains holds; leased cutover_reconcile_pass re-checks open liabilities and re-blocks on source reactivation or contract drift
+stopped_at: Catalog-only import reviewed; documentation and live deployment verification pending
+last_updated: "2026-10-08"
+last_activity: 2026-10-08
+last_activity_desc: Removed cutover and physical-count workflow; CSV/JSON catalogs import as hidden drafts, old order status is ignored, publication uses ordinary Catalog actions
 progress:
   total_phases: 5
   completed_phases: 4
@@ -24,13 +24,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-20)
 
 **Core value:** A merchant can sell one authoritative inventory safely through LNbits-backed web and Nostr flows without duplicate invoices, double allocation, or relay delivery being mistaken for payment truth.
-**Current focus:** Phase 4 — Release C: Migration and Cutover (04-01 import verified; 04-02 evidence-backed cutover next; 04-03/04 pending)
+**Current focus:** Phase 4 — Release C: catalog-only CSV/JSON import/export, merchant review of hidden drafts, and normal Catalog publication; no cutover.
 
 ## Current Position
 
-Phase: 4 (Release C — Migration and Cutover) — IN PROGRESS (04-01 complete; 04-02 core lifecycle implemented, hardening + remaining negative cases pending; 04-03/04 next)
-Status: Phases 1, 2, 3 and 03.1 all complete; Phase 3 release gate verified (one operator-deferred item in 03-UAT: live plebeian.market smoke)
-Last activity: 2026-10-07 — source fingerprint contract and fail-closed gates tested locally; demo PNGs tracked to survive release packaging; no live deployment or cutover authorization
+Phase: 4 (Release C — Catalog Import and Export) — IN PROGRESS (code reviewed locally; documentation and deployment verification pending)
+Status: Phases 1, 2, 3 and 03.1 complete; Phase 4 legacy freeze/reconciliation plans superseded by the catalog-only workflow
+Last activity: 2026-10-08 — simplified imports committed locally; no live deployment of the simplified behavior yet
 
 Progress: [████████░░] 80% of roadmap phases (4/5)
 
@@ -75,7 +75,7 @@ Decisions are logged in PROJECT.md and the normative specification.
 - Runtime identity is `infinitemarkets`.
 - Direct qualified `nostr-sdk` is the baseline; other relay extensions are unqualified adapter candidates.
 - GSD Phase 1 is the contract's Phase 0 evidence gate; it contains no production runtime implementation.
-- Release order is A web commerce, B Gamma NIP-17, C legacy interop/migration.
+- Release order is A web commerce, B Gamma NIP-17, C catalog import/export with drafts; no old-system migration gate.
 - Checkout preserves Editorial/Guided/Compact merchant presets with responsive mobile fallback and invariant payment semantics.
 - Merchant order operations use a split list/detail workspace with embedded chronology.
 - Public themes use preset, Brand Basics, and guarded Advanced Tokens tiers; admin styling stays host-controlled.
@@ -102,14 +102,14 @@ Decisions are logged in PROJECT.md and the normative specification.
 - Phase 2 has no remaining blocker. Typography/spacing token consolidation and durable visual snapshot baselines are non-blocking UI recommendations in `02-UI-REVIEW.md`.
 - The new demo uses a fresh disposable database rather than migrating old demo orders and the previously hand-added images. If those records must remain visible, the old database requires a separate recovery plan.
 - Release B cannot claim production readiness without deployed egress controls and external-client evidence.
-- Release C requires a live scarce-stock payable-invoice cutover rehearsal.
-- 04-02 cutover lifecycle implemented and hardened: instance-wide disable + restart attestation, source-contract hash, signed snapshot, per-liability wait/partition/reconcile, completion gate, physical-count activation, abort retaining holds, leased reconcile pass. Adversarial negatives (tampered snapshot, foreign/unowned wallet, missing/extra invoices) pass on SQLite AND PostgreSQL (docker postgres:18); real installed nostrmarket source evidence verified at contract hash 24759dc4.
-- 04-03 implemented: merchant product CSV export (`infinitemarkets-products-v1`) + bounded native reimport as blocked drafts; attested activation (signed attestation → complete epoch) for zero-liability non-nostrmarket imports, stock-count gate still required; owned-media ingest (manifest+sha256 upload into host data folder, audited relink); lightnin-dark preset + storefront tier (quad grid, hero_hidden, footer logo). Remaining: live scarce-stock rehearsal (04-04), then release gate + push.
+- Release C no longer provides cutover, stock-count activation, or reconciliation of old invoices. Prior 04-02 implementation and 04-04 rehearsal documents are historical records, not current release gates.
+- CSV/JSON catalogs import as hidden drafts; merchant review/publication is explicit. Normal local stock and settlement checks still apply, but merchants must avoid selling the same physical units on an old store independently.
+- Product CSV export, native reimport, managed media upload/relink, and storefront profile controls are implemented. Current closeout: review final docs, run verification, and deploy the approved simplified extension without publishing products.
 
 ### Roadmap Evolution
 
 - Phase 03.1 inserted after Phase 3: Buyer accounts — email magic-link sign-in and Nostr identity linking
-- Phase 4 edited: scope amended to import-only: LEG-01/LEG-02 (NIP-15 projections + NIP-04 legacy messaging) dropped; Phase 4 renamed Release C — Migration and Cutover
+- Phase 4 revised: LEG-01/02 and old-system cutover LEG-04/05 dropped; active LEG-03/06 cover catalog-only file import/export, hidden draft review and normal publication.
 
 ## Deferred Items
 
@@ -121,6 +121,6 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 ## Session Continuity
 
-Last session: 2026-10-07T22:30:00.000Z
-Stopped at: Phase 4 04-03 implemented and committed (export, native reimport, attested activation, owned media, storefront profile); 04-04 scarce-stock rehearsal pending
-Resume file: .planning/phases/04-release-c-migration-and-cutover/04-04-PLAN.md
+Last session: 2026-10-08
+Stopped at: Catalog-only import implementation locally committed; reviewed fingerprint handling and documenting removal of old cutover before approved live deployment
+Resume file: .planning/ROADMAP.md

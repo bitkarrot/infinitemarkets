@@ -579,26 +579,20 @@ def preview_legacy_import(
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", source_instance):
         raise ValueError("invalid source instance")
     normalized = parse_legacy_catalog(data, source_kind=source_kind, currency=currency)
-    key = ext_settings().privacy_key
-    liabilities = [
-        {"invoice_hash": crypto.hmac_index(key, "legacy-invoice", merchant_id,
-                                            row["invoice_id"]),
-         "order_hash": crypto.hmac_index(key, "legacy-order", merchant_id,
-                                          row["order_id"]),
-         "product_legacy_id": row["product_legacy_id"], "quantity": row["quantity"],
-         "status": "unverified"}
-        for row in normalized["liabilities"]
-    ]
+    catalog_json = json.dumps(
+        sorted(normalized["products"], key=lambda item: item["handle"]),
+        sort_keys=True, separators=(",", ":"),
+    )
     source_hash = crypto.hmac_index(
-        key, "legacy-source", merchant_id,
+        ext_settings().privacy_key, "legacy-catalog", merchant_id,
         hashlib.sha256(
             source_kind.encode() + b"\0" + source_instance.encode() + b"\0"
-            + currency.encode() + b"\0" + data
+            + currency.encode() + b"\0" + catalog_json.encode()
         ).hexdigest(),
     )
     return {"source_hash": source_hash, "source_instance": source_instance,
             "source_kind": source_kind, "products": normalized["products"],
-            "liabilities": liabilities, "source_completeness": "unknown"}
+            "liabilities": [], "source_completeness": "unknown"}
 
 
 async def execute_shopify_import(
@@ -793,7 +787,7 @@ async def execute_catalog_import(
             "commitment_id": signed.id().to_hex()}
 
 
-def _bounded_json(data: bytes) -> object:
+def _bounded_json(data: bytes, *, catalog_only: bool = False) -> object:
     if len(data) > MAX_UPLOAD_BYTES:
         raise ValueError("legacy catalog exceeds upload limit")
     def unique_keys(pairs):
@@ -836,6 +830,8 @@ def _bounded_json(data: bytes) -> object:
             raise ValueError("legacy JSON string exceeds limit")
         elif isinstance(item, float) and (item != item or abs(item) == float("inf")):
             raise ValueError("invalid JSON number")
+    if catalog_only and isinstance(value, dict):
+        value.pop("orders", None)
     check(value)
     return value
 
@@ -870,6 +866,47 @@ def _legacy_currency(value: str, selected: str) -> str:
     if value and value != selected:
         raise ValueError("legacy source currency does not match selection")
     return selected
+
+
+def infer_legacy_currency(data: bytes, source_kind: str) -> str | None:
+    if source_kind == "nostrmarket":
+        source = _bounded_json(data, catalog_only=True)
+        if not isinstance(source, dict):
+            return None
+        stalls, products = source.get("stalls", []), source.get("products", [])
+        if not isinstance(stalls, list) or not isinstance(products, list):
+            return None
+        rows = stalls + products
+    elif source_kind == "nip15_events":
+        if data.lstrip().startswith(b"["):
+            entries = _bounded_json(data)
+        else:
+            lines = data.splitlines()
+            if len(lines) > MAX_ROWS:
+                raise ValueError("legacy event dump exceeds row limit")
+            entries = [_bounded_json(line) for line in lines if line.strip()]
+        if not isinstance(entries, list):
+            return None
+        rows = [_bounded_json(e["content"].encode()) for e in entries
+                if isinstance(e, dict) and e.get("kind") in (30017, 30018)
+                and isinstance(e.get("content"), str)]
+    else:
+        return None
+    found = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        config = row.get("config") or row.get("meta") or {}
+        if isinstance(config, str):
+            config = _bounded_json(config.encode())
+        value = row.get("currency") or (
+            config.get("currency") if isinstance(config, dict) else None
+        )
+        if isinstance(value, str) and value.strip():
+            found.add(value.upper())
+    if len(found) > 1:
+        raise ValueError("catalog contains multiple currencies")
+    return next(iter(found)) if found else None
 
 
 def parse_legacy_catalog(data: bytes, *, source_kind: str, currency: str) -> dict:
@@ -916,8 +953,8 @@ def parse_legacy_catalog(data: bytes, *, source_kind: str, currency: str) -> dic
                 raise ValueError(f"Legacy event row {event_index}: identity mismatch")
             (stalls if entry["kind"] == 30017 else products).append(content)
     else:
-        source = _bounded_json(data)
-        if not isinstance(source, dict) or set(source) - {"stalls", "products", "orders"}:
+        source = _bounded_json(data, catalog_only=True)
+        if not isinstance(source, dict) or set(source) - {"stalls", "products"}:
             raise ValueError("invalid nostrmarket export")
         stalls, products = (source.get(name, []) for name in ("stalls", "products"))
     if not all(isinstance(rows, list) and len(rows) <= MAX_ROWS

@@ -1,6 +1,6 @@
 ---
 name: shopify-migration
-description: Export a Shopify store (products, URLs, SEO fields, images, shipping profile) for migration into infinitemarkets, preserving Google-indexed URLs via a redirect map. Use when archiving a Shopify store, preparing a Shopify CSV import, mapping legacy product URLs, or planning an infinitemarkets cutover.
+description: Export Shopify products and media for CSV catalog import into Infinite Markets as hidden drafts; preserve indexed URLs via an external redirect map. Use when preparing a Shopify CSV import or reviewing a product catalog before publication.
 ---
 
 # Shopify → infinitemarkets migration export
@@ -62,12 +62,16 @@ the rendered page is the only record of what Google indexes.
   work is spec'd in `shopify-archive/SHOPIFY-IMPORT-PROPOSAL.md` (slug d_tags,
   `/infinitemarkets/legacy/{handle}` 301 route, meta/JSON-LD emission,
   sitemap, redirect export, shipping-profile import).
-- Edge rule for same-domain cutover:
+- Edge rule for moving a storefront domain (outside the extension):
   `^/products/([a-z0-9-]+)$ → 301 /infinitemarkets/legacy/$1`, deployed wherever
   the old domain's DNS lands. Keep 180+ days.
-- Import flow: admin UI or `POST /infinitemarkets/api/v1/migration/shopify/preview`
-  → `/execute`; products land as hidden drafts in an "Imported — review"
-  category for recategorization before publish.
+- Import flow: Migration tab → select Shopify CSV and currency → Preview products
+  → Import as drafts; or use `POST /infinitemarkets/api/v1/migration/shopify/preview`
+  then `/execute` with the preview hash. Products land as hidden drafts in an
+  "Imported — review" category. Review images, prices, size options and stock
+  in Catalog, then publish approved products normally. There is no attestation,
+  stock-count gate, or old-order reconciliation; the operator must ensure
+  overlapping old-store inventory is managed before publishing.
 
 ## Pitfalls
 
@@ -75,6 +79,6 @@ the rendered page is the only record of what Google indexes.
   fallback slugs (collision-safe: check `_check_d_tag` + merchant uniqueness).
 - Shopify serves the same product under `/collections/<c>/products/<handle>` —
   wildcard redirects must match the `/products/` segment anywhere in path.
-- Re-host images: rewrite og:image and JSON-LD image URLs before cutover.
+- Re-host images: rewrite og:image and JSON-LD image URLs before switching the external storefront domain.
 - Keep the old domain's redirects alive after Shopify closes — rules must live
   wherever DNS points next.

@@ -55,6 +55,12 @@ Screenshots are captured on a seeded demo instance; the Messages view shows a fi
 - Reversible order archiving, bulk product operations, order notifications over host SMTP
 - NIP-99 product and Gamma collection publication to public relays with durable per-relay outbox evidence
 
+### Catalog import and export
+- Upload Shopify CSV, native Infinite Markets CSV, nostrmarket JSON, or signed NIP-15 event dumps. Preview the file; select a currency only for Shopify CSV or JSON without one. Advanced source identifiers and Shopify mapping are optional.
+- Import creates **hidden drafts**. Review images, prices, stock and size options in Catalog (including draft-page preview); publish approved products there through normal product actions (set visibility to on-sale and clear draft). Publishing an imported variable parent also publishes its imported draft options.
+- Export a round-trippable product CSV; optional media upload/relink replaces remote image references with merchant-supplied, validated files.
+- There is **no cutover, attestation, physical-count gate or previous-order reconciliation**. Old order and payment status are ignored; the merchant must manage any overlapping inventory in the old store independently before publishing.
+
 ### Gamma Nostr orders (Release B)
 - **Kind-10050 inbox profile**: merchants publish declared inbox relays and activate only after reachability is proven
 - **NIP-17 encrypted ordering**: kind-16 order/payment/status messages and kind-17 receipts over gift-wrapped (kind-1059) transport

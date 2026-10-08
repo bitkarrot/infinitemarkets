@@ -14,7 +14,7 @@ These pitfalls are the corrected outcomes of the standalone Astra audit. They ar
 | Recipient dedupe collision | One queue row per event regardless of recipient | Include `recipient_hash` in uniqueness and create one row per address | 1 |
 | Broken NIP-89 link | Advertised naddr route is undeclared or fetches relay hints | Declare local naddr handler; validate kind/pubkey/d and ignore hints | 1/2 |
 | False NIP-15 compatibility | Wrong `specs`, missing `type`/`shipping_id`, opaque addresses accepted | Literal fixtures; reject unsupported physical orders before reservation | 1/4 |
-| New-key migration double-sale | New identity assumed to partition stock | Freeze old intake and reconcile/partition payable inventory liabilities | 1/4 |
+| Old/new store inventory overlap | Imported stock might also be for sale on an old store | Merchant manages old-store intake externally before publishing drafts; extension provides no cross-store reconciliation | 4 |
 | Durable-state gaps | Cursors, quota scope, leases, or validated inbox checkpoints are implicit | Map every checkpoint to schema and restart tests | 1 |
 | Host behavior assumed | CORS, shutdown, audit redaction, or callback durability treated as guaranteed | Enforce route/task behavior in extension and qualify deployment predicates | 1/2 |
 | FX drift/rounding | Cached float helper timestamped as fresh or truncated with `int` | Uncached provider call, explicit float boundary, Decimal mean/units/ceiling and provenance | 1/2 |
@@ -26,4 +26,4 @@ These pitfalls are the corrected outcomes of the standalone Astra audit. They ar
 
 - Do not start Release A if any P0-01–P0-14 criterion lacks evidence.
 - Do not claim Release B without deployed egress control and independent Gamma-client proof.
-- Do not claim Release C without literal legacy fixtures and a scarce-stock payable-invoice cutover rehearsal.
+- Do not claim Release C until catalog-only import/export, hidden-draft review and publication are verified; do not imply old-store invoices or inventory are checked.
