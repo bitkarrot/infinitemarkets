@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Diagram</title>
+<script>document.documentElement.dataset.theme = localStorage.getItem('imv-theme') || 'dark';</script>
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body class="viewer">
@@ -20,6 +21,7 @@
   <button id="fitw" title="Fit width — pan up/down">Fit W</button>
   <button id="fith" title="Fit height — pan left/right">Fit H</button>
   <button id="actual" title="Actual size">1:1</button>
+  <button id="themeBtn" title="Toggle dark / light">☀ Light</button>
   <button id="notesBtn" title="Toggle notes / long-form outline">Notes</button>
   <span id="zoomPct">100%</span>
 </div>

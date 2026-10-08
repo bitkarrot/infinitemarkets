@@ -1,29 +1,45 @@
 (function () {
+  const THEME_KEY = 'imv-theme';
   const id = new URLSearchParams(location.search).get('d') || window.DIAGRAMS[0].id;
+  let d = null;
+
   const s = document.createElement('script');
   s.src = 'diagrams/' + id + '.js';
   s.onload = () => init(window.DIAGRAM_DATA[id]);
   s.onerror = () => { document.getElementById('hudTitle').textContent = 'Diagram not found: ' + id; };
   document.body.appendChild(s);
 
-  mermaid.initialize({
-    startOnLoad: false,
-    theme: 'base',
-    themeVariables: {
-      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif',
-      fontSize: '19px',
-      lineColor: '#8298bd',
-      primaryTextColor: '#ffffff',
-      edgeLabelBackground: '#141d33'
-    },
-    flowchart: { curve: 'basis', htmlLabels: true, nodeSpacing: 70, rankSpacing: 110, padding: 18 },
-    securityLevel: 'loose'
-  });
+  function initMermaid(theme) {
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'base',
+      themeVariables: {
+        fontFamily: "'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif",
+        fontSize: '19px',
+        lineColor: '#111111',
+        primaryTextColor: '#111111',
+        edgeLabelBackground: theme === 'dark' ? '#26251f' : '#fffdf7'
+      },
+      flowchart: { curve: 'basis', htmlLabels: true, nodeSpacing: 70, rankSpacing: 110, padding: 18 },
+      securityLevel: 'loose'
+    });
+  }
 
   const vp = document.getElementById('viewport');
   const cv = document.getElementById('canvas');
   const pct = document.getElementById('zoomPct');
+  const themeBtn = document.getElementById('themeBtn');
   let scale = 1, tx = 0, ty = 0, natW = 0, natH = 0;
+
+  function getTheme() { return localStorage.getItem(THEME_KEY) || 'dark'; }
+  function setTheme(t) {
+    localStorage.setItem(THEME_KEY, t);
+    document.documentElement.dataset.theme = t;
+    themeBtn.textContent = t === 'dark' ? '☀ Light' : '☾ Dark';
+    if (d) render();
+  }
+  themeBtn.onclick = () => setTheme(getTheme() === 'dark' ? 'light' : 'dark');
+  themeBtn.textContent = getTheme() === 'dark' ? '☀ Light' : '☾ Dark';
 
   function apply() {
     cv.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
@@ -44,6 +60,24 @@
     tx = natW * scale <= innerWidth ? (innerWidth - natW * scale) / 2 : 40;
     ty = natH * scale <= innerHeight ? (innerHeight - natH * scale) / 2 : 90;
     apply();
+  }
+
+  function render(refit) {
+    cv.innerHTML = '';
+    const pre = document.createElement('pre');
+    pre.className = 'mermaid';
+    pre.textContent = d.mermaid + '\n' + d.styles[getTheme()];
+    cv.appendChild(pre);
+    initMermaid(getTheme());
+    return mermaid.run({ nodes: [pre] }).then(() => {
+      const svg = cv.querySelector('svg');
+      const vb = svg.viewBox.baseVal;
+      natW = vb.width; natH = vb.height;
+      svg.removeAttribute('width');
+      svg.style.width = natW + 'px';
+      svg.style.height = natH + 'px';
+      if (refit) fit(); else apply();
+    });
   }
 
   vp.addEventListener('wheel', e => {
@@ -74,8 +108,9 @@
   document.getElementById('notesBtn').onclick   = () => notes.classList.toggle('open');
   document.getElementById('closeNotes').onclick = () => notes.classList.remove('open');
 
-  function init(d) {
-    if (!d) return;
+  function init(data) {
+    if (!data) return;
+    d = data;
     document.title = d.title + ' — infinitemarkets';
     document.getElementById('hudTitle').textContent = d.title;
     document.getElementById('hudSrc').textContent = d.source;
@@ -91,15 +126,6 @@
         sec.bullets.map(b => `<li>${b}</li>`).join('') +
         `</ul>`).join('');
 
-    document.getElementById('src').textContent = d.mermaid;
-    mermaid.run({ nodes: [document.getElementById('src')] }).then(() => {
-      const svg = cv.querySelector('svg');
-      const vb = svg.viewBox.baseVal;
-      natW = vb.width; natH = vb.height;
-      svg.removeAttribute('width');
-      svg.style.width = natW + 'px';
-      svg.style.height = natH + 'px';
-      fit();
-    });
+    render(true);
   }
 })();

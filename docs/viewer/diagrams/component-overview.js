@@ -3,10 +3,10 @@ window.DIAGRAM_DATA['component-overview'] = {
   title: 'Component Diagram — As Built',
   source: 'docs/architecture-overview.md — §1 (Releases A + B + post-03.1 surfaces)',
   legend: [
-    { color: '#2b6cb0', label: 'Browsers' },
-    { color: '#b37a3d', label: 'LNbits host services' },
-    { color: '#3db377', label: 'infinitemarkets extension' },
-    { color: '#8a63d2', label: 'Outbound destinations' }
+    { color: '#ffd23d', label: 'Browsers' },
+    { color: '#ff6a1f', label: 'LNbits host services' },
+    { color: '#4fdc9a', label: 'infinitemarkets extension' },
+    { color: '#ff5aa8', label: 'Outbound destinations' }
   ],
   mermaid: `flowchart TD
     subgraph Browsers[Browsers]
@@ -54,14 +54,15 @@ window.DIAGRAM_DATA['component-overview'] = {
     Transport -->|"send_to(urls) — outbound only, Release A"| Relays
     Relays -.->|"inbound: kind 1059 gift-wrapped orders (Release B)"| Transport
     Transport -->|"record ACK / reject / timeout"| PubTable
-    Transport -.->|"configured, not used yet"| Blossom
+    Transport -.->|"configured, not used yet"| Blossom`,
 
-    classDef browserNode fill:#1e4d7b,stroke:#5aa9e6,stroke-width:2px,color:#eaf4ff
-    classDef hostNode fill:#7a4a1f,stroke:#e0a458,stroke-width:2px,color:#fff3e6
-    classDef extNode fill:#1f6b43,stroke:#4fd28a,stroke-width:2px,color:#e9fff2
-    classDef extDB fill:#145030,stroke:#4fd28a,stroke-width:2px,color:#d6ffe9
-    classDef sinkNode fill:#4a3573,stroke:#9d7bd8,stroke-width:2px,color:#f0e8ff
-    classDef sinkDB fill:#382a58,stroke:#9d7bd8,stroke-width:2px,color:#e4d8ff
+  styles: {
+    light: `    classDef browserNode fill:#ffd23d,stroke:#111111,stroke-width:2px,color:#111111
+    classDef hostNode fill:#ff6a1f,stroke:#111111,stroke-width:2px,color:#111111
+    classDef extNode fill:#4fdc9a,stroke:#111111,stroke-width:2px,color:#111111
+    classDef extDB fill:#fffdf7,stroke:#111111,stroke-width:2px,color:#111111
+    classDef sinkNode fill:#ff5aa8,stroke:#111111,stroke-width:2px,color:#111111
+    classDef sinkDB fill:#fffdf7,stroke:#111111,stroke-width:2px,color:#111111
 
     class AdminSPA,BuyerUI browserNode
     class Payments hostNode
@@ -70,12 +71,34 @@ window.DIAGRAM_DATA['component-overview'] = {
     class Relays,Blossom sinkNode
     class PubTable sinkDB
 
-    style Browsers fill:#0d2540,stroke:#3d7bb3,stroke-width:2.5px,color:#9cc8ef
-    style Host fill:#33240f,stroke:#b37a3d,stroke-width:2.5px,color:#efc89c
-    style Ext fill:#0f3320,stroke:#3db377,stroke-width:2.5px,color:#9cefc0
-    style Dest fill:#241a3d,stroke:#7a5cc0,stroke-width:2.5px,color:#cbb6f2
+    style Browsers fill:#fcefcd,stroke:#111111,stroke-width:2.5px,color:#111111
+    style Host fill:#ffe1cf,stroke:#111111,stroke-width:2.5px,color:#111111
+    style Ext fill:#d8f3e3,stroke:#111111,stroke-width:2.5px,color:#111111
+    style Dest fill:#ffe0ec,stroke:#111111,stroke-width:2.5px,color:#111111
 
-    linkStyle default stroke:#8298bd,stroke-width:2px`,
+    linkStyle default stroke:#111111,stroke-width:2.5px`,
+
+    dark: `    classDef browserNode fill:#ffd23d,stroke:#f4f0e6,stroke-width:2px,color:#111111
+    classDef hostNode fill:#ff6a1f,stroke:#f4f0e6,stroke-width:2px,color:#111111
+    classDef extNode fill:#4fdc9a,stroke:#f4f0e6,stroke-width:2px,color:#111111
+    classDef extDB fill:#26251f,stroke:#f4f0e6,stroke-width:2px,color:#f4f0e6
+    classDef sinkNode fill:#ff5aa8,stroke:#f4f0e6,stroke-width:2px,color:#111111
+    classDef sinkDB fill:#26251f,stroke:#f4f0e6,stroke-width:2px,color:#f4f0e6
+
+    class AdminSPA,BuyerUI browserNode
+    class Payments hostNode
+    class AdminAPI,Modules,Views,PublicAPI,Checkout,Workers,Outbox,Transport extNode
+    class ExtDB extDB
+    class Relays,Blossom sinkNode
+    class PubTable sinkDB
+
+    style Browsers fill:#322d1b,stroke:#f4f0e6,stroke-width:2.5px,color:#f4f0e6
+    style Host fill:#342517,stroke:#f4f0e6,stroke-width:2.5px,color:#f4f0e6
+    style Ext fill:#1e2f24,stroke:#f4f0e6,stroke-width:2.5px,color:#f4f0e6
+    style Dest fill:#331b26,stroke:#f4f0e6,stroke-width:2.5px,color:#f4f0e6
+
+    linkStyle default stroke:#f4f0e6,stroke-width:2.5px`
+  },
 
   sections: [
     {

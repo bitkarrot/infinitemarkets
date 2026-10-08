@@ -3,9 +3,9 @@ window.DIAGRAM_DATA['lnbits-integration'] = {
   title: 'LNbits Core Integration Architecture',
   source: 'docs/technical-specification.md — §2.1',
   legend: [
-    { color: '#2b6cb0', label: 'Clients & network' },
-    { color: '#b37a3d', label: 'LNbits core (host & settlement authority)' },
-    { color: '#3db377', label: 'infinitemarkets extension (commerce authority)' }
+    { color: '#ffd23d', label: 'Clients & network' },
+    { color: '#ff6a1f', label: 'LNbits core (host & settlement authority)' },
+    { color: '#4fdc9a', label: 'infinitemarkets extension (commerce authority)' }
   ],
   mermaid: `flowchart LR
     subgraph Clients[Clients and network]
@@ -56,13 +56,14 @@ window.DIAGRAM_DATA['lnbits-integration'] = {
     GammaDB -->|Pending publication intents| Transport
     Relays -->|Encrypted orders and messages| Transport
     Transport -->|Durably admit before processing| GammaDB
-    Transport -->|Signed product, collection and order events| Relays
+    Transport -->|Signed product, collection and order events| Relays`,
 
-    classDef clientNode fill:#1e4d7b,stroke:#5aa9e6,stroke-width:2px,color:#eaf4ff
-    classDef coreNode fill:#7a4a1f,stroke:#e0a458,stroke-width:2px,color:#fff3e6
-    classDef coreDB fill:#5c3418,stroke:#e0a458,stroke-width:2px,color:#ffe8d1
-    classDef gammaNode fill:#1f6b43,stroke:#4fd28a,stroke-width:2px,color:#e9fff2
-    classDef gammaDB fill:#145030,stroke:#4fd28a,stroke-width:2px,color:#d6ffe9
+  styles: {
+    light: `    classDef clientNode fill:#ffd23d,stroke:#111111,stroke-width:2px,color:#111111
+    classDef coreNode fill:#ff6a1f,stroke:#111111,stroke-width:2px,color:#111111
+    classDef coreDB fill:#fffdf7,stroke:#111111,stroke-width:2px,color:#111111
+    classDef gammaNode fill:#4fdc9a,stroke:#111111,stroke-width:2px,color:#111111
+    classDef gammaDB fill:#fffdf7,stroke:#111111,stroke-width:2px,color:#111111
 
     class Merchant,Buyer,Lightning,Relays clientNode
     class Host,Identity,InvoiceService,Funding,Tasks,Notify coreNode
@@ -70,11 +71,30 @@ window.DIAGRAM_DATA['lnbits-integration'] = {
     class Boundary,Services,PaymentAdapter,Workers,Transport gammaNode
     class GammaDB gammaDB
 
-    style Clients fill:#0d2540,stroke:#3d7bb3,stroke-width:2.5px,color:#9cc8ef
-    style Core fill:#33240f,stroke:#b37a3d,stroke-width:2.5px,color:#efc89c
-    style Gamma fill:#0f3320,stroke:#3db377,stroke-width:2.5px,color:#9cefc0
+    style Clients fill:#fcefcd,stroke:#111111,stroke-width:2.5px,color:#111111
+    style Core fill:#ffe1cf,stroke:#111111,stroke-width:2.5px,color:#111111
+    style Gamma fill:#d8f3e3,stroke:#111111,stroke-width:2.5px,color:#111111
 
-    linkStyle default stroke:#8298bd,stroke-width:2px`,
+    linkStyle default stroke:#111111,stroke-width:2.5px`,
+
+    dark: `    classDef clientNode fill:#ffd23d,stroke:#f4f0e6,stroke-width:2px,color:#111111
+    classDef coreNode fill:#ff6a1f,stroke:#f4f0e6,stroke-width:2px,color:#111111
+    classDef coreDB fill:#26251f,stroke:#f4f0e6,stroke-width:2px,color:#f4f0e6
+    classDef gammaNode fill:#4fdc9a,stroke:#f4f0e6,stroke-width:2px,color:#111111
+    classDef gammaDB fill:#26251f,stroke:#f4f0e6,stroke-width:2px,color:#f4f0e6
+
+    class Merchant,Buyer,Lightning,Relays clientNode
+    class Host,Identity,InvoiceService,Funding,Tasks,Notify coreNode
+    class CorePayments coreDB
+    class Boundary,Services,PaymentAdapter,Workers,Transport gammaNode
+    class GammaDB gammaDB
+
+    style Clients fill:#322d1b,stroke:#f4f0e6,stroke-width:2.5px,color:#f4f0e6
+    style Core fill:#342517,stroke:#f4f0e6,stroke-width:2.5px,color:#f4f0e6
+    style Gamma fill:#1e2f24,stroke:#f4f0e6,stroke-width:2.5px,color:#f4f0e6
+
+    linkStyle default stroke:#f4f0e6,stroke-width:2.5px`
+  },
 
   sections: [
     {

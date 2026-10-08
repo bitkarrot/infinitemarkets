@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>infinitemarkets — Architecture Guide</title>
+<script>document.documentElement.dataset.theme = localStorage.getItem('imv-theme') || 'dark';</script>
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body class="index">
@@ -16,6 +17,7 @@
        long-form architecture guide and an eventual slideshow — each diagram's
        content lives as structured data in <code>diagrams/*.js</code>.</p>
   </header>
+  <button class="theme-fab" id="themeBtn">☀ Light</button>
   <div class="cards" id="cards"></div>
   <footer class="note">
     Sources of truth: <code>docs/technical-specification.md</code> (normative contract)
@@ -26,11 +28,20 @@
 </div>
 <script src="diagrams/registry.js"></script>
 <script>
+  const tb = document.getElementById('themeBtn');
+  const paint = () => tb.textContent = document.documentElement.dataset.theme === 'dark' ? '☀ Light' : '☾ Dark';
+  tb.onclick = () => {
+    const t = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = t;
+    localStorage.setItem('imv-theme', t);
+    paint();
+  };
+  paint();
   const el = document.getElementById('cards');
   window.DIAGRAMS.forEach(d => {
     el.insertAdjacentHTML('beforeend', `
       <a class="card" href="view.html?d=${d.id}">
-        <div class="num">${d.num} · ${d.kind.toUpperCase()}</div>
+        <div class="num" style="background:${d.accent}">${d.num} · ${d.kind.toUpperCase()}</div>
         <h2>${d.title}</h2>
         <div class="src">${d.source}</div>
         <p>${d.summary}</p>

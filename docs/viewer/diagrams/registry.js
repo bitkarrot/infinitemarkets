@@ -5,6 +5,7 @@ window.DIAGRAMS = [
   {
     id: 'lnbits-integration',
     num: '01',
+    accent: '#ffd23d',
     title: 'LNbits Core Integration Architecture',
     source: 'docs/technical-specification.md — §2.1',
     kind: 'Spec contract',
@@ -13,6 +14,7 @@ window.DIAGRAMS = [
   {
     id: 'component-overview',
     num: '02',
+    accent: '#ff5aa8',
     title: 'Component Diagram — As Built',
     source: 'docs/architecture-overview.md — §1',
     kind: 'Implementation state',
