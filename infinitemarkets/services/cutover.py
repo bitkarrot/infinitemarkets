@@ -680,7 +680,28 @@ async def cutover_status(merchant_id: str, user, epoch_id: str) -> dict:
             "WHERE epoch_id = :e ORDER BY sequence LIMIT 100",
             {"e": epoch_id},
         )
+        products = await tx.fetch_all(
+            f"SELECT p.id, p.title, p.product_type, p.parent_product_id, "
+            f"p.stock_on_hand, p.stock_reserved, p.stock_counted_at "
+            f"FROM {tx.table('import_rows')} r "
+            f"JOIN {tx.table('products')} p ON p.id = r.product_id "
+            "WHERE r.import_id = :i AND p.deleted_at IS NULL "
+            "ORDER BY p.parent_product_id IS NOT NULL, p.title LIMIT 500",
+            {"i": row["import_id"]},
+        )
     return {**_public_epoch(row), "source": source,
+            "products": [
+                {
+                    "id": p["id"],
+                    "title": p["title"],
+                    "product_type": p["product_type"],
+                    "parent_product_id": p["parent_product_id"],
+                    "stock_on_hand": p["stock_on_hand"],
+                    "stock_reserved": p["stock_reserved"],
+                    "counted": p["stock_counted_at"] is not None,
+                }
+                for p in products
+            ],
             "events": [dict(event) for event in events]}
 
 

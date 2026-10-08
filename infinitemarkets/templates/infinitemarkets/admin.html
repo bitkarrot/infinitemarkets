@@ -1205,6 +1205,44 @@
                     </q-item-section>
                   </q-item>
                 </q-list>
+                <q-list v-if="gmMigration.cutover && gmMigration.cutover.products
+                             && gmMigration.cutover.products.length" dense bordered
+                        class="q-mt-md" data-gm="migration-products">
+                  <q-item-label header>
+                    Imported products — record a physical stock count for
+                    each row (including every size option) before publishing
+                  </q-item-label>
+                  <q-item v-for="product in gmMigration.cutover.products"
+                          :key="product.id">
+                    <q-item-section>
+                      <q-item-label>
+                        <span v-if="product.parent_product_id"
+                              class="text-grey-7" aria-hidden="true">↳ </span>
+                        {{ product.title }}
+                        <q-badge v-if="product.counted" color="positive"
+                                 text-color="white" class="q-ml-xs"
+                                 label="counted"></q-badge>
+                        <q-badge v-else color="warning" text-color="dark"
+                                 class="q-ml-xs"
+                                 label="not counted"></q-badge>
+                      </q-item-label>
+                      <q-item-label caption>
+                        {{ product.product_type }} · declared
+                        {{ product.stock_on_hand === null ? 'unlimited' : product.stock_on_hand }}
+                      </q-item-label>
+                      <div class="row q-gutter-xs q-mt-xs items-center">
+                        <q-input dense outlined type="number" min="0"
+                                 style="width: 9rem" label="Counted stock"
+                                 :model-value="gmMigration.stockCounts[product.id]"
+                                 @update:model-value="gmMigration.stockCounts[product.id] = $event">
+                        </q-input>
+                        <q-btn dense outline label="Record count" size="sm"
+                               :loading="gmMigration.busy"
+                               @click="gmRecordStockCount(product.id)"></q-btn>
+                      </div>
+                    </q-item-section>
+                  </q-item>
+                </q-list>
               </div>
             </div>
           </div>
