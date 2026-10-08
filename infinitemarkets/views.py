@@ -332,13 +332,16 @@ async def product_preview(
     # would make a draft variable product look like it has no options.
     async with db.connect() as conn:
         variations = await conn.fetchall(
-            f"SELECT d_tag, title, amount_minor, currency,"
+            f"SELECT id, d_tag, title, amount_minor, currency,"
             " currency_decimals, stock_on_hand, stock_reserved, nip99_status"
             f" FROM {table('products')} "
             "WHERE parent_product_id = :p AND deleted_at IS NULL",
             {"p": product["id"]},
         )
-    detail["variations"] = [dict(v) for v in variations]
+    opts = await nip89.variation_options(product["id"])
+    detail["variations"] = [
+        dict(v) | {"options": opts.get(v["id"], [])} for v in variations
+    ]
     theme = await theme_service.get_theme(merchant["id"])
     store = await _store_ctx(merchant, theme)
     payload = nip89.public_product_json(product, detail)

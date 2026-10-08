@@ -82,6 +82,24 @@ async def product_by_address(pubkey_hex: str, d_tag: str) -> dict | None:
     return product
 
 
+async def variation_options(product_id: str) -> dict[str, list[str]]:
+    """Option labels per variation id — spec key/value pairs minus SKU
+    bookkeeping, so chips can read "M" instead of the full child title."""
+    async with db.connect() as conn:
+        rows = await conn.fetchall(
+            f"SELECT p.id, s.key, s.value FROM {table('product_specs')} s "
+            f"JOIN {table('products')} p ON p.id = s.product_id "
+            "WHERE p.parent_product_id = :p AND p.deleted_at IS NULL",
+            {"p": product_id},
+        )
+    out: dict[str, list[str]] = {}
+    for s in rows:
+        if (s["key"] or "").lower() == "sku":
+            continue
+        out.setdefault(s["id"], []).append(str(s["value"]))
+    return out
+
+
 async def product_detail(product: dict) -> dict:
     """Attach images/specs/categories/variations/shipping for rendering —
     mirrors the admin read, minus internals."""
@@ -107,19 +125,23 @@ async def product_detail(product: dict) -> dict:
             {"p": pid},
         )
         variations = await conn.fetchall(
-            f"SELECT d_tag, title, amount_minor, currency, currency_decimals,"
-            " stock_on_hand, stock_reserved, nip99_status "
+            f"SELECT id, d_tag, title, amount_minor, currency,"
+            " currency_decimals, stock_on_hand, stock_reserved, nip99_status "
             f"FROM {table('products')} "
             "WHERE parent_product_id = :p AND deleted_at IS NULL"
             " AND NOT draft AND visibility != 'hidden'"
             f" AND {released_product_clause('products', table)}",
             {"p": pid},
         )
+    opts = await variation_options(pid)
     return {
         "images": [dict(i) for i in images],
         "specs": {s["key"]: s["value"] for s in specs},
         "shipping": [dict(s) for s in shipping],
-        "variations": [dict(v) for v in variations],
+        "variations": [
+            dict(v) | {"options": opts.get(v["id"], [])}
+            for v in variations
+        ],
     }
 
 
@@ -201,6 +223,7 @@ def public_product_json(product: dict, detail: dict) -> dict:
             {
                 "d_tag": v["d_tag"],
                 "title": v["title"],
+                "options": v.get("options") or [],
                 "amount_minor": v["amount_minor"],
                 "currency": v["currency"],
                 "currency_decimals": v["currency_decimals"],

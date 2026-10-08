@@ -153,6 +153,21 @@
     return Number(n).toLocaleString("en-US") + " sats";
   };
 
+  /* Major-units label — mirrors the server-side price_label(). */
+  GM.price = function (minor, currency, decimals) {
+    if (minor === null || minor === undefined) return "";
+    var code = String(currency || "SAT").toUpperCase();
+    if (code === "SAT" || code === "SATS") {
+      return Number(minor).toLocaleString("en-US") + " sats";
+    }
+    var dec = decimals === null || decimals === undefined
+      ? 2 : Number(decimals);
+    var major = Number(minor) / Math.pow(10, dec);
+    return major.toLocaleString("en-US", {
+      minimumFractionDigits: dec, maximumFractionDigits: dec
+    }) + " " + code;
+  };
+
   /* Middle-truncate a long reference (order ref, npub) for display. */
   GM.trunc = function (s, head, tail) {
     s = String(s || "");

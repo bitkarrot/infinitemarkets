@@ -127,11 +127,11 @@
                 <label class="choice variation-option{% if v_off %} is-disabled{% endif %}">
                   <input type="radio" name="variation" value="{{ v.d_tag }}"
                          data-price="{{ v.amount_minor }}"
+                         data-currency="{{ v.currency }}"
+                         data-decimals="{{ v.currency_decimals }}"
                          {% if v_off %}disabled{% endif %}>
-                  <span>{{ v.title or v.d_tag }}</span>
-                  {% if v.amount_minor != product.price.amount_minor %}
+                  <span>{{ v.options | join(' · ') if v.options else (v.title or v.d_tag) }}</span>
                   <small>{{ price_label(v.amount_minor, v.currency, v.currency_decimals) }}</small>
-                  {% endif %}
                   {% if v_off %}<small>Out of Stock</small>
                   {% elif v.available is not none and v.available < 5 %}<small>Low Stock, Order Soon!</small>{% endif %}
                 </label>

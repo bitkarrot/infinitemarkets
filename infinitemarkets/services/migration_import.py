@@ -269,13 +269,21 @@ def parse_shopify_csv(
             images[handle].setdefault(variant_image, MAX_ROWS * 2 + index)
         price = row.get(keys["price"], "").strip()
         if price:
-            options = [
-                row.get(keys.get(f"option{n}", ""), "").strip()
-                if mapping is not None else row.get(
-                    f"{keys['option']}{n} Value", row.get(f"{keys['option']}{n} value", "")
-                ).strip()
-                for n in (1, 2, 3)
-            ]
+            options = []
+            for n in (1, 2, 3):
+                if mapping is not None:
+                    value = row.get(keys.get(f"option{n}", ""), "").strip()
+                    name = ""
+                else:
+                    value = row.get(
+                        f"{keys['option']}{n} Value",
+                        row.get(f"{keys['option']}{n} value", ""),
+                    ).strip()
+                    name = row.get(
+                        f"{keys['option']}{n} Name",
+                        row.get(f"{keys['option']}{n} name", ""),
+                    ).strip()
+                options.append(f"{name}={value}" if name and value else value)
             sku = row.get(keys.get("sku", ""), "").strip()
             if len(sku) > 200 or any(len(option) > 200 for option in options):
                 raise ValueError(f"Shopify row {index + 2}: variant field exceeds limit")
@@ -761,7 +769,10 @@ async def execute_catalog_import(
             if len(variants) > 1:
                 for index, variant in enumerate(variants):
                     label = (
-                        " / ".join(filter(None, variant["options"]))
+                        " / ".join(
+                            o.partition("=")[2] or o
+                            for o in variant["options"] if o
+                        )
                         or variant["sku"] or str(index + 1)
                     )
                     payload = {

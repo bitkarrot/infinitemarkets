@@ -269,9 +269,27 @@
     }
     return payload;
   }
+  /* The header price is server-rendered for the parent product — when a
+     variation is picked it must re-render for the chosen option or the
+     buyer reads the wrong amount. */
+  function syncVariationPrice() {
+    var priceEl = document.querySelector(".product-price .amount");
+    if (!priceEl) return;
+    var chosen = form.querySelector("input[name=variation]:checked");
+    if (!chosen) return;
+    var minor = Number(chosen.getAttribute("data-price"));
+    if (!Number.isSafeInteger(minor)) return;
+    priceEl.textContent = GM.price(
+      minor,
+      chosen.getAttribute("data-currency"),
+      chosen.getAttribute("data-decimals")
+    );
+    priceEl.setAttribute("data-minor", String(minor));
+  }
   function updateSummary(ev) {
     if (ev && ["quantity", "variation", "country", "region", "shipping_option"]
         .indexOf(ev.target.name) < 0) return;
+    if (ev && ev.target.name === "variation") syncVariationPrice();
     if (pendingPayload) return;
     syncQtyButtons();
     var qty = currentQty();
