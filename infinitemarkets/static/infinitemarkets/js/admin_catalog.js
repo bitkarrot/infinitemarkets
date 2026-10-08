@@ -126,6 +126,14 @@
       };
     },
     computed: {
+      gmShippingChoices: function () {
+        return this.gmCatalog.shipping.map(function (option) {
+          return Object.assign({}, option, {
+            title: option.title + (option.active ? "" : " (inactive)"),
+            disable: !option.active
+          });
+        });
+      },
       gmCatalogRows: function () {
         var counts = {};
         this.gmCatalog.products.forEach(function (p) {
@@ -270,7 +278,8 @@
             visibility: "on-sale", draft: false,
             stock_on_hand: null,
             parent_product_id: "",
-            collection_ids: [], images_text: "", delivery_content: ""
+            collection_ids: [], shipping_option_ids: [],
+            shipping_option_extras: {}, images_text: "", delivery_content: ""
           }
         };
       },
@@ -301,6 +310,13 @@
             stock_on_hand: d.stock_on_hand,
             parent_product_id: d.parent_product_id || "",
             collection_ids: d.collection_ids || [],
+            shipping_option_ids: (d.shipping_options || []).map(function (option) {
+              return option.shipping_option_id;
+            }),
+            shipping_option_extras: (d.shipping_options || []).reduce(function (extras, option) {
+              extras[option.shipping_option_id] = option.extra_cost_minor;
+              return extras;
+            }, {}),
             images_text: (d.images || [])
               .map(function (i) { return i.url; })
               .join("\n"),
@@ -338,7 +354,13 @@
               f.stock_on_hand === undefined
               ? null
               : Number(f.stock_on_hand),
-          collection_ids: f.collection_ids || []
+          collection_ids: f.collection_ids || [],
+          shipping_option_ids: f.format === "physical"
+            ? (f.shipping_option_ids || []).map(function (id) {
+                var extra = f.shipping_option_extras[id];
+                return extra == null ? id : { id: id, extra_cost_minor: extra };
+              })
+            : []
         };
         if (f.format === "digital") {
           body.delivery_content = (f.delivery_content || "").trim();

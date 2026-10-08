@@ -385,6 +385,49 @@ test('categories tab: create, rename, and delete guards', async ({page}) => {
   })
 })
 
+test('product editor attaches and removes shipping options without unpublishing', async ({page}) => {
+  await page.goto('/infinitemarkets/')
+  await page.locator('[data-gm-nav="catalog"]').click()
+  const catalog = page.locator('[data-gm-surface="catalog"]')
+  const row = catalog.locator('[data-gm-table="products"] tbody tr').filter({hasText: seed.physical.title})
+  await row.getByRole('button', {name: 'Edit product'}).click()
+  const editor = catalog.locator('[data-gm-catalog-editor="product"]')
+  const shipping = editor.getByLabel('Shipping options')
+  await expect(shipping).toHaveValue(seed.shipping.title)
+  await shipping.click()
+  await page.getByRole('option', {name: seed.shipping.title}).click()
+  await editor.getByRole('button', {name: 'Save product'}).click()
+  let detail = await page.request.get(`/infinitemarkets/api/v1/products/${seed.physical.id}`)
+  expect(detail.status()).toBe(200)
+  expect((await detail.json()).shipping_options).toEqual([])
+
+  await row.getByRole('button', {name: 'Edit product'}).click()
+  await editor.getByLabel('Shipping options').click()
+  await page.getByRole('option', {name: seed.shipping.title}).click()
+  await editor.getByRole('button', {name: 'Save product'}).click()
+  detail = await page.request.get(`/infinitemarkets/api/v1/products/${seed.physical.id}`)
+  expect(detail.status()).toBe(200)
+  const product = await detail.json()
+  expect(product.shipping_options.map((item: {shipping_option_id: string}) => item.shipping_option_id))
+    .toEqual([seed.shipping.id])
+  expect(Boolean(product.draft)).toBe(false)
+  expect(product.visibility).toBe('on-sale')
+
+  const csrf = (await page.context().cookies()).find(c => c.name === 'gm_csrf')?.value || ''
+  const updated = await page.request.patch(`/infinitemarkets/api/v1/products/${seed.physical.id}`, {
+    headers: {Origin: seed.base_url, 'X-CSRF-Token': csrf},
+    data: {shipping_option_ids: [{id: seed.shipping.id, extra_cost_minor: 125}]}
+  })
+  expect(updated.status()).toBe(200)
+  await page.reload()
+  await page.locator('[data-gm-nav="catalog"]').click()
+  await row.getByRole('button', {name: 'Edit product'}).click()
+  await expect(editor.getByLabel('Shipping options')).toHaveValue(seed.shipping.title)
+  await editor.getByRole('button', {name: 'Save product'}).click()
+  detail = await page.request.get(`/infinitemarkets/api/v1/products/${seed.physical.id}`)
+  expect((await detail.json()).shipping_options[0].extra_cost_minor).toBe(125)
+})
+
 test('catalog editors stay in-pane and bulk tools update selected products', async ({page}) => {
   await page.goto('/infinitemarkets/')
   await page.locator('[data-gm-nav="catalog"]').click()

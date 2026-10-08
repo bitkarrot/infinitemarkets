@@ -74,6 +74,16 @@ async def test_admin_shell_document(runtime_env):
     assert 'admin-categories.jpg' not in about.text
 
 
+async def test_product_editor_shipping_options(runtime_env):
+    html = (await runtime_env["client"].get("/infinitemarkets/")).text
+    assert 'v-model="gmCatalog.editor.form.shipping_option_ids"' in html
+    assert 'label="Shipping options" :options="gmShippingChoices"' in html
+    assert 'EU does not cover individual EU countries' in html
+    js = (await runtime_env["client"].get(f"{JS}/admin_catalog.js")).text
+    assert 'shipping_option_ids: (d.shipping_options || []).map' in js
+    assert 'extra_cost_minor: extra' in js
+
+
 async def test_migration_admin_surface(runtime_env):
     html = (await runtime_env["client"].get("/infinitemarkets/")).text
     assert 'data-gm-nav="migration"' in html

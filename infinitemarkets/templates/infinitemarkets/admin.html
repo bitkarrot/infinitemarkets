@@ -586,6 +586,13 @@
                           outlined multiple label="Collections"
                           :options="gmCatalog.collections" option-value="id"
                           option-label="title" emit-value map-options></q-select>
+                <q-select v-if="gmCatalog.editor.form.format === 'physical'"
+                          v-model="gmCatalog.editor.form.shipping_option_ids"
+                          dense outlined multiple use-chips class="gm-editor-wide"
+                          label="Shipping options" :options="gmShippingChoices"
+                          option-value="id" option-label="title" option-disable="disable"
+                          emit-value map-options
+                          hint="Choose options buyers can use at checkout. Set their prices and destination countries in Shipping."></q-select>
                 <q-select v-model="gmCatalog.editor.form.visibility" dense outlined
                           label="Visibility" :options="gmCatalog.visibilities"></q-select>
                 <q-checkbox v-model="gmCatalog.editor.form.draft"
@@ -910,7 +917,8 @@
                           @update:model-value="gmOnShippingCurrency"></q-select>
                 <q-input v-model="gmCatalog.shippingEditor.form.countries_text" dense
                          outlined class="gm-editor-wide"
-                         label="Countries (comma-separated ISO codes, blank = all)"></q-input>
+                         label="Destination countries (two-letter codes, comma-separated)"
+                         hint="List each country, such as US, CA, DE or FR; EU does not cover individual EU countries."></q-input>
                 <q-input v-model="gmCatalog.shippingEditor.form.regions_text" dense
                          outlined class="gm-editor-wide"
                          label="Regions (comma-separated, optional)"></q-input>
