@@ -12,6 +12,35 @@
   var VISIBILITIES = ["on-sale", "hidden", "pre-order"];
   var SERVICES = ["standard", "express", "overnight", "pickup"];
   var DURATION_UNITS = ["H", "D", "W"];
+  var COUNTRY_CODES = (
+    "AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ " +
+    "BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ " +
+    "CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ " +
+    "DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR " +
+    "GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY " +
+    "HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP " +
+    "KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY " +
+    "MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ " +
+    "NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY " +
+    "QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ " +
+    "TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ " +
+    "UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW"
+  ).split(" ");
+  var EU_COUNTRIES = (
+    "AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE"
+  ).split(" ");
+  var countryNames = typeof Intl.DisplayNames === "function"
+    ? new Intl.DisplayNames([navigator.language || "en"], { type: "region" })
+    : null;
+  var COUNTRY_OPTIONS = COUNTRY_CODES.map(function (code) {
+    return {
+      label: (countryNames ? countryNames.of(code) : code) + " (" + code + ")",
+      value: code
+    };
+  }).sort(function (a, b) { return a.label.localeCompare(b.label); });
+  var COUNTRY_LABELS = Object.fromEntries(COUNTRY_OPTIONS.map(function (item) {
+    return [item.value, item.label];
+  }));
   var PRODUCT_COLUMNS = [
     { name: "title", label: "Title", field: "title", align: "left", sortable: true, style: "width: 240px" },
     { name: "type", label: "Type", field: "product_type", align: "left", style: "width: 150px" },
@@ -80,6 +109,7 @@
           products: [],
           collections: [],
           shipping: [],
+          countryOptions: COUNTRY_OPTIONS,
           productColumns: PRODUCT_COLUMNS,
           categoryColumns: CATEGORY_COLUMNS,
           collectionColumns: COLLECTION_COLUMNS,
@@ -126,6 +156,10 @@
       };
     },
     computed: {
+      gmShippingEuSelected: function () {
+        var selected = this.gmCatalog.shippingEditor.form.countries || [];
+        return EU_COUNTRIES.every(function (code) { return selected.includes(code); });
+      },
       gmShippingChoices: function () {
         return this.gmCatalog.shipping.map(function (option) {
           return Object.assign({}, option, {
@@ -582,14 +616,42 @@
       },
 
       /* --- shipping -------------------------------------------------------- */
+      gmCountryLabel: function (code) {
+        return COUNTRY_LABELS[code] || code + " (unsupported)";
+      },
+      gmFilterShippingCountries: function (term, update) {
+        var query = (term || "").trim().toLowerCase();
+        var self = this;
+        update(function () {
+          self.gmCatalog.countryOptions = query
+            ? COUNTRY_OPTIONS.filter(function (item) {
+                return item.label.toLowerCase().includes(query);
+              })
+            : COUNTRY_OPTIONS;
+        });
+      },
+      gmToggleShippingEu: function (checked) {
+        var f = this.gmCatalog.shippingEditor.form;
+        this.gmCatalog.shippingEditor.error = null;
+        f.countries = checked
+          ? Array.from(new Set((f.countries || []).concat(EU_COUNTRIES)))
+          : (f.countries || []).filter(function (code) {
+              return !EU_COUNTRIES.includes(code);
+            });
+      },
+      gmRemoveShippingCountry: function (code) {
+        var f = this.gmCatalog.shippingEditor.form;
+        f.countries = f.countries.filter(function (item) { return item !== code; });
+      },
       gmNewShipping: function () {
         this.gmCatalog.tab = "shipping";
+        this.gmCatalog.countryOptions = COUNTRY_OPTIONS;
         this.gmCatalog.shippingEditor = {
           show: true, saving: false, error: null, isNew: true,
           form: {
             title: "", service: "standard", base_price_major: 0,
             currency: "SAT", currency_decimals: 0,
-            countries_text: "US", regions_text: "",
+            countries: [], regions_text: "",
             duration_min: null, duration_max: null, duration_unit: "D",
             location: "", active: true
           }
@@ -597,6 +659,7 @@
       },
       gmEditShipping: function (row) {
         this.gmCatalog.tab = "shipping";
+        this.gmCatalog.countryOptions = COUNTRY_OPTIONS;
         this.gmCatalog.shippingEditor = {
           show: true, saving: false, error: null, isNew: false,
           form: {
@@ -610,7 +673,9 @@
               row.currency_decimals === undefined
                 ? gmDecimals(row.currency || "SAT")
                 : row.currency_decimals,
-            countries_text: (row.countries || []).join(", "),
+            countries: Array.from(new Set((row.countries || []).flatMap(function (code) {
+              return code === "EU" ? EU_COUNTRIES : [code];
+            }))),
             regions_text: (row.regions || []).join(", "),
             duration_min: row.duration_min, duration_max: row.duration_max,
             duration_unit: row.duration_unit || "D",
@@ -630,6 +695,13 @@
             .map(function (x) { return x.trim().toUpperCase(); })
             .filter(function (x) { return x.length; });
         };
+        if (!f.countries.length || f.countries.some(function (code) {
+          return !COUNTRY_LABELS[code];
+        })) {
+          ed.error = "Select at least one valid destination country.";
+          ed.saving = false;
+          return;
+        }
         var body = {
           title: f.title,
           service: f.service,
@@ -643,7 +715,7 @@
           currency_decimals: f.currency_decimals === null ||
             f.currency_decimals === undefined
             ? gmDecimals(f.currency) : f.currency_decimals,
-          countries: splitList(f.countries_text),
+          countries: Array.from(new Set(f.countries)),
           regions: splitList(f.regions_text),
           duration_min:
             f.duration_min === null || f.duration_min === ""

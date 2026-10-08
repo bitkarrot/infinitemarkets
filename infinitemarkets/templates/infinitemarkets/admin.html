@@ -915,10 +915,36 @@
                           new-value-mode="add-unique"
                           maxlength="8"
                           @update:model-value="gmOnShippingCurrency"></q-select>
-                <q-input v-model="gmCatalog.shippingEditor.form.countries_text" dense
-                         outlined class="gm-editor-wide"
-                         label="Destination countries (two-letter codes, comma-separated)"
-                         hint="List each country, such as US, CA, DE or FR; EU does not cover individual EU countries."></q-input>
+                <q-select v-model="gmCatalog.shippingEditor.form.countries"
+                          dense outlined multiple use-input input-debounce="0"
+                          class="gm-editor-wide" label="Destination countries"
+                          :options="gmCatalog.countryOptions"
+                          option-value="value" option-label="label"
+                          emit-value map-options @filter="gmFilterShippingCountries"
+                          @update:model-value="gmCatalog.shippingEditor.error = null"
+                          :error="!gmCatalog.shippingEditor.form.countries.length ? !!gmCatalog.shippingEditor.error : false"
+                          :error-message="gmCatalog.shippingEditor.error"
+                          hint="Search by country name or code; select again to remove.">
+                  <template v-slot:selected>
+                    <span>{{ gmCatalog.shippingEditor.form.countries.length }} countries selected</span>
+                  </template>
+                </q-select>
+                <div class="gm-editor-wide">
+                  <q-checkbox :model-value="gmShippingEuSelected"
+                              label="European Union (27 countries)"
+                              @update:model-value="gmToggleShippingEu"></q-checkbox>
+                  <div class="text-caption text-grey-7">
+                    Checking adds all EU member countries; unchecking removes them. Only individual country codes are saved.
+                  </div>
+                  <q-expansion-item dense
+                                    :label="'Review ' + gmCatalog.shippingEditor.form.countries.length + ' destinations'">
+                    <div class="row q-gutter-xs q-pa-sm">
+                      <q-chip v-for="code in gmCatalog.shippingEditor.form.countries"
+                              :key="code" removable
+                              @remove="gmRemoveShippingCountry(code)">{{ gmCountryLabel(code) }}</q-chip>
+                    </div>
+                  </q-expansion-item>
+                </div>
                 <q-input v-model="gmCatalog.shippingEditor.form.regions_text" dense
                          outlined class="gm-editor-wide"
                          label="Regions (comma-separated, optional)"></q-input>
@@ -958,8 +984,11 @@
                     <q-td key="price" :props="props" data-col="price">
                       {{ gmPrice(props.row.base_price_minor, props.row.currency, props.row.currency_decimals) }}
                     </q-td>
-                    <q-td key="countries" :props="props" data-col="countries">
-                      {{ (props.row.countries || []).join(', ') || 'All' }}
+                    <q-td key="countries" :props="props" data-col="countries"
+                          :title="(props.row.countries || []).map(gmCountryLabel).join(', ')">
+                      {{ (props.row.countries || []).length > 3
+                        ? props.row.countries.length + ' countries'
+                        : (props.row.countries || []).map(gmCountryLabel).join(', ') || 'None' }}
                     </q-td>
                     <q-td key="active" :props="props" data-col="active">
                       {{ props.row.active ? 'Yes' : 'No' }}

@@ -78,10 +78,21 @@ async def test_product_editor_shipping_options(runtime_env):
     html = (await runtime_env["client"].get("/infinitemarkets/")).text
     assert 'v-model="gmCatalog.editor.form.shipping_option_ids"' in html
     assert 'label="Shipping options" :options="gmShippingChoices"' in html
-    assert 'EU does not cover individual EU countries' in html
+    assert 'label="European Union (27 countries)"' in html
+    assert 'Only individual country codes are saved.' in html
     js = (await runtime_env["client"].get(f"{JS}/admin_catalog.js")).text
     assert 'shipping_option_ids: (d.shipping_options || []).map' in js
     assert 'extra_cost_minor: extra' in js
+    blocks = dict(re.findall(
+        r'var (COUNTRY_CODES|EU_COUNTRIES) = \((.*?)\)\.split\(" "\);', js, re.S,
+    ))
+    codes = " ".join(re.findall(r'"([A-Z ]+)"', blocks["COUNTRY_CODES"])).split()
+    eu = " ".join(re.findall(r'"([A-Z ]+)"', blocks["EU_COUNTRIES"])).split()
+    assert len(codes) == len(set(codes)) == 249
+    assert len(eu) == len(set(eu)) == 27
+    assert set(eu) <= set(codes)
+    assert {"US", "CA", "DE", "FR", "GB"} <= set(codes)
+    assert "EU" not in codes
 
 
 async def test_migration_admin_surface(runtime_env):

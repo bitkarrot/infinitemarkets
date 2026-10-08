@@ -110,6 +110,7 @@ def test_three_product_stock_fixture_with_variant_total():
     assert [p["stock_on_hand"] for p in products] == [100, 100, 100]
     assert [v["stock_on_hand"] for v in products[0]["variants"]] == [34, 33, 33]
     assert len(products[0]["images"]) == 4
+    assert all("shipping_option_ids" not in product for product in products)
 
 
 def test_any_unknown_variant_blocks_product_stock():
