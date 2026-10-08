@@ -164,7 +164,22 @@
         var rows = [];
         parents.forEach(function (p) {
           var kids = children[p.id] || [];
-          rows.push(decorate(p, { _variantCount: kids.length }));
+          var prow = decorate(p, { _variantCount: kids.length });
+          if (kids.length) {
+            /* A variable parent's own stock row is meaningless — sellable
+               units live on the options. Show the live aggregate. */
+            var sum = 0;
+            var anyUnlimited = false;
+            kids.forEach(function (v) {
+              if (v.stock_on_hand === null || v.stock_on_hand === undefined) {
+                anyUnlimited = true;
+              } else {
+                sum += (v.stock_on_hand || 0) - (v.stock_reserved || 0);
+              }
+            });
+            prow._stock = anyUnlimited ? "Unlimited" : sum + " total";
+          }
+          rows.push(prow);
           if (self.gmCatalog.expandedProducts.includes(p.id)) {
             kids.forEach(function (v) {
               rows.push(decorate(v, {

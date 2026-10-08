@@ -510,7 +510,7 @@ async def test_hidden_and_sold_and_preorder_states(runtime_env):
     resp = await client.get(
         f"/infinitemarkets/p/{merchant['pubkey']}/{sold['d_tag']}"
     )
-    assert "Sold out" in resp.text
+    assert "Out of Stock" in resp.text
 
 
 async def test_not_found_and_invalid_d_tag(runtime_env):
@@ -617,3 +617,71 @@ async def test_draft_preview_requires_owner(runtime_env):
         headers=_headers(runtime_env),
     )
     assert notfound.status_code == 404
+
+
+async def test_variable_parent_stock_is_children_sum(runtime_env):
+    """A variable parent's effective stock is the sum of its variations —
+    never its own (zero) row — and buyers never see raw counts."""
+    client = runtime_env["client"]
+    merchant = await _merchant(runtime_env)
+    cat, parent = await _catalog_and_product(
+        runtime_env,
+        title="Sized Tee Parent",
+        product_type="variable",
+        stock_on_hand=0,
+        stock_reserved=0,
+    )
+    headers = _headers(runtime_env)
+    for size, qty in (("S", 3), ("M", 10)):
+        resp = await client.post(
+            f"{API}/products",
+            json={
+                "category_id": cat["id"],
+                "title": f"Sized Tee {size}",
+                "amount_minor": 2000,
+                "currency": "USD",
+                "currency_decimals": 2,
+                "product_type": "variation",
+                "format": "physical",
+                "visibility": "on-sale",
+                "stock_on_hand": qty,
+                "parent_product_id": parent["id"],
+            },
+            headers=headers,
+        )
+        assert resp.status_code == 201, resp.text
+
+    resp = await client.get(
+        f"/infinitemarkets/p/{merchant['pubkey']}/{parent['d_tag']}"
+    )
+    assert resp.status_code == 200
+    # aggregate 13 → plain "In stock", never the number
+    assert "In stock" in resp.text
+    assert "13" not in re.sub(r"<script[\s\S]*</script>", "", resp.text)
+    # child with 3 units → low-stock copy, still no count
+    assert "Low Stock, Order Soon!" in resp.text
+    assert "3 left" not in resp.text and "10 left" not in resp.text
+
+
+async def test_low_stock_and_sold_out_copy(runtime_env):
+    client = runtime_env["client"]
+    merchant = await _merchant(runtime_env)
+
+    _, low = await _catalog_and_product(
+        runtime_env, title="Low Candle", stock_on_hand=4, stock_reserved=0
+    )
+    resp = await client.get(
+        f"/infinitemarkets/p/{merchant['pubkey']}/{low['d_tag']}"
+    )
+    assert resp.status_code == 200
+    assert "Low Stock, Order Soon!" in resp.text
+    assert "4 left" not in resp.text and "4 available" not in resp.text
+
+    _, full = await _catalog_and_product(
+        runtime_env, title="Full Candle", stock_on_hand=50, stock_reserved=0
+    )
+    resp = await client.get(
+        f"/infinitemarkets/p/{merchant['pubkey']}/{full['d_tag']}"
+    )
+    assert "In stock" in resp.text
+    assert "50" not in re.sub(r"<script[\s\S]*</script>", "", resp.text)

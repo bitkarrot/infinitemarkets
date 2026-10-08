@@ -15,6 +15,8 @@ from decimal import Decimal
 
 from ..db import (
     db,
+    effective_stock,
+    effective_stock_select,
     released_product_clause,
     released_product_select,
     table,
@@ -67,7 +69,8 @@ async def product_by_address(pubkey_hex: str, d_tag: str) -> dict | None:
         return None
     async with db.connect() as conn:
         row = await conn.fetchone(
-            f"SELECT *, {released_product_select('products', table)} "
+            f"SELECT *, {released_product_select('products', table)}, "
+            f"{effective_stock_select('products', table)} "
             f"FROM {table('products')} "
             "WHERE merchant_id = :m AND d_tag = :d",
             {"m": merchant["id"], "d": d_tag},
@@ -143,8 +146,8 @@ def availability_state(product: dict) -> str:
         return "preorder"
     if product.get("nip99_status") == "sold":
         return "sold"
-    on_hand = product.get("stock_on_hand")
-    if on_hand is not None and on_hand - product.get("stock_reserved", 0) <= 0:
+    on_hand, reserved = effective_stock(product)
+    if on_hand is not None and on_hand - reserved <= 0:
         return "sold"
     return "available"
 
@@ -162,12 +165,8 @@ def price_label(amount_minor, currency, decimals) -> str:
 
 def public_product_json(product: dict, detail: dict) -> dict:
     """The §5.4 read contract — no internals, no ids, no reserved counts."""
-    on_hand = product.get("stock_on_hand")
-    available = (
-        on_hand - product.get("stock_reserved", 0)
-        if on_hand is not None
-        else None
-    )
+    on_hand, reserved = effective_stock(product)
+    available = on_hand - reserved if on_hand is not None else None
     return {
         "d_tag": product["d_tag"],
         "merchant_pubkey": product["_merchant"]["pubkey"],

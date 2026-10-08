@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from . import crypto
 from .db import (
     db,
+    effective_stock_select,
     released_product_clause,
     released_product_select,
     table,
@@ -116,6 +117,7 @@ async def public_merchant_products(
         "p.stock_reserved, p.nip99_status, p.draft, p.deleted_at, "
         "p.import_source_kind, "
         f"{released_product_select('p', table)}, "
+        f"{effective_stock_select('p', table)}, "
         "cat.name AS category_name, cat.public_slug AS category_slug "
         f"FROM {table('products')} p "
         f"JOIN {table('categories')} cat ON cat.id = p.category_id "
@@ -205,7 +207,8 @@ async def public_collection(
         if not row:
             raise not_found("collection not found")
         members = await conn.fetchall(
-            f"SELECT p.* FROM {table('products')} p "
+            f"SELECT p.*, {effective_stock_select('p', table)} "
+            f"FROM {table('products')} p "
             f"JOIN {table('product_collections')} pc ON pc.product_id = p.id "
             "WHERE pc.collection_id = :c AND p.deleted_at IS NULL"
             " AND NOT p.draft AND p.visibility != 'hidden'"

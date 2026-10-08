@@ -23,7 +23,11 @@ from lnbits.core.models import User
 from lnbits.decorators import check_user_exists
 from lnbits.helpers import template_renderer
 
-from .db import released_product_clause, released_product_select
+from .db import (
+    effective_stock_select,
+    released_product_clause,
+    released_product_select,
+)
 from .services import nip89
 from .views_public_api import PUBLIC_HEADERS
 
@@ -313,7 +317,8 @@ async def product_preview(
     merchant = await merchant_service.current_merchant(user)
     async with db.connect() as conn:
         row = await conn.fetchone(
-            f"SELECT * FROM {table('products')} "
+            f"SELECT *, {effective_stock_select('products', table)} "
+            f"FROM {table('products')} "
             "WHERE id = :p AND merchant_id = :m AND deleted_at IS NULL",
             {"p": product_id, "m": merchant["id"]},
         )
@@ -429,6 +434,7 @@ async def _browse_products(request: Request, merchant: dict,
         "p.stock_reserved, p.nip99_status, p.created_at, p.draft, p.deleted_at, "
         "p.import_source_kind, "
         f"{released_product_select('p', table)}, "
+        f"{effective_stock_select('p', table)}, "
         "cat.name AS category_name, cat.public_slug AS category_slug "
         f"FROM {table('products')} p "
         f"JOIN {table('categories')} cat ON cat.id = p.category_id "

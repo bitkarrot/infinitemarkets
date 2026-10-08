@@ -136,6 +136,41 @@ def released_product_select(ref: str, table_fn) -> str:
     )
 
 
+def effective_stock_select(ref: str, table_fn) -> str:
+    """SELECT fragment — ``eff_on_hand``/``eff_reserved`` columns where a
+    ``variable`` parent's stock is the live sum over its non-deleted
+    variation children (parents never carry sellable units of their own).
+    Other rows pass through their own columns. Emitted under distinct
+    aliases so ``SELECT *`` callers keep raw values too — readers prefer
+    the ``eff_`` columns when present."""
+    return (
+        f"(CASE WHEN {ref}.product_type = 'variable' THEN ("
+        f"SELECT SUM(v.stock_on_hand) FROM {table_fn('products')} v "
+        f"WHERE v.parent_product_id = {ref}.id AND v.deleted_at IS NULL"
+        f") ELSE {ref}.stock_on_hand END) AS eff_on_hand, "
+        f"(CASE WHEN {ref}.product_type = 'variable' THEN ("
+        f"SELECT SUM(v.stock_reserved) FROM {table_fn('products')} v "
+        f"WHERE v.parent_product_id = {ref}.id AND v.deleted_at IS NULL"
+        f") ELSE {ref}.stock_reserved END) AS eff_reserved"
+    )
+
+
+def effective_stock(row: dict) -> tuple:
+    """Read the ``eff_*`` columns when a query emitted them, else the row's
+    own stock columns."""
+    on_hand = (
+        row["eff_on_hand"]
+        if "eff_on_hand" in row
+        else row.get("stock_on_hand")
+    )
+    reserved = (
+        row["eff_reserved"]
+        if "eff_reserved" in row
+        else row.get("stock_reserved")
+    )
+    return on_hand, (reserved or 0)
+
+
 class DomainTransaction:
     """One section-14 domain transaction: explicit begin/commit/rollback.
 

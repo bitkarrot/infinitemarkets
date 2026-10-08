@@ -42,7 +42,7 @@
             {% if not p.image %}<span class="card-placeholder">No image available</span>{% endif %}
             {% if p.availability in ('sold', 'preorder') or p.format == 'digital' %}
             <span class="card-badges">
-              {% if p.availability == 'sold' %}<span class="card-badge">Sold out</span>{% elif p.availability == 'preorder' %}<span class="card-badge">Pre-order</span>{% endif %}
+              {% if p.availability == 'sold' %}<span class="card-badge">Out of Stock</span>{% elif p.availability == 'preorder' %}<span class="card-badge">Pre-order</span>{% endif %}
               {% if p.format == 'digital' %}<span class="card-badge">Digital</span>{% endif %}
             </span>
             {% endif %}
@@ -51,7 +51,7 @@
         <div class="card-body">
           <h3 class="card-title">{{ p.title }}</h3>
           {% if p.availability == 'sold' %}
-          <p class="card-meta"><span class="chip chip-sold">Sold out</span></p>
+          <p class="card-meta"><span class="chip chip-sold">Out of Stock</span></p>
           {% elif p.availability == 'preorder' %}
           <p class="card-meta"><span class="chip chip-preorder">Pre-order</span></p>
           {% else %}
