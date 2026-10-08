@@ -2058,3 +2058,18 @@ body { margin: 0; }
   .gm-public[data-layout="gallery"] .thumb { transition: none; }
   .gm-public[data-layout="gallery"] .product-card:hover .card-art img { transform: none; }
 }
+
+/* Merchant draft preview banner — visible only on the authenticated
+   /preview/{id} route, never on public pages. */
+.gm-public .preview-banner {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  padding: 10px 16px;
+  background: #7a5800;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  letter-spacing: 0.01em;
+}

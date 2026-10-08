@@ -298,6 +298,69 @@ async def nip89_handler(request: Request, naddr: str):
 
 
 @infinitemarkets_generic_router.get(
+    "/preview/{product_id}", response_class=HTMLResponse
+)
+async def product_preview(
+    request: Request, product_id: str, user: User = Depends(check_user_exists),
+):
+    """Merchant-scoped preview of a product (draft or hidden) rendered with
+    the real public PDP chrome — the publish-day look, not the Nostr
+    event payload. Requires ownership; never reachable anonymously."""
+    from .db import db, table
+    from .services import merchant as merchant_service
+    from .services import themes as theme_service
+
+    merchant = await merchant_service.current_merchant(user)
+    async with db.connect() as conn:
+        row = await conn.fetchone(
+            f"SELECT * FROM {table('products')} "
+            "WHERE id = :p AND merchant_id = :m AND deleted_at IS NULL",
+            {"p": product_id, "m": merchant["id"]},
+        )
+    if not row:
+        return _public_response(request, "public_invalid.html", {},
+                                status=404)
+    product = dict(row)
+    product["_merchant"] = merchant
+    detail = await nip89.product_detail(product)
+    # Preview shows draft/hidden variations too — publication filtering
+    # would make a draft variable product look like it has no options.
+    async with db.connect() as conn:
+        variations = await conn.fetchall(
+            f"SELECT d_tag, title, amount_minor, currency,"
+            " currency_decimals, stock_on_hand, stock_reserved, nip99_status"
+            f" FROM {table('products')} "
+            "WHERE parent_product_id = :p AND deleted_at IS NULL",
+            {"p": product["id"]},
+        )
+    detail["variations"] = [dict(v) for v in variations]
+    theme = await theme_service.get_theme(merchant["id"])
+    store = await _store_ctx(merchant, theme)
+    payload = nip89.public_product_json(product, detail)
+    return _public_response(
+        request,
+        "public_product.html",
+        {
+            "product": payload,
+            "state": "available",  # render the live-sale look
+            "preview_mode": True,
+            "description_html": nip89.render_markdown(
+                product.get("description_md")
+            ),
+            "merchant_name": merchant.get("display_name") or "",
+            "merchant_pubkey": merchant["pubkey"],
+            "theme_css": theme_service.emit_css(theme),
+            "layout": theme_service.theme_layout(theme),
+            "instant_delivery": (
+                product["format"] == "digital"
+                and product.get("delivery_enc") is not None
+            ),
+            **store,
+        },
+    )
+
+
+@infinitemarkets_generic_router.get(
     "/p/{pubkey}/{d_tag}", response_class=HTMLResponse
 )
 async def product_page(request: Request, pubkey: str, d_tag: str):

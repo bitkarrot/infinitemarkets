@@ -7,6 +7,12 @@
 <script src="/static/vendor/qrcode.vue.browser.js" defer></script>
 {% endblock %}
 {% block content %}
+{%- if preview_mode -%}
+<div class="preview-banner" role="status">
+  Draft preview — this is how the page will look when published.
+  It is not reachable from your storefront yet.
+</div>
+{%- endif -%}
 {%- set physical = product.format == 'physical' -%}
 {%- set price = price_label(product.price.amount_minor, product.price.currency, product.price.decimals) -%}
 {%- set in_sats = (product.price.currency or 'SAT') | upper in ('SAT', 'SATS') -%}

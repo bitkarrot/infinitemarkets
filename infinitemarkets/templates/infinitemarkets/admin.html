@@ -675,6 +675,10 @@
                       <q-checkbox v-model="props.selected"></q-checkbox>
                     </q-td>
                     <q-td key="title" :props="props" data-col="title">
+                      <q-btn v-if="props.row._variantCount" flat dense round
+                             size="sm" :icon="expandedProducts.includes(props.row.id) ? 'expand_more' : 'chevron_right'"
+                             :aria-label="(expandedProducts.includes(props.row.id) ? 'Collapse' : 'Expand') + ' options'"
+                             @click="gmToggleVariants(props.row.id)"></q-btn>
                       <span v-if="props.row._isVariant" class="text-grey-7"
                             aria-hidden="true">↳ </span>
                       {{ props.row.title || props.row.d_tag }}
@@ -702,7 +706,13 @@
                       </q-btn>
                       <q-btn flat dense round icon="visibility" aria-label="Preview events"
                              @click="gmDryRun(props.row)">
-                        <q-tooltip>Preview events</q-tooltip>
+                        <q-tooltip>Preview events (Nostr payload)</q-tooltip>
+                      </q-btn>
+                      <q-btn flat dense round icon="open_in_new"
+                             aria-label="Preview page"
+                             :href="'/infinitemarkets/preview/' + props.row.id"
+                             target="_blank" rel="noopener">
+                        <q-tooltip>Preview page — draft shown as published</q-tooltip>
                       </q-btn>
                       <q-btn flat dense round color="negative" icon="delete"
                              aria-label="Delete product"

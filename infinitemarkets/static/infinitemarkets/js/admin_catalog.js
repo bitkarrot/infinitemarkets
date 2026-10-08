@@ -103,6 +103,7 @@
             show: false, kind: "", id: "", title: "", refs: null,
             busy: false
           },
+          expandedProducts: [],
           dryRun: { show: false, json: "", loading: false }
         }
       };
@@ -145,26 +146,34 @@
             p.stock_on_hand === null || p.stock_on_hand === undefined
               ? "Unlimited"
               : String((p.stock_on_hand || 0) - (p.stock_reserved || 0));
+          var price = "—";
+          if (p.amount_minor !== null && p.amount_minor !== undefined) {
+            var dec = p.currency_decimals || 0;
+            price = dec > 0
+              ? (p.amount_minor / Math.pow(10, dec)).toFixed(dec) +
+                " " + (p.currency || "SAT")
+              : p.amount_minor + " " + (p.currency || "SAT");
+          }
           return Object.assign({}, p, opts || {}, {
             _stock: stock,
-            _price:
-              (p.amount_minor === null || p.amount_minor === undefined
-                ? "—"
-                : p.amount_minor + " " + (p.currency || "SAT"))
+            _price: price
           });
         }
 
+        var self = this;
         var rows = [];
         parents.forEach(function (p) {
           var kids = children[p.id] || [];
           rows.push(decorate(p, { _variantCount: kids.length }));
-          kids.forEach(function (v) {
-            rows.push(decorate(v, {
-              _variantOf: (byId[p.id].title || "") ||
-                byId[p.id].d_tag,
-              _isVariant: true
-            }));
-          });
+          if (self.expandedProducts.includes(p.id)) {
+            kids.forEach(function (v) {
+              rows.push(decorate(v, {
+                _variantOf: (byId[p.id].title || "") ||
+                  byId[p.id].d_tag,
+                _isVariant: true
+              }));
+            });
+          }
         });
         return rows;
       }
@@ -289,6 +298,11 @@
           ed.error = self.gmProblemCopy(e.problem);
         }
         ed.saving = false;
+      },
+      gmToggleVariants: function (id) {
+        var i = this.expandedProducts.indexOf(id);
+        if (i >= 0) this.expandedProducts.splice(i, 1);
+        else this.expandedProducts.push(id);
       },
       gmDryRun: async function (row) {
         /* GET /products/{id}/events — rendered unsigned JSON viewer. */

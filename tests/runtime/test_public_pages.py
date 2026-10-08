@@ -556,3 +556,64 @@ async def test_order_page_shell(runtime_env):
     assert resp.status_code == 200
     _assert_public_headers(resp)
     assert "gm-public" in resp.text
+
+
+async def test_draft_preview_page_authed(runtime_env):
+    """Merchant-owned hidden product renders on the /preview route with
+    the draft banner and full PDP chrome — invisible publicly."""
+    client = runtime_env["client"]
+    merchant = await _merchant(runtime_env)
+    _, product = await _catalog_and_product(
+        runtime_env,
+        title="Preview Hidden Hats",
+        visibility="hidden",
+        amount_minor=7000,
+        currency="USD",
+        currency_decimals=2,
+    )
+
+    public = await client.get(
+        f"/infinitemarkets/p/{merchant['pubkey']}/{product['d_tag']}"
+    )
+    assert public.status_code == 200
+    assert "preview-banner" not in public.text
+
+    prev = await client.get(
+        f"/infinitemarkets/preview/{product['id']}",
+        headers=_headers(runtime_env),
+    )
+    assert prev.status_code == 200
+    _assert_public_headers(prev)
+    assert "preview-banner" in prev.text
+    assert "Draft preview" in prev.text
+    assert "Preview Hidden Hats" in prev.text
+    assert "70.00" in prev.text
+
+
+async def test_draft_preview_requires_owner(runtime_env):
+    """Anonymous requesters and non-owners get no preview access."""
+    client = runtime_env["client"]
+    await _merchant(runtime_env)
+    _, product = await _catalog_and_product(
+        runtime_env, visibility="hidden"
+    )
+
+    # Anonymous — a bare client with no auth cookie must not see the draft.
+    import httpx
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=runtime_env["app"]),
+        base_url=ORIGIN,
+    ) as anon_client:
+        anon = await anon_client.get(
+            f"/infinitemarkets/preview/{product['id']}"
+        )
+    assert anon.status_code != 200
+    assert "preview-banner" not in anon.text
+
+    # Unknown id → 404 for the owner too.
+    notfound = await client.get(
+        f"/infinitemarkets/preview/{uuid.uuid4().hex}",
+        headers=_headers(runtime_env),
+    )
+    assert notfound.status_code == 404
