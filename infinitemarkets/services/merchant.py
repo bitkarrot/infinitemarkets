@@ -16,6 +16,8 @@ import json
 import time
 import uuid
 
+from nostr_sdk import PublicKey
+
 from .. import crypto
 from ..db import (
     DomainTransaction,
@@ -122,10 +124,15 @@ def _encrypt_wallet_id(
 
 def _public_merchant(row: dict) -> dict:
     """Merchant projection — never includes wallet_id_enc or key material."""
+    try:
+        npub = PublicKey.parse(row["pubkey"]).to_bech32()
+    except Exception:  # noqa: BLE001 — malformed legacy row fallback
+        npub = ""
     return {
         "id": row["id"],
         "user_id": row["user_id"],
         "pubkey": row["pubkey"],
+        "npub": npub,
         "display_name": row["display_name"],
         "profile_json": row["profile_json"],
         "payment_preference": row["payment_preference"],
@@ -244,6 +251,28 @@ async def current_merchant(user, settings: ExtSettings | None = None) -> dict:
     return merchant
 
 
+def _validate_profile(profile: dict) -> None:
+    if not isinstance(profile, dict):
+        raise unprocessable(
+            "invalid-profile", "Invalid profile", "profile_json must be an object"
+        )
+    about = profile.get("about")
+    if about is not None and (not isinstance(about, str) or len(about) > 2000):
+        raise unprocessable(
+            "invalid-profile", "Invalid profile", "about must be 2000 characters or fewer"
+        )
+    picture = profile.get("picture")
+    if picture is not None and (
+        not isinstance(picture, str)
+        or len(picture) > 500
+        or not picture.startswith("https://")
+    ):
+        raise unprocessable(
+            "invalid-profile", "Invalid profile",
+            "picture must be an https URL of 500 characters or fewer",
+        )
+
+
 async def patch_merchant(merchant_id: str, user, patch: dict,
                          settings: ExtSettings | None = None) -> dict:
     settings = settings or ext_settings()
@@ -287,9 +316,17 @@ async def patch_merchant(merchant_id: str, user, patch: dict,
         updates["display_name"] = patch["display_name"]
     if "profile_json" in patch:
         profile = patch["profile_json"]
-        updates["profile_json"] = (
-            json.dumps(profile) if not isinstance(profile, str) else profile
-        )
+        if isinstance(profile, str):
+            try:
+                parsed = json.loads(profile)
+            except json.JSONDecodeError as exc:
+                raise unprocessable(
+                    "invalid-profile", "Invalid profile",
+                    "profile_json must contain a JSON object",
+                ) from exc
+            profile = parsed
+        _validate_profile(profile)
+        updates["profile_json"] = json.dumps(profile, sort_keys=True)
     if "recommended_app_d" in patch:
         updates["recommended_app_d"] = patch["recommended_app_d"]
     if "theme" in patch:

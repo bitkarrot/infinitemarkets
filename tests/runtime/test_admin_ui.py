@@ -110,14 +110,30 @@ async def test_product_actions_precede_title(runtime_env):
     assert actions < title < delete
 
 
+async def test_product_table_columns_sortable(runtime_env):
+    js = (await runtime_env["client"].get(f"{JS}/admin_catalog.js")).text
+    for column in ("title", "type", "price", "stock", "visibility", "state"):
+        assert f'{{ name: "{column}"' in js
+        start = js.index(f'{{ name: "{column}"')
+        assert "sortable: true" in js[start:js.index("}", start)]
+    assert "_priceSort" in js
+    assert "_stockSort" in js
+
+
 async def test_settings_key_reveal(runtime_env):
     html = (await runtime_env["client"].get("/infinitemarkets/")).text
     assert 'aria-label="Show private key"' in html
     assert 'label="Store secret key (nsec)"' in html
     assert 'Keep this key secret' in html
+    assert 'label="Avatar URL (https)"' in html
+    assert 'label="Bio"' in html
+    assert 'label="View Nostr profile"' in html
+    assert 'label="Save identity"' in html
     js = (await runtime_env["client"].get(f"{JS}/admin_settings.js")).text
     assert '"/keys/export"' in js
     assert 'nsecReveal' in js
+    assert 'profileAvatar' in js
+    assert 'profileBio' in js
     assert "nsec1" not in html + js
 
 

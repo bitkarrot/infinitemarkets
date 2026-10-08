@@ -178,11 +178,19 @@ async def test_shipping_event():
 async def test_identity_and_handler_events_have_no_labels():
     events = _events()
     merchant = {
-        "display_name": "shop", "profile_json": None,
+        "display_name": "shop",
+        "profile_json": json.dumps({
+            "about": "Handmade goods",
+            "picture": "https://cdn.example/avatar.png",
+        }),
         "recommended_app_d": "infinitemarkets",
     }
     profile = events.merchant_profile_event(merchant, pubkey=PUBKEY)
     assert profile["kind"] == 0
+    content = json.loads(profile["content"])
+    assert content["name"] == "shop"
+    assert content["about"] == "Handmade goods"
+    assert content["picture"] == "https://cdn.example/avatar.png"
     assert not any(t[0] in ("L", "l") for t in profile["tags"])
 
     rec = events.handler_recommendation_event(merchant, pubkey=PUBKEY)

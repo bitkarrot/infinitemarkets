@@ -428,6 +428,18 @@ test('product editor attaches and removes shipping options without unpublishing'
   expect((await detail.json()).shipping_options[0].extra_cost_minor).toBe(125)
 })
 
+test('product table sorts stock numerically', async ({page}) => {
+  await page.goto('/infinitemarkets/')
+  await page.locator('[data-gm-nav="catalog"]').click()
+  const table = page.locator('[data-gm-table="products"]')
+  const firstTitle = table.locator('tbody tr [data-col="title"]').first()
+  const stock = table.getByRole('columnheader', {name: 'Stock'})
+  await stock.click()
+  await expect(firstTitle).toContainText(seed.physical.title)
+  await stock.click()
+  await expect(firstTitle).toContainText(seed.digital.title)
+})
+
 test('product quick actions precede title while delete stays at the right edge', async ({page}) => {
   await page.goto('/infinitemarkets/')
   await page.setViewportSize({width: 390, height: 844})
@@ -842,6 +854,16 @@ test('settings surface: identity, relays, notifications, appearance', async ({
   await expect(
     settings.getByRole('button', {name: 'Copy storefront URL'})
   ).toHaveCount(0)
+
+  const nostrProfile = settings.getByRole('link', {name: 'View Nostr profile'})
+  await expect(nostrProfile).toHaveAttribute('href', /^https:\/\/nostr\.at\/npub1/)
+  await settings.getByLabel('Avatar URL (https)').fill('https://cdn.example/avatar.png')
+  await settings.getByLabel('Bio').fill('Handmade goods from the shop.')
+  await settings.getByRole('button', {name: 'Save identity'}).click()
+  const merchant = await page.request.get('/infinitemarkets/api/v1/merchants/current')
+  const profile = JSON.parse((await merchant.json()).profile_json)
+  expect(profile.picture).toBe('https://cdn.example/avatar.png')
+  expect(profile.about).toBe('Handmade goods from the shop.')
 
   await settings.getByRole('button', {name: 'Show private key'}).click()
   const secret = settings.getByLabel('Store secret key (nsec)')

@@ -9,6 +9,7 @@ error shape, and owner scoping (foreign merchant -> 404).
 
 from __future__ import annotations
 
+import json
 import uuid
 
 import httpx
@@ -42,6 +43,22 @@ async def _cookie(runtime_env) -> dict:
     if not client.cookies.get("gm_csrf"):
         await client.get(f"{API}/merchants/current")
     return _cookie_headers(client)
+
+
+async def _ensure_merchant(runtime_env) -> dict:
+    current = await runtime_env["client"].get(f"{API}/merchants/current")
+    if current.status_code == 200:
+        runtime_env["merchant_id"] = current.json()["id"]
+        return current.json()
+    assert current.status_code == 404, current.text
+    created = await runtime_env["client"].post(
+        f"{API}/merchants",
+        json={"wallet_id": runtime_env["wallet"].id},
+        headers=await _cookie(runtime_env),
+    )
+    assert created.status_code == 201, created.text
+    runtime_env["merchant_id"] = created.json()["id"]
+    return created.json()
 
 
 # --- auth matrix ---------------------------------------------------------------
@@ -142,11 +159,13 @@ async def test_cookie_with_forged_bearer_still_enforces_origin(runtime_env):
 
 
 async def test_current_merchant_projection(runtime_env):
+    await _ensure_merchant(runtime_env)
     resp = await runtime_env["client"].get(f"{API}/merchants/current")
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["id"] == runtime_env["merchant_id"]
     assert body["state"] == "draft"
+    assert body["npub"].startswith("npub1")
     assert "wallet_id_enc" not in body
     assert "wallet_id_hash" not in body
     assert "relay_health" in body
@@ -244,6 +263,34 @@ async def test_notification_config(runtime_env):
     assert body["notify_emails"] == ["ops@x.example"]
     assert body["notify_events"]["order_received"] is True
     assert "queue" in body  # plan delta: queue array present (empty until m002)
+
+
+async def test_profile_identity_fields(runtime_env):
+    mid = (await _ensure_merchant(runtime_env))["id"]
+    headers = await _cookie(runtime_env)
+    profile = {
+        "about": "Handmade goods from the shop.",
+        "picture": "https://cdn.example/avatar.png",
+        "website": "https://shop.example",
+    }
+    resp = await runtime_env["client"].patch(
+        f"{API}/merchants/{mid}",
+        json={"profile_json": profile},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    saved = json.loads(resp.json()["profile_json"])
+    assert saved["about"] == profile["about"]
+    assert saved["picture"] == profile["picture"]
+    assert saved["website"] == profile["website"]
+
+    resp = await runtime_env["client"].patch(
+        f"{API}/merchants/{mid}",
+        json={"profile_json": {"picture": "http://insecure.example/a.png"}},
+        headers=headers,
+    )
+    assert resp.status_code == 422
+    assert resp.json()["type"] == "urn:infinitemarkets:invalid-profile"
 
 
 async def test_publish_enqueues_outbox_intents(runtime_env):

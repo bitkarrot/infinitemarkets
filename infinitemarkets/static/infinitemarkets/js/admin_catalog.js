@@ -44,11 +44,11 @@
   var PRODUCT_COLUMNS = [
     { name: "actions", label: "Actions", field: "id", align: "left", style: "width: 132px" },
     { name: "title", label: "Title", field: "title", align: "left", sortable: true, style: "width: 240px" },
-    { name: "type", label: "Type", field: "product_type", align: "left", style: "width: 150px" },
-    { name: "price", label: "Price", field: "_price", align: "left", style: "width: 120px" },
-    { name: "stock", label: "Stock", field: "_stock", align: "left", style: "width: 90px" },
-    { name: "visibility", label: "Visibility", field: "visibility", align: "left", style: "width: 110px" },
-    { name: "state", label: "State", field: "nip99_status", align: "left", style: "width: 100px" },
+    { name: "type", label: "Type", field: "_typeSort", align: "left", sortable: true, style: "width: 150px" },
+    { name: "price", label: "Price", field: "_priceSort", align: "left", sortable: true, style: "width: 120px" },
+    { name: "stock", label: "Stock", field: "_stockSort", align: "left", sortable: true, style: "width: 90px" },
+    { name: "visibility", label: "Visibility", field: "visibility", align: "left", sortable: true, style: "width: 110px" },
+    { name: "state", label: "State", field: "nip99_status", align: "left", sortable: true, style: "width: 100px" },
     { name: "delete", label: "Delete", field: "id", align: "left", style: "width: 72px" }
   ];
   var CATEGORY_COLUMNS = [
@@ -202,13 +202,16 @@
         });
 
         function decorate(p, opts) {
-          var stock =
-            p.stock_on_hand === null || p.stock_on_hand === undefined
-              ? "Unlimited"
-              : String((p.stock_on_hand || 0) - (p.stock_reserved || 0));
+          var unlimited = p.stock_on_hand === null || p.stock_on_hand === undefined;
+          var stockValue = unlimited
+            ? Number.MAX_SAFE_INTEGER
+            : (p.stock_on_hand || 0) - (p.stock_reserved || 0);
+          var stock = unlimited ? "Unlimited" : String(stockValue);
           var price = "—";
+          var priceSort = Number.MAX_SAFE_INTEGER;
           if (p.amount_minor !== null && p.amount_minor !== undefined) {
             var dec = p.currency_decimals || 0;
+            priceSort = p.amount_minor;
             price = dec > 0
               ? (p.amount_minor / Math.pow(10, dec)).toFixed(dec) +
                 " " + (p.currency || "SAT")
@@ -216,7 +219,10 @@
           }
           return Object.assign({}, p, opts || {}, {
             _stock: stock,
-            _price: price
+            _stockSort: stockValue,
+            _price: price,
+            _priceSort: priceSort,
+            _typeSort: (p.product_type || "") + "/" + (p.format || "")
           });
         }
 
@@ -238,6 +244,7 @@
               }
             });
             prow._stock = anyUnlimited ? "Unlimited" : sum + " total";
+            prow._stockSort = anyUnlimited ? Number.MAX_SAFE_INTEGER : sum;
           }
           rows.push(prow);
           if (self.gmCatalog.expandedProducts.includes(p.id)) {

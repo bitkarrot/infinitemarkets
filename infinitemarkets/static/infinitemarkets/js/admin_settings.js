@@ -190,6 +190,10 @@
           wallets: [],
           walletBlocked: false,
           displayName: "",
+          profileJson: {},
+          profileAvatar: "",
+          profileBio: "",
+          identitySaving: false,
           nsecInput: "",
           nsecNote: NSEC_NOTE,
           nsecReveal: "",
@@ -326,6 +330,15 @@
           self.gmSettings.wallets = self.gm.wallets || [];
           var m = self.gm.merchant;
           self.gmSettings.displayName = m.display_name || "";
+          var profile = {};
+          try {
+            profile = JSON.parse(m.profile_json || "{}");
+          } catch (e2) {
+            profile = {};
+          }
+          self.gmSettings.profileJson = profile;
+          self.gmSettings.profileAvatar = profile.picture || "";
+          self.gmSettings.profileBio = profile.about || "";
           self.gmSettings.specRevision = m.spec_revision || "";
           var t = m.theme || {};
           var h = t.hero || {};
@@ -363,18 +376,41 @@
         }
         self.gmSettings.loading = false;
       },
-      gmSaveDisplayName: async function () {
+      gmSaveIdentity: async function () {
         var self = this;
+        var avatar = (self.gmSettings.profileAvatar || "").trim();
+        var bio = (self.gmSettings.profileBio || "").trim();
+        if (avatar && !/^https:\/\//.test(avatar)) {
+          self.gmSettings.error =
+            "Use an https:// image address for the avatar.";
+          return;
+        }
+        if (bio.length > 2000) {
+          self.gmSettings.error = "Keep the bio to 2000 characters or fewer.";
+          return;
+        }
+        var profile = Object.assign({}, self.gmSettings.profileJson || {});
+        if (avatar) profile.picture = avatar;
+        else delete profile.picture;
+        if (bio) profile.about = bio;
+        else delete profile.about;
+        self.gmSettings.identitySaving = true;
         try {
           var m = await self.gmApi(
             "PATCH", "/merchants/" + self.gmMerchantId(),
-            { display_name: self.gmSettings.displayName }
+            {
+              display_name: self.gmSettings.displayName,
+              profile_json: profile
+            }
           );
           self.gm.merchant.display_name = m.display_name;
-          self.gmSettings.notice = "Display name saved.";
+          self.gm.merchant.profile_json = m.profile_json;
+          self.gmSettings.profileJson = profile;
+          self.gmSettings.notice = "Identity saved.";
         } catch (e) {
           self.gmSettings.error = self.gmProblemCopy(e.problem);
         }
+        self.gmSettings.identitySaving = false;
       },
       gmImportKey: async function () {
         /* nsec enters a masked input, posts once over TLS, and is cleared
