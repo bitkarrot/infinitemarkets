@@ -1098,7 +1098,14 @@ async def patch_product(merchant_id: str, user, product_id: str,
                 or patch.get("visibility") in ("on-sale", "pre-order")
             )
         ):
-            raise conflict("import-blocked", "Import requires verified cutover")
+            raise conflict(
+                "import-blocked",
+                "This product came from an import and stays blocked until "
+                "its import is released. In the Migration tab: select the "
+                "import, choose 'Prepare to move old products', attest or "
+                "reconcile it, then record a stock count for the product "
+                "(and each size option) before publishing.",
+            )
         if "product_type" in patch or "parent_product_id" in patch:
             # re-validate the resulting combination
             parent_id = await _validate_variation(
@@ -1285,7 +1292,13 @@ async def bulk_products(
                 row["import_source_kind"] is not None and not row["import_released"]
                 for row in rows
             ):
-                raise conflict("import-blocked", "Import requires verified cutover")
+                raise conflict(
+                    "import-blocked",
+                    "One or more imported products are still blocked. "
+                    "Release their import first (Migration tab → 'Prepare "
+                    "to move old products' → attest/reconcile → record "
+                    "stock counts), then retry.",
+                )
 
         if action == "delete":
             for product_id in ids:
