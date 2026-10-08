@@ -40,6 +40,22 @@
     { name: "active", label: "Active", field: "active", align: "left", style: "width: 80px" },
     { name: "actions", label: "Actions", field: "id", align: "left", style: "width: 150px" }
   ];
+  /* Common codes offered as dropdown options — the backend accepts any
+     ^[A-Z0-9]{3,8}$ code, so the editor also keeps free-text entry. */
+  var CURRENCIES = [
+    "SAT", "USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF",
+    "BRL", "MXN", "INR", "KRW", "PLN", "SEK", "NOK", "DKK",
+    "NZD", "SGD", "HKD", "ZAR", "BTC"
+  ];
+  /* Mirrors fx.default_currency_decimals for the dropdown codes —
+     anything unlisted defaults to 2 like the backend. */
+  var CURRENCY_DECIMALS = {
+    SAT: 0, BTC: 8, JPY: 0, KRW: 0
+  };
+  var gmDecimals = function (code) {
+    var d = CURRENCY_DECIMALS[String(code || "").toUpperCase()];
+    return d === undefined ? 2 : d;
+  };
   var BULK_ACTIONS = [
     { label: "Increase prices by percentage", value: "price-markup" },
     { label: "Move to collection", value: "move-collection" },
@@ -80,6 +96,7 @@
           productTypes: PRODUCT_TYPES,
           formats: FORMATS,
           visibilities: VISIBILITIES,
+          currencies: CURRENCIES,
           durationUnits: DURATION_UNITS,
           imageDisclosure: IMAGE_DISCLOSURE,
           deleteDisclosure: DELETE_DISCLOSURE,
@@ -194,6 +211,27 @@
       }
     },
     methods: {
+      gmDecimals: gmDecimals,
+      gmPrice: function (minor, currency, decimals) {
+        if (minor === null || minor === undefined) return "—";
+        var dec = decimals || 0;
+        return dec > 0
+          ? (minor / Math.pow(10, dec)).toFixed(dec) +
+              " " + (currency || "SAT")
+          : minor + " " + (currency || "SAT");
+      },
+      gmOnCurrency: function (val) {
+        /* Keep decimals in step with the picked currency — the editor
+           works in major units and stores minor units on save. */
+        var f = this.gmCatalog.editor.form;
+        f.currency = val;
+        f.currency_decimals = gmDecimals(val);
+      },
+      gmOnShippingCurrency: function (val) {
+        var f = this.gmCatalog.shippingEditor.form;
+        f.currency = val;
+        f.currency_decimals = gmDecimals(val);
+      },
       gmLoadCatalog: async function () {
         var self = this;
         self.gmCatalog.loading = true;
@@ -228,7 +266,7 @@
               : "",
             title: "", summary: "", description_md: "",
             product_type: "simple", format: "digital",
-            amount_minor: 0, currency: "SAT",
+            price_major: 0, currency: "SAT", currency_decimals: 0,
             visibility: "on-sale", draft: false,
             stock_on_hand: null,
             parent_product_id: "",
@@ -250,8 +288,14 @@
             description_md: d.description_md || "",
             product_type: d.product_type || "simple",
             format: d.format || "digital",
-            amount_minor: d.amount_minor || 0,
+            price_major: (d.amount_minor || 0) /
+              Math.pow(10, d.currency_decimals || 0),
             currency: d.currency || "SAT",
+            currency_decimals:
+              d.currency_decimals === null ||
+              d.currency_decimals === undefined
+                ? gmDecimals(d.currency || "SAT")
+                : d.currency_decimals,
             visibility: d.visibility || "on-sale",
             draft: !!d.draft,
             stock_on_hand: d.stock_on_hand,
@@ -277,8 +321,16 @@
           description_md: f.description_md || undefined,
           product_type: f.product_type,
           format: f.format,
-          amount_minor: Number(f.amount_minor) || 0,
+          amount_minor: Math.round(
+            (Number(f.price_major) || 0) *
+            Math.pow(10, f.currency_decimals === null ||
+              f.currency_decimals === undefined
+              ? gmDecimals(f.currency) : f.currency_decimals)
+          ),
           currency: f.currency || "SAT",
+          currency_decimals: f.currency_decimals === null ||
+            f.currency_decimals === undefined
+            ? gmDecimals(f.currency) : f.currency_decimals,
           visibility: f.visibility,
           draft: !!f.draft,
           stock_on_hand:
@@ -513,8 +565,9 @@
         this.gmCatalog.shippingEditor = {
           show: true, saving: false, error: null, isNew: true,
           form: {
-            title: "", service: "standard", base_price_minor: 0,
-            currency: "SAT", countries_text: "US", regions_text: "",
+            title: "", service: "standard", base_price_major: 0,
+            currency: "SAT", currency_decimals: 0,
+            countries_text: "US", regions_text: "",
             duration_min: null, duration_max: null, duration_unit: "D",
             location: "", active: true
           }
@@ -527,8 +580,14 @@
           form: {
             id: row.id, title: row.title || "",
             service: row.service || "standard",
-            base_price_minor: row.base_price_minor || 0,
+            base_price_major: (row.base_price_minor || 0) /
+              Math.pow(10, row.currency_decimals || 0),
             currency: row.currency || "SAT",
+            currency_decimals:
+              row.currency_decimals === null ||
+              row.currency_decimals === undefined
+                ? gmDecimals(row.currency || "SAT")
+                : row.currency_decimals,
             countries_text: (row.countries || []).join(", "),
             regions_text: (row.regions || []).join(", "),
             duration_min: row.duration_min, duration_max: row.duration_max,
@@ -552,8 +611,16 @@
         var body = {
           title: f.title,
           service: f.service,
-          base_price_minor: Number(f.base_price_minor) || 0,
+          base_price_minor: Math.round(
+            (Number(f.base_price_major) || 0) *
+            Math.pow(10, f.currency_decimals === null ||
+              f.currency_decimals === undefined
+              ? gmDecimals(f.currency) : f.currency_decimals)
+          ),
           currency: f.currency || "SAT",
+          currency_decimals: f.currency_decimals === null ||
+            f.currency_decimals === undefined
+            ? gmDecimals(f.currency) : f.currency_decimals,
           countries: splitList(f.countries_text),
           regions: splitList(f.regions_text),
           duration_min:

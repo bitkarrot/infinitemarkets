@@ -565,11 +565,17 @@
                          class="gm-editor-wide" data-gm="delivery-editor"
                          label="Digital delivery — download link, license key or instructions"
                          hint="Stored encrypted. Buyers see this only after confirmed payment. Never published to Nostr."></q-input>
-                <q-input v-model.number="gmCatalog.editor.form.amount_minor" dense
-                         outlined type="number" min="0"
-                         label="Price (minor units)"></q-input>
-                <q-input v-model="gmCatalog.editor.form.currency" dense outlined
-                         label="Currency (SAT or fiat code)" maxlength="8"></q-input>
+                <q-input v-model.number="gmCatalog.editor.form.price_major" dense
+                         outlined type="number" min="0" step="any"
+                         :label="'Price (' + (gmCatalog.editor.form.currency || 'SAT') + ')'"
+                         :hint="'stored as ' + Math.round((Number(gmCatalog.editor.form.price_major) || 0) * Math.pow(10, gmCatalog.editor.form.currency_decimals || 0)) + ' minor units'"></q-input>
+                <q-select v-model="gmCatalog.editor.form.currency" dense outlined
+                          label="Currency (SAT or fiat code)"
+                          :options="gmCatalog.currencies"
+                          use-input fill-input hide-selected
+                          new-value-mode="add-unique"
+                          maxlength="8"
+                          @update:model-value="gmOnCurrency"></q-select>
                 <q-input v-model.number="gmCatalog.editor.form.stock_on_hand" dense
                          outlined type="number" min="0"
                          label="Stock on hand (blank = unlimited)"></q-input>
@@ -891,11 +897,17 @@
                 <q-select v-model="gmCatalog.shippingEditor.form.service" dense
                           outlined label="Service"
                           :options="gmCatalog.services"></q-select>
-                <q-input v-model.number="gmCatalog.shippingEditor.form.base_price_minor"
-                         dense outlined type="number" min="0"
-                         label="Base price (minor units)"></q-input>
-                <q-input v-model="gmCatalog.shippingEditor.form.currency" dense
-                         outlined label="Currency" maxlength="8"></q-input>
+                <q-input v-model.number="gmCatalog.shippingEditor.form.base_price_major"
+                         dense outlined type="number" min="0" step="any"
+                         :label="'Base price (' + (gmCatalog.shippingEditor.form.currency || 'SAT') + ')'"
+                         :hint="'stored as ' + Math.round((Number(gmCatalog.shippingEditor.form.base_price_major) || 0) * Math.pow(10, gmCatalog.shippingEditor.form.currency_decimals || 0)) + ' minor units'"></q-input>
+                <q-select v-model="gmCatalog.shippingEditor.form.currency" dense
+                          outlined label="Currency"
+                          :options="gmCatalog.currencies"
+                          use-input fill-input hide-selected
+                          new-value-mode="add-unique"
+                          maxlength="8"
+                          @update:model-value="gmOnShippingCurrency"></q-select>
                 <q-input v-model="gmCatalog.shippingEditor.form.countries_text" dense
                          outlined class="gm-editor-wide"
                          label="Countries (comma-separated ISO codes, blank = all)"></q-input>
@@ -936,7 +948,7 @@
                     <q-td key="title" :props="props" data-col="title">{{ props.row.title }}</q-td>
                     <q-td key="service" :props="props" data-col="service">{{ props.row.service }}</q-td>
                     <q-td key="price" :props="props" data-col="price">
-                      {{ props.row.base_price_minor }} {{ props.row.currency }}
+                      {{ gmPrice(props.row.base_price_minor, props.row.currency, props.row.currency_decimals) }}
                     </q-td>
                     <q-td key="countries" :props="props" data-col="countries">
                       {{ (props.row.countries || []).join(', ') || 'All' }}
