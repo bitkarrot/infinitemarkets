@@ -71,7 +71,7 @@ async def test_admin_shell_document(runtime_env):
     assert len(revisions) == 1
     about = await runtime_env["client"].get(f"{JS}/admin_about.js")
     assert about.status_code == 200
-    assert 'title: "Catalog: products & categories"' in about.text
+    assert 'admin-categories.jpg' not in about.text
 
 
 async def test_migration_admin_surface(runtime_env):

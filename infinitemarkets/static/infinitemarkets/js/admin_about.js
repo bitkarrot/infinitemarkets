@@ -14,9 +14,6 @@
       { file: "admin-orders.jpg", title: "Orders",
         caption: "Order workspace: search, filter and move orders through " +
                  "their states with a full audit trail." },
-      { file: "admin-categories.jpg", title: "Catalog: products & categories",
-        caption: "One primary category per product, plus collections and " +
-                 "shipping options, with bulk editing." },
       { file: "admin-publications.jpg", title: "Publications",
         caption: "Relay health and every outbox entry with timestamps and " +
                  "per-relay delivery evidence." },

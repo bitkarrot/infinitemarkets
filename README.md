@@ -19,7 +19,7 @@ An [LNbits](https://github.com/lnbits/lnbits) extension that gives a merchant on
 <table>
   <tr>
     <td><img src="infinitemarkets/static/infinitemarkets/img/screenshots/admin-orders.jpg" alt="Orders workspace"><br>Orders</td>
-    <td><img src="infinitemarkets/static/infinitemarkets/img/screenshots/admin-categories.jpg" alt="Categories and products"><br>Categories &amp; products</td>
+    <td><strong>Catalog</strong><br>Manage products, categories, collections, and shipping.</td>
     <td><img src="infinitemarkets/static/infinitemarkets/img/screenshots/admin-publications.jpg" alt="Publications"><br>Publications</td>
   </tr>
   <tr>
