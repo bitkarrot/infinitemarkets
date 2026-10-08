@@ -1154,7 +1154,7 @@
                          @click="gmCutoverAction('complete')"></q-btn>
                 </div>
                 <q-banner v-if="gmMigration.sourceCheck" data-gm="migration-source-check"
-                          class="bg-info text-white q-mt-md">
+                          class="bg-info text-dark q-mt-md">
                   Old records matched this upload at the time of the check:
                   {{ gmMigration.sourceCheck.source_product_count }} products,
                   {{ gmMigration.sourceCheck.liability_count }} invoice items,
@@ -1941,7 +1941,7 @@
 
           <!-- B6 appearance -->
           <q-tab-panel name="appearance" class="gm-tab-panel">
-            <q-banner class="bg-info text-white q-mb-md" data-gm="boundary-note">
+            <q-banner class="bg-info text-dark q-mb-md" data-gm="boundary-note">
               {{ gmSettings.boundaryNote }}
             </q-banner>
             <div class="row q-col-gutter-md">

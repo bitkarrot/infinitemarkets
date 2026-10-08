@@ -61,7 +61,32 @@
         }
       };
     },
+    watch: {
+      /* Section errors/notices also pop a dismissible toast at the top —
+         inline banners are easy to miss below long content. */
+      "gmCatalog.error": function (v) { this.gmToast(v, "negative"); },
+      "gmCatalog.notice": function (v) { this.gmToast(v, "positive"); },
+      "gmMigration.error": function (v) { this.gmToast(v, "negative"); },
+      "gmMessages.error": function (v) { this.gmToast(v, "negative"); },
+      "gmNotify.error": function (v) { this.gmToast(v, "negative"); },
+      "gmNotify.notice": function (v) { this.gmToast(v, "positive"); },
+      "gmOrders.error": function (v) { this.gmToast(v, "negative"); },
+      "gmOrders.notice": function (v) { this.gmToast(v, "positive"); },
+      "gmPubs.error": function (v) { this.gmToast(v, "negative"); },
+      "gmSettings.error": function (v) { this.gmToast(v, "negative"); },
+      "gmSettings.notice": function (v) { this.gmToast(v, "positive"); }
+    },
     methods: {
+      gmToast: function (message, type) {
+        if (!message || !this.$q || !this.$q.notify) return;
+        this.$q.notify({
+          type: type,
+          message: String(message),
+          position: "top",
+          timeout: 8000,
+          actions: [{ icon: "close", color: "white", dense: true, round: true }]
+        });
+      },
       /* Admin JSON fetch — cookie auth is implicit same-origin; mutations
          carry Origin (browser-supplied), X-CSRF-Token, Idempotency-Key. */
       gmApi: async function (method, path, body) {
