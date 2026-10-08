@@ -977,9 +977,9 @@
 
       <section v-show="gm.view === 'migration'" data-gm-surface="migration">
         <h1 class="text-h6 q-mb-md">Product migration</h1>
-        <q-banner class="bg-warning text-dark q-mb-md">
-          Imported products stay hidden and blocked. Uploaded stock and order status do not
-          verify physical inventory or old payable invoices; importing never authorizes sales.
+        <q-banner class="bg-info text-dark q-mb-md">
+          Imported products land as hidden drafts. Review them in the
+          Catalog tab and publish when ready.
         </q-banner>
         <q-card flat bordered class="q-pa-md">
           <div class="text-subtitle1 q-mb-md">Import product file</div>
@@ -994,47 +994,49 @@
           <input id="gm-shopify-file" :key="gmMigration.sourceKind" type="file"
                  :accept="['shopify', 'infinitemarkets'].includes(gmMigration.sourceKind) ? '.csv,text/csv' : '.json,.ndjson,application/json'"
                  class="block q-my-sm" @change="gmMigrationFileChanged">
-          <q-input v-model="gmMigration.sourceInstance" outlined dense
-                   label="Source store identifier" hint="A stable identifier for the source catalog"
-                   class="q-mb-md"></q-input>
-          <q-input v-model="gmMigration.currency" outlined dense
-                   label="Source currency (three-letter code)"
-                   hint="Choose the currency used for prices in the export"
-                   class="q-mb-md"></q-input>
-          <div v-if="gmMigration.sourceKind === 'shopify'" class="q-mb-md">
-            <q-select v-model="gmMigration.selectedPreset" dense outlined clearable
-                      label="Saved column mapping (optional)"
-                      :options="gmMigration.presets.map(p => ({ label: p.name, value: p.id }))"
-                      emit-value map-options @update:model-value="gmChooseCsvPreset"></q-select>
-            <q-input v-model="gmMigration.mappingText" outlined dense type="textarea"
-                     label="Custom CSV column mapping (JSON, optional)"
-                     hint="Map handle, title and price to header names; preview before import"
+          <q-select v-if="gmMigration.sourceKind !== 'infinitemarkets'"
+                    v-model="gmMigration.currency" outlined dense use-input fill-input
+                    hide-selected clearable new-value-mode="add-unique" input-debounce="0"
+                    label="Currency used in the file" hint="Select the price currency before previewing; Shopify files do not include one."
+                    :options="['SAT', 'USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CHF', 'BRL', 'MXN', 'INR', 'KRW', 'PLN', 'SEK', 'NOK', 'DKK', 'NZD', 'SGD', 'HKD', 'ZAR']"
+                    @update:model-value="gmMigration.selectionDirty = true"
+                    class="q-mb-md"></q-select>
+          <q-expansion-item label="Advanced import options" class="q-mb-md">
+            <q-input v-model="gmMigration.sourceInstance" outlined dense
+                     label="Source identifier (optional)"
+                     hint="Defaults to one catalog per format. If you previously used a source name, reuse it to avoid duplicate products."
                      @update:model-value="gmMigration.selectionDirty = true"
-                     class="q-mt-sm"></q-input>
-            <div class="row q-gutter-sm q-mt-sm">
-              <q-input v-model="gmMigration.presetName" outlined dense
-                       label="Mapping name" class="col"></q-input>
-              <q-btn outline color="primary" label="Save column mapping"
-                     :disable="!gmMigration.presetName || !gmMigration.mappingText"
-                     @click="gmSaveCsvPreset"></q-btn>
+                     class="q-my-md"></q-input>
+            <div v-if="gmMigration.sourceKind === 'shopify'">
+              <q-select v-model="gmMigration.selectedPreset" dense outlined clearable
+                        label="Saved column mapping (optional)"
+                        :options="gmMigration.presets.map(p => ({ label: p.name, value: p.id }))"
+                        emit-value map-options @update:model-value="gmChooseCsvPreset"></q-select>
+              <q-input v-model="gmMigration.mappingText" outlined dense type="textarea"
+                       label="Custom CSV column mapping (JSON, optional)"
+                       hint="Map handle, title and price to header names; preview before import"
+                       @update:model-value="gmMigration.selectionDirty = true"
+                       class="q-mt-sm"></q-input>
+              <div class="row q-gutter-sm q-mt-sm">
+                <q-input v-model="gmMigration.presetName" outlined dense
+                         label="Mapping name" class="col"></q-input>
+                <q-btn outline color="primary" label="Save column mapping"
+                       :disable="!gmMigration.presetName || !gmMigration.mappingText"
+                       @click="gmSaveCsvPreset"></q-btn>
+              </div>
             </div>
-          </div>
+          </q-expansion-item>
           <div class="row q-gutter-sm q-mb-md">
             <q-btn flat color="primary" icon="download" label="Export products (CSV)"
                    href="/infinitemarkets/api/v1/migration/products/export"
                    type="a" data-gm="export-products"></q-btn>
-            <span class="text-caption self-center">
-              The export is a catalog backup — not proof of stock or settled orders.
-            </span>
+            <span class="text-caption self-center">Download a copy of your product catalog.</span>
           </div>
           <div class="row q-gutter-sm">
-            <q-btn color="primary" outline label="Validate file"
-                   :loading="gmMigration.busy" :disable="!gmMigration.file"
-                   @click="gmShopifyUpload('validate')"></q-btn>
-            <q-btn color="primary" outline label="Preview / dry-run"
-                   :loading="gmMigration.busy" :disable="!gmMigration.file"
-                   @click="gmShopifyUpload('dry-run')"></q-btn>
-            <q-btn color="primary" unelevated label="Import as blocked drafts"
+            <q-btn color="primary" outline label="Preview products"
+                   :loading="gmMigration.busy" :disable="!gmMigration.file || (gmMigration.sourceKind !== 'infinitemarkets' && !gmMigration.currency)"
+                   @click="gmShopifyUpload('preview')"></q-btn>
+            <q-btn color="primary" unelevated label="Import as drafts"
                    :loading="gmMigration.busy" :disable="!gmMigration.preview || gmMigration.selectionDirty || gmMigration.preview.products.some(p => p.image_selection_required)"
                    @click="gmExecuteShopify"></q-btn>
           </div>
@@ -1042,15 +1044,12 @@
             {{ gmMigration.error }}
           </q-banner>
           <q-banner v-if="gmMigration.result" class="bg-positive text-white q-mt-md">
-            Imported {{ gmMigration.result.product_count }} products as blocked drafts.
-            Review categories, physical stock and old payable orders before cutover.
+            {{ gmMigration.result.already_imported ? 'This file was already imported.' :
+               'Imported ' + gmMigration.result.product_count + ' products as drafts.' }}
+            Review and publish them from the Catalog tab.
           </q-banner>
           <div v-if="gmMigration.preview" class="q-mt-md" data-gm="migration-preview">
             <div class="text-subtitle2">{{ gmMigration.preview.products.length }} products to review</div>
-            <p v-if="gmMigration.preview.liabilities" class="text-caption">
-              {{ gmMigration.preview.liabilities.length }} uploaded obligations remain unverified.
-              This file cannot prove the old order list is complete.
-            </p>
             <q-list bordered separator class="q-mt-sm">
               <q-item v-for="product in gmMigration.preview.products" :key="product.handle">
                 <q-item-section>
@@ -1074,178 +1073,17 @@
             </q-list>
           </div>
         </q-card>
-        <q-card flat bordered class="q-pa-md q-mt-md" data-gm="migration-audit">
-          <h2 class="text-subtitle1 q-my-none">Import history</h2>
-          <p class="text-caption">A signed import record proves what was uploaded, not that
-            old invoices have been settled or that stock has been counted.</p>
+        <q-card flat bordered class="q-pa-md q-mt-md" data-gm="migration-history">
+          <h2 class="text-subtitle1 q-my-none">Recent imports</h2>
           <q-list bordered separator v-if="gmMigration.imports.length">
             <q-item v-for="entry in gmMigration.imports" :key="entry.id">
               <q-item-section>
-                <q-item-label>{{ entry.source_kind }} · {{ entry.source_instance }}</q-item-label>
-                <q-item-label caption>{{ entry.product_count }} blocked products ·
-                  {{ entry.liability_count }} unverified obligations</q-item-label>
-              </q-item-section>
-              <q-item-section side>
-                <q-btn flat dense label="View audit" @click="gmLoadImportAudit(entry.id)"></q-btn>
+                <q-item-label>{{ entry.source_kind }} · {{ entry.product_count }} products</q-item-label>
+                <q-item-label caption>{{ gmTime(entry.created_at) }}</q-item-label>
               </q-item-section>
             </q-item>
           </q-list>
           <p v-else class="text-caption">No imports yet.</p>
-          <div v-if="gmMigration.audit" class="q-mt-md">
-            <div class="text-subtitle2">Import {{ gmMigration.audit.id }}</div>
-            <p>State: {{ gmMigration.audit.state }} · Cutover verified: No</p>
-            <p class="text-caption">Signed commitment: {{ gmMigration.audit.commitment_id }}<br>
-              Source hash: {{ gmMigration.audit.source_hash }}</p>
-            <p class="text-caption">{{ gmMigration.audit.rows.length }} product mappings ·
-              {{ gmMigration.audit.liabilities.length }} unverified obligations</p>
-            <q-list dense bordered v-if="gmMigration.audit.rows.length">
-              <q-item v-for="row in gmMigration.audit.rows" :key="row.product_id">
-                <q-item-section>{{ row.legacy_id }} · {{ row.content_hash }}</q-item-section>
-              </q-item>
-            </q-list>
-            <q-banner v-if="gmMigration.audit.source_kind !== 'nostrmarket'"
-                      class="bg-info text-dark q-mt-md">
-              This source has no same-instance order settlement. To activate the
-              imported drafts you must attest that no outstanding payable orders exist
-              for it, then record a physical stock count per product.
-            </q-banner>
-            <div class="q-mt-md" data-gm="migration-freeze">
-              <q-banner v-if="gmMigration.audit.source_kind === 'nostrmarket'"
-                        class="bg-warning text-dark q-mb-md">
-                Pausing the old merchant does not stop invoice reissue or order restore.
-                Only an operator can disable nostrmarket for this entire LNbits instance
-                and restart it. These controls do not disable the old extension or approve sales.
-              </q-banner>
-              <q-btn outline color="primary" label="Prepare to move old products"
-                     @click="gmStageCutover(gmMigration.audit.id)"></q-btn>
-              <div v-if="gmMigration.cutover" class="q-mt-md">
-                <p>Old-store move: {{ gmMigration.cutover.state }} ·
-                  Old invoices checked: {{ gmMigration.cutover.snapshot_verified ?
-                    'Yes' : 'No' }} ·
-                  Products available for sale: {{ gmMigration.cutover.cutover_verified ?
-                    'Yes' : 'No' }}</p>
-                <p v-if="gmMigration.cutover.source" class="text-caption">
-                  Old extension: {{ gmMigration.cutover.source.disabled ?
-                    'Disabled' :
-                    'Still running or cannot be checked' }}
-                </p>
-                <div class="row q-gutter-sm">
-                  <q-btn v-if="gmMigration.cutover.state === 'staged' &&
-                               gmMigration.audit.source_kind === 'nostrmarket'" outline
-                         label="Record freeze request (does not disable)"
-                         @click="gmCutoverAction('freeze-request')"></q-btn>
-                  <q-btn v-if="gmMigration.cutover.state === 'staged' &&
-                               gmMigration.audit.source_kind !== 'nostrmarket'" outline
-                         color="positive"
-                         label="Attest: no outstanding payable orders remain"
-                         :loading="gmMigration.busy"
-                         @click="gmCutoverAction('attest')"></q-btn>
-                  <q-btn v-if="gmMigration.cutover.state === 'freeze_requested'" outline
-                         label="Verify old invoices" :loading="gmMigration.busy"
-                         @click="gmCheckOldSource"></q-btn>
-                  <q-btn v-if="['staged', 'freeze_requested', 'snapshot_verified',
-                               'reconciling'].includes(gmMigration.cutover.state)"
-                         outline color="negative" label="Stop move; keep stock blocked"
-                         @click="gmCutoverAction('abort')"></q-btn>
-                  <q-btn v-if="['snapshot_verified', 'reconciling']
-                               .includes(gmMigration.cutover.state)"
-                         outline color="positive" label="Finish move (requires all liabilities covered)"
-                         :loading="gmMigration.busy"
-                         @click="gmCutoverAction('complete')"></q-btn>
-                </div>
-                <q-banner v-if="gmMigration.sourceCheck" data-gm="migration-source-check"
-                          class="bg-info text-dark q-mt-md">
-                  Old records matched this upload at the time of the check:
-                  {{ gmMigration.sourceCheck.source_product_count }} products,
-                  {{ gmMigration.sourceCheck.liability_count }} invoice items,
-                  {{ gmMigration.sourceCheck.payable_quantity }} units still payable and
-                  {{ gmMigration.sourceCheck.paid_quantity }} already paid.
-                  This preview is not a verified stock count or permission to sell.
-                </q-banner>
-                <q-list v-if="gmMigration.liabilities.length" dense bordered
-                        class="q-mt-md" data-gm="migration-liabilities">
-                  <q-item-label header>Old payable invoices</q-item-label>
-                  <q-item v-for="liability in gmMigration.liabilities"
-                          :key="liability.id">
-                    <q-item-section>
-                      <q-item-label>{{ liability.title }} ·
-                        qty {{ liability.quantity }} · {{ liability.status }}
-                        <template v-if="liability.partition_state !== 'none'">
-                          ({{ liability.partition_state }})
-                        </template>
-                      </q-item-label>
-                      <q-item-label caption>
-                        {{ liability.invoice_hash.slice(0, 16) }}…
-                      </q-item-label>
-                      <div class="row q-gutter-xs q-mt-xs items-center">
-                        <q-input dense outlined type="number" min="0"
-                                 style="width: 9rem" label="Counted stock"
-                                 :model-value="gmMigration.stockCounts[liability.product_id]"
-                                 @update:model-value="gmMigration.stockCounts[liability.product_id] = $event">
-                        </q-input>
-                        <q-btn dense outline label="Record count" size="sm"
-                               :loading="gmMigration.busy"
-                               @click="gmRecordStockCount(liability.product_id)"></q-btn>
-                      </div>
-                    </q-item-section>
-                    <q-item-section side
-                                    v-if="['payable', 'waiting', 'partitioned']
-                                         .includes(liability.status)">
-                      <div class="row q-gutter-xs">
-                        <q-btn v-if="liability.status === 'payable'" dense outline
-                               label="Wait" size="sm"
-                               @click="gmLiabilityAction(liability.id, 'wait')"></q-btn>
-                        <q-btn v-if="liability.status !== 'partitioned'" dense outline
-                               label="Hold stock" size="sm" :loading="gmMigration.busy"
-                               @click="gmLiabilityAction(liability.id, 'partition')"></q-btn>
-                        <q-btn dense outline label="Re-check payment" size="sm"
-                               :loading="gmMigration.busy"
-                               @click="gmLiabilityAction(liability.id, 'reconcile')"></q-btn>
-                      </div>
-                    </q-item-section>
-                  </q-item>
-                </q-list>
-                <q-list v-if="gmMigration.cutover && gmMigration.cutover.products
-                             && gmMigration.cutover.products.length" dense bordered
-                        class="q-mt-md" data-gm="migration-products">
-                  <q-item-label header>
-                    Imported products — record a physical stock count for
-                    each row (including every size option) before publishing
-                  </q-item-label>
-                  <q-item v-for="product in gmMigration.cutover.products"
-                          :key="product.id">
-                    <q-item-section>
-                      <q-item-label>
-                        <span v-if="product.parent_product_id"
-                              class="text-grey-7" aria-hidden="true">↳ </span>
-                        {{ product.title }}
-                        <q-badge v-if="product.counted" color="positive"
-                                 text-color="white" class="q-ml-xs"
-                                 label="counted"></q-badge>
-                        <q-badge v-else color="warning" text-color="dark"
-                                 class="q-ml-xs"
-                                 label="not counted"></q-badge>
-                      </q-item-label>
-                      <q-item-label caption>
-                        {{ product.product_type }} · declared
-                        {{ product.stock_on_hand === null ? 'unlimited' : product.stock_on_hand }}
-                      </q-item-label>
-                      <div class="row q-gutter-xs q-mt-xs items-center">
-                        <q-input dense outlined type="number" min="0"
-                                 style="width: 9rem" label="Counted stock"
-                                 :model-value="gmMigration.stockCounts[product.id]"
-                                 @update:model-value="gmMigration.stockCounts[product.id] = $event">
-                        </q-input>
-                        <q-btn dense outline label="Record count" size="sm"
-                               :loading="gmMigration.busy"
-                               @click="gmRecordStockCount(product.id)"></q-btn>
-                      </div>
-                    </q-item-section>
-                  </q-item>
-                </q-list>
-              </div>
-            </div>
-          </div>
         </q-card>
       </section>
 

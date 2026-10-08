@@ -312,7 +312,7 @@ async def test_gallery_listing_cards_and_editorial_baseline(runtime_env):
                 f"UPDATE {tx.table('products')} SET visibility = 'on-sale', "
                 "stock_on_hand = 0 WHERE id = :id", {"id": product["id"]},
             )
-        assert 'class="card-badge">Sold out</span>' in (
+        assert 'class="card-badge">Out of Stock</span>' in (
             await client.get(shop_url)
         ).text
         await themes.save_theme(mid, {"layout": "editorial"})

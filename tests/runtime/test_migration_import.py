@@ -165,7 +165,7 @@ def test_custom_csv_mapping_is_explicit_and_pinned():
         parse_shopify_csv(data, currency="USD", mapping={"handle": "Key"})
 
 
-def test_nostrmarket_export_normalizes_provisional_orders():
+def test_nostrmarket_export_imports_only_catalog():
     source = {
         "stalls": [{"id": "stall-a", "currency": "USD", "wallet": "untrusted"}],
         "products": [{"id": "old-a", "stall_id": "stall-a", "name": "Legacy Mug",
@@ -181,10 +181,7 @@ def test_nostrmarket_export_normalizes_provisional_orders():
     )
     assert result["products"][0]["variants"][0]["amount_minor"] == 1250
     assert result["products"][0]["description_md"] == "Mug"
-    assert result["liabilities"] == [{
-        "order_id": "old-order", "invoice_id": "a" * 64,
-        "product_legacy_id": "old-a", "quantity": 1,
-    }]
+    assert result["liabilities"] == []
     assert result["source_completeness"] == "unknown"
     source["private_key"] = "bad"
     with pytest.raises(ValueError, match="secret fields"):
@@ -205,10 +202,9 @@ def test_nostrmarket_export_normalizes_provisional_orders():
         )
     source["products"][0]["quantity"] = 2
     source["orders"].append({**source["orders"][0], "id": "second-order"})
-    with pytest.raises(ValueError, match="duplicate legacy invoice"):
-        parse_legacy_catalog(
-            json.dumps(source).encode(), source_kind="nostrmarket", currency="USD"
-        )
+    assert parse_legacy_catalog(
+        json.dumps(source).encode(), source_kind="nostrmarket", currency="USD"
+    )["liabilities"] == []
     with pytest.raises(ValueError, match="nesting limit"):
         parse_legacy_catalog(
             json.dumps({"stalls": [], "products": [{"x": [{"x": [
@@ -243,7 +239,7 @@ def test_nip15_signed_events_and_ndjson_only_allowed_kinds():
         )
 
 
-async def test_imported_drafts_cannot_be_published(runtime_env):
+async def test_imported_drafts_publish_after_review(runtime_env):
     from infinitemarkets.db import db, table
     from infinitemarkets.services import migration_import
 
@@ -259,17 +255,15 @@ async def test_imported_drafts_cannot_be_published(runtime_env):
     assert merchant.status_code == 201, merchant.text
     merchant_id = merchant.json()["id"]
     data = SAMPLE.read_bytes()
-    preview = migration_import.preview_shopify_import(
-        data, currency="USD", source_instance="sample-store", merchant_id=merchant_id
-    )
     import_api = "/infinitemarkets/api/v1/migration/shopify"
-    form = {"currency": "USD", "source_instance": "sample-store"}
+    form = {"currency": "USD"}
     upload = {"file": ("shopify.csv", data, "text/csv")}
     preview_response = await client.post(
         f"{import_api}/preview", data=form, files=upload, headers=headers
     )
     assert preview_response.status_code == 200, preview_response.text
-    assert preview_response.json()["source_hash"] == preview["source_hash"]
+    preview = preview_response.json()
+    assert preview["source_instance"] == "shopify-catalog"
     dry_run = await client.post(
         f"{import_api}/dry-run", data=form, files=upload, headers=headers
     )
@@ -303,7 +297,7 @@ async def test_imported_drafts_cannot_be_published(runtime_env):
     audit = await client.get(
         f"/infinitemarkets/api/v1/migration/imports/{result['import_id']}"
     )
-    assert audit.status_code == 200 and audit.json()["cutover_verified"] is False
+    assert audit.status_code == 200
     assert audit.json()["commitment"]["id"] == result["commitment_id"]
     assert len(audit.json()["rows"]) == 2
     assert "invoice_ref_enc" not in audit.text
@@ -336,7 +330,8 @@ async def test_imported_drafts_cannot_be_published(runtime_env):
         )
     assert foreign.value.status == 404
     repeated = await client.post(
-        f"{import_api}/execute", data=form, files=upload, headers=headers
+        f"{import_api}/execute", data=form,
+        files={"file": ("renamed-shopify.csv", data, "text/csv")}, headers=headers,
     )
     assert repeated.status_code == 200, repeated.text
     assert repeated.json()["already_imported"]
@@ -361,44 +356,25 @@ async def test_imported_drafts_cannot_be_published(runtime_env):
             f"SELECT COUNT(*) AS n FROM {table('outbox_events')} "
             "WHERE merchant_id = :m AND aggregate_type = 'products'", {"m": merchant_id},
         )
-    assert product_intents["n"] == 0
+    assert product_intents["n"] == len(rows)
     product_id = rows[0]["id"]
     api = "/infinitemarkets/api/v1/products"
-    assert (await client.patch(
-        f"{api}/{product_id}", json={"draft": False}, headers=headers
-    )).status_code == 409
-    assert (await client.post(
-        f"{api}/bulk", json={"product_ids": [product_id], "action": "publish"},
-        headers=headers,
-    )).status_code == 409
+    patched = await client.patch(
+        f"{api}/{product_id}",
+        json={"draft": False, "visibility": "on-sale"}, headers=headers,
+    )
+    assert patched.status_code == 200, patched.text
     from infinitemarkets.services import checkout
 
     async with db.connect() as conn:
-        blocked = await conn.fetchone(
-            f"SELECT d_tag FROM {table('products')} WHERE id = :i", {"i": product_id},
+        row = await conn.fetchone(
+            f"SELECT d_tag FROM {table('products')} WHERE id = :i",
+            {"i": product_id},
         )
-    with pytest.raises(ProblemError) as rejected:
-        await checkout._resolve_items(
-            merchant_id, [{"d_tag": blocked["d_tag"], "quantity": 1}]
-        )
-    assert rejected.value.status == 422
-    async with db.connect() as conn:
-        await conn.execute(
-            f"UPDATE {table('products')} SET draft = FALSE, visibility = 'on-sale' "
-            "WHERE id = :i", {"i": product_id},
-        )
-    try:
-        with pytest.raises(ProblemError) as held:
-            await checkout._resolve_items(
-                merchant_id, [{"d_tag": blocked["d_tag"], "quantity": 1}]
-            )
-        assert held.value.status == 422
-    finally:
-        async with db.connect() as conn:
-            await conn.execute(
-                f"UPDATE {table('products')} SET draft = TRUE, visibility = 'hidden' "
-                "WHERE id = :i", {"i": product_id},
-            )
+    resolved = await checkout._resolve_items(
+        merchant_id, [{"d_tag": row["d_tag"], "quantity": 1}]
+    )
+    assert resolved and resolved[0]["product"]["id"] == product_id
     category = await client.post(
         "/infinitemarkets/api/v1/categories", json={"name": "Reviewed"}, headers=headers
     )
@@ -510,7 +486,7 @@ async def test_imported_drafts_cannot_be_published(runtime_env):
         f"{legacy_api}/preview", data=legacy_form, files=legacy_upload, headers=headers
     )
     assert first.status_code == 200, first.text
-    assert first.json()["liabilities"][0]["status"] == "unverified"
+    assert first.json()["liabilities"] == []
     assert "buyer@example.com" not in first.text and "b" * 64 not in first.text
     legacy_form["source_hash"] = first.json()["source_hash"]
     imported = await client.post(
@@ -520,19 +496,15 @@ async def test_imported_drafts_cannot_be_published(runtime_env):
     audited = await client.get(
         f"/infinitemarkets/api/v1/migration/imports/{imported.json()['import_id']}"
     )
-    assert audited.status_code == 200 and audited.json()["liability_count"] == 1
-    assert audited.json()["liabilities"][0]["status"] == "unverified"
+    assert audited.status_code == 200 and audited.json()["liability_count"] == 0
+    assert audited.json()["liabilities"] == []
     assert "buyer@example.com" not in audited.text and "b" * 64 not in audited.text
     async with db.connect() as conn:
         stored = await conn.fetchone(
-            f"SELECT l.invoice_ref_enc, l.status, p.draft, p.import_authorized "
-            f"FROM {table('imported_liabilities')} l "
-            f"JOIN {table('products')} p ON p.id = l.product_id "
-            "WHERE l.import_id = :i", {"i": imported.json()["import_id"]},
+            f"SELECT COUNT(*) AS n FROM {table('imported_liabilities')} "
+            "WHERE import_id = :i", {"i": imported.json()["import_id"]},
         )
-    assert stored["status"] == "unverified" and stored["draft"]
-    assert not stored["import_authorized"]
-    assert b"b" * 64 not in bytes(stored["invoice_ref_enc"])
+    assert stored["n"] == 0
     from nostr_sdk import EventBuilder, Keys, Kind, Tag
 
     signing_keys = Keys.generate()
@@ -564,12 +536,12 @@ async def test_imported_drafts_cannot_be_published(runtime_env):
         f"/infinitemarkets/api/v1/migration/imports/{event_imported.json()['import_id']}"
     )
     assert event_audit.json()["source_kind"] == "nip15_events"
-    assert event_audit.json()["cutover_verified"] is False
+    assert event_audit.status_code == 200
 
 
-async def test_authorization_flag_alone_cannot_publish_imported_stock(runtime_env):
+async def test_imported_product_publishes_normally(runtime_env):
+    """Imported products can be patched, published and rendered normally."""
     from infinitemarkets.db import DomainTransaction, db, table
-    from infinitemarkets.services import outbox
 
     client = runtime_env["client"]
     current = await client.get("/infinitemarkets/api/v1/merchants/current")
@@ -585,16 +557,15 @@ async def test_authorization_flag_alone_cannot_publish_imported_stock(runtime_en
     else:
         assert current.status_code == 200, current.text
         merchant_data = current.json()
-    merchant_id = merchant_data["id"]
     pubkey = merchant_data["pubkey"]
     category = await client.post(
         "/infinitemarkets/api/v1/categories", headers=headers,
-        json={"name": "Blocked publication"},
+        json={"name": "Imported publication"},
     )
     assert category.status_code == 201, category.text
     product = await client.post(
         "/infinitemarkets/api/v1/products", headers=headers, json={
-            "category_id": category.json()["id"], "title": "Blocked source",
+            "category_id": category.json()["id"], "title": "Imported item",
             "amount_minor": 100, "currency": "SAT", "format": "digital",
             "draft": True, "visibility": "hidden", "stock_on_hand": 1,
         },
@@ -603,64 +574,35 @@ async def test_authorization_flag_alone_cannot_publish_imported_stock(runtime_en
     product_id = product.json()["id"]
     async with DomainTransaction() as tx:
         await tx.execute(
-            f"UPDATE {tx.table('products')} SET draft = FALSE, "
-            "visibility = 'on-sale', import_source_kind = 'nostrmarket', "
-            "import_legacy_id = 'legacy-id', import_authorized = TRUE WHERE id = :p",
+            f"UPDATE {tx.table('products')} "
+            "SET import_source_kind = 'shopify', "
+            "import_legacy_id = 'legacy-id', import_authorized = TRUE "
+            "WHERE id = :p",
             {"p": product_id},
         )
     api = "/infinitemarkets/api/v1/products"
-    assert (await client.patch(
-        f"{api}/{product_id}", headers=headers, json={"draft": False},
-    )).status_code == 409
-    assert (await client.post(
-        f"{api}/bulk", headers=headers,
-        json={"action": "publish", "product_ids": [product_id]},
-    )).status_code == 409
-    assert (await client.get(f"{api}/{product_id}/events")).json() == []
+    patched = await client.patch(
+        f"{api}/{product_id}", headers=headers,
+        json={"draft": False, "visibility": "on-sale"},
+    )
+    assert patched.status_code == 200, patched.text
+    events = await client.get(f"{api}/{product_id}/events")
+    assert events.status_code == 200 and events.json()
     listing = await client.get(
         f"/infinitemarkets/api/v1/public/merchants/{pubkey}/products"
     )
-    assert listing.status_code == 200, listing.text
-    assert product.json()["d_tag"] not in json.dumps(listing.json())
-    detail = await client.get(
-        f"/infinitemarkets/api/v1/public/products/{pubkey}/{product.json()['d_tag']}"
-    )
-    assert detail.status_code == 404
+    assert product.json()["d_tag"] in json.dumps(listing.json())
     page = await client.get(
         f"/infinitemarkets/p/{pubkey}/{product.json()['d_tag']}"
     )
-    assert page.status_code == 404
-    for kind in (30402, 30018):
-        assert await outbox.render_intent({
-            "merchant_id": merchant_id, "aggregate_type": "products",
-            "aggregate_id": product_id, "event_kind": kind,
-        }) is None
-    collection = await client.post(
-        "/infinitemarkets/api/v1/collections", headers=headers,
-        json={"title": "Blocked collection"},
-    )
-    assert collection.status_code == 201, collection.text
-    moved = await client.post(
-        f"{api}/bulk", headers=headers,
-        json={"action": "move-collection", "product_ids": [product_id],
-              "value": collection.json()["id"]},
-    )
-    assert moved.status_code == 200, moved.text
-    assert await outbox.render_intent({
-        "merchant_id": merchant_id, "aggregate_type": "collections",
-        "aggregate_id": collection.json()["id"], "event_kind": 30405,
-    }) is None
-    published = await client.post(
-        f"/infinitemarkets/api/v1/merchants/{merchant_id}/publish", headers=headers,
-    )
-    assert published.status_code == 200, published.text
+    assert page.status_code == 200
     async with db.connect() as conn:
         row = await conn.fetchone(
             f"SELECT COUNT(*) AS n FROM {table('outbox_events')} "
             "WHERE aggregate_type = 'products' AND aggregate_id = :p",
             {"p": product_id},
         )
-    assert row["n"] == 0
+    assert row["n"] >= 1
 
 
 async def test_private_three_product_sample_import(runtime_env):
@@ -673,7 +615,18 @@ async def test_private_three_product_sample_import(runtime_env):
     data = Path(sample_path).read_bytes()
     client = runtime_env["client"]
     response = await client.get("/infinitemarkets/api/v1/merchants/current")
-    assert response.status_code == 200, response.text
+    headers = {
+        "Origin": "https://shop.example",
+        "X-CSRF-Token": client.cookies.get("gm_csrf"),
+    }
+    if response.status_code == 404:
+        response = await client.post(
+            "/infinitemarkets/api/v1/merchants",
+            json={"wallet_id": runtime_env["wallet"].id}, headers=headers,
+        )
+        assert response.status_code == 201, response.text
+    else:
+        assert response.status_code == 200, response.text
     preview = migration_import.preview_shopify_import(
         data, currency="USD", source_instance="private-sample",
         merchant_id=response.json()["id"],
@@ -713,3 +666,17 @@ async def test_private_three_product_sample_import(runtime_env):
         )
     assert sorted(row["stock_on_hand"] for row in variants) == [33, 33, 34]
     assert all(row["draft"] for row in variants)
+    parent = next(row for row in rows if row["stock_on_hand"] == 0)
+    published = await client.patch(
+        f"/infinitemarkets/api/v1/products/{parent['id']}",
+        json={"draft": False, "visibility": "on-sale"}, headers=headers,
+    )
+    assert published.status_code == 200, published.text
+    async with db.connect() as conn:
+        options = await conn.fetchall(
+            f"SELECT stock_on_hand, draft, visibility FROM {table('products')} "
+            "WHERE parent_product_id = :p", {"p": parent["id"]},
+        )
+    assert sorted(option["stock_on_hand"] for option in options) == [33, 33, 34]
+    assert all(not option["draft"] and option["visibility"] == "on-sale"
+               for option in options)

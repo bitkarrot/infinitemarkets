@@ -702,7 +702,6 @@ async def test_stock_rejection_does_not_leave_recoverable_received_order(runtime
     [
         ("draft", True), ("visibility", "hidden"),
         ("nip99_status", "deleted"), ("recurring_frequency", "monthly"),
-        ("import_source_kind", "shopify"),
     ],
 )
 async def test_claim_rechecks_product_after_quote(runtime_env, monkeypatch, column, value):
@@ -742,13 +741,15 @@ async def test_claim_rechecks_product_after_quote(runtime_env, monkeypatch, colu
     assert row["stock_reserved"] == 0
 
 
-async def test_import_marker_cannot_sell_without_cutover_epoch(runtime_env):
+async def test_import_marker_sells_normally(runtime_env):
+    """Imported rows are ordinary products — no cutover gate. A row with
+    import markers sells and reserves stock like any other."""
     checkout = _svcs()["checkout"]
     db_module = importlib.import_module("infinitemarkets.db")
     client = runtime_env["client"]
     headers = {"Origin": ORIGIN, "X-CSRF-Token": client.cookies.get("gm_csrf")}
     response = await client.post(f"{API}/products", headers=headers, json={
-        "category_id": runtime_env["category_id"], "title": "unverified import",
+        "category_id": runtime_env["category_id"], "title": "imported item",
         "amount_minor": 100, "currency": "SAT", "format": "digital",
         "visibility": "on-sale", "stock_on_hand": 3,
     })
@@ -756,27 +757,26 @@ async def test_import_marker_cannot_sell_without_cutover_epoch(runtime_env):
     product = response.json()
     async with db_module.DomainTransaction() as tx:
         await tx.execute(
-            f"UPDATE {tx.table('products')} SET import_source_kind = 'nostrmarket', "
+            f"UPDATE {tx.table('products')} SET import_source_kind = 'shopify', "
             "import_legacy_id = 'old-product', import_authorized = TRUE WHERE id = :p",
             {"p": product["id"]},
         )
-    with pytest.raises(checkout.ProblemError) as error:
-        await checkout.checkout(
-            payload=await _payload(runtime_env, [{"d_tag": product["d_tag"], "quantity": 1}]),
-            idempotency_key=uuid.uuid4().hex * 2, client_scope="unverified-import",
-        )
-    assert error.value.status == 422
+    result = await checkout.checkout(
+        payload=await _payload(runtime_env, [{"d_tag": product["d_tag"], "quantity": 1}]),
+        idempotency_key=uuid.uuid4().hex * 2, client_scope="imported-product",
+    )
+    assert result["order"]["total_sat"] == 100
     async with db_module.db.connect() as conn:
         row = await conn.fetchone(
             f"SELECT stock_reserved FROM {db_module.table('products')} WHERE id = :p",
             {"p": product["id"]},
         )
-    assert row["stock_reserved"] == 0
+    assert row["stock_reserved"] == 1
 
 
-@pytest.mark.parametrize("imported_parent", [False, True])
+@pytest.mark.parametrize("parent_defect", ["hidden", "draft"])
 async def test_claim_rechecks_variation_parent_after_quote(
-    runtime_env, monkeypatch, imported_parent,
+    runtime_env, monkeypatch, parent_defect,
 ):
     checkout = _svcs()["checkout"]
     db_module = importlib.import_module("infinitemarkets.db")
@@ -798,16 +798,14 @@ async def test_claim_rechecks_variation_parent_after_quote(
 
     async def stale_parent(**kwargs):
         async with db_module.DomainTransaction() as tx:
-            if imported_parent:
+            if parent_defect == "hidden":
                 await tx.execute(
-                    f"UPDATE {tx.table('products')} "
-                    "SET import_source_kind = 'nostrmarket', "
-                    "import_legacy_id = 'legacy-parent', import_authorized = TRUE "
-                    "WHERE id = :p", {"p": parent.json()["id"]},
+                    f"UPDATE {tx.table('products')} SET visibility = 'hidden' WHERE id = :p",
+                    {"p": parent.json()["id"]},
                 )
             else:
                 await tx.execute(
-                    f"UPDATE {tx.table('products')} SET visibility = 'hidden' WHERE id = :p",
+                    f"UPDATE {tx.table('products')} SET draft = TRUE WHERE id = :p",
                     {"p": parent.json()["id"]},
                 )
         return await original(**kwargs)

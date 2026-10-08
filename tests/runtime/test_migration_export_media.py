@@ -39,11 +39,11 @@ async def _merchant(runtime_env):
     return (await client.get(f"{API}/merchants/current")).json()
 
 
-async def test_export_reimport_and_attested_activation(runtime_env):
-    """Native export → CSV → reimport as blocked drafts → attest →
-    physical count → publishable. Formula injection is escaped."""
+async def test_export_reimport_and_activation(runtime_env):
+    """Native export → CSV → reimport as drafts → publish directly.
+    Formula injection is escaped."""
     client = runtime_env["client"]
-    await _merchant(runtime_env)
+    merchant = await _merchant(runtime_env)
     headers = _headers(client)
 
     cat = await client.post(
@@ -79,6 +79,18 @@ async def test_export_reimport_and_attested_activation(runtime_env):
         headers=headers,
     )
     assert variant.status_code == 201, variant.text
+    medium = await client.post(
+        f"{API}/products",
+        json={
+            "category_id": cat.json()["id"], "title": "Medium",
+            "product_type": "variation", "parent_product_id": product.json()["id"],
+            "amount_minor": 1299, "currency": "USD", "currency_decimals": 2,
+            "stock_on_hand": 4, "visibility": "on-sale", "format": "digital",
+            "specs": [{"key": "Size", "value": "M"}],
+        },
+        headers=headers,
+    )
+    assert medium.status_code == 201, medium.text
 
     exported = await client.get(f"{API}/migration/products/export")
     assert exported.status_code == 200, exported.text
@@ -92,15 +104,15 @@ async def test_export_reimport_and_attested_activation(runtime_env):
         r for r in rows if r["row"] == "product" and "cmd" in r["title"]
     )
     assert parent["title"].startswith("'=")  # formula-escaped
-    variant_row = next(r for r in rows if r["row"] == "variant")
-    assert variant_row["parent_handle"] in exported_handles
-    assert variant_row["option_1"] == "Size=L"
-    assert variant_row["stock_on_hand"] == "3"
+    variant_rows = [r for r in rows if r["row"] == "variant"]
+    assert all(r["parent_handle"] in exported_handles for r in variant_rows)
+    assert {(r["option_1"], r["stock_on_hand"]) for r in variant_rows} == {
+        ("Size=L", "3"), ("Size=M", "4")
+    }
 
-    # Re-import into the same merchant (source_instance varies per run via
-    # timestamp inside execute, so re-importing own export is allowed).
+    # Re-import into the same merchant using the default catalog identifier.
     upload = {"file": ("export.csv", text.encode(), "text/csv")}
-    form = {"currency": "USD", "source_instance": "self-reimport"}
+    form = {}
     preview = await client.post(
         f"{API}/migration/native/preview", data=form, files=upload,
         headers=headers,
@@ -114,16 +126,33 @@ async def test_export_reimport_and_attested_activation(runtime_env):
     assert imported.status_code == 200, imported.text
     import_id = imported.json()["import_id"]
 
-    staged = await client.post(
-        f"{API}/migration/imports/{import_id}/cutover", headers=headers,
+    audit = await client.get(
+        f"{API}/migration/imports/{import_id}", headers=headers
     )
-    assert staged.status_code == 200, staged.text
-    attested = await client.post(
-        f"{API}/migration/cutovers/{staged.json()['id']}/attest",
+    assert audit.status_code == 200, audit.text
+    imported_id = audit.json()["rows"][0]["product_id"]
+    published = await client.patch(
+        f"{API}/products/{imported_id}",
+        json={"draft": False, "visibility": "on-sale"},
         headers=headers,
     )
-    assert attested.status_code == 200, attested.text
-    assert attested.json()["state"] == "complete"
+    assert published.status_code == 200, published.text
+    from infinitemarkets.db import db, table
+
+    async with db.connect() as conn:
+        children = await conn.fetchall(
+            f"SELECT draft, visibility FROM {table('products')} "
+            "WHERE parent_product_id = :p", {"p": imported_id},
+        )
+    assert children and all(
+        not child["draft"] and child["visibility"] == "on-sale"
+        for child in children
+    )
+    page = await client.get(
+        f"/infinitemarkets/p/{merchant['pubkey']}/{published.json()['d_tag']}"
+    )
+    assert page.status_code == 200
+    assert page.text.count('name="variation"') == 2
 
 
 async def test_export_is_merchant_scoped(runtime_env):

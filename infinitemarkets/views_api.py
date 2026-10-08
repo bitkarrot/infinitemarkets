@@ -486,14 +486,14 @@ async def _catalog_upload(request: Request, *, execute: bool, source_kind: str):
     except MultiPartException as exc:
         raise unprocessable("invalid-content", "invalid import form") from exc
     try:
-        expected = {"file", "currency", "source_instance"}
+        required = {"file"}
+        if source_kind != "infinitemarkets":
+            required.add("currency")
         if execute:
-            expected.add("source_hash")
-        if "image_selection" in form:
-            expected.add("image_selection")
-        if "mapping" in form:
-            expected.add("mapping")
-        if set(form.keys()) != expected or len(form.multi_items()) != len(expected):
+            required.add("source_hash")
+        allowed = required | {"currency", "source_instance", "image_selection", "mapping"}
+        if (not required <= set(form) or set(form) - allowed
+                or len(form.multi_items()) != len(form)):
             raise unprocessable("invalid-content", "unexpected import fields")
         upload = form["file"]
         extensions = (
@@ -506,7 +506,7 @@ async def _catalog_upload(request: Request, *, execute: bool, source_kind: str):
         if source_kind not in ("shopify", "infinitemarkets") and (
                 {"image_selection", "mapping"} & set(form)):
             raise unprocessable("invalid-content", "CSV options are only for Shopify")
-        fields = tuple(form[name] for name in expected - {"file", "image_selection", "mapping"})
+        fields = tuple(form[name] for name in set(form) - {"file", "image_selection", "mapping"})
         if any(not isinstance(value, str) or len(value) > 100 for value in fields):
             raise unprocessable("invalid-content", "invalid import fields")
         selection = None
@@ -530,7 +530,8 @@ async def _catalog_upload(request: Request, *, execute: bool, source_kind: str):
         data = await upload.read(MAX_UPLOAD_BYTES + 1)
         if len(data) > MAX_UPLOAD_BYTES:
             raise unprocessable("invalid-content", "import exceeds upload limit")
-        return (data, form["currency"], form["source_instance"],
+        source_instance = form.get("source_instance") or source_kind + "-catalog"
+        return (data, form.get("currency") or "SAT", source_instance,
                 form.get("source_hash"), selection, mapping)
     finally:
         await form.close()
@@ -557,110 +558,6 @@ async def save_import_preset(
         )
     except ValueError as exc:
         raise unprocessable("invalid-content", str(exc)) from exc
-
-
-@infinitemarkets_api_router.post("/migration/imports/{import_id}/cutover")
-@problem_boundary
-async def stage_cutover(
-    request: Request, import_id: str, user: User = Depends(check_user_exists),
-):
-    from .services import cutover
-
-    return await cutover.stage_import(await _mid(user), user, import_id)
-
-
-@infinitemarkets_api_router.get("/migration/cutovers/{epoch_id}")
-@problem_boundary
-async def get_cutover(epoch_id: str, user: User = Depends(check_user_exists)):
-    from .services import cutover
-
-    return await cutover.cutover_status(await _mid(user), user, epoch_id)
-
-
-@infinitemarkets_api_router.post("/migration/cutovers/{epoch_id}/freeze-request")
-@problem_boundary
-async def request_cutover_freeze(
-    request: Request, epoch_id: str, user: User = Depends(check_user_exists),
-):
-    from .services import cutover
-
-    return await cutover.request_freeze(await _mid(user), user, epoch_id)
-
-
-@infinitemarkets_api_router.post("/migration/cutovers/{epoch_id}/check-source")
-@problem_boundary
-async def check_cutover_source(
-    request: Request, epoch_id: str, user: User = Depends(check_user_exists),
-):
-    from .services import cutover
-
-    return await cutover.check_source(await _mid(user), user, epoch_id)
-
-
-@infinitemarkets_api_router.post("/migration/cutovers/{epoch_id}/abort")
-@problem_boundary
-async def abort_cutover_staging(
-    request: Request, epoch_id: str, user: User = Depends(check_user_exists),
-):
-    from .services import cutover
-
-    return await cutover.abort_staging(await _mid(user), user, epoch_id)
-
-
-class LiabilityActionBody(_Strict):
-    action: str = Field(pattern="^(wait|partition|reconcile)$")
-
-
-@infinitemarkets_api_router.get("/migration/cutovers/{epoch_id}/liabilities")
-@problem_boundary
-async def list_cutover_liabilities(
-    epoch_id: str, user: User = Depends(check_user_exists),
-):
-    from .services import cutover
-
-    return await cutover.list_liabilities(await _mid(user), user, epoch_id)
-
-
-@infinitemarkets_api_router.post(
-    "/migration/cutovers/{epoch_id}/liabilities/{liability_id}"
-)
-@problem_boundary
-async def choose_liability_disposition(
-    request: Request,
-    epoch_id: str,
-    liability_id: str,
-    body: LiabilityActionBody,
-    user: User = Depends(check_user_exists),
-):
-    from .services import cutover
-
-    merchant_id = await _mid(user)
-    if body.action == "wait":
-        return await cutover.choose_wait(merchant_id, user, epoch_id, liability_id)
-    if body.action == "partition":
-        return await cutover.choose_partition(merchant_id, user, epoch_id, liability_id)
-    return await cutover.reconcile_liability(merchant_id, user, epoch_id, liability_id)
-
-
-@infinitemarkets_api_router.post("/migration/cutovers/{epoch_id}/complete")
-@problem_boundary
-async def complete_cutover(
-    request: Request, epoch_id: str, user: User = Depends(check_user_exists),
-):
-    from .services import cutover
-
-    return await cutover.complete_cutover(await _mid(user), user, epoch_id)
-
-
-@infinitemarkets_api_router.post("/migration/cutovers/{epoch_id}/attest")
-@problem_boundary
-async def attest_cutover(
-    request: Request, epoch_id: str, user: User = Depends(check_user_exists),
-):
-    """Merchant attestation for zero-liability non-nostrmarket imports."""
-    from .services import cutover
-
-    return await cutover.attest_no_liabilities(await _mid(user), user, epoch_id)
 
 
 @infinitemarkets_api_router.get("/migration/products/export")
@@ -1034,23 +931,6 @@ async def delete_product(
 ):
     return await category_service.delete_product(
         await _mid(user), user, product_id
-    )
-
-
-class StockCountBody(_Strict):
-    quantity: int = Field(ge=0, le=2**31 - 1)
-
-
-@infinitemarkets_api_router.post("/products/{product_id}/stock-count")
-@problem_boundary
-async def confirm_product_stock_count(
-    request: Request,
-    product_id: str,
-    body: StockCountBody,
-    user: User = Depends(check_user_exists),
-):
-    return await category_service.confirm_stock_count(
-        await _mid(user), user, product_id, body.quantity
     )
 
 

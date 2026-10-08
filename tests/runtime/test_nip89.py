@@ -185,7 +185,7 @@ async def test_public_product_page_states(runtime_env):
         headers=headers,
     )
     resp = await client.get(url)
-    assert "Sold out" in resp.text
+    assert "Out of Stock" in resp.text
     assert "btn-buy" not in resp.text
 
     # hidden -> not available

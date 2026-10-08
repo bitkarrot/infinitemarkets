@@ -1055,6 +1055,28 @@ async def _detail_list(table_name: str, product_id: str,
     return [dict(r) for r in rows]
 
 
+async def _publish_import_variants(
+    tx: DomainTransaction, merchant_id: str, parent_id: str,
+    pubkey: str, visibility: str, now: int,
+) -> None:
+    children = await tx.fetch_all(
+        f"SELECT id, revision FROM {tx.table('products')} "
+        "WHERE parent_product_id = :p AND merchant_id = :m "
+        f"AND import_source_kind IS NOT NULL AND draft AND deleted_at IS NULL{tx.for_update}",
+        {"p": parent_id, "m": merchant_id},
+    )
+    for child in children:
+        await tx.execute(
+            f"UPDATE {tx.table('products')} SET draft = FALSE, "
+            "visibility = :v, revision = revision + 1, updated_at = :t "
+            "WHERE id = :i",
+            {"i": child["id"], "v": visibility, "t": now},
+        )
+        await _enqueue_product(
+            tx, merchant_id, child["id"], child["revision"] + 1, pubkey
+        )
+
+
 async def patch_product(merchant_id: str, user, product_id: str,
                         patch: dict) -> dict:
     merchant = await _merchant_owned(merchant_id, user)
@@ -1082,30 +1104,11 @@ async def patch_product(merchant_id: str, user, product_id: str,
 
     now = _now()
     async with DomainTransaction() as tx:
-        import_row = await tx.fetch_one(
-            f"SELECT import_source_kind, "
-            f"{released_product_select('products', tx.table)} "
-            f"FROM {tx.table('products')} "
+        await tx.fetch_one(
+            f"SELECT id FROM {tx.table('products')} "
             f"WHERE id = :i AND merchant_id = :m{tx.for_update}",
             {"i": product_id, "m": merchant_id},
         )
-        if (
-            import_row
-            and import_row["import_source_kind"] is not None
-            and not import_row["import_released"]
-            and (
-                patch.get("draft") is False
-                or patch.get("visibility") in ("on-sale", "pre-order")
-            )
-        ):
-            raise conflict(
-                "import-blocked",
-                "This product came from an import and stays blocked until "
-                "its import is released. In the Migration tab: select the "
-                "import, choose 'Prepare to move old products', attest or "
-                "reconcile it, then record a stock count for the product "
-                "(and each size option) before publishing.",
-            )
         if "product_type" in patch or "parent_product_id" in patch:
             # re-validate the resulting combination
             parent_id = await _validate_variation(
@@ -1188,45 +1191,14 @@ async def patch_product(merchant_id: str, user, product_id: str,
         await _enqueue_product(
             tx, merchant_id, product_id, new_revision, merchant["pubkey"]
         )
+        if (row["product_type"] == "variable" and row["import_source_kind"]
+                and not fields.get("draft", row["draft"])
+                and fields.get("visibility", row["visibility"]) != "hidden"):
+            await _publish_import_variants(
+                tx, merchant_id, product_id, merchant["pubkey"],
+                fields.get("visibility", row["visibility"]), now,
+            )
     return await get_product(merchant_id, user, product_id)
-
-
-async def confirm_stock_count(
-    merchant_id: str, user, product_id: str, quantity: int
-) -> dict:
-    """Merchant attests a physical count for an imported product — required
-    (with a ``complete`` cutover epoch) before it can publish or sell.
-    Counts below already-reserved stock fail closed."""
-    if not isinstance(quantity, int) or quantity < 0:
-        raise unprocessable("invalid-content", "quantity must be a non-negative integer")
-    await _merchant_owned(merchant_id, user)
-    async with DomainTransaction() as tx:
-        row = await tx.fetch_one(
-            f"SELECT stock_reserved, import_source_kind "
-            f"FROM {tx.table('products')} "
-            f"WHERE id = :i AND merchant_id = :m AND deleted_at IS NULL"
-            f"{tx.for_update}",
-            {"i": product_id, "m": merchant_id},
-        )
-        if not row:
-            raise not_found("product not found")
-        if row["import_source_kind"] is None:
-            raise conflict(
-                "not-imported",
-                "Physical counts only apply to imported products",
-            )
-        if row["stock_reserved"] > quantity:
-            raise conflict(
-                "insufficient-stock",
-                "Reserved stock exceeds the counted quantity",
-            )
-        await tx.execute(
-            f"UPDATE {tx.table('products')} "
-            "SET stock_on_hand = :q, stock_counted_at = :t, updated_at = :t "
-            "WHERE id = :i AND merchant_id = :m",
-            {"i": product_id, "q": quantity, "t": _now(), "m": merchant_id},
-        )
-    return {"id": product_id, "stock_on_hand": quantity, "stock_counted": True}
 
 
 async def bulk_products(
@@ -1287,19 +1259,6 @@ async def bulk_products(
         by_id = {row["id"]: row for row in rows}
         if len(by_id) != len(ids):
             raise not_found("one or more products not found")
-        if action == "publish" or (action == "visibility" and value != "hidden"):
-            if any(
-                row["import_source_kind"] is not None and not row["import_released"]
-                for row in rows
-            ):
-                raise conflict(
-                    "import-blocked",
-                    "One or more imported products are still blocked. "
-                    "Release their import first (Migration tab → 'Prepare "
-                    "to move old products' → attest/reconcile → record "
-                    "stock counts), then retry.",
-                )
-
         if action == "delete":
             for product_id in ids:
                 await _delete_product_locked(
@@ -1404,6 +1363,14 @@ async def bulk_products(
                     product_id,
                     product["revision"],
                     merchant["pubkey"],
+                )
+            row = by_id[product_id]
+            visible = value if action == "visibility" else row["visibility"]
+            draft = action != "publish" and bool(row["draft"])
+            if (action in ("publish", "visibility") and row["product_type"] == "variable"
+                    and row["import_source_kind"] and not draft and visible != "hidden"):
+                await _publish_import_variants(
+                    tx, merchant_id, product_id, merchant["pubkey"], visible, now
                 )
     return {"updated": len(ids), "product_ids": ids}
 

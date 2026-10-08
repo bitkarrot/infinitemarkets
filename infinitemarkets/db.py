@@ -102,38 +102,16 @@ def _raw_sqlite(conn: Connection):
 
 
 def released_product_clause(ref: str, table_fn) -> str:
-    """SQL predicate — True when a product is not a cutover-blocked import.
-
-    ``ref`` is the product table alias/name usable inside the predicate.
-    Imported rows stay blocked until a ``complete`` epoch covers their
-    import AND the merchant has recorded an explicit physical stock count
-    (``stock_counted_at``); ``import_authorized`` alone is never
-    sufficient. ``table_fn`` qualifies names per dialect (``db.table``
-    outside, ``tx.table`` inside).
-    """
-    return (
-        f"({ref}.import_source_kind IS NULL OR ("
-        f"{ref}.stock_counted_at IS NOT NULL AND EXISTS ("
-        f"SELECT 1 FROM {table_fn('import_rows')} r "
-        f"JOIN {table_fn('catalog_imports')} ci ON ci.id = r.import_id "
-        f"AND ci.merchant_id = {ref}.merchant_id "
-        f"JOIN {table_fn('cutover_epochs')} e ON e.import_id = r.import_id "
-        f"AND e.merchant_id = ci.merchant_id AND e.state = 'complete' "
-        f"WHERE r.product_id = {ref}.id)))"
-    )
+    """SQL predicate — always true. Imported products are ordinary drafts:
+    the cutover/attestation gate was removed, so nothing blocks a row on
+    ``import_source_kind``. Kept at call sites so the predicate signature
+    is stable and queries stay readable."""
+    return "1 = 1"
 
 
 def released_product_select(ref: str, table_fn) -> str:
-    """SELECT fragment — ``import_released`` bool for dict-based checks."""
-    return (
-        f"({ref}.stock_counted_at IS NOT NULL AND EXISTS ("
-        f"SELECT 1 FROM {table_fn('import_rows')} r "
-        f"JOIN {table_fn('catalog_imports')} ci ON ci.id = r.import_id "
-        f"AND ci.merchant_id = {ref}.merchant_id "
-        f"JOIN {table_fn('cutover_epochs')} e ON e.import_id = r.import_id "
-        f"AND e.merchant_id = ci.merchant_id AND e.state = 'complete' "
-        f"WHERE r.product_id = {ref}.id)) AS import_released"
-    )
+    """SELECT fragment — ``import_released`` is always true now."""
+    return "1 AS import_released"
 
 
 def effective_stock_select(ref: str, table_fn) -> str:

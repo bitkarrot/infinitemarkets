@@ -21,11 +21,6 @@
           selections: {},
           selectionDirty: false,
           imports: [],
-          audit: null,
-          cutover: null,
-          liabilities: [],
-          stockCounts: {},
-          sourceCheck: null,
           preview: null,
           result: null,
           error: null,
@@ -40,111 +35,6 @@
           this.gmMigration.presets = await this.gmApi("GET", "/migration/csv-presets");
         } catch (error) {
           this.gmMigration.error = this.gmProblemCopy(error.problem);
-        }
-      },
-      gmLoadImportAudit: async function (id) {
-        try {
-          this.gmMigration.cutover = null;
-          this.gmMigration.liabilities = [];
-          this.gmMigration.sourceCheck = null;
-          this.gmMigration.audit = await this.gmApi("GET", "/migration/imports/" + id);
-        } catch (error) {
-          this.gmMigration.error = this.gmProblemCopy(error.problem);
-        }
-      },
-      gmStageCutover: async function (id) {
-        try {
-          this.gmMigration.sourceCheck = null;
-          this.gmMigration.cutover = await this.gmApi(
-            "POST", "/migration/imports/" + id + "/cutover", {}
-          );
-          await this.gmLoadCutover(this.gmMigration.cutover.id);
-        } catch (error) {
-          this.gmMigration.error = this.gmProblemCopy(error.problem);
-        }
-      },
-      gmLoadCutover: async function (id) {
-        try {
-          this.gmMigration.cutover = await this.gmApi(
-            "GET", "/migration/cutovers/" + id
-          );
-          var reconciling = [
-            "snapshot_verified", "reconciling", "ready", "complete"
-          ].indexOf(this.gmMigration.cutover.state) !== -1;
-          if (reconciling) {
-            var list = await this.gmApi(
-              "GET", "/migration/cutovers/" + id + "/liabilities"
-            );
-            this.gmMigration.liabilities = list.liabilities;
-          } else {
-            this.gmMigration.liabilities = [];
-          }
-        } catch (error) {
-          this.gmMigration.error = this.gmProblemCopy(error.problem);
-        }
-      },
-      gmCutoverAction: async function (action) {
-        var epoch = this.gmMigration.cutover;
-        try {
-          this.gmMigration.sourceCheck = null;
-          await this.gmApi("POST", "/migration/cutovers/" + epoch.id + "/" + action, {});
-          await this.gmLoadCutover(epoch.id);
-        } catch (error) {
-          this.gmMigration.error = this.gmProblemCopy(error.problem);
-        }
-      },
-      gmLiabilityAction: async function (liabilityId, action) {
-        var epoch = this.gmMigration.cutover;
-        try {
-          this.gmMigration.busy = true;
-          await this.gmApi(
-            "POST",
-            "/migration/cutovers/" + epoch.id + "/liabilities/" + liabilityId,
-            { action: action }
-          );
-          await this.gmLoadCutover(epoch.id);
-        } catch (error) {
-          this.gmMigration.error = this.gmProblemCopy(error.problem);
-        } finally {
-          this.gmMigration.busy = false;
-        }
-      },
-      gmRecordStockCount: async function (productId) {
-        var state = this.gmMigration;
-        var quantity = parseInt(state.stockCounts[productId], 10);
-        if (!Number.isInteger(quantity) || quantity < 0) {
-          state.error = "Enter a non-negative counted quantity.";
-          return;
-        }
-        try {
-          state.busy = true;
-          await this.gmApi(
-            "POST", "/products/" + productId + "/stock-count",
-            { quantity: quantity }
-          );
-          state.error = null;
-          if (state.cutover) {
-            await this.gmLoadCutover(state.cutover.id);
-          }
-        } catch (error) {
-          state.error = this.gmProblemCopy(error.problem);
-        } finally {
-          state.busy = false;
-        }
-      },
-      gmCheckOldSource: async function () {
-        var state = this.gmMigration;
-        state.busy = true;
-        state.error = null;
-        state.sourceCheck = null;
-        try {
-          state.sourceCheck = await this.gmApi(
-            "POST", "/migration/cutovers/" + state.cutover.id + "/check-source", {}
-          );
-        } catch (error) {
-          state.error = this.gmProblemCopy(error.problem);
-        } finally {
-          state.busy = false;
         }
       },
       gmChooseCsvPreset: function (id) {
@@ -204,8 +94,15 @@
         try {
           var form = new FormData();
           form.append("file", state.file);
-          form.append("currency", state.currency.trim().toUpperCase());
-          form.append("source_instance", state.sourceInstance.trim());
+          if (state.sourceKind !== "infinitemarkets") {
+            if (!state.currency || !state.currency.trim()) {
+              throw new Error("Select the currency used in this catalog.");
+            }
+            form.append("currency", state.currency.trim().toUpperCase());
+          }
+          if (state.sourceInstance.trim()) {
+            form.append("source_instance", state.sourceInstance.trim());
+          }
           if (Object.keys(state.selections).length) {
             form.append("image_selection", JSON.stringify(state.selections));
           }
@@ -239,7 +136,6 @@
             state.result = result;
             state.preview = null;
             this.gmLoadImports();
-            this.gmLoadImportAudit(result.import_id);
             if (this.gmLoadCatalog) this.gmLoadCatalog();
           }
         } catch (error) {

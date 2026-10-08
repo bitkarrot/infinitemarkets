@@ -536,8 +536,7 @@ def preview_native_import(
     )
     return {"source_hash": source_hash, "source_instance": source_instance,
             "source_kind": "infinitemarkets", "products": products,
-            "liabilities": [], "source_completeness": "unknown",
-            "cutover_verified": False}
+            "liabilities": [], "source_completeness": "unknown"}
 
 
 def preview_shopify_import(
@@ -568,8 +567,7 @@ def preview_shopify_import(
             ext_settings().privacy_key, "shopify-source", merchant_id, source_hash
         )
     return {"source_hash": source_hash, "source_instance": source_instance,
-            "products": products, "source_completeness": "unknown",
-            "cutover_verified": False}
+            "products": products, "source_completeness": "unknown"}
 
 
 def preview_legacy_import(
@@ -600,8 +598,7 @@ def preview_legacy_import(
     )
     return {"source_hash": source_hash, "source_instance": source_instance,
             "source_kind": source_kind, "products": normalized["products"],
-            "liabilities": liabilities, "source_completeness": "unknown",
-            "cutover_verified": False}
+            "liabilities": liabilities, "source_completeness": "unknown"}
 
 
 async def execute_shopify_import(
@@ -631,14 +628,12 @@ async def execute_catalog_import(
         )
         if any(p.get("image_selection_required") for p in preview["products"]):
             raise ValueError("Shopify product needs explicit image selection")
-        liabilities_raw = []
     elif source_kind == "infinitemarkets":
         if image_selection is not None or mapping is not None:
             raise ValueError("CSV mapping and image selection are only for Shopify")
         preview = preview_native_import(
             merchant_id, data, source_instance=source_instance,
         )
-        liabilities_raw = []
     else:
         if image_selection is not None or mapping is not None:
             raise ValueError("CSV mapping and image selection are only for Shopify")
@@ -646,9 +641,6 @@ async def execute_catalog_import(
             merchant_id, data, source_kind=source_kind, currency=currency,
             source_instance=source_instance,
         )
-        liabilities_raw = parse_legacy_catalog(
-            data, source_kind=source_kind, currency=currency
-        )["liabilities"]
     if not expected_hash or expected_hash != preview["source_hash"]:
         raise conflict("import-changed", "Import differs from preview")
     products = preview["products"]
@@ -696,7 +688,7 @@ async def execute_catalog_import(
             {"m": merchant_id},
         )
         previous = await tx.fetch_one(
-            f"SELECT id, product_count, commitment_id FROM {tx.table('catalog_imports')} "
+            f"SELECT id, product_count, commitment_id, state FROM {tx.table('catalog_imports')} "
             "WHERE merchant_id = :m AND source_kind = :k "
             "AND source_instance = :s AND source_hash = :h",
             {"m": merchant_id, "k": source_kind,
@@ -704,7 +696,7 @@ async def execute_catalog_import(
         )
         if previous:
             return {"import_id": previous["id"], "product_count": previous["product_count"],
-                    "state": "blocked_drafts", "already_imported": True,
+                    "state": previous["state"], "already_imported": True,
                     "commitment_id": previous["commitment_id"]}
         for product in products:
             existing = await tx.fetch_one(
@@ -739,13 +731,12 @@ async def execute_catalog_import(
             "source_currency, commitment_json, commitment_id, "
             "state, product_count, liability_count, created_at) "
             "VALUES (:i, :m, :k, :s, :h, :c, :j, :e, "
-            "'blocked_drafts', :n, :ln, :t)",
+            "'imported_drafts', :n, :ln, :t)",
             {"i": import_id, "m": merchant_id, "k": source_kind,
              "s": source_instance, "h": expected_hash, "c": currency,
              "j": signed.as_json(), "e": signed.id().to_hex(),
-             "n": len(products), "ln": len(liabilities_raw), "t": now},
+             "n": len(products), "ln": 0, "t": now},
         )
-        product_ids = {}
         for product in products:
             variants = product["variants"]
             product_currency = product.get("currency") or currency
@@ -765,7 +756,6 @@ async def execute_catalog_import(
                 tx, merchant_id, category_id, parent_payload,
                 source_instance, product["handle"], source_kind,
             )
-            product_ids[product["handle"]] = parent_id
             if len(variants) > 1:
                 for index, variant in enumerate(variants):
                     label = (
@@ -798,30 +788,8 @@ async def execute_catalog_import(
                 {"i": uuid.uuid4().hex, "b": import_id, "p": parent_id,
                  "l": product["handle"], "h": normalized_hash, "j": normalized},
             )
-        if liabilities_raw:
-            from .. import crypto
-
-            settings = ext_settings()
-            for raw, summary in zip(liabilities_raw, preview["liabilities"], strict=True):
-                liability_id = uuid.uuid4().hex
-                invoice_enc = crypto.encrypt(
-                    raw["invoice_id"].encode(),
-                    settings.master_keys[settings.active_key_version],
-                    record_id=liability_id, table="imported_liabilities",
-                    column="invoice_ref_enc", key_version=settings.active_key_version,
-                )
-                await tx.execute(
-                    f"INSERT INTO {tx.table('imported_liabilities')} "
-                    "(id, merchant_id, import_id, product_id, invoice_hash, "
-                    "order_hash, invoice_ref_enc, quantity, status, created_at) "
-                    "VALUES (:i, :m, :b, :p, :h, :o, :e, :q, 'unverified', :t)",
-                    {"i": liability_id, "m": merchant_id, "b": import_id,
-                     "p": product_ids[raw["product_legacy_id"]],
-                     "h": summary["invoice_hash"], "o": summary["order_hash"],
-                     "e": invoice_enc, "q": raw["quantity"], "t": now},
-                )
     return {"import_id": import_id, "product_count": len(products),
-            "state": "blocked_drafts", "already_imported": False,
+            "state": "imported_drafts", "already_imported": False,
             "commitment_id": signed.id().to_hex()}
 
 
@@ -947,16 +915,13 @@ def parse_legacy_catalog(data: bytes, *, source_kind: str, currency: str) -> dic
             if not isinstance(content, dict) or content.get("id") != d_tags[0]:
                 raise ValueError(f"Legacy event row {event_index}: identity mismatch")
             (stalls if entry["kind"] == 30017 else products).append(content)
-        orders = []
     else:
         source = _bounded_json(data)
         if not isinstance(source, dict) or set(source) - {"stalls", "products", "orders"}:
             raise ValueError("invalid nostrmarket export")
-        stalls, products, orders = (source.get(name, []) for name in (
-            "stalls", "products", "orders"
-        ))
+        stalls, products = (source.get(name, []) for name in ("stalls", "products"))
     if not all(isinstance(rows, list) and len(rows) <= MAX_ROWS
-               for rows in (stalls, products, orders)) or not products:
+               for rows in (stalls, products)) or not products:
         raise ValueError("legacy catalog requires products")
     stall_ids = set()
     for stall_index, stall in enumerate(stalls, start=1):
@@ -1029,42 +994,7 @@ def parse_legacy_catalog(data: bytes, *, source_kind: str, currency: str) -> dic
             "inventory_unknown": quantity is None, "source_status": active,
             "draft": True, "visibility": "hidden",
         })
-    liabilities, seen_orders, seen_invoices = [], set(), set()
-    for order_index, row in enumerate(orders, start=1):
-        if not isinstance(row, dict) or not isinstance(row.get("id"), str):
-            raise ValueError(f"Legacy order row {order_index}: invalid order")
-        order_id, invoice = row["id"], row.get("invoice_id")
-        if (not order_id or len(order_id) > 128 or order_id in seen_orders
-                or not isinstance(invoice, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", invoice)):
-            raise ValueError(f"Legacy order row {order_index}: invalid order or invoice")
-        if invoice.lower() in seen_invoices:
-            raise ValueError(f"Legacy order row {order_index}: duplicate legacy invoice")
-        seen_invoices.add(invoice.lower())
-        seen_orders.add(order_id)
-        items = row.get("items", row.get("order_items"))
-        if isinstance(items, str):
-            items = _bounded_json(items.encode())
-        if not isinstance(items, list) or not items or len(items) > MAX_ROWS:
-            raise ValueError(f"Legacy order row {order_index}: invalid items")
-        item_ids = set()
-        for item_index, item in enumerate(items, start=1):
-            if not isinstance(item, dict) or item.get("product_id") not in ids:
-                raise ValueError(
-                    f"Legacy order row {order_index} item {item_index}: unknown product"
-                )
-            qty = item.get("quantity")
-            if type(qty) is not int or not 0 < qty <= MAX_STOCK:
-                raise ValueError(
-                    f"Legacy order row {order_index} item {item_index}: invalid quantity"
-                )
-            if item["product_id"] in item_ids or len(liabilities) >= MAX_ROWS:
-                raise ValueError(
-                    f"Legacy order row {order_index} item {item_index}: duplicate or excessive"
-                )
-            item_ids.add(item["product_id"])
-            liabilities.append({"order_id": order_id, "invoice_id": invoice.lower(),
-                                "product_legacy_id": item["product_id"], "quantity": qty})
-    return {"products": normalized, "liabilities": liabilities,
+    return {"products": normalized, "liabilities": [],
             "source_completeness": "unknown"}
 
 
@@ -1225,7 +1155,6 @@ async def audit_import(merchant_id: str, user, import_id: str) -> dict:
         "rows": [{key: row[key] for key in ("legacy_id", "content_hash", "product_id")}
                  for row in rows],
         "liabilities": [dict(row) for row in liabilities],
-        "cutover_verified": False,
     }
 
 
