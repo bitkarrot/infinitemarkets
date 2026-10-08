@@ -824,6 +824,10 @@ test('settings surface: identity, relays, notifications, appearance', async ({
   page
 }) => {
   await page.goto('/infinitemarkets/')
+  const logo = page.getByRole('img', {name: 'Infinite Markets'})
+  await expect(logo).toBeVisible()
+  expect(await logo.evaluate((img: HTMLImageElement) => img.naturalWidth))
+    .toBeGreaterThan(0)
   await page.locator('[data-gm-nav="settings"]').click()
   const settings = page.locator('[data-gm-surface="settings"]')
   await expect(settings.getByText('Relays').first()).toBeVisible({
@@ -835,6 +839,9 @@ test('settings surface: identity, relays, notifications, appearance', async ({
   await expect(
     page.getByRole('button', {name: 'Save relay configuration'})
   ).toBeVisible()
+  await expect(
+    settings.getByRole('button', {name: 'Copy storefront URL'})
+  ).toHaveCount(0)
 
   await settings.getByRole('button', {name: 'Show private key'}).click()
   const secret = settings.getByLabel('Store secret key (nsec)')

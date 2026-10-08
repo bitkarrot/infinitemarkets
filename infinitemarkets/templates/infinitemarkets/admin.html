@@ -50,7 +50,9 @@
   <div v-else class="gm-frame">
   <header class="gm-topbar" data-gm="store-bar">
     <div class="gm-topbar-brand">
-      <span class="gm-topbar-mark">{{ (gm.merchant.display_name || 'S').slice(0, 1).toUpperCase() }}</span>
+      <img class="gm-topbar-logo"
+           src="/infinitemarkets/static/infinitemarkets/img/infinite-markets-logo-128.png"
+           width="40" height="40" alt="Infinite Markets">
       <div>
         <div class="gm-topbar-name">{{ gm.merchant.display_name || 'Your store' }}</div>
         <div class="gm-topbar-meta">
@@ -1565,8 +1567,6 @@
                              label="View public storefront"
                              :href="'/infinitemarkets/public/merchants/' + gm.merchant.pubkey"
                              target="_blank" rel="noopener"></q-btn>
-                      <q-btn color="primary" flat dense label="Copy storefront URL"
-                             @click="gmCopy(gmOrigin() + '/infinitemarkets/public/merchants/' + gm.merchant.pubkey)"></q-btn>
                     </div>
                     <div class="q-mt-sm">
                       <q-badge outline label="Payment preference: manual"></q-badge>
@@ -2801,11 +2801,9 @@
   background: rgba(128, 128, 128, 0.06);
 }
 .gm-topbar-brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.gm-topbar-mark {
-  display: inline-flex; align-items: center; justify-content: center;
+.gm-topbar-logo {
   width: 40px; height: 40px; border-radius: 10px;
-  background: var(--q-primary); color: #fff;
-  font-weight: 800; font-size: 18px; flex: 0 0 auto;
+  object-fit: contain; flex: 0 0 auto;
 }
 .gm-topbar-name { font-size: 18px; font-weight: 700; line-height: 1.2; }
 .gm-topbar-meta { font-size: 12px; opacity: 0.8; margin-top: 2px; }

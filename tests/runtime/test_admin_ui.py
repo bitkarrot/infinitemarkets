@@ -52,6 +52,10 @@ async def test_admin_shell_document(runtime_env):
     assert resp.headers["cache-control"] == "no-store"
     html = resp.text
     assert 'id="gm-admin-root"' in html
+    assert 'class="gm-topbar-logo"' in html
+    assert 'infinite-markets-logo-128.png' in html
+    assert 'gm-topbar-mark' not in html
+    assert 'Copy storefront URL' not in html
     # One nav section — the five surfaces.
     for nav in ("orders", "catalog", "publications", "messages",
                 "settings"):
