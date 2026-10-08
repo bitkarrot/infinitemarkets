@@ -95,6 +95,17 @@ async def test_product_editor_shipping_options(runtime_env):
     assert "EU" not in codes
 
 
+async def test_product_actions_precede_title(runtime_env):
+    html = (await runtime_env["client"].get("/infinitemarkets/")).text
+    assert html.index('data-col="actions"') < html.index('data-col="title"')
+    assert html.index('data-col="delete"') > html.index('data-col="state"')
+    js = (await runtime_env["client"].get(f"{JS}/admin_catalog.js")).text
+    actions = js.index('{ name: "actions", label: "Actions"')
+    title = js.index('{ name: "title", label: "Title"')
+    delete = js.index('{ name: "delete", label: "Delete"')
+    assert actions < title < delete
+
+
 async def test_migration_admin_surface(runtime_env):
     html = (await runtime_env["client"].get("/infinitemarkets/")).text
     assert 'data-gm-nav="migration"' in html

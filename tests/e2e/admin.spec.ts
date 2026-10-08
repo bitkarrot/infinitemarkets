@@ -428,6 +428,29 @@ test('product editor attaches and removes shipping options without unpublishing'
   expect((await detail.json()).shipping_options[0].extra_cost_minor).toBe(125)
 })
 
+test('product quick actions precede title while delete stays at the right edge', async ({page}) => {
+  await page.goto('/infinitemarkets/')
+  await page.setViewportSize({width: 390, height: 844})
+  await page.locator('[data-gm-nav="catalog"]').click()
+  const row = page.locator('[data-gm-table="products"] tbody tr').filter({hasText: seed.physical.title})
+  const title = await row.locator('[data-col="title"]').boundingBox()
+  const quickActions = [
+    row.getByRole('button', {name: 'Edit product'}),
+    row.getByRole('button', {name: 'Preview events'}),
+    row.getByRole('link', {name: 'Preview page'})
+  ]
+  for (const [index, locator] of quickActions.entries()) {
+    const action = await locator.boundingBox()
+    const label = ['Edit product', 'Preview events', 'Preview page'][index]
+    expect(action, `${label} should be rendered`).not.toBeNull()
+    expect(action!.x, `${label} should appear before Title`).toBeLessThan(title!.x)
+    expect(action!.x, `${label} should not require horizontal scrolling`).toBeGreaterThanOrEqual(0)
+    expect(action!.x + action!.width, `${label} should fit at 390px`).toBeLessThanOrEqual(391)
+  }
+  const remove = await row.getByRole('button', {name: 'Delete product'}).boundingBox()
+  expect(remove!.x, 'Delete product should stay after Title').toBeGreaterThan(title!.x)
+})
+
 test('shipping editor selects countries by name and expands the EU zone', async ({page}) => {
   await page.goto('/infinitemarkets/')
   await page.locator('[data-gm-nav="catalog"]').click()

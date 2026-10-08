@@ -687,6 +687,22 @@
                     <q-td auto-width>
                       <q-checkbox v-model="props.selected"></q-checkbox>
                     </q-td>
+                    <q-td key="actions" :props="props" data-col="actions">
+                      <q-btn flat dense round icon="edit" aria-label="Edit product"
+                             @click="gmEditProduct(props.row)">
+                        <q-tooltip>Edit</q-tooltip>
+                      </q-btn>
+                      <q-btn flat dense round icon="visibility" aria-label="Preview events"
+                             @click="gmDryRun(props.row)">
+                        <q-tooltip>Preview events (Nostr payload)</q-tooltip>
+                      </q-btn>
+                      <q-btn flat dense round icon="open_in_new"
+                             aria-label="Preview page"
+                             :href="'/infinitemarkets/preview/' + props.row.id"
+                             target="_blank" rel="noopener">
+                        <q-tooltip>Preview page — draft shown as published</q-tooltip>
+                      </q-btn>
+                    </q-td>
                     <q-td key="title" :props="props" data-col="title">
                       <q-btn v-if="props.row._variantCount" flat dense round
                              size="sm" :icon="gmCatalog.expandedProducts.includes(props.row.id) ? 'expand_more' : 'chevron_right'"
@@ -712,21 +728,7 @@
                     <q-td key="stock" :props="props" data-col="stock">{{ props.row._stock }}</q-td>
                     <q-td key="visibility" :props="props" data-col="visibility">{{ props.row.visibility }}</q-td>
                     <q-td key="state" :props="props" data-col="state">{{ props.row.nip99_status }}</q-td>
-                    <q-td key="actions" :props="props" data-col="actions">
-                      <q-btn flat dense round icon="edit" aria-label="Edit product"
-                             @click="gmEditProduct(props.row)">
-                        <q-tooltip>Edit</q-tooltip>
-                      </q-btn>
-                      <q-btn flat dense round icon="visibility" aria-label="Preview events"
-                             @click="gmDryRun(props.row)">
-                        <q-tooltip>Preview events (Nostr payload)</q-tooltip>
-                      </q-btn>
-                      <q-btn flat dense round icon="open_in_new"
-                             aria-label="Preview page"
-                             :href="'/infinitemarkets/preview/' + props.row.id"
-                             target="_blank" rel="noopener">
-                        <q-tooltip>Preview page — draft shown as published</q-tooltip>
-                      </q-btn>
+                    <q-td key="delete" :props="props" data-col="delete">
                       <q-btn flat dense round color="negative" icon="delete"
                              aria-label="Delete product"
                              @click="gmAskDelete('product', props.row)">

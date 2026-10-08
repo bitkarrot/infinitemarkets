@@ -42,13 +42,14 @@
     return [item.value, item.label];
   }));
   var PRODUCT_COLUMNS = [
+    { name: "actions", label: "Actions", field: "id", align: "left", style: "width: 132px" },
     { name: "title", label: "Title", field: "title", align: "left", sortable: true, style: "width: 240px" },
     { name: "type", label: "Type", field: "product_type", align: "left", style: "width: 150px" },
     { name: "price", label: "Price", field: "_price", align: "left", style: "width: 120px" },
     { name: "stock", label: "Stock", field: "_stock", align: "left", style: "width: 90px" },
     { name: "visibility", label: "Visibility", field: "visibility", align: "left", style: "width: 110px" },
     { name: "state", label: "State", field: "nip99_status", align: "left", style: "width: 100px" },
-    { name: "actions", label: "Actions", field: "id", align: "left", style: "width: 140px" }
+    { name: "delete", label: "Delete", field: "id", align: "left", style: "width: 72px" }
   ];
   var CATEGORY_COLUMNS = [
     { name: "name", label: "Name", field: "name", align: "left", sortable: true, style: "width: 240px" },
