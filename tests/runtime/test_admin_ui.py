@@ -266,6 +266,9 @@ async def test_admin_publications_copy(runtime_env):
     assert 'data-gm="outbox-row"' in html
     assert 'data-gm="outbox-detail"' in html
     assert 'data-gm="relay-check"' in html
+    assert 'data-gm="publications-tabs"' in html
+    assert 'data-gm="relay-check-tab"' in html
+    assert 'name="delivery" label="Delivery"' in html
     assert 'data-gm="relay-check-local-filter"' in html
     assert 'data-gm="relay-check-result-filter"' in html
     assert 'data-gm="reissue-tombstones"' in html

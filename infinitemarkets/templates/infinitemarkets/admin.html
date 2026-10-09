@@ -1136,7 +1136,7 @@
           <q-btn color="primary" unelevated dense no-caps icon="travel_explore"
                  label="Check relays" data-gm="relay-check"
                  :loading="gmPubs.check.busy"
-                 @click="gmRunRelayCheck">
+                 @click="gmPubs.tab = 'relay-check'; gmRunRelayCheck">
           </q-btn>
           <q-btn color="primary" outline dense no-caps icon="delete_sweep"
                  label="Prune history" data-gm="prune-outbox"
@@ -1193,6 +1193,15 @@
           </template>
         </q-banner>
 
+        <q-tabs v-model="gmPubs.tab" dense class="q-mb-md"
+                data-gm="publications-tabs">
+          <q-tab name="delivery" label="Delivery"></q-tab>
+          <q-tab name="relay-check" label="Live relay check"
+                 data-gm="relay-check-tab"></q-tab>
+        </q-tabs>
+        <q-tab-panels v-model="gmPubs.tab" animated>
+          <q-tab-panel name="delivery" class="q-pa-none">
+
         <q-card flat bordered class="q-mb-md" v-if="gmPubs.exceptionOrders.length">
           <q-card-section>
             <div class="text-subtitle2 q-mb-sm">Orders needing attention</div>
@@ -1230,6 +1239,75 @@
           </q-card-section>
         </q-card>
 
+
+
+        <q-card flat bordered>
+          <q-card-section>
+            <div class="text-subtitle2 q-mb-sm">Outbox</div>
+            <div v-if="gmPubs.loading">
+              <q-skeleton type="rect" height="44px" class="q-mb-sm"></q-skeleton>
+            </div>
+            <div v-else-if="!gmPubs.intents.length" class="text-grey-7">
+              No publications pending
+            </div>
+            <q-table v-else dense flat :rows="gmPubs.intents" row-key="id"
+                     :pagination="{ rowsPerPage: 20 }">
+              <template v-slot:header>
+                <q-tr>
+                  <q-th>Kind</q-th><q-th>Reference</q-th><q-th>State</q-th>
+                  <q-th>Attempts</q-th><q-th>Queued</q-th><q-th>Relays</q-th><q-th></q-th>
+                </q-tr>
+              </template>
+              <template v-slot:body="props">
+                <q-tr class="cursor-pointer" tabindex="0"
+                    data-gm="outbox-row"
+                    @click="gmSelectPub(props.row)"
+                    @keydown.enter.prevent="gmSelectPub(props.row)">
+                  <q-td>{{ gmPubKindLabel(props.row) }}</q-td>
+                  <q-td><code>{{ gmTrunc(props.row.aggregate_id, 8, 4) }}</code>
+                    <q-badge v-if="props.row.state === 'superseded'" color="grey"
+                             label="superseded" class="q-ml-xs"></q-badge>
+                  </q-td>
+                  <q-td>
+                    <q-badge :color="props.row.state === 'failed' ? 'negative' : props.row.state === 'partially_published' ? 'warning' : 'primary'"
+                             :text-color="props.row.state === 'partially_published' ? 'dark' : 'white'"
+                             :label="gmPubStateLabel(props.row.state)"></q-badge>
+                  </q-td>
+                  <q-td>{{ props.row.attempts }}</q-td>
+                  <q-td>
+                    {{ gmTime(props.row.created_at) }}
+                    <div v-if="props.row.updated_at && props.row.updated_at !== props.row.created_at"
+                         class="text-caption text-grey-7">
+                      upd {{ gmTime(props.row.updated_at) }}
+                    </div>
+                  </q-td>
+                  <q-td>
+                    <span v-for="p in (props.row.relay_publications || [])"
+                          :key="p.relay_url" class="q-mr-xs">
+                      <q-badge outline
+                               :color="p.result === 'accepted' ? 'positive' : 'negative'"
+                               :label="gmPubCellLabel(p) + ' ' + gmTrunc(p.relay_url.replace('wss://', ''), 10, 4)">
+                      </q-badge>
+                    </span>
+                    <div v-if="props.row.state === 'partially_published'"
+                         class="text-caption text-warning q-mt-xs">
+                      Not yet accepted by:
+                      {{ gmMissingRelays(props.row).join(', ') }}
+                    </div>
+                  </q-td>
+                  <q-td>
+                    <q-btn v-if="['failed', 'partially_published'].includes(props.row.state)"
+                           flat dense label="Retry"
+                           :loading="gmPubs.retrying === props.row.id"
+                           @click.stop="gmRetryIntent(props.row)"></q-btn>
+                  </q-td>
+                </q-tr>
+              </template>
+            </q-table>
+          </q-card-section>
+        </q-card>
+          </q-tab-panel>
+          <q-tab-panel name="relay-check" class="q-pa-none">
         <q-card flat bordered class="q-mb-md" data-gm="relay-check-panel">
           <q-card-section>
             <div class="row items-center q-mb-sm">
@@ -1394,72 +1472,8 @@
             </q-expansion-item>
           </q-card-section>
         </q-card>
-
-        <q-card flat bordered>
-          <q-card-section>
-            <div class="text-subtitle2 q-mb-sm">Outbox</div>
-            <div v-if="gmPubs.loading">
-              <q-skeleton type="rect" height="44px" class="q-mb-sm"></q-skeleton>
-            </div>
-            <div v-else-if="!gmPubs.intents.length" class="text-grey-7">
-              No publications pending
-            </div>
-            <q-table v-else dense flat :rows="gmPubs.intents" row-key="id"
-                     :pagination="{ rowsPerPage: 20 }">
-              <template v-slot:header>
-                <q-tr>
-                  <q-th>Kind</q-th><q-th>Reference</q-th><q-th>State</q-th>
-                  <q-th>Attempts</q-th><q-th>Queued</q-th><q-th>Relays</q-th><q-th></q-th>
-                </q-tr>
-              </template>
-              <template v-slot:body="props">
-                <q-tr class="cursor-pointer" tabindex="0"
-                    data-gm="outbox-row"
-                    @click="gmSelectPub(props.row)"
-                    @keydown.enter.prevent="gmSelectPub(props.row)">
-                  <q-td>{{ gmPubKindLabel(props.row) }}</q-td>
-                  <q-td><code>{{ gmTrunc(props.row.aggregate_id, 8, 4) }}</code>
-                    <q-badge v-if="props.row.state === 'superseded'" color="grey"
-                             label="superseded" class="q-ml-xs"></q-badge>
-                  </q-td>
-                  <q-td>
-                    <q-badge :color="props.row.state === 'failed' ? 'negative' : props.row.state === 'partially_published' ? 'warning' : 'primary'"
-                             :text-color="props.row.state === 'partially_published' ? 'dark' : 'white'"
-                             :label="gmPubStateLabel(props.row.state)"></q-badge>
-                  </q-td>
-                  <q-td>{{ props.row.attempts }}</q-td>
-                  <q-td>
-                    {{ gmTime(props.row.created_at) }}
-                    <div v-if="props.row.updated_at && props.row.updated_at !== props.row.created_at"
-                         class="text-caption text-grey-7">
-                      upd {{ gmTime(props.row.updated_at) }}
-                    </div>
-                  </q-td>
-                  <q-td>
-                    <span v-for="p in (props.row.relay_publications || [])"
-                          :key="p.relay_url" class="q-mr-xs">
-                      <q-badge outline
-                               :color="p.result === 'accepted' ? 'positive' : 'negative'"
-                               :label="gmPubCellLabel(p) + ' ' + gmTrunc(p.relay_url.replace('wss://', ''), 10, 4)">
-                      </q-badge>
-                    </span>
-                    <div v-if="props.row.state === 'partially_published'"
-                         class="text-caption text-warning q-mt-xs">
-                      Not yet accepted by:
-                      {{ gmMissingRelays(props.row).join(', ') }}
-                    </div>
-                  </q-td>
-                  <q-td>
-                    <q-btn v-if="['failed', 'partially_published'].includes(props.row.state)"
-                           flat dense label="Retry"
-                           :loading="gmPubs.retrying === props.row.id"
-                           @click.stop="gmRetryIntent(props.row)"></q-btn>
-                  </q-td>
-                </q-tr>
-              </template>
-            </q-table>
-          </q-card-section>
-        </q-card>
+          </q-tab-panel>
+        </q-tab-panels>
       </section>
 
       <!-- ================= GAM-04: messages workspace ================= -->

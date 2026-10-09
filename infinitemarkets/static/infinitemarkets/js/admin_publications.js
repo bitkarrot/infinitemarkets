@@ -62,6 +62,7 @@
         gmPubs: {
           loading: false,
           error: null,
+          tab: "delivery",
           relays: [],
           defaults: { relays: [], blossom_servers: [] },
           blossomServers: [],
