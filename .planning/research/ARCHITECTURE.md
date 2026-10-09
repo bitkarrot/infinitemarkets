@@ -9,7 +9,7 @@ This document condenses the corrected normative architecture. `docs/technical-sp
 1. **LNbits host** — FastAPI mounting, authentication primitives, extension DB lifecycle, incoming invoice creation/query/listener, configured SMTP, and exchange-rate providers.
 2. **Domain core** — merchant, catalog, inventory, order, reservation, payment projection, fulfillment, and legal transitions. It imports no FastAPI, LNbits, SQL, SDK, or UI code.
 3. **Application services** — catalog publication, checkout, invoice saga, settlement, inbox dispatch, outbox delivery, email, reconciliation, and migration orchestration.
-4. **Protocol adapters** — Gamma/NIP-99/NIP-89, NIP-17/NIP-44/NIP-59, and Release-C NIP-15/NIP-04 DTOs.
+4. **Protocol adapters** — Gamma/NIP-99/NIP-89, NIP-17/NIP-44/NIP-59, retained NIP-15 projections, and file-based catalog parsers.
 5. **Infrastructure adapters** — LNbits payments/auth/SMTP/FX, SQL repositories/transactions, key store, and direct relay transport.
 6. **HTTP/UI** — merchant administration and public catalog/checkout/status routes.
 

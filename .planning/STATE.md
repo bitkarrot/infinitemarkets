@@ -4,43 +4,43 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 04
 current_phase_name: Release C — Catalog Import and Export
-status: in_progress
-stopped_at: Catalog-only import reviewed; documentation and live deployment verification pending
-last_updated: "2026-10-08"
-last_activity: 2026-10-08
-last_activity_desc: Removed cutover and physical-count workflow; CSV/JSON catalogs import as hidden drafts, old order status is ignored, publication uses ordinary Catalog actions
+status: complete
+stopped_at: Release C and post-release merchant operations verified; preparing v0.4 release
+last_updated: "2026-10-09"
+last_activity: 2026-10-09
+last_activity_desc: Catalog-only import/export, merchant profile controls, email history tooling, message profiles, live relay reconciliation, and fresh kind-5 tombstone reissue verified
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 18
-  completed_plans: 15
-  percent: 83
+  completed_plans: 18
+  percent: 100
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-09-20)
+See: .planning/PROJECT.md (updated 2026-10-09)
 
 **Core value:** A merchant can sell one authoritative inventory safely through LNbits-backed web and Nostr flows without duplicate invoices, double allocation, or relay delivery being mistaken for payment truth.
-**Current focus:** Phase 4 — Release C: catalog-only CSV/JSON import/export, merchant review of hidden drafts, and normal Catalog publication; no cutover.
+**Current focus:** v1 roadmap complete; operational hardening, marketplace interoperability, and merchant UX maintenance.
 
 ## Current Position
 
-Phase: 4 (Release C — Catalog Import and Export) — IN PROGRESS (code reviewed locally; documentation and deployment verification pending)
-Status: Phases 1, 2, 3 and 03.1 complete; Phase 4 legacy freeze/reconciliation plans superseded by the catalog-only workflow
-Last activity: 2026-10-08 — simplified imports committed locally; no live deployment of the simplified behavior yet
+Phase: 4 (Release C — Catalog Import and Export) — COMPLETE
+Status: Phases 1, 2, 3, 03.1, and 4 complete; legacy freeze/reconciliation plans remain superseded historical records
+Last activity: 2026-10-09 — catalog-only workflow verified, live relay reconciliation/tombstone reissue deployed, and v0.4 release packaging prepared
 
-Progress: [████████░░] 80% of roadmap phases (4/5)
+Progress: [██████████] 100% of roadmap phases (5/5)
 
-**Ad-hoc work since 03.1 (not phase-planned, committed + deployed, released as v0.1/v0.2):** storefront filters + collection links; configurable index hero; dark/light shopper toggle; Messages list+thread redesign; Publications timestamps/row detail; brand logo URL + footer copy; point-and-click Fine-tune + accent move; single-column merchant settings; primary-colored settings buttons; embeddable shop component (`gm-embed.js` + public products API + CORS), iframe embed with widened CSP, admin Embed snippets; About/More section + screenshots; outbox history prune control; Releases v0.1, v0.2.
+**Ad-hoc work since 03.1 (not phase-planned, committed + deployed, released as v0.1/v0.2 and packaged for v0.4):** storefront filters + collection links; configurable index hero; dark/light shopper toggle; Messages list+thread redesign and counterparty kind-0 profiles; Publications timestamps/row detail, live relay catalog check, filters/sorting, and fresh kind-5 reissue; brand logo URL + footer copy; point-and-click Fine-tune + accent move; single-column merchant settings; primary-colored settings buttons; embeddable shop component (`gm-embed.js` + public products API + CORS), iframe embed with widened CSP, admin Embed snippets; About/More section + screenshots; outbox history prune control; Merchant Nostr Profile (avatar, bio, banner, NIP-05, Lightning address) and owner-only `nsec` reveal; redacted email previews + terminal-history cleanup; sortable Catalog columns and first-column quick actions; searchable country/EU shipping picker; Releases v0.1, v0.2, v0.3.
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 7
+- Total plans completed: 18
 - Average duration: -
 - Total execution time: 0 hours
 
@@ -50,6 +50,9 @@ Progress: [████████░░] 80% of roadmap phases (4/5)
 |-------|-------|-------|----------|
 | 1 | 3 | - | - |
 | 2 | 4 | - | - |
+| 3 | 4 | - | - |
+| 03.1 | 3 | - | - |
+| 4 | 4 historical records | - | - |
 
 **Recent Trend:**
 
@@ -105,10 +108,9 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 - Phase 2 has no remaining blocker. Typography/spacing token consolidation and durable visual snapshot baselines are non-blocking UI recommendations in `02-UI-REVIEW.md`.
 - The new demo uses a fresh disposable database rather than migrating old demo orders and the previously hand-added images. If those records must remain visible, the old database requires a separate recovery plan.
-- Release B cannot claim production readiness without deployed egress controls and external-client evidence.
-- Release C no longer provides cutover, stock-count activation, or reconciliation of old invoices. Prior 04-02 implementation and 04-04 rehearsal documents are historical records, not current release gates.
-- CSV/JSON catalogs import as hidden drafts; merchant review/publication is explicit. Normal local stock and settlement checks still apply, but merchants must avoid selling the same physical units on an old store independently.
-- Product CSV export, native reimport, managed media upload/relink, and storefront profile controls are implemented. Current closeout: review final docs, run verification, and deploy the approved simplified extension without publishing products.
+- Release B cannot claim full production interoperability without deployed egress controls and external-client evidence.
+- Release C provides catalog-only import/export; it does not reconcile old invoices or freeze another store. Operators must avoid selling the same physical units elsewhere independently.
+- Kind-5 deletion is a relay request. The live relay check detects stale deleted copies, and reissue sends fresh tombstones, but relays/clients can still ignore NIP-09.
 
 ### Roadmap Evolution
 
@@ -125,6 +127,6 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 ## Session Continuity
 
-Last session: 2026-10-08
-Stopped at: Catalog-only import implementation locally committed; reviewed fingerprint handling and documenting removal of old cutover before approved live deployment
-Resume file: .planning/ROADMAP.md
+Last session: 2026-10-09
+Stopped at: v1 roadmap and Phase 4 verified; preparing the v0.4 release artifacts and manifest
+Resume file: .planning/phases/04-release-c-migration-and-cutover/04-VERIFICATION.md

@@ -1,6 +1,6 @@
 # infinitemarkets — Technical Specification
 
-**Status:** Normative implementation contract; Release A/B implemented, Release C import work pending
+**Status:** Normative implementation contract; Releases A, B, 03.1, and C are implemented
 **Audience:** Implementers of the `infinitemarkets` LNbits extension
 **Companion document:** `architecture-proposal.md` (architecture and rationale; this document is the normative build contract)
 **Target host baseline:** LNbits `v1.6.2-rc1`, commit `e336fe1`; other versions require CI qualification
@@ -939,6 +939,13 @@ unlimited stock. Lossy rules (must be surfaced in UI preview):
   `["a", "<address>"]` and `["k", "<kind>"]`; the protocol-address row is retained
   with the tombstone event id. A deletion request cannot guarantee erasure from all
   relays/clients and the UI MUST say so.
+- The owner-triggered relay catalog check may report `stale-deleted` when a relay
+  still returns a verified catalog event after a tombstone. The reissue endpoint
+  validates each requested address against locally deleted records and enqueues a
+  fresh kind-5 intent with a newer aggregate revision; it MUST NOT recreate the
+  deleted product/category, alter order/payment state, or directly command a
+  relay. Reissue is bounded to 100 addresses per request because relays are free
+  to ignore NIP-09.
 - Deleting a `shipping_option` or `collection` still referenced by products MUST be
   either rejected with a reference report or executed as an explicit strip-and-
   republish (merchant chooses); dangling `30406`/`30405` references are a defect.

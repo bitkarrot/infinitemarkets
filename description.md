@@ -28,8 +28,15 @@ delivery is never mistaken for payment truth.
 - Embeddable shop: a JavaScript component that renders product cards into
   any static page (including the WebPages extension), an in-page product
   modal mode, and a chrome-free iframe embed
-- Email notifications for order events with per-address test sends
-- Publications outbox with per-relay delivery evidence and a prune control
+- Email notifications for order events with per-address test sends,
+  owner-only redacted queue previews, and terminal-history cleanup
+- Publications outbox with per-relay delivery evidence, live relay catalog
+  reconciliation, filters/sorting, prune control, and fresh kind-5 deletion
+  reissues for stale relay copies
+- Merchant Nostr profile controls for avatar, bio, header image, NIP-05 and
+  Lightning address, plus explicit owner-only store-key reveal
+- Messages show counterparty names/NIP-05/avatars with nostr.at links when a
+  verified kind-0 profile is available from configured relays
 - CSV/JSON product catalog upload with preview; imports land as hidden drafts for
   merchant review and normal Catalog publication (including size options).
   There is no old-order reconciliation, cutover, or physical stock-count gate;

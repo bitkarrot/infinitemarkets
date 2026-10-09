@@ -49,10 +49,10 @@ Screenshots are captured on a seeded demo instance; the Messages view shows a fi
 ## Features
 
 ### Categories & web commerce (Release A)
-- Merchant-defined categories (one primary category per product), curated collections, shipping options, and visibility flags (`on-sale`, `hidden`, `pre-order`, draft)
+- Merchant-defined categories (one primary category per product), curated collections, searchable country-zone shipping options, and visibility flags (`on-sale`, `hidden`, `pre-order`, draft)
 - Public storefront with category and collection browsing, price/currency filters, newest/price/name sorting, and private per-order links
 - Lightning checkout: quote → reservation → invoice → settlement saga with late-settlement reconciliation
-- Reversible order archiving, bulk product operations, order notifications over host SMTP
+- Sortable Catalog tables with first-column Edit/Preview actions, reversible order archiving, bulk product operations, and order notifications over host SMTP
 - NIP-99 product and Gamma collection publication to public relays with durable per-relay outbox evidence
 
 ### Catalog import and export
@@ -69,7 +69,11 @@ Screenshots are captured on a seeded demo instance; the Messages view shows a fi
 - **NIP-42 relay authentication** and paid-relay support (`payment-required` surfaces the invoice for external payment — the extension never spends)
 - **NIP-07 sign-in** for buyers: header account chip with kind-0 name/avatar, dedicated order-history page with retroactive order claiming via private links, token-equivalent access to digital delivery, and a kind-0 profile editor (signed buyer-side, published to the merchant's public relays)
 - **Storefront modes**: `full`, `showcase`, `browse_only`, `nostr_only` — private order links and in-flight invoices keep working in every mode
-- **Admin Messages workspace**: customer/unknown folders, unread markers, thread reply/compose, per-relay delivery evidence, retry, rejected-intake review with mute
+- **Admin Messages workspace**: customer/unknown folders, unread markers, thread reply/compose, per-relay delivery evidence, retry, rejected-intake review with mute, and relay-refreshed counterparty names/NIP-05/avatars with `nostr.at` profile links
+- **Merchant Nostr Profile**: edit name, bio, avatar, header image, NIP-05 (`nip05`) and Lightning (`lud16`) address; the generated/imported store key publishes them as kind-0 profile metadata
+- **Store key custody**: a new merchant gets an encrypted generated `nsec`; the owner may reveal it explicitly from Settings or replace it via `nsec…` import
+- **Recent email queue**: owner-only redacted previews show what was attempted/sent without order-status tokens or digital-delivery secrets; terminal queue history can be cleared
+- **Relay catalog check**: Publications can query configured public relays, verify signed catalog events, classify missing/divergent/draft/stale-deleted copies, and reissue fresh kind-5 deletion requests for stale relay copies
 
 ## Requirements
 
@@ -209,7 +213,8 @@ Copy-ready snippets for all three options (link grid, modal grid, iframe) are in
 - Relay-target egress screening: discovered/inbox relay targets are DNS-resolved and non-global ranges (private, loopback, link-local, multicast, reserved, metadata incl. `169.254.169.254`, CGNAT) rejected at validate, connect, and reconnect — IPv4 and IPv6
 - Bounded relay churn: inbox sessions re-open under per-(merchant, relay) exponential backoff (30 s → 15 min, reset on EOSE); a relay that repeatedly rejects NIP-42 auth is disabled after 10 rejections and flagged `auth-failed` on the relay-health surface (retryable via `POST /merchants/{id}/relay-auth/retry/{relay_url}`); when no enabled inbox relay is usable the merchant admin shows an urgent "inbox unreachable" warning
 - The extension **never** invokes outgoing-payment APIs — paid-relay invoices are surfaced for external payment only
-- Encrypted at rest: NIP-17 payloads and buyer identifiers are stored encrypted; rejected intake is auditable
+- Encrypted at rest: NIP-17 payloads, buyer identifiers, merchant private keys, counterparty profiles, and email queue previews are stored encrypted; rejected intake is auditable
+- Owner-only private-key export is explicit (`POST /merchants/{id}/keys/export`), `no-store`, and disabled in normal merchant responses
 - OS/container egress policy remains an operator responsibility when claiming Release-B conformance (see `PINS.md` §8 and spec decision 30)
 
 ## Conformance status

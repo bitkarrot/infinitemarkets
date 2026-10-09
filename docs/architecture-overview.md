@@ -1,9 +1,10 @@
 # infinitemarkets — Architecture Overview (as built)
 
-**Status:** Implementation-state document covering Releases A/B and catalog
-import/export. `technical-specification.md` is the normative contract. Imported
-products are hidden drafts until explicitly published from Catalog; the
-extension has no cutover or old-order reconciliation workflow.
+**Status:** Implementation-state document covering Releases A/B/03.1/C and
+the post-release merchant operations surfaces. `technical-specification.md` is
+the normative contract. Imported products are hidden drafts until explicitly
+published from Catalog; the extension has no cutover or old-order
+reconciliation workflow.
 
 ## 1. Component diagram
 
@@ -135,12 +136,16 @@ emails, and prune retained data on fixed intervals.
 
 **Deletion.** Soft-delete in the DB → a kind-5 tombstone is published so the
 relay copy stops advertising the item — the row is kept for order and audit
-history.
+history. `Publications → Check relays` verifies current relay copies without
+mutating them; if a relay still serves a deleted address, **Re-request
+deletions** queues a fresh kind-5 event through the outbox. Relays and clients
+may still ignore NIP-09, so the check is the audit tool rather than a delete
+command.
 
-## 4. Post-03.1 surfaces (ad-hoc, released as v0.1–v0.2)
+## 4. Post-03.1 surfaces (ad-hoc, released as v0.1–v0.4)
 
-These shipped between 03.1 and Phase 4 planning — committed on `main` and
-covered by runtime + Playwright tests, but not part of a phase plan.
+These shipped after 03.1, alongside the Phase-4 implementation — committed on
+`main` and covered by runtime + browser tests, but not part of a phase plan.
 
 **Public embedding.** Three ways to put a shop on an external page:
 
@@ -170,6 +175,19 @@ creator credit, screenshot gallery, link cards), the Embed snippets tab,
 Messages redesigned as conversation list + chat thread, Publications rows
 carrying timestamps and clickable detail, and single-column merchant
 settings.
+
+**v0.3–v0.4 merchant operations.** Settings → Merchant Nostr Profile manages
+`name`, bio, avatar, header image, NIP-05, and Lightning address, links to the
+public `nostr.at` profile, and offers explicit owner-only `nsec` reveal/import
+while keeping private key material encrypted at rest. Catalog tables expose
+sortable product columns and keep Edit/Preview actions visible before Title;
+the shipping editor uses a searchable country list with a 27-member European
+Union preset. Settings → Notifications provides redacted, owner-only email
+previews and clears only terminal queue rows. Messages resolves verified
+counterparty kind-0 profiles into name/NIP-05/avatar/link fields with a safe
+`npub` fallback. Publications adds a read-only live relay catalog check,
+sort/filter controls, and bounded fresh kind-5 reissue for stale deleted
+copies.
 
 **Outbox history prune.** `POST /api/v1/merchants/{id}/outbox/prune`
 (`{older_than_days}`, 7–3650) deletes terminal intents — published,

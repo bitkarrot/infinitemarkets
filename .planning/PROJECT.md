@@ -12,16 +12,17 @@ A merchant can sell one authoritative inventory safely through LNbits-backed web
 
 ### Validated
 
-(None yet — Phase 0 must qualify the host, SDK, schema, and protocol contracts before runtime implementation.)
+- Phase 0 qualification (P0-01 through P0-14) has reproducible artifacts.
+- Release A catalog publication and safe public web checkout are implemented and deployed.
+- Release B Gamma NIP-17 order messaging with recipient-specific relay routing is implemented and deployed.
+- Phase 03.1 buyer accounts provide email magic-link and Nostr identity sign-in.
+- Release C catalog import/export is implemented and deployed: CSV/JSON products land as hidden drafts for merchant review and ordinary publication; no cutover or previous-order workflow.
+- One canonical domain model and inventory/payment authority remain shared across web and Nostr adapters.
+- Key custody, privacy, authentication, transaction, recovery, and deployment gates are enforced by the implementation contract.
 
 ### Active
 
-- [ ] Pass every P0-01 through P0-14 conformance criterion with reproducible artifacts.
-- [ ] Deliver Release A catalog publication and safe public web checkout on LNbits.
-- [ ] Deliver Release B Gamma NIP-17 order messaging with recipient-specific relay routing.
-- [ ] Deliver Release C catalog import/export: CSV/JSON products land as hidden drafts for merchant review and ordinary publication; no cutover or previous-order workflow.
-- [ ] Preserve one canonical domain model and one inventory/payment authority across all adapters.
-- [ ] Enforce key custody, privacy, authentication, transaction, recovery, and deployment gates from the normative specification.
+- v1 roadmap complete; ongoing work is operational hardening, marketplace interoperability, and merchant UX maintenance.
 
 ### Out of Scope
 
@@ -58,19 +59,19 @@ A merchant can sell one authoritative inventory safely through LNbits-backed web
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Standard Python LNbits extension | Durable background work, direct relay transport, migrations, and transactions are required | Pending validation |
-| Runtime identifier is `infinitemarkets` | Freeze package/API/payment/AAD identity before persisted data exists | Pending validation |
-| Corrected technical specification is authoritative | Prevent rationale or plan drift from inventing behavior | Pending validation |
-| Phase 0 precedes runtime implementation | Plausible host/SDK assumptions need executable evidence | Pending validation |
-| Direct qualified `nostr-sdk` transport is baseline | NIP-17 requires per-recipient targets and positive ACK evidence | Pending validation |
-| LNbits is settlement authority | Avoid a second payment truth source | Pending validation |
-| Release sequence is A web, B Gamma, C catalog portability | Later imports must not block safe web/Gamma checkout | Implemented; local tests passed |
-| Catalog imports are merchant-approved drafts, not a transfer of inventory authority | Old orders are ignored; merchants handle overlap with another store before publishing | Implemented; local tests passed |
-| SMTP failures are boolean/unclassified in v1 | The pinned host helper erases SMTP failure categories | Pending validation |
-| External relay smoke uses `wss://nostr.net` only with ephemeral synthetic events | Useful interoperability signal without becoming a production dependency | Pending validation |
-| Public checkout uses bounded Editorial/Guided/Compact presets with responsive fallback | Preserve merchant choice without changing checkout semantics or mobile safety | Pending validation |
-| Merchant orders use split list/detail navigation with embedded chronology | Optimize daily triage while keeping payment, inventory, fulfillment, and audit understandable | Pending validation |
-| Storefront themes use preset → brand basics → guarded advanced tiers | Allow merchant identity without arbitrary CSS or admin/checkout drift | Pending validation |
+| Standard Python LNbits extension | Durable background work, direct relay transport, migrations, and transactions are required | Implemented and verified |
+| Runtime identifier is `infinitemarkets` | Freeze package/API/payment/AAD identity before persisted data exists | Implemented and verified |
+| Corrected technical specification is authoritative | Prevent rationale or plan drift from inventing behavior | Implemented and verified |
+| Phase 0 precedes runtime implementation | Plausible host/SDK assumptions need executable evidence | Implemented and verified |
+| Direct qualified `nostr-sdk` transport is baseline | NIP-17 requires per-recipient targets and positive ACK evidence | Implemented and verified |
+| LNbits is settlement authority | Avoid a second payment truth source | Implemented and verified |
+| Release sequence is A web, B Gamma, C catalog portability | Later imports must not block safe web/Gamma checkout | Implemented and verified |
+| Catalog imports are merchant-approved drafts, not a transfer of inventory authority | Old orders are ignored; merchants handle overlap with another store before publishing | Implemented and verified |
+| SMTP failures are boolean/unclassified in v1 | The pinned host helper erases SMTP failure categories | Implemented and verified |
+| External relay smoke uses `wss://nostr.net` only with ephemeral synthetic events | Useful interoperability signal without becoming a production dependency | Superseded in daily operations by the authenticated live relay catalog check |
+| Public checkout uses bounded Editorial/Guided/Compact presets with responsive fallback | Preserve merchant choice without changing checkout semantics or mobile safety | Implemented and verified |
+| Merchant orders use split list/detail navigation with embedded chronology | Optimize daily triage while keeping payment, inventory, fulfillment, and audit understandable | Implemented and verified |
+| Storefront themes use preset → brand basics → guarded advanced tiers | Allow merchant identity without arbitrary CSS or admin/checkout drift | Implemented and verified |
 
 ## Evolution
 
@@ -88,4 +89,4 @@ This document evolves at phase transitions and milestone boundaries.
 3. Update context, constraints, and decision outcomes.
 
 ---
-*Last updated: 2026-09-20 after UI sketch validation*
+*Last updated: 2026-10-09 after Release C/v0.4 verification*

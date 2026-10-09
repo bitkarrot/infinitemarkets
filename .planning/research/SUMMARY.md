@@ -8,7 +8,7 @@ A standard Python LNbits extension is viable. LNbits supplies the necessary exte
 
 ### Table Stakes
 
-The project needs more than event serialization: a canonical commerce domain, atomic reservations, a recoverable invoice saga, durable inbox/outbox/email queues, positive relay ACK evidence, encrypted key/PII storage, explicit host auth/lifecycle enforcement, and restart closure. Release claims must remain staged: A web commerce, B Gamma NIP-17, C NIP-15/migration.
+The project needs more than event serialization: a canonical commerce domain, atomic reservations, a recoverable invoice saga, durable inbox/outbox/email queues, positive relay ACK evidence, encrypted key/PII storage, explicit host auth/lifecycle enforcement, and restart closure. Release claims remain staged: A web commerce, B Gamma NIP-17, and C catalog import/export.
 
 ### Watch Out For
 
@@ -19,7 +19,7 @@ The highest-risk failures are plausible but silent: duplicate invoices after unk
 1. Make conformance qualification the first phase, with no production extension code.
 2. Build Release A as the first complete vertical slice after the gate passes.
 3. Add NIP-17 only after domain/payment/recovery behavior is stable.
-4. Use the final v1 phase for file-only catalog import/export as hidden drafts; old-order reconciliation and cutover were removed from the extension scope.
+4. The final v1 phase shipped file-only catalog import/export as hidden drafts; old-order reconciliation and cutover were removed from extension scope.
 5. Re-run relevant Phase 0 assertions through each real release implementation.
 
 ## Sources

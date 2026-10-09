@@ -1,96 +1,65 @@
-# Phase 04 — Migration & Cutover Verification
+# Phase 04 — Catalog Import and Export Verification
 
-**Historical verification, superseded 2026-10-08:** The original cutover experiment and its results below describe code that was later removed. They are not evidence that current imports perform an old-invoice audit. Current CSV/JSON product imports create hidden drafts for merchant review and ordinary Catalog publication; no cutover/stock-count gate remains. See `docs/technical-specification.md` §13.
+**Date:** 2026-10-09
+**Status:** Complete — catalog-only scope verified and deployed through `main`.
+**Current scope:** file upload/preview/import into hidden drafts, merchant
+review in Catalog, ordinary publication, product CSV export, and optional
+owned-media relink. No cutover, old-order audit, attestation, source freeze, or
+physical-count activation gate is part of the current workflow.
 
-Date: 2026-10-07. Scope: LEG-03..06. Local qualification only — **no live
-cutover, deployment, or push of the freeze gate has occurred.**
+The earlier cutover experiment was removed. Any document or test reference to
+liability reconciliation, frozen intake, attestation, or stock-count release is
+historical only, not current acceptance criteria.
 
-## Observed evidence
+## Verified behavior
 
-### Import → attested activation → guarded sale (Shopify/native)
+- Shopify CSV, native CSV, nostrmarket JSON, and signed NIP-15 event files
+  preview and import as hidden drafts through merchant-owned API actions.
+- Imports preserve product titles, descriptions, prices, source currency,
+  bounded stock values, size options, image references, and variable-product
+  relationships without publishing relay events.
+- Merchants review/edit imported drafts and publish them through normal
+  Catalog actions; publishing a variable parent publishes its imported draft
+  options with it.
+- Native product CSV export is merchant-owned, spreadsheet-safe, and
+  reimportable as hidden drafts; it contains no keys, orders, buyer PII, or
+  reservation internals.
+- Optional media relink uses uploaded files and manifests; URL-to-file hashes
+  and file types are verified before product image references change.
+- Searchable shipping destinations, including the 27-country European Union
+  preset, work independently of catalog import; Shopify shipping rates/zones
+  are not imported.
+- Merchant Nostr Profile saves and publishes `name`, `about`, `picture`,
+  `banner`, `nip05`, and `lud16`; generated/imported keys remain encrypted and
+  the owner can explicitly reveal the `nsec`.
+- Publications exposes a read-only live relay check that verifies signed
+  catalog events and tombstones, reports missing/divergent/stale copies, and
+  can reissue bounded fresh kind-5 deletion requests for locally deleted
+  addresses.
+- Messages resolve verified kind-0 counterparty names, NIP-05 identifiers,
+  avatars, and `nostr.at` links with an `npub` fallback.
+- Email queue history exposes redacted owner-only previews and clears only
+  terminal `sent|suppressed|failed` rows.
 
-- `test_shopify_attested_activation_and_stock_gate`: real 3-product
-  Shopify CSV → preview → execute (blocked drafts) → stage →
-  `POST /cutovers/{id}/attest` → epoch `complete`. Product PATCH to
-  `draft=false` is still 409 until `POST /products/{id}/stock-count` —
-  attestation alone never sells stock. Second attest is idempotent.
-- `test_attest_rejects_nostrmarket_and_liability_imports`: attestation is
-  409 for nostrmarket imports (with or without orders — the same-instance
-  settlement surface exists regardless) and for any import carrying a
-  liability row.
-- `test_export_reimport_and_attested_activation`: export → parse →
-  verify preamble marker, variant `parent_handle`/`option_N=Size=L`
-  round-trip, `'` formula-escape → native preview → execute → stage →
-  attest → complete.
+## Verification commands
 
-### Verified cutover (nostrmarket, same instance)
+- `make verify-runtime` — **428 passed, 3 skipped, 233 deselected** on
+  2026-10-09.
+- `make lint` — passed.
+- Focused relay-check/tombstone and admin UI tests passed.
+- Deployed source matched the reviewed extension files on the live host.
+- Git `main` was pushed through `d0e2c22` before release packaging.
 
-- Full lifecycle verified in `test_cutover.py` (16 tests) and
-  `test_cutover_rehearsal.py` (4 tests), on **both** SQLite and Docker
-  PostgreSQL 18: disable+restart attestation, pinned source-contract hash
-  (real installed nostrmarket @ `d941f0a`, code hash `24759dc4…`),
-  Nostr-signed post-freeze snapshot, per-liability wait/partition/
-  reconcile, exactly-once terminal transitions, completion gate,
-  abort-retains-holds, leased background reconcile pass, and re-block on
-  source reactivation or contract drift.
-- Re-block applies **only** to nostrmarket-sourced epochs — a reactivated
-  old extension cannot disturb a completed Shopify/native attestation.
+## Honest limitations
 
-### Scarce stock (LEG-05)
-
-- `test_scarce_stock_guard_and_surplus`: stock=1 + payable qty=1 —
-  completion and checkout are both refused while unpartitioned; after
-  partition + completion + count, `stock_reserved=1` and the held unit
-  cannot sell (422). stock=2 + qty=1 — the single surplus unit sells,
-  the second unit stays partitioned.
-- `test_shared_stock_primitive_contention`: two concurrent
-  `checkout.checkout` transactions both resolve items before either
-  writes; exactly one wins, loser gets `insufficient-stock` (422), no
-  invoice minted, `stock_reserved ≤ stock_on_hand`. A raw write without
-  the capacity predicate is refused by the schema CHECK constraint —
-  the guard is belt-and-suspenders.
-- `test_unpaid_terminal_releases_hold_exactly_once` /
-  `test_paid_terminal_consumes_hold_exactly_once`: release/consume are
-  exactly-once; repeated reconcile is a no-op.
-
-### Media + storefront
-
-- `test_media_upload_and_relink` / `_rejects_foreign_and_mismatched`:
-  manifest-scoped sha256-verified upload, JPEG/PNG/WebP sniffing,
-  content-addressed storage in host `data/images/infinitemarkets/<ns>/`,
-  relink rewrites owned URLs only; foreign URLs and hash mismatches are
-  rejected.
-- `test_lightnin_dark_storefront_profile`: `lightnin-dark` preset +
-  `storefront.grid=quad` + `hero_hidden` + `footer.logo_url` persist,
-  render `data-grid="quad"`, suppress the hero, and emit `#242833` /
-  `#fce477` tokens; invalid grid values are 422.
-- `tests/e2e/cutover-rehearsal.mjs` (run against seeded e2e host):
-  export preamble verified over HTTP; desktop 1440 renders 4 columns,
-  mobile 390 renders 2, hero toggle round-trips.
-
-## Commands run
-
-- `make lint` — clean (ruff).
-- `uv run pytest tests/runtime` — 445 passed, 4 skipped (SQLite).
-- `uv run pytest tests/runtime/test_cutover.py
-  tests/runtime/test_migration_import.py
-  tests/runtime/test_cutover_rehearsal.py
-  tests/runtime/test_migration_export_media.py` under
-  `LNBITS_DATABASE_URL=postgres://lnbits:lnbits@localhost:5432/lnbits`
-  (docker `postgres:18`) — all pass.
-- `node tests/e2e/cutover-rehearsal.mjs` — all checks pass.
-
-## Honest limitations / residual risk
-
-- **No live cutover has been rehearsed.** The real nostrmarket disable +
-  LNbits restart is an operator action and has not been performed; all
-  freeze evidence in tests is mocked or fixture-driven.
-- Shopify CSVs contain no inventory quantities and no payable-invoice
-  surface — imported stock is *declared, not verified*, and activation is
-  merchant-attested rather than cryptographically proven. The physical
-  stock count gate is the only stock authority for these sources.
-- The merchant media upload is API-level; a browser batch UI for
-  hundreds of images is not built (operator scripting expected).
-- `import_authorized` is now only settable via epoch completion — it is
-  still not sufficient alone to sell (release predicate also requires
-  `stock_counted_at`).
+- Relay ACK proves historical delivery acceptance only; it does not prove a
+  relay currently serves an event. The live relay check is required for that
+  observation.
+- Kind-5 deletion is a request, not a relay command. Relays or clients such
+  as Plebeian Market may retain or ignore stale catalog copies until they
+  implement deletion handling or receive a newer hidden/out-of-stock revision.
+- Shopify exports do not provide shipping rates/zones or a product-to-shipping
+  assignment; merchants configure those in Infinite Markets after import.
+- Public marketplace filters vary. In particular, a regular product without a
+  `stock` tag can be treated as out of stock even when it appears in the
+  marketplace dashboard.

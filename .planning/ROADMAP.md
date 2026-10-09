@@ -15,7 +15,7 @@ The project advances through four gated vertical stages. GSD Phase 1 executes th
 - [x] **Phase 1: Conformance Profile (Contract Phase 0)** - Prove host, SDK, schema, state, security, and protocol assumptions before runtime implementation. (completed 2026-09-20)
 - [x] **Phase 2: Release A — Safe Web Commerce** - Ship catalog publication and LNbits-backed public checkout as the first production vertical slice. (completed 2026-09-27)
 - [x] **Phase 3: Release B — Gamma NIP-17 Orders** - Add encrypted recipient-specific Gamma order messaging and external-client conformance. (completed 2026-09-29)
-- [ ] **Phase 4: Release C — Catalog Import and Export** - Import file-based catalogs as hidden drafts for merchant review and publication; no extension-managed cutover.
+- [x] **Phase 4: Release C — Catalog Import and Export** - Import file-based catalogs as hidden drafts for merchant review and publication; no extension-managed cutover. (completed 2026-10-09)
 
 ## Phase Details
 
@@ -169,7 +169,7 @@ Plans:
 - [x] 04-02: Historical cutover implementation, subsequently removed; not a current phase gate.
 - [x] 04-03: Product CSV export, media upload/relink, storefront profile and native CSV reimport.
 - [x] 04-04: Superseded rehearsal plan; no longer a current release criterion.
-- [ ] Current closeout: verify reviewed catalog-only workflow, tests and live deployment without publishing imported products.
+- [x] Closeout: catalog-only workflow, tests, live deployment, merchant operations surfaces, and relay reconciliation verified for release packaging.
 
 ## Progress
 
@@ -181,4 +181,4 @@ Plans:
 | 2. Release A — Safe Web Commerce | 4/4 | Complete    | 2026-09-27 |
 | 3. Release B — Gamma NIP-17 Orders | 4/4 | Complete    | 2026-09-29 |
 | 03.1. Buyer accounts (INSERTED) | 3/3 | Complete   | 2026-10-05 |
-| 4. Release C — Catalog Import and Export | Catalog workflow implemented; closeout pending | In progress | - |
+| 4. Release C — Catalog Import and Export | Catalog workflow implemented and verified | Complete | 2026-10-09 |

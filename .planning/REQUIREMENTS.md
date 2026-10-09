@@ -70,10 +70,10 @@
 
 - [x] ~~**LEG-01**: Merchant can publish literal NIP-15 `30017`/`30018` projections~~ — **Dropped** (Phase-4 scope amendment: import-only, no live legacy interop).
 - [x] ~~**LEG-02**: Legacy buyer literal NIP-04 type 0/1/2 message exchange~~ — **Dropped** (Phase-4 scope amendment).
-- [ ] **LEG-03**: Merchant can preview and import Shopify CSV, native CSV, nostrmarket JSON and signed NIP-15 event files without arbitrary URL/path/database access or private-key leakage. Only the file and a currency where absent are required; source naming and Shopify mapping are optional. Imports are hidden drafts with merchant-scoped records. Old orders and payment status are ignored.
+- [x] **LEG-03**: Merchant can preview and import Shopify CSV, native CSV, nostrmarket JSON and signed NIP-15 event files without arbitrary URL/path/database access or private-key leakage. Only the file and a currency where absent are required; source naming and Shopify mapping are optional. Imports are hidden drafts with merchant-scoped records. Old orders and payment status are ignored.
 - [x] ~~**LEG-04**: Old-intake freeze, payable-invoice reconciliation and activation gate~~ — **Dropped**. No cutover, attestation, physical stock-count or old-order audit is part of catalog import; old-store inventory coordination is operator-managed.
 - [x] ~~**LEG-05**: Scarce-stock old/new cutover rehearsal~~ — **Dropped**. Normal checkout contention and stock-reservation tests remain required for published products.
-- [ ] **LEG-06**: Merchant can export products as safe, round-trippable CSV and review/import classic/modern Shopify CSV (including options and image-only rows). Optional merchant-supplied media can be validated and relinked without server-side URL fetches; >20 images require explicit selection. Products import as hidden drafts and only become available after explicit Catalog publication. Variable parents and their imported options publish together.
+- [x] **LEG-06**: Merchant can export products as safe, round-trippable CSV and review/import classic/modern Shopify CSV (including options and image-only rows). Optional merchant-supplied media can be validated and relinked without server-side URL fetches; >20 images require explicit selection. Products import as hidden drafts and only become available after explicit Catalog publication. Variable parents and their imported options publish together.
 
 ## v2 Requirements
 
@@ -155,10 +155,10 @@ A requirement is complete only when implementation (or Phase 0 probe/model), aut
 | ACC-05 | Phase 03.1 | Complete |
 | LEG-01 | Phase 4 | Dropped — Phase-4 scope amendment |
 | LEG-02 | Phase 4 | Dropped — Phase-4 scope amendment |
-| LEG-03 | Phase 4 | Pending |
+| LEG-03 | Phase 4 | Complete |
 | LEG-04 | Phase 4 | Dropped — catalog-only scope |
 | LEG-05 | Phase 4 | Dropped — catalog-only scope |
-| LEG-06 | Phase 4 | Pending |
+| LEG-06 | Phase 4 | Complete |
 
 **Coverage:**
 
@@ -168,4 +168,4 @@ A requirement is complete only when implementation (or Phase 0 probe/model), aut
 
 ---
 *Requirements defined: 2026-09-20*
-*Last updated: 2026-10-08 — Release C is catalog-only draft import/export; LEG-04/05 dropped*
+*Last updated: 2026-10-09 — Release C catalog-only draft import/export verified and deployed; LEG-04/05 dropped*
