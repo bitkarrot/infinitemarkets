@@ -1879,7 +1879,8 @@ pages load no third-party scripts.
 - **Release C** (catalog portability): merchant-scoped CSV/JSON import into hidden
   drafts, product preview/edit, ordinary publication, export and optional managed
   media relink. No old-invoice reconciliation or cutover rehearsal is claimed.
-  NIP-15/NIP-04 ordering interop is not a Release-C gate.
+  Retained NIP-15 `30017/30018` projections and the `NIP-04` compatibility
+  surface are not a Release-C live-ordering gate.
 
 ---
 

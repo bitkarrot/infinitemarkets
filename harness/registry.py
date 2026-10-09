@@ -181,10 +181,15 @@ HTTP_ROUTES: tuple[str, ...] = (
     "GET /merchants/current",
     "PATCH /merchants/{id}",
     "POST /merchants/{id}/keys/import",
+    "POST /merchants/{id}/keys/export",
     "POST /merchants/{id}/publish",
     "GET /merchants/{id}/relay-health",
+    "POST /merchants/{id}/catalog/relay-check",
+    "POST /merchants/{id}/catalog/tombstones/reissue",
     "GET /merchants/{id}/notifications",
     "PATCH /merchants/{id}/notifications",
+    "GET /merchants/{id}/notifications/email-queue/{queue_id}",
+    "DELETE /merchants/{id}/notifications/email-queue",
     "POST /merchants/{id}/notifications/test",
     "DELETE /merchants/{id}",
     # 5.2 admin — catalog
@@ -195,21 +200,21 @@ HTTP_ROUTES: tuple[str, ...] = (
     "DELETE /categories/{id}",
     "GET /products",
     "POST /products",
-    "POST /products/bulk",
     "GET /products/{id}",
     "PATCH /products/{id}",
     "DELETE /products/{id}",
+    "POST /products/bulk",
     "POST /products/{id}/images",
     "GET /collections",
     "POST /collections",
+    "GET /collections/{id}",
     "PATCH /collections/{id}",
     "DELETE /collections/{id}",
-    "GET /collections/{id}",
     "GET /shipping",
     "POST /shipping",
+    "GET /shipping/{id}",
     "PATCH /shipping/{id}",
     "DELETE /shipping/{id}",
-    "GET /shipping/{id}",
     "GET /products/{id}/events",
     # 5.3 admin — orders
     # GET /orders is dual use: the admin list route AND the §5.4 signed-in
@@ -247,11 +252,16 @@ HTTP_ROUTES: tuple[str, ...] = (
     "POST /public/nostr/link/email",
     "GET /public/nostr/link/challenge",
     "POST /public/nostr/link/verify",
-    # 5.5 migration
-    "POST /import/nostrmarket/preview",
-    "POST /import/nostrmarket/execute",
-    "GET /import/{job_id}",
-    "POST /import/{job_id}/cutover",
+    # 5.5 catalog import/export
+    "POST /migration/shopify/preview",
+    "POST /migration/shopify/execute",
+    "POST /migration/native/preview",
+    "POST /migration/native/execute",
+    "POST /migration/legacy/{nostrmarket|nip15_events}/preview",
+    "POST /migration/legacy/{nostrmarket|nip15_events}/execute",
+    "GET /migration/imports",
+    "GET /migration/imports/{import_id}",
+    "GET /migration/products/export",
 )
 
 # --- Section 5.6 error codes ----------------------------------------------------
@@ -347,7 +357,9 @@ RELEASE_GATES: dict[str, frozenset[int]] = {
     # Release B: full Gamma merchant — kind-10050, NIP-17 sender+receiver
     # copies, type 1-4 messages, kind-17 receipts.
     "B": frozenset({13, 14, 16, 17, 1059, 10050}),
-    # Release C: interop — NIP-15 30017/30018 + NIP-04 order channel.
+    # Release C: retained compatibility/import event surface — NIP-15
+    # 30017/30018 projections and the NIP-04 order channel are registered but
+    # are not live ordering gates for the catalog-only workflow.
     "C": frozenset({4, 30017, 30018}),
 }
 
@@ -403,7 +415,8 @@ TABLE_CLASSIFICATION: dict[str, str] = {
     "task_leases": TABLE_MODELED,
     "rate_limit_buckets": TABLE_MODELED,
     "settings": TABLE_NOT_MODELED,
-    "migration_jobs": TABLE_NOT_MODELED,
+    "catalog_imports": TABLE_NOT_MODELED,
+    "import_rows": TABLE_NOT_MODELED,
     "email_queue": TABLE_MODELED,
     # Buyer-session tables (plan 03-03, D-01 — not spec §4 literals)
     "nostr_challenges": TABLE_NOT_MODELED,
