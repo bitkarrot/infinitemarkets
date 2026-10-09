@@ -261,6 +261,8 @@ async def test_admin_publications_copy(runtime_env):
     assert "RELAY_CHECK_RESULTS" in js
     assert "inactive-copy-served" in js
     assert "gmRelayCheckKind" in js
+    assert "gmRelayCheckSetLocalStates" in js
+    assert "gmRelayCheckSetResults" in js
     assert js.count("sortable: true") >= 6
     html = (await runtime_env["client"].get("/infinitemarkets/")).text
     assert 'data-gm="outbox-row"' in html

@@ -251,6 +251,12 @@
         }
         return rows;
       },
+      gmRelayCheckSetLocalStates: function (value) {
+        this.gmPubs.check.localStates = Array.isArray(value) ? value : [];
+      },
+      gmRelayCheckSetResults: function (value) {
+        this.gmPubs.check.results = Array.isArray(value) ? value : [];
+      },
       gmRelayCheckClearFilters: function () {
         this.gmPubs.check.localStates = [];
         this.gmPubs.check.results = [];

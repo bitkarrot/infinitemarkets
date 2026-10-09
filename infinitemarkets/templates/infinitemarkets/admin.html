@@ -1336,17 +1336,19 @@
 
             <div class="row q-col-gutter-sm items-center q-mb-sm">
               <div class="col-12 col-sm-4">
-                <q-select v-model="gmPubs.check.localStates" dense outlined
+                <q-select :model-value="gmPubs.check.localStates" dense outlined
                           multiple use-chips emit-value map-options clearable
                           label="Local state"
                           :options="gmRelayCheckLocalStateOptions"
+                          @update:model-value="gmRelayCheckSetLocalStates"
                           data-gm="relay-check-local-filter"></q-select>
               </div>
               <div class="col-12 col-sm-4">
-                <q-select v-model="gmPubs.check.results" dense outlined
+                <q-select :model-value="gmPubs.check.results" dense outlined
                           multiple use-chips emit-value map-options clearable
                           label="Result"
                           :options="gmRelayCheckResultOptions"
+                          @update:model-value="gmRelayCheckSetResults"
                           data-gm="relay-check-result-filter"></q-select>
               </div>
               <div class="col-12 col-sm-auto text-caption text-grey-7"
