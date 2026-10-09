@@ -1249,6 +1249,35 @@
                      @click="gmRunRelayCheck"></q-btn>
             </div>
 
+            <div class="row q-col-gutter-sm items-center q-mb-sm">
+              <div class="col-12 col-sm-4">
+                <q-select v-model="gmPubs.check.localStates" dense outlined
+                          multiple use-chips emit-value map-options clearable
+                          label="Local state"
+                          :options="gmRelayCheckLocalStateOptions"
+                          data-gm="relay-check-local-filter"></q-select>
+              </div>
+              <div class="col-12 col-sm-4">
+                <q-select v-model="gmPubs.check.results" dense outlined
+                          multiple use-chips emit-value map-options clearable
+                          label="Result"
+                          :options="gmRelayCheckResultOptions"
+                          data-gm="relay-check-result-filter"></q-select>
+              </div>
+              <div class="col-12 col-sm-auto text-caption text-grey-7"
+                   v-if="gmPubs.check.summary">
+                Showing {{ gmRelayCheckRows().length }} of
+                {{ gmPubs.check.items.length }}
+              </div>
+              <div class="col-12 col-sm-auto">
+                <q-btn flat dense no-caps color="primary"
+                       icon="filter_alt_off" label="Clear filters"
+                       v-if="gmPubs.check.localStates.length || gmPubs.check.results.length"
+                       @click="gmRelayCheckClearFilters"
+                       data-gm="relay-check-clear-filters"></q-btn>
+              </div>
+            </div>
+
             <div v-if="gmPubs.check.summary" class="q-mb-sm"
                  data-gm="relay-check-summary">
               Checked {{ gmPubs.check.summary.relays_checked }} relays ·

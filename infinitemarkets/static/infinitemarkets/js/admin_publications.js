@@ -33,6 +33,22 @@
     superseded: "Superseded"
   };
 
+  var RELAY_CHECK_LOCAL_STATES = [
+    {label: "Active", value: "active"},
+    {label: "Draft", value: "draft"},
+    {label: "Deleted", value: "deleted"}
+  ];
+  var RELAY_CHECK_RESULTS = [
+    {label: "Published", value: "observed"},
+    {label: "Partial", value: "partial"},
+    {label: "Missing", value: "missing"},
+    {label: "Divergent", value: "divergent"},
+    {label: "Stale copy", value: "stale"},
+    {label: "Deleted copy served", value: "stale-deleted"},
+    {label: "Draft copy served", value: "draft-copy-served"},
+    {label: "Not observed", value: "not-observed"}
+  ];
+
   function fmtTime(ts) {
     if (!ts) return "—";
     return new Date(ts * 1000).toLocaleString();
@@ -58,7 +74,9 @@
             items: [],
             unmatched: [],
             summary: null,
-            showAll: false
+            showAll: false,
+            localStates: [],
+            results: []
           },
           prune: {show: false, days: 90, busy: false, result: null},
           pruneDayOptions: [7, 14, 30, 60, 90, 180, 365]
@@ -87,17 +105,33 @@
                 : "—";
             } }
         ],
+        gmRelayCheckLocalStateOptions: RELAY_CHECK_LOCAL_STATES,
+        gmRelayCheckResultOptions: RELAY_CHECK_RESULTS,
         gmRelayCheckColumns: [
-          { name: "kind", label: "Kind", field: "kind", align: "left" },
-          { name: "item", label: "Catalog item", field: "title",
-            align: "left" },
-          { name: "local", label: "Local state", field: "local",
-            align: "left" },
-          { name: "relays", label: "Relay copies", field: "observed_on",
-            align: "left" },
-          { name: "latest", label: "Latest observed", field: "latest_event",
-            align: "left" },
-          { name: "result", label: "Result", field: "status", align: "left" }
+          { name: "kind", label: "Kind", field: "kind", align: "left",
+            sortable: true },
+          { name: "item", label: "Catalog item", align: "left",
+            sortable: true,
+            field: function (row) {
+              return row.title || row.d_tag || "";
+            } },
+          { name: "local", label: "Local state", align: "left",
+            sortable: true,
+            field: function (row) {
+              return row.local.state + ":" + (row.local.visibility || "");
+            } },
+          { name: "relays", label: "Relay copies", align: "left",
+            sortable: true,
+            field: function (row) {
+              return row.observed_on.length;
+            } },
+          { name: "latest", label: "Latest observed", align: "left",
+            sortable: true,
+            field: function (row) {
+              return row.latest_event ? row.latest_event.created_at : 0;
+            } },
+          { name: "result", label: "Result", field: "status",
+            align: "left", sortable: true }
         ]
       };
     },
@@ -192,11 +226,27 @@
       gmRelayCheckRows: function () {
         var check = this.gmPubs.check;
         var rows = check.items || [];
-        if (check.showAll) return rows;
-        return rows.filter(function (r) {
-          return r.expected || r.observed_on.length ||
-            r.tombstoned_on.length || r.status !== "not-observed";
-        });
+        if (!check.showAll) {
+          rows = rows.filter(function (r) {
+            return r.expected || r.observed_on.length ||
+              r.tombstoned_on.length || r.status !== "not-observed";
+          });
+        }
+        if (check.localStates.length) {
+          rows = rows.filter(function (r) {
+            return check.localStates.indexOf(r.local.state) !== -1;
+          });
+        }
+        if (check.results.length) {
+          rows = rows.filter(function (r) {
+            return check.results.indexOf(r.status) !== -1;
+          });
+        }
+        return rows;
+      },
+      gmRelayCheckClearFilters: function () {
+        this.gmPubs.check.localStates = [];
+        this.gmPubs.check.results = [];
       },
       gmRelayCheckLabel: function (row) {
         var labels = {
