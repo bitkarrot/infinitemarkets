@@ -260,6 +260,25 @@ async def catalog_relay_check(
     return await relay_service.catalog_reconcile(merchant_id)
 
 
+@infinitemarkets_api_router.post(
+    "/merchants/{merchant_id}/catalog/tombstones/reissue"
+)
+@problem_boundary
+async def reissue_catalog_tombstones(
+    request: Request,
+    merchant_id: str,
+    body: dict,
+    user: User = Depends(check_user_exists),
+):
+    """Queue fresh kind-5 deletion requests for deleted local addresses."""
+    from .services import relay as relay_service
+
+    await merchant_service.get_merchant_row(merchant_id, str(user.id))
+    return await relay_service.reissue_deletion_requests(
+        merchant_id, body.get("addresses")
+    )
+
+
 @infinitemarkets_api_router.get("/merchants/{merchant_id}/outbox")
 @problem_boundary
 async def get_outbox(

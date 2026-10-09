@@ -1247,6 +1247,13 @@
                      label="Run check" data-gm="relay-check-run"
                      :loading="gmPubs.check.busy"
                      @click="gmRunRelayCheck"></q-btn>
+              <q-btn v-if="gmPubs.check.summary" color="warning" outline dense
+                     no-caps icon="delete_forever"
+                     :label="'Re-request deletions (' + gmRelayCheckStaleAddresses().length + ')'"
+                     :disable="!gmRelayCheckStaleAddresses().length"
+                     :loading="gmPubs.check.reissuing"
+                     data-gm="reissue-tombstones"
+                     @click="gmReissueTombstones"></q-btn>
             </div>
 
             <div class="row q-col-gutter-sm items-center q-mb-sm">

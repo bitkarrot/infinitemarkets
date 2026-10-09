@@ -352,7 +352,7 @@ async def test_catalog_relay_check(runtime_env, monkeypatch):
     from nostr_sdk import EventBuilder, Kind, PublicKey, Tag, Timestamp
 
     from harness.relay import LocalRelay, RelayMode
-    from infinitemarkets.db import DomainTransaction
+    from infinitemarkets.db import DomainTransaction, db, table
     from infinitemarkets.keystore import MerchantKeyStore
     from infinitemarkets.settings import ext_settings
 
@@ -472,18 +472,52 @@ async def test_catalog_relay_check(runtime_env, monkeypatch):
             json={},
             headers=_headers(env, csrf),
         )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        rows = {
+            i["address"]: i for i in body["items"] if i["kind"] == 30402
+        }
+        deleted_row = rows[f"30402:{pubkey}:{deleted['d_tag']}"]
+        reissue = await client.post(
+            f"/infinitemarkets/api/v1/merchants/{mid}/catalog/tombstones/reissue",
+            json={"addresses": [
+                deleted_row["address"], deleted_row["address"]
+            ]},
+            headers=_headers(env, csrf),
+        )
+        assert reissue.status_code == 200, reissue.text
+        again = await client.post(
+            f"/infinitemarkets/api/v1/merchants/{mid}/catalog/tombstones/reissue",
+            json={"addresses": [deleted_row["address"]]},
+            headers=_headers(env, csrf),
+        )
+        assert again.status_code == 200, again.text
+        from infinitemarkets.services import outbox
+
+        outcome = await outbox.worker_tick("tombstone-test")
+        deleted_address = deleted_row["address"]
+
+        def tombstone_received(relay):
+            return any(
+                item.get("event", {}).get("kind") == 5
+                and [
+                    tag for tag in item.get("event", {}).get("tags", [])
+                    if len(tag) > 1 and tag[0] == "a"
+                    and tag[1] == deleted_address
+                ]
+                for item in relay.received_events
+            )
+
+        tombstone_sent = (
+            tombstone_received(relay_a) and tombstone_received(relay_b)
+        )
     finally:
         await relay_a.stop()
         await relay_b.stop()
 
-    assert resp.status_code == 200, resp.text
-    body = resp.json()
     assert body["pubkey"] == pubkey
     assert all(r["state"] == "ok" for r in body["relays"])
     assert all(r["invalid_events"] == 0 for r in body["relays"])
-    rows = {
-        i["address"]: i for i in body["items"] if i["kind"] == 30402
-    }
     active_row = rows[f"30402:{pubkey}:{active['d_tag']}"]
     assert active_row["status"] == "divergent"
     assert set(active_row["observed_on"]) == {relay_a_url, relay_b_url}
@@ -500,7 +534,6 @@ async def test_catalog_relay_check(runtime_env, monkeypatch):
     assert digital_row["missing_on"] == [relay_b_url]
     assert "stock-tag-missing" in digital_row["findings"]
 
-    deleted_row = rows[f"30402:{pubkey}:{deleted['d_tag']}"]
     assert deleted_row["status"] == "stale-deleted"
     assert deleted_row["tombstoned_on"] == [relay_a_url]
     assert "tombstone-did-not-remove-copy" in deleted_row["findings"]
@@ -511,3 +544,36 @@ async def test_catalog_relay_check(runtime_env, monkeypatch):
     assert summary["stale_deleted"] >= 1
     assert summary["duplicate_title_groups"] >= 1
     assert "old copy" not in json.dumps(body)
+
+    assert reissue.json()["queued"] == 1
+    first_revision = reissue.json()["items"][0]["revision"]
+    assert again.json()["items"][0]["revision"] > first_revision
+    latest_intent_id = again.json()["items"][0]["outbox_event_id"]
+    assert outcome["claimed"] >= 1
+    assert tombstone_sent, (outcome, relay_a.received_events, relay_b.received_events)
+
+    async with db.connect() as conn:
+        intent = await conn.fetchone(
+            f"SELECT id, event_address, event_kind, state,"
+            f" aggregate_revision FROM {table('outbox_events')}"
+            " WHERE id = :i",
+            {"i": latest_intent_id},
+        )
+        publications = await conn.fetchall(
+            f"SELECT relay_url, result FROM {table('relay_publications')}"
+            " WHERE outbox_event_id = :i",
+            {"i": latest_intent_id},
+        )
+    assert intent["event_address"] == deleted_row["address"]
+    assert intent["state"] == "published"
+    assert intent["aggregate_revision"] > first_revision
+    assert {
+        p["relay_url"] for p in publications if p["result"] == "accepted"
+    } == {relay_a_url, relay_b_url}
+
+    invalid = await client.post(
+        f"/infinitemarkets/api/v1/merchants/{mid}/catalog/tombstones/reissue",
+        json={"addresses": [active_row["address"]]},
+        headers=_headers(env, csrf),
+    )
+    assert invalid.status_code == 422, invalid.text

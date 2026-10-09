@@ -76,7 +76,8 @@
             summary: null,
             showAll: false,
             localStates: [],
-            results: []
+            results: [],
+            reissuing: false
           },
           prune: {show: false, days: 90, busy: false, result: null},
           pruneDayOptions: [7, 14, 30, 60, 90, 180, 365]
@@ -247,6 +248,38 @@
       gmRelayCheckClearFilters: function () {
         this.gmPubs.check.localStates = [];
         this.gmPubs.check.results = [];
+      },
+      gmRelayCheckStaleAddresses: function () {
+        return (this.gmPubs.check.items || [])
+          .filter(function (r) {
+            return r.status === "stale-deleted";
+          })
+          .map(function (r) { return r.address; });
+      },
+      gmReissueTombstones: async function () {
+        var self = this;
+        var mid = self.gmMerchantId();
+        var addresses = self.gmRelayCheckStaleAddresses();
+        if (!addresses.length || self.gmPubs.check.reissuing) return;
+        self.gmPubs.check.reissuing = true;
+        self.gmPubs.error = null;
+        try {
+          var res = await self.gmApi(
+            "POST",
+            "/merchants/" + mid + "/catalog/tombstones/reissue",
+            {addresses: addresses}
+          );
+          self.gmToast(
+            res.queued + " deletion request" +
+              (res.queued === 1 ? "" : "s") +
+              " queued — relays may still ignore kind-5 removals",
+            "positive"
+          );
+          await self.gmLoadPublications();
+        } catch (e) {
+          self.gmPubs.error = self.gmProblemCopy(e.problem);
+        }
+        self.gmPubs.check.reissuing = false;
       },
       gmRelayCheckLabel: function (row) {
         var labels = {

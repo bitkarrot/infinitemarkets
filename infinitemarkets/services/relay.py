@@ -821,6 +821,143 @@ async def catalog_reconcile(merchant_id: str) -> dict:
     }
 
 
+REISSUE_TOMBSTONE_MAX = 100
+
+
+async def reissue_deletion_requests(merchant_id: str,
+                                    addresses: list[str]) -> dict:
+    """Queue fresh kind-5 requests for deleted local catalog addresses.
+
+    A tombstone is a request, not a relay command. Each reissue gets a
+    monotonically newer outbox revision so relays that accepted — but
+    ignored — an earlier kind-5 receive a fresh signed event through the
+    normal delivery path instead of being skipped by per-intent ACK
+    evidence.
+    """
+    from ..security import not_found
+    from . import events as event_builder
+    from .outbox import enqueue_intent
+
+    if not isinstance(addresses, list) or not addresses:
+        raise unprocessable(
+            "invalid-content", "addresses must be a non-empty list"
+        )
+    requested = []
+    seen = set()
+    for address in addresses:
+        if not isinstance(address, str) or len(address) > 512:
+            raise unprocessable(
+                "invalid-content", "addresses must contain valid strings"
+            )
+        if address not in seen:
+            seen.add(address)
+            requested.append(address)
+    if len(requested) > REISSUE_TOMBSTONE_MAX:
+        raise unprocessable(
+            "invalid-content",
+            f"at most {REISSUE_TOMBSTONE_MAX} addresses may be reissued",
+        )
+
+    queued = []
+    async with DomainTransaction() as tx:
+        merchant = await tx.fetch_one(
+            f"SELECT id, pubkey FROM {tx.table('merchants')} WHERE id = :m",
+            {"m": merchant_id},
+        )
+        if merchant is None:
+            raise not_found("merchant not found")
+
+        products = await tx.fetch_all(
+            f"SELECT p.id, p.d_tag, p.revision, p.nip15_product_id,"
+            " p.product_type, p.parent_product_id,"
+            " parent.d_tag AS parent_d_tag"
+            f" FROM {tx.table('products')} p"
+            " LEFT JOIN ("
+            f"SELECT id, d_tag FROM {tx.table('products')}"
+            " ) parent ON parent.id = p.parent_product_id"
+            " WHERE p.merchant_id = :m AND p.deleted_at IS NOT NULL",
+            {"m": merchant_id},
+        )
+        categories = await tx.fetch_all(
+            f"SELECT id, nip15_stall_d"
+            f" FROM {tx.table('categories')}"
+            " WHERE merchant_id = :m AND deleted_at IS NOT NULL",
+            {"m": merchant_id},
+        )
+
+        targets: dict[str, dict] = {}
+        for product in products:
+            product = dict(product)
+            targets[f"30402:{merchant['pubkey']}:{product['d_tag']}"] = {
+                "aggregate_type": "products",
+                "aggregate_id": product["id"],
+                "revision": product["revision"] or 0,
+            }
+            nip15_id = event_builder.nip15_product_id(
+                product, product["parent_d_tag"]
+            )
+            targets[f"30018:{merchant['pubkey']}:{nip15_id}"] = {
+                "aggregate_type": "products",
+                "aggregate_id": product["id"],
+                "revision": product["revision"] or 0,
+            }
+        for category in categories:
+            if not category["nip15_stall_d"]:
+                continue
+            address = (
+                f"30017:{merchant['pubkey']}:"
+                f"{category['nip15_stall_d']}"
+            )
+            targets[address] = {
+                "aggregate_type": "categories",
+                "aggregate_id": category["id"],
+                "revision": 0,
+            }
+
+        for address in requested:
+            parts = address.split(":")
+            if len(parts) != 3:
+                raise unprocessable(
+                    "invalid-content",
+                    f"invalid catalog address: {address}",
+                )
+            target = targets.get(address)
+            if target is None:
+                raise unprocessable(
+                    "invalid-content",
+                    "address is not a deleted local catalog address",
+                    address,
+                )
+            latest = await tx.fetch_one(
+                f"SELECT MAX(aggregate_revision) AS n"
+                f" FROM {tx.table('outbox_events')}"
+                " WHERE aggregate_type = :t AND aggregate_id = :i"
+                " AND event_kind = 5",
+                {
+                    "t": target["aggregate_type"],
+                    "i": target["aggregate_id"],
+                },
+            )
+            revision = max(
+                target["revision"] or 0, latest["n"] or 0
+            ) + 1
+            intent_id = await enqueue_intent(
+                tx,
+                merchant_id,
+                target["aggregate_type"],
+                target["aggregate_id"],
+                5,
+                revision=revision,
+                event_address=address,
+            )
+            queued.append({
+                "address": address,
+                "outbox_event_id": intent_id,
+                "revision": revision,
+            })
+    return {"queued": len(queued), "items": queued}
+
+
 async def prune_outbox(merchant_id: str, older_than_days: int) -> dict:
     """Manual history flush — outbox intents have no automatic retention.
     Deletes terminal rows (published / superseded / failed) whose last
