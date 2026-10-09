@@ -29,7 +29,7 @@ window.DIAGRAM_DATA['lnbits-integration'] = {
         Boundary[Extension routes and lifecycle hooks]
         Services[Checkout, product/category, order, and settlement services]
         PaymentAdapter[LNbits payment adapter]
-        Workers[Reconciliation, inbox, and outbox workers]
+        Workers[Reconciliation, inbox listener/processor, outbox, email, and retention workers]
         GammaDB[(Namespaced extension database)]
         Transport[Direct relay-aware Nostr transport]
     end
@@ -56,7 +56,7 @@ window.DIAGRAM_DATA['lnbits-integration'] = {
     GammaDB -->|Pending publication intents| Transport
     Relays -->|Encrypted orders and messages| Transport
     Transport -->|Durably admit before processing| GammaDB
-    Transport -->|Signed product, collection and order events| Relays`,
+    Transport -->|Signed catalog, profile, order, and tombstone events| Relays`,
 
   styles: {
     light: `    classDef clientNode fill:#ffd23d,stroke:#111111,stroke-width:2px,color:#111111
@@ -115,8 +115,8 @@ window.DIAGRAM_DATA['lnbits-integration'] = {
       bullets: [
         'The extension owns categories, products, collections, inventory, reservations, orders, inbox, outbox, and local payment-projection state in its <b>namespaced database</b>.',
         'It <b>MUST NOT</b> write LNbits core payment tables directly.',
-        'Nostr transport is <b>extension-owned</b> and reaches relays directly; relays are never authoritative for inventory or settlement.',
-        'The extension stores no SMTP or spend credentials and its code policy forbids outgoing-payment APIs — but native host process privilege is <b>not</b> a spend-capability sandbox (§8.3).'
+        'Nostr transport is <b>extension-owned</b> and reaches relays directly; relays are never authoritative for inventory, settlement, or local catalog state. The relay catalog check is observational, while tombstone reissue only queues a fresh NIP-09 request.',
+        'The extension stores no SMTP or spend credentials and its code policy forbids outgoing-payment APIs — but native host process privilege is <b>not</b> a spend-capability sandbox (§8.3). Merchant Nostr private keys remain encrypted; reveal/export is explicit and owner-only.'
       ]
     }
   ]

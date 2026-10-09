@@ -16,8 +16,8 @@ window.DIAGRAMS = [
     num: '02',
     accent: '#ff5aa8',
     title: 'Component Diagram — As Built',
-    source: 'docs/architecture-overview.md — §1',
+    source: 'docs/architecture-overview.md — §1-§4',
     kind: 'Implementation state',
-    summary: 'What is wired today: merchant admin SPA, public storefront surfaces, checkout and settlement against LNbits payments, the six background workers, and the outbox → transport → relay publication pipeline.'
+    summary: 'What is wired today: merchant admin SPA, public storefront surfaces, catalog imports, checkout and settlement against LNbits payments, counterparty profiles, live relay audit/tombstone reissue, workers, and the outbox → transport → relay pipeline.'
   }
 ];
