@@ -1351,6 +1351,7 @@ async def list_conversations(
     request: Request,
     merchant_id: str,
     folder: str = "customer",
+    refresh_profiles: bool = False,
     user: User = Depends(check_user_exists),
 ):
     """Conversation list for the Customer/Unknown folders (D-14)."""
@@ -1358,7 +1359,7 @@ async def list_conversations(
 
     await merchant_service.get_merchant_row(merchant_id, str(user.id))
     return await order_message_service.list_conversations(
-        merchant_id, folder
+        merchant_id, folder, refresh_profiles=refresh_profiles
     )
 
 

@@ -931,12 +931,18 @@ async def retention_prune(now: int | None = None) -> dict:
             {"t": now - INBOX_QUARANTINE_RETENTION_S},
         )
         report["inbox_erased"] += rc
-        # Expired peer-relay cache rows purge outright.
+        # Expired peer-relay/profile cache rows purge outright.
         rc = await tx.execute(
             f"DELETE FROM {tx.table('peer_relays')} WHERE expires_at <= :n",
             {"n": now},
         )
         report["peer_relays_purged"] = rc
+        rc = await tx.execute(
+            f"DELETE FROM {tx.table('counterparty_profiles')}"
+            " WHERE expires_at <= :n",
+            {"n": now},
+        )
+        report["counterparty_profiles_purged"] = rc
         # Terminal orders older than 90d: erase PII ciphertexts, keep the
         # financial/audit columns (hashes, totals, states, events).
         terminal = (

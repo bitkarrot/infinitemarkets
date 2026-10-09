@@ -6,6 +6,7 @@ surface, and host-palette-only theming (no merchant tokens)."""
 from __future__ import annotations
 
 import asyncio
+import json
 import re
 
 import pytest
@@ -64,6 +65,9 @@ async def test_admin_shell_document(runtime_env):
     assert '<h1 class="text-h6 q-my-none col">Catalog</h1>' in html
     assert '<q-tab name="categories" label="Categories"></q-tab>' in html
     assert 'data-gm-surface="messages"' in html
+    assert 'gmProfileName(c.counterparty)' in html
+    assert 'c.counterparty.profile_url' in html
+    assert 'c.counterparty.avatar_url' in html
     # Every module script loads.
     revisions = set()
     for mod in ("admin_app", "admin_orders", "admin_catalog",
@@ -73,6 +77,10 @@ async def test_admin_shell_document(runtime_env):
         assert match, mod
         revisions.add(match.group(1))
     assert len(revisions) == 1
+    messages = await runtime_env["client"].get(f"{JS}/admin_messages.js")
+    assert messages.status_code == 200
+    assert "gmSelectedCounterparty" in messages.text
+    assert "gmProfileName" in messages.text
     about = await runtime_env["client"].get(f"{JS}/admin_about.js")
     assert about.status_code == 200
     assert 'admin-categories.jpg' not in about.text
@@ -353,7 +361,7 @@ async def _sign_in(runtime_env, label: str) -> "tuple":
     return buyer, keys
 
 
-async def test_messages_workspace(runtime_env):
+async def test_messages_workspace(runtime_env, monkeypatch):
     """GAM-04 conversations/thread/read/unread/delivery + compose +
     rejected-intake + cross-tenant isolation."""
     import time
@@ -441,6 +449,36 @@ async def test_messages_workspace(runtime_env):
     assert resp.status_code == 200, resp.text
     buyer_hex = keys.public_key().to_hex()
 
+    # A signed kind-0 on the configured local relay supplies the merchant
+    # Messages profile cache (display name + HTTPS avatar only).
+    monkeypatch.setenv("INFINITEMARKETS_RELAY_IO", "on")
+    monkeypatch.setenv("INFINITEMARKETS_ALLOW_INSECURE_RELAYS", "1")
+    from nostr_sdk import EventBuilder, Kind, NostrSigner
+
+    from harness.relay import LocalRelay
+
+    profile_event = await EventBuilder(
+        Kind(0),
+        json.dumps({
+            "display_name": "Message Buyer",
+            "name": "msgbuyer",
+            "nip05": "buyer@example.com",
+            "picture": "https://cdn.example/buyer.png",
+        }),
+    ).sign(NostrSigner.keys(keys))
+    profile_relay = await LocalRelay(
+        canned_events=[json.loads(profile_event.as_json())]
+    ).start()
+    profile_relay_url = profile_relay.url
+    async with DomainTransaction() as tx:
+        await tx.execute(
+            "INSERT INTO relay_configs "
+            "(id, merchant_id, relay_url, direction, enabled, created_at,"
+            " updated_at) VALUES (:i, :m, :u, 'public', TRUE, :n, :n)",
+            {"i": uuid.uuid4().hex, "m": mid, "u": profile_relay_url,
+             "n": int(time.time())},
+        )
+
     # Order-bound DM threads onto order:<id>; a stranger's DM lands in
     # Unknown (D-14).
     async with env["ext_module"].db.connect() as conn:
@@ -482,6 +520,31 @@ async def test_messages_workspace(runtime_env):
     assert found[0]["unread"] >= 1
     assert "shipped" in found[0]["preview"]
     assert found[0]["counterparty_npub"].startswith("npub1")
+    profile = found[0]["counterparty"]
+    assert profile["display_name"] == "Message Buyer"
+    assert profile["username"] == "msgbuyer"
+    assert profile["nip05"] == "buyer@example.com"
+    assert profile["avatar_url"] == "https://cdn.example/buyer.png"
+    assert profile["profile_url"] == (
+        f"https://nostr.at/{found[0]['counterparty_npub']}"
+    )
+    resp = await client.get(
+        f"{API}/merchants/{mid}/messages/conversations?folder=customer"
+        "&refresh_profiles=true",
+        headers=await cookie(),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["conversations"][0]["counterparty"]["display_name"] == (
+        "Message Buyer"
+    )
+
+    await profile_relay.stop()
+    async with DomainTransaction() as tx:
+        await tx.execute(
+            "DELETE FROM relay_configs WHERE merchant_id = :m"
+            " AND relay_url = :u",
+            {"m": mid, "u": profile_relay_url},
+        )
 
     resp = await client.get(
         f"{API}/merchants/{mid}/messages/conversations?folder=unknown",
@@ -508,6 +571,8 @@ async def test_messages_workspace(runtime_env):
     )
     assert resp.status_code == 200, resp.text
     thread = resp.json()
+    assert thread["counterparty"]["display_name"] == "Message Buyer"
+    assert thread["counterparty"]["avatar_url"].endswith("/buyer.png")
     inbound = [m for m in thread["messages"] if m["direction"] == "in"]
     assert inbound and inbound[0]["read"] is False
     assert any("shipped" in m["content"] for m in inbound)

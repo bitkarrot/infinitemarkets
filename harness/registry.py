@@ -393,6 +393,7 @@ TABLE_CLASSIFICATION: dict[str, str] = {
     # 4.11
     "relay_configs": TABLE_NOT_MODELED,
     "peer_relays": TABLE_NOT_MODELED,
+    "counterparty_profiles": TABLE_NOT_MODELED,
     "relay_cursors": TABLE_MODELED,
     # 4.12-4.18
     "inventory_reservations": TABLE_MODELED,

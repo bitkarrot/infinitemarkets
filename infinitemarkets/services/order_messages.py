@@ -1036,7 +1036,7 @@ async def _owned_conversations(conn, merchant_id: str, folder: str,
 
 
 async def list_conversations(
-    merchant_id: str, folder: str = "customer"
+    merchant_id: str, folder: str = "customer", refresh_profiles: bool = False
 ) -> dict:
     """Conversation list for one folder — last message preview,
     unread flag, counterparty npub, order linkage."""
@@ -1062,10 +1062,10 @@ async def list_conversations(
             preview = (
                 _decrypt_text(last, "content_enc", settings) if last else ""
             ) or ""
-            counterparty = None
+            counterparty_pubkey = None
             if last:
-                counterparty = _npub(
-                    _decrypt_text(last, "participant_keys_enc", settings)
+                counterparty_pubkey = _decrypt_text(
+                    last, "participant_keys_enc", settings
                 )
             order_id = None
             order_ref = None
@@ -1099,9 +1099,24 @@ async def list_conversations(
                     "message_count": int(group["n"]),
                     "last_at": group["last_at"],
                     "preview": preview[:_PREVIEW_LEN],
-                    "counterparty_npub": counterparty,
+                    "counterparty_npub": _npub(counterparty_pubkey),
+                    "_counterparty_pubkey": counterparty_pubkey,
                 }
             )
+    pubkeys = [
+        c["_counterparty_pubkey"] for c in conversations
+        if c.get("_counterparty_pubkey")
+    ]
+    from . import profiles
+
+    cached = await profiles.refresh_profiles(
+        merchant_id, pubkeys, settings=settings, force=refresh_profiles
+    )
+    for conv in conversations:
+        pubkey = conv.pop("_counterparty_pubkey", None)
+        conv["counterparty"] = (
+            cached.get(pubkey) if pubkey else None
+        )
     return {"conversations": conversations}
 
 
@@ -1131,8 +1146,26 @@ async def get_thread(merchant_id: str, conversation_id: str) -> dict:
             }
             for r in rows
         ]
+        counterparty_pubkey = next(
+            (
+                _decrypt_text(r, "participant_keys_enc", settings)
+                for r in rows
+                if r["participant_keys_enc"] is not None
+            ),
+            None,
+        )
+    counterparty = None
+    if counterparty_pubkey:
+        from . import profiles
+
+        counterparty = (
+            await profiles.refresh_profiles(
+                merchant_id, [counterparty_pubkey], settings=settings
+            )
+        ).get(counterparty_pubkey)
     return {
         "conversation_id": conversation_id,
+        "counterparty": counterparty,
         "order_id": (
             conversation_id[6:]
             if conversation_id.startswith("order:")

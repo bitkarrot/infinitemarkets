@@ -1406,3 +1406,19 @@ async def m014_email_preview(db: Connection):
     await db.execute(
         f"ALTER TABLE {s}email_queue ADD COLUMN preview_enc {db.blob}"
     )
+
+
+async def m015_counterparty_profiles(db: Connection):
+    s = db.references_schema
+    blob_t = db.blob
+    int_t = db.big_int
+    await db.execute(
+        f"CREATE TABLE {s}counterparty_profiles ("
+        "id TEXT PRIMARY KEY, merchant_id TEXT NOT NULL "
+        f"REFERENCES {s}merchants(id) ON DELETE CASCADE, "
+        "pubkey_hash TEXT NOT NULL, "
+        f"pubkey_enc {blob_t} NOT NULL, "
+        f"profile_enc {blob_t} NOT NULL, "
+        f"fetched_at {int_t} NOT NULL, expires_at {int_t} NOT NULL, "
+        "UNIQUE (merchant_id, pubkey_hash))"
+    )

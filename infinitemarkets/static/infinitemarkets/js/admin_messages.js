@@ -59,9 +59,9 @@
         } catch (e) {
           self.gmMessages.error = self.gmProblemCopy(e.problem);
         }
-        await self.gmLoadConversations();
+        await self.gmLoadConversations(true);
       },
-      gmLoadConversations: async function () {
+      gmLoadConversations: async function (refreshProfiles) {
         var self = this;
         var mid = self.gmMerchantId();
         if (!mid) return;
@@ -71,7 +71,8 @@
           var res = await self.gmApi(
             "GET",
             "/merchants/" + mid + "/messages/conversations?folder=" +
-              self.gmMessages.folder
+              self.gmMessages.folder +
+              (refreshProfiles ? "&refresh_profiles=true" : "")
           );
           self.gmMessages.conversations = res.conversations || [];
         } catch (e) {
@@ -140,6 +141,34 @@
         } catch (e) {
           self.gmMessages.error = self.gmProblemCopy(e.problem);
         }
+      },
+      gmSelectedCounterparty: function () {
+        var self = this;
+        var selected = self.gmMessages.thread.counterparty;
+        if (selected) return selected;
+        var conv = self.gmMessages.conversations.find(function (c) {
+          return c.conversation_id === self.gmMessages.selected;
+        });
+        return conv ? conv.counterparty : null;
+      },
+      gmProfileName: function (profile) {
+        if (!profile) return "Unknown sender";
+        if (profile.display_name) return profile.display_name;
+        if (profile.nip05) return profile.nip05;
+        if (profile.npub) return this.gmTrunc(profile.npub, 10, 4);
+        return "Unknown sender";
+      },
+      gmProfileInitial: function (profile) {
+        var name = profile && (
+          profile.display_name || profile.username || profile.nip05
+        );
+        if (name) return name.trim().charAt(0).toUpperCase();
+        return profile && profile.npub
+          ? profile.npub.slice(4, 6).toUpperCase()
+          : "?";
+      },
+      gmClearAvatar: function (profile) {
+        if (profile) profile.avatar_url = null;
       },
       gmRetryMessageIntent: async function (d) {
         var self = this;

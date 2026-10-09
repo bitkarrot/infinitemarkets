@@ -398,7 +398,8 @@ authenticated merchant route, never the public-token status route.
 `order_messages` (id PK, order_id FK NULL, direction `in|out`, protocol,
 semantic_kind, sender_hash/recipient_hash, participant_keys_enc, rumor_id/event_id,
 content_enc BLOB, created_at). General-message text and any structured payload needed for merchant history
-is encrypted at rest and retained per §11.3.
+is encrypted at rest and retained per §11.3. Counterparty kind-0 display data
+uses `counterparty_profiles` (§4.11).
 
 ### 4.8 `payments`
 
@@ -445,7 +446,7 @@ expresses publication ordering.
 attempt_no). NIP-17 recipient and sender copies have different event ids. Positive
 `accepted` evidence is durable and successful copy/relay targets are never resent.
 
-### 4.11 `relay_configs`, `peer_relays`, and `relay_cursors`
+### 4.11 `relay_configs`, `peer_relays`, `counterparty_profiles`, and `relay_cursors`
 
 `relay_configs`: `id` PK, `merchant_id` FK (NULL = server-wide default), `relay_url`,
 `direction` (`public|inbox|both`), `enabled`, timestamps, plus the per-relay auth
@@ -453,7 +454,11 @@ surface `auth_state`, `auth_note`, `paid_invoice`, `auth_updated_at` — a bound
 vocabulary: `auth-required → auth-sent → authenticated`, `auth-failed` (terminal,
 operator-retryable), `payment-required`. The kind-10050 discovered inbox
 relays of *buyers* are cached in `peer_relays` (`pubkey_hash`, `pubkey_enc`, `relay_url`,
-`fetched_at`, `expires_at`). Buyer keys/order ids are encrypted at rest; keyed HMAC
+`fetched_at`, `expires_at`). Public kind-0 display metadata for Messages uses
+`counterparty_profiles` (`merchant_id`, `pubkey_hash`, `pubkey_enc`, `profile_enc`,
+`fetched_at`, `expires_at`; UNIQUE(merchant_id, pubkey_hash)). Stored profiles keep
+only bounded display fields (`display_name`/`username`, `nip05`, HTTPS avatar URL);
+fetch misses cache briefly. Buyer keys/order ids are encrypted at rest; keyed HMAC
 indexes permit lookup without deterministic encryption.
 
 `relay_cursors`: `id` PK, `merchant_id` FK, normalized `relay_url`, `protocol`
@@ -543,6 +548,7 @@ inbox_events(rumor_id) UNIQUE WHERE rumor_id IS NOT NULL
 outbox_events(state, next_attempt_at)    outbox_events(aggregate_type, aggregate_id, aggregate_revision)
 payments(order_id) UNIQUE                payments(payment_hash) UNIQUE
 peer_relays(pubkey_hash)                 inventory_reservations(order_id, product_id) UNIQUE
+counterparty_profiles(merchant_id,pubkey_hash) UNIQUE
 orders(merchant_id, buyer_pubkey_hash, external_id_hash) UNIQUE WHERE buyer_pubkey_hash IS NOT NULL
 orders(merchant_id, external_id_hash) UNIQUE WHERE protocol = 'web'
 email_queue(state, next_attempt_at)         email_queue(order_id)
@@ -1619,8 +1625,9 @@ cryptographic methods validate input lengths before allocation/decode.
 
 `orders.address_enc`, `orders.contact_enc`, `order_messages.content_enc`,
 `outbox_events.payload_enc`, `order_fulfillment.tracking_enc`,
-`orders.public_token_enc`, `email_queue.recipient_enc`, encrypted idempotency
-responses, participant/external/wallet identifiers, BOLT11/checking ids, and any retained
+`orders.public_token_enc`, `email_queue.recipient_enc`, `counterparty_profiles.pubkey_enc`
+and `profile_enc`, encrypted idempotency responses, participant/external/wallet
+identifiers, BOLT11/checking ids, and any retained
 decrypted rumor use the same AES-256-GCM envelope with per-record/field AAD. The inbox
 stores outer ciphertext only by default; plaintext exists only during bounded processing.
 

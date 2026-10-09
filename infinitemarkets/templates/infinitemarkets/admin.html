@@ -1363,12 +1363,30 @@
                 <q-item-section avatar>
                   <q-avatar size="36px" class="gm-conv-avatar"
                             :class="{ 'is-unknown': !c.counterparty_npub }">
-                    {{ c.counterparty_npub ? c.counterparty_npub.slice(4, 6).toUpperCase() : '?' }}
+                    <img v-if="c.counterparty && c.counterparty.avatar_url"
+                         :src="c.counterparty.avatar_url"
+                         :alt="gmProfileName(c.counterparty) + ' avatar'"
+                         referrerpolicy="no-referrer"
+                         @error="gmClearAvatar(c.counterparty)">
+                    <template v-else>{{ gmProfileInitial(c.counterparty) }}</template>
                   </q-avatar>
                 </q-item-section>
                 <q-item-section>
                   <q-item-label class="gm-conv-title">
-                    {{ c.counterparty_npub ? gmTrunc(c.counterparty_npub, 10, 4) : 'Unknown sender' }}
+                    <a v-if="c.counterparty && c.counterparty.profile_url"
+                       class="gm-profile-link"
+                       :href="c.counterparty.profile_url" target="_blank"
+                       rel="noopener noreferrer" @click.stop>
+                      {{ gmProfileName(c.counterparty) }}
+                    </a>
+                    <template v-else>Unknown sender</template>
+                  </q-item-label>
+                  <q-item-label v-if="c.counterparty && c.counterparty.npub"
+                                caption class="gm-conv-order">
+                    {{ gmTrunc(c.counterparty.npub, 10, 4) }}
+                    <template v-if="c.counterparty.nip05">
+                      · {{ c.counterparty.nip05 }}
+                    </template>
                   </q-item-label>
                   <q-item-label v-if="c.order_ref" caption
                                 class="gm-conv-order">
@@ -1407,9 +1425,35 @@
             </div>
             <div v-else class="gm-msg-thread" data-gm="thread">
               <div class="gm-msg-thread-head">
+                <q-avatar size="36px" class="gm-conv-avatar"
+                          :class="{ 'is-unknown': !gmSelectedCounterparty() }">
+                  <img v-if="gmSelectedCounterparty() && gmSelectedCounterparty().avatar_url"
+                       :src="gmSelectedCounterparty().avatar_url"
+                       :alt="gmProfileName(gmSelectedCounterparty()) + ' avatar'"
+                       referrerpolicy="no-referrer"
+                       @error="gmClearAvatar(gmSelectedCounterparty())">
+                  <template v-else>
+                    {{ gmProfileInitial(gmSelectedCounterparty()) }}
+                  </template>
+                </q-avatar>
                 <div class="col">
                   <div class="text-subtitle2">
-                    {{ gmMessages.selected.startsWith('order:') ? 'Order conversation' : 'Unknown sender' }}
+                    <a v-if="gmSelectedCounterparty() && gmSelectedCounterparty().profile_url"
+                       class="gm-profile-link"
+                       :href="gmSelectedCounterparty().profile_url"
+                       target="_blank" rel="noopener noreferrer">
+                      {{ gmProfileName(gmSelectedCounterparty()) }}
+                    </a>
+                    <template v-else>
+                      {{ gmMessages.selected.startsWith('order:') ? 'Order conversation' : 'Unknown sender' }}
+                    </template>
+                  </div>
+                  <div v-if="gmSelectedCounterparty() && gmSelectedCounterparty().npub"
+                       class="text-caption">
+                    {{ gmTrunc(gmSelectedCounterparty().npub, 10, 4) }}
+                    <template v-if="gmSelectedCounterparty().nip05">
+                      · {{ gmSelectedCounterparty().nip05 }}
+                    </template>
                   </div>
                   <q-badge v-if="gmMessages.thread.order_id" outline
                            :label="'order ' + gmTrunc(gmMessages.thread.order_id, 8, 4)">
@@ -1432,7 +1476,11 @@
                      :class="m.direction === 'out' ? 'is-out' : 'is-in'">
                   <div class="gm-msg-bubble">
                     <div class="gm-msg-meta">
-                      <strong>{{ m.direction === 'out' ? 'You' : 'Them' }}</strong>
+                      <strong>{{
+                        m.direction === 'out'
+                          ? 'You'
+                          : gmProfileName(gmSelectedCounterparty())
+                      }}</strong>
                       <q-badge v-if="m.semantic_kind" outline
                                :label="m.semantic_kind"></q-badge>
                       <q-badge v-if="m.direction === 'in' && !m.read"
@@ -3214,6 +3262,15 @@
   background: rgba(37, 99, 235, 0.14); font-size: 13px; font-weight: 700;
 }
 .gm-conv-avatar.is-unknown { background: rgba(128, 128, 128, 0.2); }
+.gm-conv-avatar img {
+  object-fit: cover; width: 100%; height: 100%;
+}
+.gm-profile-link {
+  color: inherit; text-decoration: none;
+}
+.gm-profile-link:hover, .gm-profile-link:focus-visible {
+  text-decoration: underline;
+}
 .gm-conv-title { font-size: 14px; }
 .gm-conv-order { font-size: 11.5px; }
 .gm-msg-empty {
