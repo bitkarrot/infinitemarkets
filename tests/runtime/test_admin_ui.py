@@ -270,6 +270,8 @@ async def test_admin_publications_copy(runtime_env):
     assert 'data-gm="relay-check-result-filter"' in html
     assert 'data-gm="reissue-tombstones"' in html
     assert 'data-gm="relay-check-table"' in html
+    assert 'data-gm="relay-check-unmatched"' in html
+    assert "Technical relay details" in html
     assert "deletion request on" in html
     assert "Queued" in html
 

@@ -1368,8 +1368,16 @@
                 </q-tr>
               </template>
             </q-table>
-            <div v-if="gmPubs.check.unmatched.length" class="q-mt-md">
-              <div class="text-subtitle2 q-mb-xs">Relay addresses without a matching local row</div>
+            <q-expansion-item v-if="gmPubs.check.unmatched.length"
+                              dense expand-separator icon="code"
+                              :label="'Technical relay details (' + gmPubs.check.unmatched.length + ')'"
+                              class="q-mt-md"
+                              data-gm="relay-check-unmatched">
+              <div class="q-pa-sm text-caption text-grey-7">
+                Diagnostic relay addresses that did not match a local catalog
+                row. These are usually historical deletion requests and do not
+                require action.
+              </div>
               <q-list dense separator>
                 <q-item v-for="u in gmPubs.check.unmatched" :key="u.address">
                   <q-item-section>
@@ -1383,7 +1391,7 @@
                   </q-item-section>
                 </q-item>
               </q-list>
-            </div>
+            </q-expansion-item>
           </q-card-section>
         </q-card>
 
