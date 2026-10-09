@@ -455,6 +455,33 @@ async def patch_notifications(
     )
 
 
+@infinitemarkets_api_router.get(
+    "/merchants/{merchant_id}/notifications/email-queue/{queue_id}"
+)
+@problem_boundary
+async def get_email_preview(
+    request: Request,
+    merchant_id: str,
+    queue_id: str,
+    user: User = Depends(check_user_exists),
+):
+    return await merchant_service.get_email_preview(
+        merchant_id, user, queue_id
+    )
+
+
+@infinitemarkets_api_router.delete(
+    "/merchants/{merchant_id}/notifications/email-queue"
+)
+@problem_boundary
+async def purge_email_history(
+    request: Request,
+    merchant_id: str,
+    user: User = Depends(check_user_exists),
+):
+    return await merchant_service.purge_email_history(merchant_id, user)
+
+
 @infinitemarkets_api_router.post("/merchants/{merchant_id}/notifications/test")
 @problem_boundary
 async def test_notification(

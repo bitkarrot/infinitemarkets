@@ -910,6 +910,7 @@ async def test_retention_erases_all_terminal_order_private_copies(runtime_env, r
     assert fresh["total_sat"] == order["total_sat"]
     for table, column in (
         ("order_fulfillment", "tracking_enc"), ("email_queue", "recipient_enc"),
+        ("email_queue", "payload_enc"), ("email_queue", "preview_enc"),
         ("idempotency_records", "response_enc"),
     ):
         row = await _row(

@@ -890,6 +890,12 @@ test('settings surface: identity, relays, notifications, appearance', async ({
   await expect(
     page.getByText('Notification addresses', {exact: true})
   ).toBeVisible()
+  await expect(
+    page.getByText('Recent email queue', {exact: true})
+  ).toBeVisible()
+  await expect(
+    page.getByText(/Message previews omit bearer links/)
+  ).toBeVisible()
 
   await page.getByRole('tab', {name: 'Appearance'}).click()
   await expect(

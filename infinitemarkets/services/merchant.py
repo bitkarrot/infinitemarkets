@@ -723,8 +723,10 @@ async def get_notifications(merchant_id: str, user) -> dict:
 
     async with db.connect() as conn:
         queue_rows = await conn.fetchall(
-            f"SELECT event_type, channel, state, attempts, last_error,"
-            f" created_at, order_id FROM {table('email_queue')}"
+            f"SELECT id, event_type, channel, state, attempts, last_error,"
+            f" created_at, sent_at, order_id,"
+            f" preview_enc IS NOT NULL AS preview_available"
+            f" FROM {table('email_queue')}"
             " WHERE merchant_id = :m ORDER BY created_at DESC LIMIT 50",
             {"m": merchant_id},
         )
@@ -735,17 +737,63 @@ async def get_notifications(merchant_id: str, user) -> dict:
         if row["notify_events"] else {},
         "queue": [
             {
+                "id": r["id"],
                 "event_type": r["event_type"],
                 "channel": r["channel"],
                 "state": r["state"],
                 "attempts": r["attempts"],
                 "last_error": r["last_error"],
                 "created_at": r["created_at"],
+                "sent_at": r["sent_at"],
                 "order_bound": r["order_id"] is not None,
+                "preview_available": bool(r["preview_available"]),
             }
             for r in queue_rows
         ],
     }
+
+
+async def get_email_preview(merchant_id: str, user, queue_id: str,
+                            settings: ExtSettings | None = None) -> dict:
+    """Owner-only redacted preview of the last attempted/sent message."""
+    settings = settings or ext_settings()
+    await get_merchant_row(merchant_id, str(user.id))
+    from ..db import db, table
+
+    async with db.connect() as conn:
+        row = await conn.fetchone(
+            f"SELECT preview_enc FROM {table('email_queue')}"
+            " WHERE merchant_id = :m AND id = :i",
+            {"m": merchant_id, "i": queue_id},
+        )
+    if not row or not row["preview_enc"]:
+        raise not_found("email preview not found")
+    ver = crypto.envelope_version(row["preview_enc"])
+    payload = json.loads(
+        crypto.decrypt(
+            row["preview_enc"], settings.master_keys[ver],
+            record_id=queue_id, table="email_queue",
+            column="preview_enc", key_version=ver,
+        )
+    )
+    return {
+        "subject": payload["subject"],
+        "body": payload["body"],
+        "redacted": True,
+    }
+
+
+async def purge_email_history(merchant_id: str, user) -> dict:
+    """Delete terminal notification rows; in-flight/pending sends remain."""
+    await get_merchant_row(merchant_id, str(user.id))
+    async with DomainTransaction() as tx:
+        deleted = await tx.execute(
+            f"DELETE FROM {tx.table('email_queue')}"
+            " WHERE merchant_id = :m"
+            " AND state IN ('sent', 'suppressed', 'failed')",
+            {"m": merchant_id},
+        )
+    return {"deleted": deleted}
 
 
 async def send_test_notification(merchant_id: str, user, recipient: str,

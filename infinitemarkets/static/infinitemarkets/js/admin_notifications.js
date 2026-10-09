@@ -29,6 +29,11 @@
           emails: [],
           events: {},
           queue: [],
+          preview: {
+            show: false, loading: false, subject: "", body: ""
+          },
+          clearConfirm: { show: false },
+          clearing: false,
           newEmail: "",
           saving: false,
           testing: null,
@@ -142,6 +147,50 @@
           self.gmNotify.error = self.gmProblemCopy(e.problem);
         }
         self.gmNotify.testing = null;
+      },
+      gmViewEmail: async function (row) {
+        var self = this;
+        var mid = self.gmMerchantId();
+        var preview = self.gmNotify.preview;
+        preview.show = true;
+        preview.loading = true;
+        preview.subject = "";
+        preview.body = "";
+        try {
+          var d = await self.gmApi(
+            "GET",
+            "/merchants/" + mid + "/notifications/email-queue/" + row.id
+          );
+          preview.subject = d.subject || "";
+          preview.body = d.body || "";
+        } catch (e) {
+          preview.show = false;
+          self.gmNotify.error = self.gmProblemCopy(e.problem);
+        }
+        preview.loading = false;
+      },
+      gmQueueHistoryCount: function () {
+        return this.gmNotify.queue.filter(function (row) {
+          return ["sent", "suppressed", "failed"].indexOf(row.state) >= 0;
+        }).length;
+      },
+      gmClearEmailQueue: async function () {
+        var self = this;
+        var mid = self.gmMerchantId();
+        self.gmNotify.clearing = true;
+        try {
+          var d = await self.gmApi(
+            "DELETE",
+            "/merchants/" + mid + "/notifications/email-queue"
+          );
+          self.gmNotify.notice =
+            "Cleared " + (d.deleted || 0) + " email history " +
+            ((d.deleted || 0) === 1 ? "entry." : "entries.");
+          await self.gmLoadNotifications();
+        } catch (e) {
+          self.gmNotify.error = self.gmProblemCopy(e.problem);
+        }
+        self.gmNotify.clearing = false;
       },
       gmQueueLabel: function (row) {
         if (row.state === "sent") return "Sent";

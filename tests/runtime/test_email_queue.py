@@ -244,7 +244,25 @@ async def test_send_classification(runtime_env, monkeypatch):
     assert rows[0]["state"] == "sent"
     assert rows[0]["sent_at"] is not None
     assert not rows[0]["recipient_enc"]
+    assert rows[0]["preview_enc"]
     assert sent_calls  # the host send_email was invoked
+
+    client = runtime_env["client"]
+    queue = await client.get(
+        f"{API}/merchants/{runtime_env['merchant_id']}/notifications"
+    )
+    entry = next(r for r in queue.json()["queue"] if r["id"] == rows[0]["id"])
+    assert entry["preview_available"] is True
+    preview = await client.get(
+        f"{API}/merchants/{runtime_env['merchant_id']}"
+        f"/notifications/email-queue/{rows[0]['id']}"
+    )
+    assert preview.status_code == 200, preview.text
+    body = preview.json()
+    assert body["redacted"] is True
+    assert "email shop: new order received" == body["subject"]
+    assert "Order status: [order-status link omitted]" in body["body"]
+    assert "/infinitemarkets/order#" not in body["body"]
 
     # False return -> retry with backoff.
     async def fail_send(*args, **kwargs):
@@ -273,6 +291,27 @@ async def test_send_classification(runtime_env, monkeypatch):
     await svcs["email"].worker_tick("w1")
     rows3 = await _queue_rows(order2["id"])
     assert rows3[0]["state"] == "failed"
+    assert rows3[0]["preview_enc"]
+
+    pending_order = await _order(runtime_env)
+    pending_rows = await _queue_rows(pending_order["id"])
+    assert pending_rows[0]["state"] == "pending"
+
+    headers = {
+        "Origin": ORIGIN,
+        "X-CSRF-Token": client.cookies.get("gm_csrf"),
+    }
+    purged = await client.delete(
+        f"{API}/merchants/{runtime_env['merchant_id']}"
+        "/notifications/email-queue",
+        headers=headers,
+    )
+    assert purged.status_code == 200, purged.text
+    assert purged.json()["deleted"] >= 2
+    remaining = await _queue_rows(order["id"])
+    assert not remaining
+    pending_after = await _queue_rows(pending_order["id"])
+    assert pending_after[0]["state"] == "pending"
 
     host_settings.lnbits_email_notifications_enabled = False
 

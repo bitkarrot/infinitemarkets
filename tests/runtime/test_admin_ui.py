@@ -259,8 +259,15 @@ async def test_admin_notifications_copy(runtime_env):
     for ev in ("order_received", "confirmed", "on_hold"):
         assert ev in js
     assert "/notifications/test" in js
+    assert "/notifications/email-queue/" in js
+    assert '"DELETE"' in js
     assert "Suppressed" in js
     assert "Failed after" in js
+    html = (await runtime_env["client"].get("/infinitemarkets/")).text
+    assert "Recent email queue" in html
+    assert "Email preview" in html
+    assert "Clear history" in html
+    assert "Bearer links and digital content are redacted" in html
 
 
 async def test_admin_theme_editor(runtime_env):

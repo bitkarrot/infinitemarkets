@@ -1836,25 +1836,86 @@
               <div class="col-12 col-md-6">
                 <q-card flat bordered>
                   <q-card-section>
-                    <div class="text-subtitle2 q-mb-sm">Recent email queue</div>
+                    <div class="row items-center q-mb-sm">
+                      <div class="text-subtitle2 col">Recent email queue</div>
+                      <q-btn v-if="gmQueueHistoryCount()" color="negative"
+                             flat dense label="Clear history"
+                             :loading="gmNotify.clearing"
+                             @click="gmNotify.clearConfirm.show = true"></q-btn>
+                    </div>
                     <div class="text-caption q-mb-sm">
                       Customer email is strictly per-order opt-in and
                       transactional only. The order-status link is a bearer
-                      token — anyone holding it can view that order.
+                      token — anyone holding it can view that order. Message
+                      previews omit bearer links and digital content.
                     </div>
                     <div v-if="!gmNotify.queue.length" class="text-grey-7">
                       Nothing sent yet.
                     </div>
                     <q-list v-else dense separator>
-                      <q-item v-for="(r, i) in gmNotify.queue" :key="i">
+                      <q-item v-for="r in gmNotify.queue" :key="r.id">
                         <q-item-section>
                           {{ r.event_type }} · {{ r.channel }}
+                          <q-item-label caption>
+                            queued {{ gmTime(r.created_at) }}
+                          </q-item-label>
                         </q-item-section>
                         <q-item-section side>
-                          {{ gmQueueLabel(r) }}
+                          <div class="row items-center q-gutter-sm">
+                            <span>{{ gmQueueLabel(r) }}</span>
+                            <q-btn v-if="r.preview_available" color="primary"
+                                   flat dense label="View"
+                                   :loading="gmNotify.preview.loading"
+                                   @click="gmViewEmail(r)"></q-btn>
+                          </div>
                         </q-item-section>
                       </q-item>
                     </q-list>
+                    <q-dialog v-model="gmNotify.preview.show">
+                      <q-card class="gm-email-preview-card">
+                        <q-card-section class="row items-center">
+                          <div class="text-subtitle1 col">Email preview</div>
+                          <q-btn flat round dense icon="close" v-close-popup
+                                 aria-label="Close email preview"></q-btn>
+                        </q-card-section>
+                        <q-separator></q-separator>
+                        <q-card-section v-if="gmNotify.preview.loading">
+                          <q-skeleton type="text"></q-skeleton>
+                          <q-skeleton type="rect" height="120px"></q-skeleton>
+                        </q-card-section>
+                        <q-card-section v-else>
+                          <div class="text-subtitle2 q-mb-sm">
+                            {{ gmNotify.preview.subject }}
+                          </div>
+                          <div class="gm-email-preview-body">
+                            {{ gmNotify.preview.body }}
+                          </div>
+                          <div class="text-caption q-mt-sm">
+                            Bearer links and digital content are redacted.
+                          </div>
+                        </q-card-section>
+                      </q-card>
+                    </q-dialog>
+                    <q-dialog v-model="gmNotify.clearConfirm.show">
+                      <q-card class="gm-email-preview-card">
+                        <q-card-section>
+                          <div class="text-subtitle1">Clear email history?</div>
+                        </q-card-section>
+                        <q-card-section class="q-pt-none text-body2">
+                          This permanently deletes {{ gmQueueHistoryCount() }}
+                          sent, suppressed, and failed queue entries. Pending
+                          and in-progress emails are not touched.
+                        </q-card-section>
+                        <q-card-actions align="right">
+                          <q-btn flat label="Cancel" v-close-popup></q-btn>
+                          <q-btn color="negative" unelevated no-caps
+                                 label="Clear history"
+                                 :loading="gmNotify.clearing"
+                                 @click="gmClearEmailQueue"
+                                 v-close-popup></q-btn>
+                        </q-card-actions>
+                      </q-card>
+                    </q-dialog>
                   </q-card-section>
                 </q-card>
               </div>
@@ -3192,6 +3253,16 @@
 .gm-msg-composer {
   display: flex; align-items: flex-end; gap: 8px; padding: 10px 14px;
   border-top: 1px solid rgba(128, 128, 128, 0.25);
+}
+.gm-email-preview-card {
+  width: min(560px, calc(100vw - 32px));
+}
+.gm-email-preview-body {
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  padding: 12px; border-radius: 8px;
+  background: rgba(128, 128, 128, 0.08);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px; line-height: 1.5;
 }
 @media (max-width: 560px) {
   .gm-msg-workspace { height: auto; }

@@ -217,6 +217,21 @@ def _render_signin_body(merchant: dict, link: str) -> str:
     )
 
 
+def _preview_enc(
+    row: dict, subject: str, body: str, settings
+) -> bytes:
+    """Encrypted owner-only message preview; bearer/digital content omitted."""
+    payload = json.dumps(
+        {"subject": subject, "body": body},
+        sort_keys=True, separators=(",", ":"),
+    ).encode()
+    ver = settings.active_key_version
+    return crypto.encrypt(
+        payload, settings.master_keys[ver], record_id=row["id"],
+        table="email_queue", column="preview_enc", key_version=ver,
+    )
+
+
 async def _status_link(
     order: dict | None, settings
 ) -> str | None:
@@ -378,12 +393,26 @@ async def worker_tick(
             )
             subject = _subject(merchant or {}, row["event_type"])
             body = _render_signin_body(merchant or {}, link)
+            preview_body = _render_signin_body(
+                merchant or {}, "[sign-in link omitted]"
+            )
         else:
             link = await _status_link(order, settings)
             subject = _subject(merchant or {}, row["event_type"])
             body = _render_body(
                 row, order, items, merchant or {}, link, delivery
             )
+            preview_delivery = [
+                {"title": d.get("title") or "digital item",
+                 "content": "[digital content omitted]"}
+                for d in delivery
+            ]
+            preview_body = _render_body(
+                row, order, items, merchant or {},
+                "[order-status link omitted]" if link else None,
+                preview_delivery,
+            )
+        preview = _preview_enc(row, subject, preview_body, settings)
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             return "lost_claim"
@@ -410,16 +439,17 @@ async def worker_tick(
                 await _leased_write(
                     tx, row,
                     "state = 'sent', sent_at = :t, recipient_enc = :empty,"
-                    " payload_enc = :empty",
-                    {"t": now, "empty": b""},
+                    " payload_enc = :empty, preview_enc = :preview",
+                    {"t": now, "empty": b"", "preview": preview},
                 )
                 return "sent"
             attempts = row["attempts"] + 1
             if attempts >= settings.email_max_attempts:
                 await _leased_write(
                     tx, row,
-                    "state = 'failed', attempts = :a, last_error = 'send-failed'",
-                    {"a": attempts},
+                    "state = 'failed', attempts = :a, last_error = 'send-failed',"
+                    " preview_enc = :preview",
+                    {"a": attempts, "preview": preview},
                 )
                 return "failed"
             await _leased_write(
@@ -427,8 +457,9 @@ async def worker_tick(
                 "state = 'pending', attempts = :a,"
                 " next_attempt_at = :na, last_error = 'send-failed',"
                 " claimed_by = NULL, claimed_at = NULL,"
-                " claimed_until = NULL",
-                {"a": attempts, "na": now + _backoff(attempts)},
+                " claimed_until = NULL, preview_enc = :preview",
+                {"a": attempts, "na": now + _backoff(attempts),
+                 "preview": preview},
             )
             return "retry"
 

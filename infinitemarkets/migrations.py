@@ -1399,3 +1399,10 @@ async def m013_stock_count_gate(db: Connection):
     await db.execute(
         f"ALTER TABLE {s}products ADD COLUMN stock_counted_at {db.big_int}"
     )
+
+
+async def m014_email_preview(db: Connection):
+    s = db.references_schema
+    await db.execute(
+        f"ALTER TABLE {s}email_queue ADD COLUMN preview_enc {db.blob}"
+    )

@@ -961,6 +961,7 @@ async def retention_prune(now: int | None = None) -> dict:
         )
         await tx.execute(
             f"UPDATE {tx.table('email_queue')} SET recipient_enc = :empty,"
+            " payload_enc = :empty, preview_enc = :empty,"
             " state = CASE WHEN state = 'sent' THEN 'sent' ELSE 'suppressed' END,"
             " claim_token = claim_token + 1, claimed_until = NULL, claimed_by = NULL"
             f" WHERE order_id IN ({terminal_ids})", {**cutoff, "empty": b""},

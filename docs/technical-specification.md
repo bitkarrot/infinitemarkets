@@ -516,16 +516,19 @@ upgrade compatibility; no current import operation reads or writes them.
 `id` PK, `merchant_id` FK, `order_id` FK NULL, `channel` (`merchant|customer|account`),
 `event_type` (`order_received|confirmed|processing|shipped|delivered|cancelled|
 expired|on_hold|refund_requested|signin_link`), `recipient_enc` BLOB, `recipient_hash` TEXT,
-`payload_enc` BLOB NULL,
+`payload_enc` BLOB NULL, `preview_enc` BLOB NULL,
 `state` (`pending|claimed|sent|suppressed|failed`), `attempts`, `next_attempt_at`,
 `claimed_by`, `claimed_at`, `claimed_until`, monotonically increasing `claim_token`,
 `last_error` (bounded code only), `created_at`, `sent_at`.
 UNIQUE(order_id, channel, event_type, recipient_hash) dedupes intent per recipient;
 each merchant recipient has its own row. Every leased write compares `claim_token`.
-The body is rendered at send time from a fixed template and current order state—no
-rendered message or decrypted address is retained. Queue uniqueness does not guarantee
-exactly-once SMTP delivery: a crash after SMTP acceptance but before commit may deliver
-a duplicate. Sent rows keep metadata only and are pruned with §11.3 retention.
+The body is rendered at send time from a fixed template and current order state. An
+owner-only AEAD preview may retain the subject/body after send attempts, but bearer
+status links, sign-in links, digital delivery content, and the recipient address are
+omitted or wiped; `preview_enc` never contains those secrets. Queue uniqueness does not
+guarantee exactly-once SMTP delivery: a crash after SMTP acceptance but before commit
+may deliver a duplicate. Sent rows keep metadata plus the redacted preview and are
+pruned with §11.3 retention or the merchant history-purge action.
 Orderless `account` rows (`signin_link`) carry the AEAD'd magic-link payload in
 `payload_enc`, are exempt from the customer-consent suppression, and still honor
 `email-disabled`, `host-email-unconfigured`, and `merchant-inactive`.
@@ -624,6 +627,8 @@ POST   /merchants/{id}/keys/export         owner-initiated nsec reveal — no-st
 POST   /merchants/{id}/publish             enqueue republication of all aggregates
 GET    /merchants/{id}/relay-health        per-relay connection/ACK summary
 GET|PATCH /merchants/{id}/notifications    notify_emails + per-event toggles (§8.8)
+GET    /merchants/{id}/notifications/email-queue/{queue_id}  redacted email preview
+DELETE /merchants/{id}/notifications/email-queue            purge sent/suppressed/failed history
 POST   /merchants/{id}/notifications/test  send a test message to a configured address
 DELETE /merchants/{id}                     begin two-step deactivation (§6.7); never destroys key before tombstones are durable
 ```
