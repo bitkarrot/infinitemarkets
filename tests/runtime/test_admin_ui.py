@@ -83,7 +83,8 @@ async def test_admin_shell_document(runtime_env):
     assert "gmProfileName" in messages.text
     about = await runtime_env["client"].get(f"{JS}/admin_about.js")
     assert about.status_code == 200
-    assert 'admin-categories.jpg' not in about.text
+    assert 'admin-categories.jpg' in about.text
+    assert 'title: "Catalog"' in about.text
 
 
 async def test_product_editor_shipping_options(runtime_env):
