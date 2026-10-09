@@ -398,6 +398,47 @@ async def test_catalog_relay_check(runtime_env, monkeypatch):
     duplicate = await product(title)
     digital = await product(f"digital-{title}", stock=None, fmt="digital")
     deleted = await product(f"deleted-{title}")
+
+    collection = await client.post(
+        "/infinitemarkets/api/v1/collections",
+        json={"title": f"collection-{title}"},
+        headers=_headers(env, csrf),
+    )
+    assert collection.status_code == 201, collection.text
+    collection = collection.json()
+    attach = await client.patch(
+        f"/infinitemarkets/api/v1/products/{active['id']}",
+        json={"collection_ids": [collection["id"]]},
+        headers=_headers(env, csrf),
+    )
+    assert attach.status_code == 200, attach.text
+
+    deleted_collection = await client.post(
+        "/infinitemarkets/api/v1/collections",
+        json={"title": f"deleted-collection-{title}"},
+        headers=_headers(env, csrf),
+    )
+    assert deleted_collection.status_code == 201, deleted_collection.text
+    deleted_collection = deleted_collection.json()
+    remove_collection = await client.delete(
+        f"/infinitemarkets/api/v1/collections/{deleted_collection['id']}",
+        headers=_headers(env, csrf),
+    )
+    assert remove_collection.status_code == 200, remove_collection.text
+
+    shipping = await client.post(
+        "/infinitemarkets/api/v1/shipping",
+        json={"title": f"shipping-{title}", "service": "standard"},
+        headers=_headers(env, csrf),
+    )
+    assert shipping.status_code == 201, shipping.text
+    shipping = shipping.json()
+    remove_shipping = await client.delete(
+        f"/infinitemarkets/api/v1/shipping/{shipping['id']}",
+        headers=_headers(env, csrf),
+    )
+    assert remove_shipping.status_code == 200, remove_shipping.text
+
     now = int(time.time())
     async with DomainTransaction() as tx:
         await tx.execute(
@@ -442,15 +483,46 @@ async def test_catalog_relay_check(runtime_env, monkeypatch):
          ["visibility", "on-sale"], ["type", "simple", "digital"]],
         now - 15,
     )
-    tombstone = await signed(
+    collection_event = await signed(
+        30405, "collection copy",
+        [["d", collection["d_tag"]], ["title", collection["title"]]],
+        now - 12,
+    )
+    deleted_collection_event = await signed(
+        30405, "deleted collection copy",
+        [["d", deleted_collection["d_tag"]],
+         ["title", deleted_collection["title"]]],
+        now - 11,
+    )
+    product_tombstone = await signed(
         5, "deleted",
         [["a", f"30402:{pubkey}:{deleted['d_tag']}"], ["k", "30402"]],
         now - 5,
     )
+    collection_tombstone = await signed(
+        5, "deleted collection",
+        [["a", f"30405:{pubkey}:{deleted_collection['d_tag']}"],
+         ["k", "30405"]],
+        now - 4,
+    )
+    shipping_tombstone = await signed(
+        5, "deleted shipping",
+        [["a", f"30406:{pubkey}:{shipping['d_tag']}"], ["k", "30406"]],
+        now - 3,
+    )
+    orphan_tombstone = await signed(
+        5, "orphan collection",
+        [["a", f"30405:{pubkey}:orphan-collection"], ["k", "30405"]],
+        now - 2,
+    )
 
     relay_a = await LocalRelay(
         mode=RelayMode.ACCEPTING,
-        canned_events=[active_new, digital_event, deleted_event, tombstone],
+        canned_events=[
+            active_new, digital_event, deleted_event, collection_event,
+            deleted_collection_event, product_tombstone,
+            collection_tombstone, shipping_tombstone, orphan_tombstone,
+        ],
     ).start()
     relay_b = await LocalRelay(
         mode=RelayMode.ACCEPTING,
@@ -474,14 +546,25 @@ async def test_catalog_relay_check(runtime_env, monkeypatch):
         )
         assert resp.status_code == 200, resp.text
         body = resp.json()
+        all_rows = {i["address"]: i for i in body["items"]}
         rows = {
             i["address"]: i for i in body["items"] if i["kind"] == 30402
         }
         deleted_row = rows[f"30402:{pubkey}:{deleted['d_tag']}"]
+        collection_row = all_rows[
+            f"30405:{pubkey}:{collection['d_tag']}"
+        ]
+        deleted_collection_row = all_rows[
+            f"30405:{pubkey}:{deleted_collection['d_tag']}"
+        ]
+        shipping_row = all_rows[
+            f"30406:{pubkey}:{shipping['d_tag']}"
+        ]
         reissue = await client.post(
             f"/infinitemarkets/api/v1/merchants/{mid}/catalog/tombstones/reissue",
             json={"addresses": [
-                deleted_row["address"], deleted_row["address"]
+                deleted_row["address"], deleted_row["address"],
+                deleted_collection_row["address"],
             ]},
             headers=_headers(env, csrf),
         )
@@ -496,20 +579,23 @@ async def test_catalog_relay_check(runtime_env, monkeypatch):
 
         outcome = await outbox.worker_tick("tombstone-test")
         deleted_address = deleted_row["address"]
+        deleted_collection_address = deleted_collection_row["address"]
 
-        def tombstone_received(relay):
+        def tombstone_received(relay, address):
             return any(
                 item.get("event", {}).get("kind") == 5
                 and [
                     tag for tag in item.get("event", {}).get("tags", [])
                     if len(tag) > 1 and tag[0] == "a"
-                    and tag[1] == deleted_address
+                    and tag[1] == address
                 ]
                 for item in relay.received_events
             )
 
-        tombstone_sent = (
-            tombstone_received(relay_a) and tombstone_received(relay_b)
+        tombstone_sent = all(
+            tombstone_received(relay, address)
+            for relay in (relay_a, relay_b)
+            for address in (deleted_address, deleted_collection_address)
         )
     finally:
         await relay_a.stop()
@@ -538,6 +624,26 @@ async def test_catalog_relay_check(runtime_env, monkeypatch):
     assert deleted_row["tombstoned_on"] == [relay_a_url]
     assert "tombstone-did-not-remove-copy" in deleted_row["findings"]
 
+    assert collection_row["status"] == "partial"
+    assert collection_row["observed_on"] == [relay_a_url]
+    assert collection_row["local"]["member_count"] == 1
+
+    assert deleted_collection_row["status"] == "stale-deleted"
+    assert deleted_collection_row["tombstoned_on"] == [relay_a_url]
+    assert deleted_collection_row["local"]["state"] == "deleted"
+
+    assert shipping_row["status"] == "not-observed"
+    assert shipping_row["observed_on"] == []
+    assert shipping_row["tombstoned_on"] == [relay_a_url]
+    assert shipping_row["local"]["state"] == "deleted"
+
+    orphan = next(
+        u for u in body["unmatched"]
+        if u["address"] == f"30405:{pubkey}:orphan-collection"
+    )
+    assert orphan["observed_on"] == []
+    assert orphan["tombstoned_on"] == [relay_a_url]
+
     summary = body["summary"]
     assert summary["relays_checked"] == 2
     assert summary["divergent"] >= 1
@@ -545,8 +651,14 @@ async def test_catalog_relay_check(runtime_env, monkeypatch):
     assert summary["duplicate_title_groups"] >= 1
     assert "old copy" not in json.dumps(body)
 
-    assert reissue.json()["queued"] == 1
-    first_revision = reissue.json()["items"][0]["revision"]
+    assert reissue.json()["queued"] == 2
+    reissue_items = {
+        i["address"]: i for i in reissue.json()["items"]
+    }
+    first_revision = reissue_items[deleted_row["address"]]["revision"]
+    assert reissue_items[
+        deleted_collection_row["address"]
+    ]["revision"] > deleted_collection_row["local"]["revision"]
     assert again.json()["items"][0]["revision"] > first_revision
     latest_intent_id = again.json()["items"][0]["outbox_event_id"]
     assert outcome["claimed"] >= 1

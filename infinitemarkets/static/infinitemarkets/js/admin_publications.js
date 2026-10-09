@@ -35,6 +35,7 @@
 
   var RELAY_CHECK_LOCAL_STATES = [
     {label: "Active", value: "active"},
+    {label: "Inactive", value: "inactive"},
     {label: "Draft", value: "draft"},
     {label: "Deleted", value: "deleted"}
   ];
@@ -46,6 +47,7 @@
     {label: "Stale copy", value: "stale"},
     {label: "Deleted copy served", value: "stale-deleted"},
     {label: "Draft copy served", value: "draft-copy-served"},
+    {label: "Inactive copy served", value: "inactive-copy-served"},
     {label: "Not observed", value: "not-observed"}
   ];
 
@@ -119,7 +121,10 @@
           { name: "local", label: "Local state", align: "left",
             sortable: true,
             field: function (row) {
-              return row.local.state + ":" + (row.local.visibility || "");
+              var detail = row.local.visibility ||
+                (row.local.member_count != null
+                  ? row.local.member_count + " members" : "");
+              return row.local.state + ":" + detail;
             } },
           { name: "relays", label: "Relay copies", align: "left",
             sortable: true,
@@ -281,6 +286,16 @@
         }
         self.gmPubs.check.reissuing = false;
       },
+      gmRelayCheckKind: function (row) {
+        var labels = {
+          30017: "Stall",
+          30018: "NIP-15 product",
+          30402: "Product",
+          30405: "Collection",
+          30406: "Shipping"
+        };
+        return labels[row.kind] || "Kind " + row.kind;
+      },
       gmRelayCheckLabel: function (row) {
         var labels = {
           observed: "Published",
@@ -290,12 +305,16 @@
           stale: "Stale copy",
           "stale-deleted": "Deleted copy served",
           "draft-copy-served": "Draft copy served",
+          "inactive-copy-served": "Inactive copy served",
           "not-observed": "Not observed"
         };
         return labels[row.status] || row.status;
       },
       gmRelayCheckColor: function (row) {
-        if (["missing", "stale-deleted", "draft-copy-served"].includes(row.status)) {
+        if ([
+          "missing", "stale-deleted", "draft-copy-served",
+          "inactive-copy-served"
+        ].includes(row.status)) {
           return "negative";
         }
         if (["partial", "divergent", "stale"].includes(row.status)) {
@@ -306,10 +325,11 @@
       },
       gmRelayCheckFinding: function (code) {
         var labels = {
-          "deleted-copy-served": "relay still serves a deleted product",
+          "deleted-copy-served": "relay still serves a deleted catalog item",
           "tombstone-not-observed": "deletion event not observed",
           "tombstone-did-not-remove-copy": "relay kept a deleted copy",
           "draft-copy-served": "relay serves a draft",
+          "inactive-copy-served": "relay serves an item that is not currently publishable",
           "missing-on-checked-relays": "not returned by any healthy relay",
           "missing-on-some-relays": "missing on some relays",
           "relay-divergence": "relays disagree about the latest event",

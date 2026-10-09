@@ -1314,7 +1314,7 @@
               <template v-slot:body="props">
                 <q-tr :props="props" data-gm="relay-check-row">
                   <q-td>
-                    <q-badge outline :label="props.row.kind === 30402 ? 'Product' : props.row.kind === 30018 ? 'NIP-15' : 'Stall'"></q-badge>
+                    <q-badge outline :label="gmRelayCheckKind(props.row)"></q-badge>
                   </q-td>
                   <q-td>
                     <div>{{ props.row.title || '(untitled)' }}</div>
@@ -1325,6 +1325,12 @@
                       {{ props.row.local.state }}
                       <template v-if="props.row.local.visibility">
                         · {{ props.row.local.visibility }}
+                      </template>
+                      <template v-else-if="props.row.local.member_count != null">
+                        · {{ props.row.local.member_count }} member{{ props.row.local.member_count === 1 ? '' : 's' }}
+                      </template>
+                      <template v-else-if="props.row.local.active === false">
+                        · disabled
                       </template>
                     </div>
                     <div v-if="props.row.local.revision != null" class="text-caption text-grey-7">
@@ -1363,13 +1369,16 @@
               </template>
             </q-table>
             <div v-if="gmPubs.check.unmatched.length" class="q-mt-md">
-              <div class="text-subtitle2 q-mb-xs">Relay events with no local record</div>
+              <div class="text-subtitle2 q-mb-xs">Relay addresses without a matching local row</div>
               <q-list dense separator>
                 <q-item v-for="u in gmPubs.check.unmatched" :key="u.address">
                   <q-item-section>
                     <q-item-label><code>{{ u.address }}</code></q-item-label>
                     <q-item-label caption>
-                      observed on {{ u.observed_on.map(gmRelayCheckRelay).join(', ') || 'none' }}
+                      live event on {{ u.observed_on.map(gmRelayCheckRelay).join(', ') || 'none' }}
+                    </q-item-label>
+                    <q-item-label caption>
+                      deletion request on {{ u.tombstoned_on.map(gmRelayCheckRelay).join(', ') || 'none' }}
                     </q-item-label>
                   </q-item-section>
                 </q-item>

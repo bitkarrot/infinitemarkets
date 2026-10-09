@@ -259,6 +259,8 @@ async def test_admin_publications_copy(runtime_env):
     assert "/catalog/tombstones/reissue" in js
     assert "RELAY_CHECK_LOCAL_STATES" in js
     assert "RELAY_CHECK_RESULTS" in js
+    assert "inactive-copy-served" in js
+    assert "gmRelayCheckKind" in js
     assert js.count("sortable: true") >= 6
     html = (await runtime_env["client"].get("/infinitemarkets/")).text
     assert 'data-gm="outbox-row"' in html
@@ -268,6 +270,7 @@ async def test_admin_publications_copy(runtime_env):
     assert 'data-gm="relay-check-result-filter"' in html
     assert 'data-gm="reissue-tombstones"' in html
     assert 'data-gm="relay-check-table"' in html
+    assert "deletion request on" in html
     assert "Queued" in html
 
 

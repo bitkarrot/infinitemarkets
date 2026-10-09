@@ -19,7 +19,12 @@ import json
 import time
 import uuid
 
-from ..db import DomainTransaction, db, table
+from ..db import (
+    DomainTransaction,
+    db,
+    released_product_clause,
+    table,
+)
 from ..security import unprocessable
 
 # Starter publication relays — merchant-editable, seeded on first publish.
@@ -441,6 +446,30 @@ async def catalog_reconcile(merchant_id: str) -> dict:
             " ORDER BY created_at, id",
             {"m": merchant_id},
         )
+        collections = await conn.fetchall(
+            f"SELECT id, d_tag, title, deleted_at, revision, created_at"
+            f" FROM {table('collections')} WHERE merchant_id = :m"
+            " ORDER BY created_at, id",
+            {"m": merchant_id},
+        )
+        collection_members = await conn.fetchall(
+            f"SELECT pc.collection_id, COUNT(*) AS member_count"
+            f" FROM {table('product_collections')} pc"
+            f" JOIN {table('collections')} c ON c.id = pc.collection_id"
+            f" JOIN {table('products')} p ON p.id = pc.product_id"
+            " WHERE c.merchant_id = :m AND p.deleted_at IS NULL"
+            " AND NOT p.draft"
+            f" AND {released_product_clause('p', table)}"
+            " GROUP BY pc.collection_id",
+            {"m": merchant_id},
+        )
+        shipping_options = await conn.fetchall(
+            f"SELECT id, d_tag, title, deleted_at, active, revision,"
+            " created_at"
+            f" FROM {table('shipping_options')} WHERE merchant_id = :m"
+            " ORDER BY created_at, id",
+            {"m": merchant_id},
+        )
         protocol_rows = await conn.fetchall(
             f"SELECT domain_type, domain_id, event_kind, d_tag,"
             " latest_event_id, latest_created_at"
@@ -542,6 +571,45 @@ async def catalog_reconcile(merchant_id: str) -> dict:
             and category["deleted_at"] is None,
         )
 
+    member_counts = {
+        r["collection_id"]: int(r["member_count"] or 0)
+        for r in collection_members
+    }
+    for collection in collections:
+        members = member_counts.get(collection["id"], 0)
+        state = (
+            "deleted" if collection["deleted_at"] is not None
+            else "active" if members else "inactive"
+        )
+        add_address(
+            30405, collection["d_tag"], "collections", collection["id"],
+            collection["title"] or "",
+            {
+                "state": state,
+                "deleted_at": collection["deleted_at"],
+                "revision": collection["revision"],
+                "member_count": members,
+            },
+            collection["deleted_at"] is None and members > 0,
+        )
+
+    for option in shipping_options:
+        state = (
+            "deleted" if option["deleted_at"] is not None
+            else "active" if option["active"] else "inactive"
+        )
+        add_address(
+            30406, option["d_tag"], "shipping_options", option["id"],
+            option["title"] or "",
+            {
+                "state": state,
+                "deleted_at": option["deleted_at"],
+                "revision": option["revision"],
+                "active": bool(option["active"]),
+            },
+            option["deleted_at"] is None and bool(option["active"]),
+        )
+
     protocol = {
         f"{r['event_kind']}:{merchant['pubkey']}:{r['d_tag']}": r
         for r in protocol_rows
@@ -590,7 +658,10 @@ async def catalog_reconcile(merchant_id: str) -> dict:
         return (
             Filter()
             .author(PublicKey.parse(merchant["pubkey"]))
-            .kinds([Kind(5), Kind(30017), Kind(30018), Kind(30402)])
+            .kinds([
+                Kind(5), Kind(30017), Kind(30018), Kind(30402),
+                Kind(30405), Kind(30406),
+            ])
             .limit(RELAY_CHECK_EVENT_LIMIT)
         )
 
@@ -624,7 +695,9 @@ async def catalog_reconcile(merchant_id: str) -> dict:
             if (
                 not valid
                 or snapshot["author"] != merchant["pubkey"]
-                or snapshot["kind"] not in {5, 30017, 30018, 30402}
+                or snapshot["kind"] not in {
+                    5, 30017, 30018, 30402, 30405, 30406
+                }
             ):
                 result["invalid_events"] += 1
                 continue
@@ -717,6 +790,9 @@ async def catalog_reconcile(merchant_id: str) -> dict:
             if observed_on:
                 status = "draft-copy-served"
                 findings.append("draft-copy-served")
+        elif not expected and observed_on:
+            status = "inactive-copy-served"
+            findings.append("inactive-copy-served")
         elif expected and checked_relays:
             if not observed_on:
                 status = "missing"
@@ -884,6 +960,16 @@ async def reissue_deletion_requests(merchant_id: str,
             " WHERE merchant_id = :m AND deleted_at IS NOT NULL",
             {"m": merchant_id},
         )
+        collections = await tx.fetch_all(
+            f"SELECT id, d_tag, revision FROM {tx.table('collections')}"
+            " WHERE merchant_id = :m AND deleted_at IS NOT NULL",
+            {"m": merchant_id},
+        )
+        shipping_options = await tx.fetch_all(
+            f"SELECT id, d_tag, revision FROM {tx.table('shipping_options')}"
+            " WHERE merchant_id = :m AND deleted_at IS NOT NULL",
+            {"m": merchant_id},
+        )
 
         targets: dict[str, dict] = {}
         for product in products:
@@ -912,6 +998,22 @@ async def reissue_deletion_requests(merchant_id: str,
                 "aggregate_type": "categories",
                 "aggregate_id": category["id"],
                 "revision": 0,
+            }
+        for collection in collections:
+            targets[
+                f"30405:{merchant['pubkey']}:{collection['d_tag']}"
+            ] = {
+                "aggregate_type": "collections",
+                "aggregate_id": collection["id"],
+                "revision": collection["revision"] or 0,
+            }
+        for option in shipping_options:
+            targets[
+                f"30406:{merchant['pubkey']}:{option['d_tag']}"
+            ] = {
+                "aggregate_type": "shipping_options",
+                "aggregate_id": option["id"],
+                "revision": option["revision"] or 0,
             }
 
         for address in requested:
