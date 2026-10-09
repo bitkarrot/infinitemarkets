@@ -254,9 +254,12 @@ async def test_admin_publications_copy(runtime_env):
     # Timestamps + row-detail surface (queued/updated shown in the table,
     # full intent fields + per-relay evidence in the detail dialog).
     assert "gmPubKindLabel" in js and "gmPubDetailFields" in js
+    assert "/catalog/relay-check" in js
     html = (await runtime_env["client"].get("/infinitemarkets/")).text
     assert 'data-gm="outbox-row"' in html
     assert 'data-gm="outbox-detail"' in html
+    assert 'data-gm="relay-check"' in html
+    assert 'data-gm="relay-check-table"' in html
     assert "Queued" in html
 
 

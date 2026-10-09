@@ -51,6 +51,15 @@
           retrying: null,
           detail: null,
           exceptionOrders: [],
+          check: {
+            busy: false,
+            checked_at: null,
+            relays: [],
+            items: [],
+            unmatched: [],
+            summary: null,
+            showAll: false
+          },
           prune: {show: false, days: 90, busy: false, result: null},
           pruneDayOptions: [7, 14, 30, 60, 90, 180, 365]
         },
@@ -77,6 +86,18 @@
                 ? r.rejected + " rejected · " + r.timeout + " timed out"
                 : "—";
             } }
+        ],
+        gmRelayCheckColumns: [
+          { name: "kind", label: "Kind", field: "kind", align: "left" },
+          { name: "item", label: "Catalog item", field: "title",
+            align: "left" },
+          { name: "local", label: "Local state", field: "local",
+            align: "left" },
+          { name: "relays", label: "Relay copies", field: "observed_on",
+            align: "left" },
+          { name: "latest", label: "Latest observed", field: "latest_event",
+            align: "left" },
+          { name: "result", label: "Result", field: "status", align: "left" }
         ]
       };
     },
@@ -146,6 +167,83 @@
         return pubs
           .filter(function (p) { return p.result !== "accepted"; })
           .map(function (p) { return p.relay_url; });
+      },
+      gmRunRelayCheck: async function () {
+        var self = this;
+        var mid = self.gmMerchantId();
+        self.gmPubs.check.busy = true;
+        self.gmPubs.error = null;
+        try {
+          var res = await self.gmApi(
+            "POST",
+            "/merchants/" + mid + "/catalog/relay-check",
+            {}
+          );
+          self.gmPubs.check.checked_at = res.checked_at;
+          self.gmPubs.check.relays = res.relays || [];
+          self.gmPubs.check.items = res.items || [];
+          self.gmPubs.check.unmatched = res.unmatched || [];
+          self.gmPubs.check.summary = res.summary || null;
+        } catch (e) {
+          self.gmPubs.error = self.gmProblemCopy(e.problem);
+        }
+        self.gmPubs.check.busy = false;
+      },
+      gmRelayCheckRows: function () {
+        var check = this.gmPubs.check;
+        var rows = check.items || [];
+        if (check.showAll) return rows;
+        return rows.filter(function (r) {
+          return r.expected || r.observed_on.length ||
+            r.tombstoned_on.length || r.status !== "not-observed";
+        });
+      },
+      gmRelayCheckLabel: function (row) {
+        var labels = {
+          observed: "Published",
+          partial: "Partial",
+          missing: "Missing",
+          divergent: "Divergent",
+          stale: "Stale copy",
+          "stale-deleted": "Deleted copy served",
+          "draft-copy-served": "Draft copy served",
+          "not-observed": "Not observed"
+        };
+        return labels[row.status] || row.status;
+      },
+      gmRelayCheckColor: function (row) {
+        if (["missing", "stale-deleted", "draft-copy-served"].includes(row.status)) {
+          return "negative";
+        }
+        if (["partial", "divergent", "stale"].includes(row.status)) {
+          return "warning";
+        }
+        if (row.status === "observed") return "positive";
+        return "grey";
+      },
+      gmRelayCheckFinding: function (code) {
+        var labels = {
+          "deleted-copy-served": "relay still serves a deleted product",
+          "tombstone-not-observed": "deletion event not observed",
+          "tombstone-did-not-remove-copy": "relay kept a deleted copy",
+          "draft-copy-served": "relay serves a draft",
+          "missing-on-checked-relays": "not returned by any healthy relay",
+          "missing-on-some-relays": "missing on some relays",
+          "relay-divergence": "relays disagree about the latest event",
+          "revision-history-observed": "relay returned multiple revisions",
+          "same-title-local-records": "same title exists on multiple local records",
+          "older-than-local-latest": "relay copy is older than local evidence",
+          "stock-tag-missing": "no stock tag — some public marketplaces omit this product"
+        };
+        return labels[code] || code;
+      },
+      gmRelayCheckRelay: function (url) {
+        return String(url || "").replace(/^wss?:\/\//, "");
+      },
+      gmRelayCheckErrors: function () {
+        return (this.gmPubs.check.relays || []).filter(function (r) {
+          return r.state !== "ok";
+        });
       },
       gmLoadPublications: async function () {
         var self = this;

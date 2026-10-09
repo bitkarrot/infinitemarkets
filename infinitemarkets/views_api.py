@@ -238,6 +238,28 @@ async def get_relay_health(
     return health
 
 
+@infinitemarkets_api_router.post(
+    "/merchants/{merchant_id}/catalog/relay-check"
+)
+@problem_boundary
+async def catalog_relay_check(
+    request: Request,
+    merchant_id: str,
+    user: User = Depends(check_user_exists),
+):
+    """Owner-triggered read-only relay reconciliation.
+
+    A positive relay ACK is historical delivery evidence; this asks the
+    configured public relays which signed catalog addresses they return
+    right now and separates active, missing, divergent, draft, and
+    deleted-but-served copies.
+    """
+    from .services import relay as relay_service
+
+    await merchant_service.get_merchant_row(merchant_id, str(user.id))
+    return await relay_service.catalog_reconcile(merchant_id)
+
+
 @infinitemarkets_api_router.get("/merchants/{merchant_id}/outbox")
 @problem_boundary
 async def get_outbox(

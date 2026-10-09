@@ -1133,6 +1133,11 @@
       <section v-show="gm.view === 'publications'" data-gm-surface="publications">
         <div class="row items-center q-mb-md q-gutter-sm">
           <h1 class="text-h6 q-my-none col">Publications</h1>
+          <q-btn color="primary" unelevated dense no-caps icon="travel_explore"
+                 label="Check relays" data-gm="relay-check"
+                 :loading="gmPubs.check.busy"
+                 @click="gmRunRelayCheck">
+          </q-btn>
           <q-btn color="primary" outline dense no-caps icon="delete_sweep"
                  label="Prune history" data-gm="prune-outbox"
                  @click="gmPubs.prune = {show: true, days: gmPubs.prune.days, busy: false, result: null}">
@@ -1222,6 +1227,118 @@
                 <q-td :props="props"><code>{{ props.row.relay_url }}</code></q-td>
               </template>
             </q-table>
+          </q-card-section>
+        </q-card>
+
+        <q-card flat bordered class="q-mb-md" data-gm="relay-check-panel">
+          <q-card-section>
+            <div class="row items-center q-mb-sm">
+              <div class="col">
+                <div class="text-subtitle2">Live relay catalog check</div>
+                <div class="text-caption text-grey-7">
+                  Queries your public relays for signed product/stall events.
+                  Tombstones are deletion requests — clients and relays may
+                  still retain older copies.
+                </div>
+              </div>
+              <q-toggle v-model="gmPubs.check.showAll" dense
+                        label="Show drafts and unobserved NIP-15 rows"></q-toggle>
+              <q-btn color="primary" outline dense no-caps icon="refresh"
+                     label="Run check" data-gm="relay-check-run"
+                     :loading="gmPubs.check.busy"
+                     @click="gmRunRelayCheck"></q-btn>
+            </div>
+
+            <div v-if="gmPubs.check.summary" class="q-mb-sm"
+                 data-gm="relay-check-summary">
+              Checked {{ gmPubs.check.summary.relays_checked }} relays ·
+              {{ gmPubs.check.summary.addresses_observed }} catalog addresses ·
+              {{ gmPubs.check.summary.expected_missing }} missing ·
+              {{ gmPubs.check.summary.stale_deleted }} stale deleted ·
+              {{ gmPubs.check.summary.divergent }} divergent ·
+              {{ gmPubs.check.summary.duplicate_title_groups }} duplicate title groups
+              <span v-if="gmPubs.check.checked_at" class="text-grey-7">
+                at {{ gmTime(gmPubs.check.checked_at) }}</span>
+            </div>
+            <q-banner v-for="r in gmRelayCheckErrors()"
+                      :key="r.relay_url" dense class="bg-warning text-dark q-mb-sm">
+              Could not read {{ gmRelayCheckRelay(r.relay_url) }}: {{ r.error || r.state }}
+            </q-banner>
+            <div v-if="!gmPubs.check.summary" class="text-grey-7">
+              Run a check to compare local catalog records with the product
+              events currently returned by each relay.
+            </div>
+            <div v-else-if="!gmRelayCheckRows().length" class="text-grey-7">
+              No publishable or relay-observed catalog items.
+            </div>
+            <q-table v-else dense flat :rows="gmRelayCheckRows()"
+                     :columns="gmRelayCheckColumns" row-key="address"
+                     :pagination="{ rowsPerPage: 25 }"
+                     data-gm="relay-check-table">
+              <template v-slot:body="props">
+                <q-tr :props="props" data-gm="relay-check-row">
+                  <q-td>
+                    <q-badge outline :label="props.row.kind === 30402 ? 'Product' : props.row.kind === 30018 ? 'NIP-15' : 'Stall'"></q-badge>
+                  </q-td>
+                  <q-td>
+                    <div>{{ props.row.title || '(untitled)' }}</div>
+                    <code class="text-caption">{{ gmTrunc(props.row.d_tag, 10, 6) }}</code>
+                  </q-td>
+                  <q-td>
+                    <div>
+                      {{ props.row.local.state }}
+                      <template v-if="props.row.local.visibility">
+                        · {{ props.row.local.visibility }}
+                      </template>
+                    </div>
+                    <div v-if="props.row.local.revision != null" class="text-caption text-grey-7">
+                      rev {{ props.row.local.revision }}
+                    </div>
+                  </q-td>
+                  <q-td>
+                    <q-badge v-for="url in props.row.observed_on" :key="url"
+                             outline color="positive" class="q-mr-xs"
+                             :label="gmRelayCheckRelay(url)"></q-badge>
+                    <q-badge v-for="url in props.row.missing_on" :key="'missing-' + url"
+                             outline color="grey" class="q-mr-xs"
+                             :label="'missing ' + gmRelayCheckRelay(url)"></q-badge>
+                    <q-badge v-for="url in props.row.tombstoned_on" :key="'deleted-' + url"
+                             outline color="warning" class="q-mr-xs"
+                             :label="'deletion ' + gmRelayCheckRelay(url)"></q-badge>
+                    <span v-if="!props.row.observed_on.length && !props.row.tombstoned_on.length"
+                          class="text-grey-7">not returned</span>
+                  </q-td>
+                  <q-td>
+                    <template v-if="props.row.latest_event">
+                      <div>{{ gmTime(props.row.latest_event.created_at) }}</div>
+                      <code class="text-caption">{{ gmTrunc(props.row.latest_event.event_id, 8, 4) }}</code>
+                    </template>
+                    <span v-else class="text-grey-7">—</span>
+                  </q-td>
+                  <q-td>
+                    <q-badge :color="gmRelayCheckColor(props.row)" text-color="white"
+                             :label="gmRelayCheckLabel(props.row)"></q-badge>
+                    <div v-for="f in props.row.findings" :key="f"
+                         class="text-caption text-grey-7">
+                      {{ gmRelayCheckFinding(f) }}
+                    </div>
+                  </q-td>
+                </q-tr>
+              </template>
+            </q-table>
+            <div v-if="gmPubs.check.unmatched.length" class="q-mt-md">
+              <div class="text-subtitle2 q-mb-xs">Relay events with no local record</div>
+              <q-list dense separator>
+                <q-item v-for="u in gmPubs.check.unmatched" :key="u.address">
+                  <q-item-section>
+                    <q-item-label><code>{{ u.address }}</code></q-item-label>
+                    <q-item-label caption>
+                      observed on {{ u.observed_on.map(gmRelayCheckRelay).join(', ') || 'none' }}
+                    </q-item-label>
+                  </q-item-section>
+                </q-item>
+              </q-list>
+            </div>
           </q-card-section>
         </q-card>
 

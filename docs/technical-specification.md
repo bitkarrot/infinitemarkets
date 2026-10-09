@@ -632,6 +632,7 @@ POST   /merchants/{id}/keys/import         body: {nsec} — over TLS only; see �
 POST   /merchants/{id}/keys/export         owner-initiated nsec reveal — no-store response; see §11
 POST   /merchants/{id}/publish             enqueue republication of all aggregates
 GET    /merchants/{id}/relay-health        per-relay connection/ACK summary
+POST   /merchants/{id}/catalog/relay-check owner-triggered read-only relay reconciliation: verify signed 30017/30018/30402 events and kind-5 tombstones per configured public relay; classify missing, divergent, draft, stale-deleted, and duplicate local records. Positive ACKs remain delivery evidence, not proof a relay currently serves an event
 GET|PATCH /merchants/{id}/notifications    notify_emails + per-event toggles (§8.8)
 GET    /merchants/{id}/notifications/email-queue/{queue_id}  redacted email preview
 DELETE /merchants/{id}/notifications/email-queue            purge sent/suppressed/failed history

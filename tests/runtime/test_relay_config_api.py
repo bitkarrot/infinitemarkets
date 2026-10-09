@@ -341,3 +341,173 @@ async def test_outbox_prune_history(runtime_env):
         headers=_headers(env, csrf),
     )
     assert resp.status_code in (403, 404)
+
+
+async def test_catalog_relay_check(runtime_env, monkeypatch):
+    """Owner-triggered relay reconciliation distinguishes stale, missing,
+    divergent, tombstoned, and duplicate local product records."""
+    import json
+    import time
+
+    from nostr_sdk import EventBuilder, Kind, PublicKey, Tag, Timestamp
+
+    from harness.relay import LocalRelay, RelayMode
+    from infinitemarkets.db import DomainTransaction
+    from infinitemarkets.keystore import MerchantKeyStore
+    from infinitemarkets.settings import ext_settings
+
+    monkeypatch.setenv("INFINITEMARKETS_RELAY_IO", "on")
+    monkeypatch.setenv("INFINITEMARKETS_ALLOW_INSECURE_RELAYS", "1")
+    client, env = runtime_env["client"], runtime_env
+    mid, csrf = await _merchant_id(env)
+    merchant = await client.get(
+        "/infinitemarkets/api/v1/merchants/current",
+        headers=_headers(env),
+    )
+    pubkey = merchant.json()["pubkey"]
+
+    title = f"relay-check-{uuid.uuid4().hex[:8]}"
+    category = await client.post(
+        "/infinitemarkets/api/v1/categories",
+        json={"name": "Relay check", "default_currency": "SAT"},
+        headers=_headers(env, csrf),
+    )
+    assert category.status_code == 201, category.text
+    cid = category.json()["id"]
+
+    async def product(name, stock=5, fmt="physical"):
+        payload = {
+            "category_id": cid,
+            "title": name,
+            "amount_minor": 100,
+            "currency": "SAT",
+            "visibility": "on-sale",
+            "format": fmt,
+        }
+        if stock is not None:
+            payload["stock_on_hand"] = stock
+        resp = await client.post(
+            "/infinitemarkets/api/v1/products",
+            json=payload,
+            headers=_headers(env, csrf),
+        )
+        assert resp.status_code == 201, resp.text
+        return resp.json()
+
+    active = await product(title)
+    duplicate = await product(title)
+    digital = await product(f"digital-{title}", stock=None, fmt="digital")
+    deleted = await product(f"deleted-{title}")
+    now = int(time.time())
+    async with DomainTransaction() as tx:
+        await tx.execute(
+            f"UPDATE {tx.table('products')} SET deleted_at = :t"
+            " WHERE id = :i",
+            {"t": now, "i": deleted["id"]},
+        )
+
+    async def signed(kind, content, tags, created_at):
+        unsigned = (
+            EventBuilder(Kind(kind), content)
+            .tags([Tag.parse(tag) for tag in tags])
+            .custom_created_at(Timestamp.from_secs(created_at))
+            .build(PublicKey.parse(pubkey))
+        )
+        event = await MerchantKeyStore(ext_settings()).sign_event(
+            mid, unsigned
+        )
+        return json.loads(event.as_json())
+
+    active_old = await signed(
+        30402, "old copy",
+        [["d", active["d_tag"]], ["title", title],
+         ["visibility", "on-sale"], ["stock", "5"]],
+        now - 20,
+    )
+    active_new = await signed(
+        30402, "new copy",
+        [["d", active["d_tag"]], ["title", title],
+         ["visibility", "on-sale"], ["stock", "5"]],
+        now - 10,
+    )
+    deleted_event = await signed(
+        30402, "deleted copy",
+        [["d", deleted["d_tag"]], ["title", f"deleted-{title}"],
+         ["visibility", "on-sale"], ["stock", "3"]],
+        now - 30,
+    )
+    digital_event = await signed(
+        30402, "digital copy",
+        [["d", digital["d_tag"]], ["title", f"digital-{title}"],
+         ["visibility", "on-sale"], ["type", "simple", "digital"]],
+        now - 15,
+    )
+    tombstone = await signed(
+        5, "deleted",
+        [["a", f"30402:{pubkey}:{deleted['d_tag']}"], ["k", "30402"]],
+        now - 5,
+    )
+
+    relay_a = await LocalRelay(
+        mode=RelayMode.ACCEPTING,
+        canned_events=[active_new, digital_event, deleted_event, tombstone],
+    ).start()
+    relay_b = await LocalRelay(
+        mode=RelayMode.ACCEPTING,
+        canned_events=[active_old, deleted_event],
+    ).start()
+    relay_a_url, relay_b_url = relay_a.url, relay_b.url
+    try:
+        patch = await client.patch(
+            f"/infinitemarkets/api/v1/merchants/{mid}",
+            json={"relay_configs": [
+                {"relay_url": relay_a.url, "direction": "public"},
+                {"relay_url": relay_b.url, "direction": "public"},
+            ]},
+            headers=_headers(env, csrf),
+        )
+        assert patch.status_code == 200, patch.text
+        resp = await client.post(
+            f"/infinitemarkets/api/v1/merchants/{mid}/catalog/relay-check",
+            json={},
+            headers=_headers(env, csrf),
+        )
+    finally:
+        await relay_a.stop()
+        await relay_b.stop()
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["pubkey"] == pubkey
+    assert all(r["state"] == "ok" for r in body["relays"])
+    assert all(r["invalid_events"] == 0 for r in body["relays"])
+    rows = {
+        i["address"]: i for i in body["items"] if i["kind"] == 30402
+    }
+    active_row = rows[f"30402:{pubkey}:{active['d_tag']}"]
+    assert active_row["status"] == "divergent"
+    assert set(active_row["observed_on"]) == {relay_a_url, relay_b_url}
+    assert "relay-divergence" in active_row["findings"]
+    assert "same-title-local-records" in active_row["findings"]
+
+    duplicate_row = rows[f"30402:{pubkey}:{duplicate['d_tag']}"]
+    assert duplicate_row["status"] == "missing"
+    assert "same-title-local-records" in duplicate_row["findings"]
+
+    digital_row = rows[f"30402:{pubkey}:{digital['d_tag']}"]
+    assert digital_row["status"] == "partial"
+    assert digital_row["observed_on"] == [relay_a_url]
+    assert digital_row["missing_on"] == [relay_b_url]
+    assert "stock-tag-missing" in digital_row["findings"]
+
+    deleted_row = rows[f"30402:{pubkey}:{deleted['d_tag']}"]
+    assert deleted_row["status"] == "stale-deleted"
+    assert deleted_row["tombstoned_on"] == [relay_a_url]
+    assert "tombstone-did-not-remove-copy" in deleted_row["findings"]
+
+    summary = body["summary"]
+    assert summary["relays_checked"] == 2
+    assert summary["divergent"] >= 1
+    assert summary["stale_deleted"] >= 1
+    assert summary["duplicate_title_groups"] >= 1
+    assert "old copy" not in json.dumps(body)
