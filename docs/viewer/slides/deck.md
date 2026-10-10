@@ -354,6 +354,10 @@ flowchart LR
     RL <--> PM
     RL <--> CM
     RL <--> OT
+    classDef relay fill:#b48cff,color:#111111
+    classDef market fill:#ff8fc4,color:#111111
+    class RL relay
+    class PM,CM,OT market
 ```
 
 - Standard NIP-99 / Gamma events, signed with the **merchant's own key**

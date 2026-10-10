@@ -256,6 +256,10 @@ flowchart LR
     RL <--> PM
     RL <--> CM
     RL <--> OT
+    classDef relay fill:#b48cff,color:#111111
+    classDef market fill:#ff8fc4,color:#111111
+    class RL relay
+    class PM,CM,OT market
 ```
 
 > The marketplace is a view. The merchant's LNbits is the source of truth.

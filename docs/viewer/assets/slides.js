@@ -76,7 +76,7 @@
     stage.innerHTML = deck.map((s, i) => {
       const accent = ACCENTS[s.meta.accent] || ACCENTS.lime;
       const cls = [`l-${s.meta.layout}`, s.meta.bg && `bg-${s.meta.bg}`, s.meta.logo && 'has-logo'].filter(Boolean).join(' ');
-      return `<section class="slide ${cls}" style="--accent:${accent}" data-i="${i}">
+      return `<section class="slide ${cls}" style="--accent:${accent}" data-accent="${s.meta.accent}" data-i="${i}">
         <span class="num">${String(i + 1).padStart(2, '0')} / ${deck.length}</span>
         ${s.meta.logo ? `<img class="slide-logo" src="${BASE}${esc(s.meta.logo)}" alt="Infinite Markets logo">` : ''}
         ${s.meta.kicker ? `<div class="kicker">${inline(s.meta.kicker)}</div>` : ''}

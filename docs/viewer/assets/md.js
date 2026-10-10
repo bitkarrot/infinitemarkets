@@ -93,6 +93,11 @@
   }
   const join = (bs, base) => bs.map(b => html(b, base)).join('');
 
+  /* Node fills must keep #111 labels readable; the palette blue is too dark,
+     so diagrams on blue sections use a lighter tint of it. */
+  const LIGHTER = { '#2e6bff': '#8eaeff' };
+  const nodeFill = c => LIGHTER[String(c).trim().toLowerCase()] || c;
+
   /* Render every .mermaid-box under root. accentOf(box) picks the node fill;
      onRender(box, svg) lets callers adapt layout to the diagram's shape. */
   async function renderMermaid(root, accentOf, onRender) {
@@ -103,7 +108,7 @@
         startOnLoad: false, theme: 'base', securityLevel: 'loose',
         themeVariables: {
           fontFamily: "'Inter', system-ui, sans-serif", fontSize: '18px',
-          primaryColor: accentOf(box), primaryTextColor: '#111111', nodeTextColor: '#111111',
+          primaryColor: nodeFill(accentOf(box)), primaryTextColor: '#111111', nodeTextColor: '#111111',
           primaryBorderColor: ink, lineColor: ink, textColor: ink, edgeLabelBackground: paper,
           clusterBkg: dark ? '#1e1d18' : '#f4f0e6', clusterBorder: ink, titleColor: ink
         },

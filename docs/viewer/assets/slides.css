@@ -138,3 +138,8 @@ body.deck #controls a.btn:hover { transform: translate(1.5px, 1.5px); box-shadow
 .slide .edgeLabel { border: 0 !important; box-shadow: none !important; padding: 0 2px !important;
   font-size: 15px !important; }
 .slide .node .nodeLabel, .slide .node .nodeLabel p, .slide .node .nodeLabel span { color: #111 !important; }
+
+/* black on the palette blue is hard to read: use white text on blue fills */
+.slide[data-accent="blue"] .kicker, .slide[data-accent="blue"] .num,
+.slide[data-accent="blue"] blockquote, .slide[data-accent="blue"] blockquote b { color: #fff; }
+.slide[data-accent="blue"] blockquote code { background: #fff; color: #111; }
