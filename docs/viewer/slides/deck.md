@@ -7,7 +7,8 @@ Authoring conventions
 - A slide's first line may be an HTML comment starting with "slide:" that sets
   layout=title|bullets|split|diagram|table|gallery|cta,
   accent=lime|yellow|orange|pink|mint|blue (viewer palette tokens), and
-  kicker="..." (the mono pill above the headline).
+  kicker="..." (the mono pill above the headline), bg=night (deep purple
+  background that suits the logo) and logo=<path> (logo on the right).
 - split: content groups (a bold-only line starts a group) or text + image
   become two columns. Blockquotes always render full width at the bottom.
 - Images: ![alt](../img/<file> "caption"), paths relative to this file.
@@ -16,7 +17,7 @@ Authoring conventions
 - Status tags in bullets render as chips: [shipped] [tested] [spec-aligned] [todo] [roadmap].
 -->
 
-<!-- slide: layout=title accent=lime kicker="infinitemarkets · v0.5 · LNbits extension" -->
+<!-- slide: layout=title accent=yellow bg=night logo=../img/logo-512.png kicker="infinitemarkets · v0.5 · LNbits extension" -->
 # Infinite Markets
 
 ## One inventory. Every storefront. Your rails.

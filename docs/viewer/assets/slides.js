@@ -75,8 +75,10 @@
   function build(deck) {
     stage.innerHTML = deck.map((s, i) => {
       const accent = ACCENTS[s.meta.accent] || ACCENTS.lime;
-      return `<section class="slide l-${s.meta.layout}" style="--accent:${accent}" data-i="${i}">
+      const cls = [`l-${s.meta.layout}`, s.meta.bg && `bg-${s.meta.bg}`, s.meta.logo && 'has-logo'].filter(Boolean).join(' ');
+      return `<section class="slide ${cls}" style="--accent:${accent}" data-i="${i}">
         <span class="num">${String(i + 1).padStart(2, '0')} / ${deck.length}</span>
+        ${s.meta.logo ? `<img class="slide-logo" src="${BASE}${esc(s.meta.logo)}" alt="Infinite Markets logo">` : ''}
         ${s.meta.kicker ? `<div class="kicker">${inline(s.meta.kicker)}</div>` : ''}
         ${join(s.heads)}
         <div class="body">${body(s.meta.layout, s.rest)}</div>
@@ -95,10 +97,15 @@
     });
 
   /* ---------- fit, navigation, chrome ---------- */
+  /* Fit the fixed 1600x900 canvas into the window, leaving room for the
+     control bar (hidden in fullscreen). */
   function scaleStage() {
-    const s = Math.min(innerWidth / 1640, (innerHeight - 70) / 940);
-    stage.style.transform = `scale(${s})`;
-    stage.style.marginBottom = '50px';
+    const fs = !!document.fullscreenElement;
+    const bar = fs ? 0 : 72, pad = fs ? 0 : 24;
+    const w = innerWidth - pad * 2, h = innerHeight - bar - pad * 2;
+    const s = Math.max(0.1, Math.min(w / 1614, h / 914));
+    stage.style.setProperty('--scale', s.toFixed(4));
+    stage.style.top = `${pad + h / 2}px`;
   }
   function overflowing(el) {
     return [el.querySelector('.body'), ...el.querySelectorAll('.col:not(.diagram)')]
@@ -158,6 +165,7 @@
   });
   addEventListener('hashchange', () => show((parseInt(location.hash.slice(1), 10) || 1) - 1));
   addEventListener('resize', scaleStage);
+  document.addEventListener('fullscreenchange', () => { document.body.classList.toggle('is-fs', !!document.fullscreenElement); scaleStage(); });
   scaleStage();
 
   fetch(DECK).then(r => { if (!r.ok) throw new Error(`${DECK}: HTTP ${r.status}`); return r.text(); })
