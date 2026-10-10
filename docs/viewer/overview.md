@@ -360,4 +360,4 @@ out of scope for v1.
 2. Set four host environment variables: `INFINITEMARKETS_MASTER_KEYS`, `INFINITEMARKETS_ACTIVE_KEY_VERSION`, `INFINITEMARKETS_PRIVACY_KEY`, and `INFINITEMARKETS_PUBLIC_BASE_URL` (see the [README](https://github.com/bitkarrot/infinitemarkets#configuration))
 3. Bind a merchant wallet and publish your first product
 
-**More:** [source code and issues](https://github.com/bitkarrot/infinitemarkets) · [slide deck](slides.html) · [architecture diagrams](architecture.html) · [demo video](https://github.com/bitkarrot/infinitemarkets/blob/main/docs/assets/infinitemarkets_demo.mp4)
+**More:** [install steps with a copy-ready manifest URL](https://infinitemarkets-docs.vercel.app/#start) · [source code and issues](https://github.com/bitkarrot/infinitemarkets) · [slide deck](slides.html) · [architecture diagrams](architecture.html) · [demo video](https://github.com/bitkarrot/infinitemarkets/blob/main/docs/assets/infinitemarkets_demo.mp4)

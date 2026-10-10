@@ -553,6 +553,7 @@ rule when deciding which extension owns stock.
 - Bind a merchant wallet, then publish your first product
 
 **Links**
+- Step-by-step install: [infinitemarkets-docs.vercel.app/#start](https://infinitemarkets-docs.vercel.app/#start)
 - Source & issues: github.com/bitkarrot/infinitemarkets
 - Architecture guide: infinitemarkets-docs.vercel.app
 - Demo video (~3.5 min): `docs/assets/infinitemarkets_demo.mp4`

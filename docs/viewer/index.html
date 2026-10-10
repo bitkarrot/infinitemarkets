@@ -18,15 +18,38 @@
 <header class="site-nav">
   <div class="container">
     <a class="brand" href="index.html"><img src="img/logo-128.png" alt="">Infinite Markets</a>
-    <nav>
-      <a href="#how">How it works</a>
-      <a href="#everywhere">Marketplaces</a>
-      <a href="#tour">Tour</a>
+    <nav class="primary" aria-label="Main">
+      <a href="#why" data-spy="why">Problem</a>
+      <a href="#how" data-spy="how">How it works</a>
+      <a href="#everywhere" data-spy="everywhere">Marketplaces</a>
+      <a href="#tour" data-spy="tour">Tour</a>
+      <a href="#start" data-spy="start">Get started</a>
+      <span class="nav-sep" aria-hidden="true"></span>
       <a href="overview.html">Overview</a>
       <a href="slides.html">Slides</a>
       <a href="https://github.com/bitkarrot/infinitemarkets" target="_blank" rel="noopener">GitHub</a>
-      <button class="theme" id="themeBtn">☀ Light</button>
     </nav>
+    <button class="theme" id="themeBtn">☀ Light</button>
+    <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="siteMenu" aria-label="Menu">☰ <span class="lbl">Menu</span></button>
+    <div class="site-menu" id="siteMenu" hidden>
+      <div><b>On this page</b>
+        <a href="#why" data-spy="why">Problem</a>
+        <a href="#how" data-spy="how">How it works</a>
+        <a href="#everywhere" data-spy="everywhere">Marketplaces</a>
+        <a href="#tour" data-spy="tour">Tour</a>
+        <a href="#lnbits" data-spy="lnbits">Built on LNbits</a>
+        <a href="#explore" data-spy="explore">Go deeper</a>
+        <a href="#status" data-spy="status">Status &amp; risks</a>
+        <a href="#start" data-spy="start">Get started</a>
+      </div>
+      <div><b>More</b>
+        <a href="overview.html">Illustrated overview</a>
+        <a href="slides.html">Slide deck</a>
+        <a href="architecture.html">Architecture diagrams</a>
+        <a href="https://github.com/bitkarrot/infinitemarkets" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/bitkarrot/infinitemarkets/issues" target="_blank" rel="noopener">Issues &amp; feedback</a>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -41,8 +64,7 @@
         every order invoiced from your own wallet.</p>
       <div class="ctas">
         <a class="pill-btn big lime" href="overview.html">Read the overview →</a>
-        <a class="pill-btn big" href="slides.html">View the slides</a>
-        <a class="pill-btn big ink" href="https://github.com/bitkarrot/infinitemarkets" target="_blank" rel="noopener">GitHub</a>
+        <a class="pill-btn big" href="#start">Get started →</a>
       </div>
       <div class="meta"><span>Lightning checkout</span><span>NIP-99 listings · NIP-17 orders</span><span>Self-hosted on LNbits</span></div>
     </div>
@@ -153,7 +175,7 @@
     </div>
     <figure class="shot">
       <div class="frame"><div class="bar"><i></i><i></i><i></i>plebeian.market</div>
-        <img src="img/plebeian-listing.png" alt="Infinite Markets listings on plebeian.market" loading="lazy"></div>
+        <img width="2542" height="1594" src="img/plebeian-listing.png" alt="Infinite Markets listings on plebeian.market" loading="lazy"></div>
       <figcaption>Live on plebeian.market (Oct 9): listings published by Infinite Markets.
         Scripted Plebeian checkout suite: 14/14 passing; a live checkout hasn't been run yet, and
         physical-item orders from Plebeian are declined for now (no machine-readable country); digital items work end to end.
@@ -169,23 +191,23 @@
     <p class="lede">Everything a merchant needs to run day to day, with background workers that keep
       going when the browser is closed. Click any screenshot to enlarge it.</p>
     <div class="grid g3 tour">
-      <figure><div class="frame"><img src="img/store-product.jpg" alt="Product page" loading="lazy"></div>
+      <figure><div class="frame"><img width="1440" height="1150" src="img/store-product.jpg" alt="Product page" loading="lazy"></div>
         <figcaption>Product pages<span>Lightning checkout, stock and shipping</span></figcaption></figure>
-      <figure><div class="frame"><img src="img/store-dark.jpg" alt="Dark mode storefront" loading="lazy"></div>
+      <figure><div class="frame"><img width="1440" height="1150" src="img/store-dark.jpg" alt="Dark mode storefront" loading="lazy"></div>
         <figcaption>Themes &amp; dark mode<span>Presets, layouts and contrast-checked colors</span></figcaption></figure>
-      <figure><div class="frame"><img src="img/store-embed.jpg" alt="Embedded product cards" loading="lazy"></div>
+      <figure><div class="frame"><img width="1200" height="860" src="img/store-embed.jpg" alt="Embedded product cards" loading="lazy"></div>
         <figcaption>Embed anywhere<span>Two lines of code, no iframe</span></figcaption></figure>
-      <figure><div class="frame"><img src="img/admin-orders.jpg" alt="Orders workspace" loading="lazy"></div>
+      <figure><div class="frame"><img width="1422" height="925" src="img/admin-orders.jpg" alt="Orders workspace" loading="lazy"></div>
         <figcaption>Orders<span>List and detail with the full order history</span></figcaption></figure>
-      <figure><div class="frame"><img src="img/admin-categories.jpg" alt="Catalog" loading="lazy"></div>
+      <figure><div class="frame"><img width="1422" height="576" src="img/admin-categories.jpg" alt="Catalog" loading="lazy"></div>
         <figcaption>Catalog<span>Sortable products, drafts and previews</span></figcaption></figure>
-      <figure><div class="frame"><img src="img/admin-messages.jpg" alt="Messages" loading="lazy"></div>
+      <figure><div class="frame"><img width="1422" height="848" src="img/admin-messages.jpg" alt="Messages" loading="lazy"></div>
         <figcaption>Messages<span>Encrypted customer threads (demo conversation)</span></figcaption></figure>
-      <figure><div class="frame"><img src="img/admin-publications.jpg" alt="Publications" loading="lazy"></div>
+      <figure><div class="frame"><img width="1422" height="925" src="img/admin-publications.jpg" alt="Publications" loading="lazy"></div>
         <figcaption>Publications<span>Per-relay delivery evidence and catalog check</span></figcaption></figure>
-      <figure><div class="frame"><img src="img/admin-migration.jpg" alt="Catalog import" loading="lazy"></div>
+      <figure><div class="frame"><img width="1422" height="925" src="img/admin-migration.jpg" alt="Catalog import" loading="lazy"></div>
         <figcaption>Bring your catalog<span>Shopify CSV, nostrmarket JSON, NIP-15, as drafts</span></figcaption></figure>
-      <figure><div class="frame"><img src="img/admin-appearance.jpg" alt="Appearance settings" loading="lazy"></div>
+      <figure><div class="frame"><img width="1422" height="925" src="img/admin-appearance.jpg" alt="Appearance settings" loading="lazy"></div>
         <figcaption>Appearance<span>Brand, hero, footer and fine-tune controls</span></figcaption></figure>
     </div>
   </div>
@@ -236,7 +258,7 @@
         <h3>Architecture diagrams</h3><p>Zoomable system diagrams of the LNbits integration and every component, with notes.</p>
         <span class="go">View the diagrams →</span></a>
       <a class="card-x" href="https://github.com/bitkarrot/infinitemarkets/blob/main/docs/assets/infinitemarkets_demo.mp4" target="_blank" rel="noopener" style="--c: var(--mint)">
-        <span class="poster"><img src="img/demo-poster.png" alt="Demo video poster" loading="lazy"></span>
+        <span class="poster"><img width="1440" height="900" src="img/demo-poster.png" alt="Demo video poster" loading="lazy"></span>
         <h3>Demo video</h3><p>About 3.5 minutes: key import, publishing to relays, a live Lightning purchase and encrypted messaging.</p>
         <span class="go">Watch on GitHub →</span></a>
     </div>
@@ -289,6 +311,10 @@
 </section>
 
 <footer class="site-foot">
+  <div class="container foot-sections">
+    <b>On this page</b>
+    <a href="#why">Problem</a><a href="#how">How it works</a><a href="#everywhere">Marketplaces</a><a href="#tour">Tour</a><a href="#lnbits">Built on LNbits</a><a href="#explore">Go deeper</a><a href="#status">Status &amp; risks</a><a href="#start">Get started</a>
+  </div>
   <div class="container">
     <a class="brand" href="index.html"><img src="img/logo-128.png" alt="">Infinite Markets</a>
     <p>Built on LNbits · MIT licensed · by <a href="https://github.com/bitkarrot" target="_blank" rel="noopener">bitkarrot</a></p>
@@ -302,6 +328,7 @@
   </div>
 </footer>
 
+<button class="to-top" id="toTop" aria-label="Back to top" hidden>↑ Top</button>
 <script src="assets/md.js"></script>
 <script>
   MD.themeToggle(document.getElementById('themeBtn'));
@@ -310,6 +337,26 @@
     await navigator.clipboard.writeText(document.getElementById(btn.dataset.copy).textContent);
     btn.textContent = 'Copied'; setTimeout(() => { btn.textContent = 'Copy'; }, 1600);
   }));
+
+  /* narrow-screen menu */
+  const menuBtn = document.getElementById('menuBtn'), menu = document.getElementById('siteMenu');
+  const setMenu = open => { menu.hidden = !open; menuBtn.setAttribute('aria-expanded', open); menuBtn.innerHTML = open ? '✕ <span class="lbl">Close</span>' : '☰ <span class="lbl">Menu</span>'; };
+  menuBtn.addEventListener('click', () => setMenu(menu.hidden));
+  menu.addEventListener('click', e => { if (e.target.closest('a')) setMenu(false); });
+  addEventListener('keydown', e => { if (e.key === 'Escape') setMenu(false); });
+  document.addEventListener('click', e => { if (!menu.hidden && !e.target.closest('#siteMenu, #menuBtn')) setMenu(false); });
+
+  /* highlight the nav item for the section in view */
+  const spyLinks = [...document.querySelectorAll('[data-spy]')];
+  const mark = id => spyLinks.forEach(a => a.classList.toggle('on', a.dataset.spy === id));
+  const spy = new IntersectionObserver(entries => entries.forEach(e => { if (e.isIntersecting) mark(e.target.id); }),
+    { rootMargin: '-45% 0px -50% 0px' });
+  document.querySelectorAll('section[id]').forEach(s => spy.observe(s));
+  new IntersectionObserver(([e]) => { if (e.isIntersecting) mark(null); document.getElementById('toTop').hidden = e.isIntersecting; })
+    .observe(document.querySelector('.hero'));
+
+  /* back to top */
+  document.getElementById('toTop').addEventListener('click', () => scrollTo({ top: 0, behavior: 'smooth' }));
 </script>
 </body>
 </html>
