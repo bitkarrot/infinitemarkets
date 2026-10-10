@@ -58,7 +58,7 @@ flowchart LR
     fiat <--> providers
 ```
 
-LNbits already offers a **Merchant Stack** of extensions: TPoS (point of
+LNbits already offers **related merchant extensions**: TPoS (point of
 sale), Inventory (shared stock), Orders (receipts and notifications), WebShop,
 NostrMarket (Nostr stalls and products on **NIP-15**, the legacy protocol),
 Nostr Relay (run your own relay), and Nostr Client (shared relay connections

@@ -96,8 +96,8 @@ merchant's browser is closed.
 
 ---
 
-<!-- slide: layout=table accent=orange kicker="part 1 · lnbits merchant stack" -->
-# The LNbits Merchant Stack
+<!-- slide: layout=table accent=orange kicker="part 1 · lnbits extensions" -->
+# Related LNbits Merchant Extensions
 
 | Piece | Role |
 |---|---|
