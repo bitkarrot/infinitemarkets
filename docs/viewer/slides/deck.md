@@ -201,6 +201,7 @@ flowchart LR
     class M,B,R,L client
     class H,I,P,F,T core
     class S,W,D,X ext
+    %% nudge: create_invoice 60 0
 ```
 
 Note:

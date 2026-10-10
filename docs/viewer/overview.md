@@ -139,6 +139,7 @@ flowchart LR
     class M,B,R,L client
     class H,I,P,F core
     class S,W,D,X ext
+    %% nudge: create_invoice 60 0
 ```
 
 The extension never writes LNbits' payment tables and never calls

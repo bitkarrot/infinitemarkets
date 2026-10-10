@@ -98,6 +98,17 @@
   const LIGHTER = { '#2e6bff': '#8eaeff' };
   const nodeFill = c => LIGHTER[String(c).trim().toLowerCase()] || c;
 
+  /* `%% nudge: <edge label> <dx> <dy>` lines (mermaid comments) shift a
+     rendered edge label in diagram units, e.g. to separate labels that
+     mermaid places on top of each other. */
+  function nudgeLabels(svg, src) {
+    for (const [, label, dx, dy] of src.matchAll(/^\s*%%\s*nudge:\s*(.+?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s*$/gm)) {
+      svg.querySelectorAll('g.edgeLabel').forEach(g => {
+        if (g.textContent.trim() === label) g.setAttribute('transform', `${g.getAttribute('transform') || ''} translate(${dx}, ${dy})`);
+      });
+    }
+  }
+
   /* Render every .mermaid-box under root. accentOf(box) picks the node fill;
      onRender(box, svg) lets callers adapt layout to the diagram's shape. */
   async function renderMermaid(root, accentOf, onRender) {
@@ -121,6 +132,7 @@
         el.removeAttribute('width'); el.removeAttribute('height'); el.style.maxWidth = '100%';
         el.classList.add('mermaid');
         el.querySelectorAll('.edgeLabel').forEach(l => { if (!l.textContent.trim()) l.style.display = 'none'; });
+        nudgeLabels(el, decodeURIComponent(box.dataset.src));
         if (onRender) onRender(box, el);
       } catch (e) {
         box.innerHTML = `<pre>${esc(String(e.message || e))}</pre>`;
