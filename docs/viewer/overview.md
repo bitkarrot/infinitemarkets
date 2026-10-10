@@ -58,11 +58,14 @@ flowchart LR
     fiat <--> providers
 ```
 
-LNbits already offers a **Merchant Stack** for in-person and simple online
-sales: TPoS (point of sale), Inventory (shared stock), Orders (receipts and
-notifications), WebShop, Tabs (deferred settlement), and SaaS hosting.
-Infinite Markets adds what was missing: **Nostr-native, multi-marketplace
-commerce with a production-grade checkout.**
+LNbits already offers a **Merchant Stack** of extensions: TPoS (point of
+sale), Inventory (shared stock), Orders (receipts and notifications), WebShop,
+NostrMarket (Nostr stalls and products on **NIP-15**, the legacy protocol),
+Nostr Relay (run your own relay), and Nostr Client (shared relay connections
+for other extensions). Infinite Markets is the next generation: **NIP-99 /
+Gamma listings and encrypted NIP-17 orders, succeeding NIP-15, with a
+production-grade checkout.** Existing NostrMarket catalogs can be imported as
+drafts.
 
 ## 2. The problem
 

@@ -105,15 +105,21 @@ merchant's browser is closed.
 | **Inventory** | Shared products & stock across extensions |
 | **Orders** | Receipts, order history, notifications |
 | **WebShop** | Simple online sales |
-| **Tabs** | Open balances, deferred settlement |
-| **SaaS** | Hosted LNbits instance, no server to run |
+| **NostrMarket** | Nostr stalls & products on **NIP-15** (legacy) |
+| **Nostr Relay** | Run your own Nostr relay, e.g. a merchant inbox |
+| **Nostr Client** | Shared relay connections for other extensions |
 
-> Infinite Markets adds what's missing: **Nostr-native, multi-marketplace
-> commerce** with a production-grade checkout.
+> Infinite Markets is the next generation: **NIP-99 / Gamma** listings and
+> encrypted NIP-17 orders, succeeding NIP-15, with a production-grade checkout.
 
 Note:
-Infinite Markets is not integrated with these extensions today; see the
-"Plugging into the Merchant Stack" slide for what's shipped versus roadmap.
+NIP-15 is marked unrecommended in the NIPs repo, which points new work to
+NIP-99. NostrMarket stays useful for existing NIP-15 merchants; Infinite
+Markets can import a nostrmarket JSON catalog as drafts. The Nostr Relay
+extension is the reference inbox relay in the conformance tests but isn't a
+runtime dependency, and Infinite Markets uses its own relay transport rather
+than Nostr Client. It doesn't integrate with Inventory or Orders today; see
+the "Plugging into the Merchant Stack" slide for shipped versus roadmap.
 
 ---
 
