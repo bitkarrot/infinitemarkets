@@ -112,7 +112,8 @@ yellow external services. Source: docs/lnbits_architecture_overview.md
 |---|---|
 | **TPoS** | In-person checkout |
 | **Inventory** | Shared products & stock across extensions |
-| **Orders** | Receipts, order history, notifications |
+| **Orders** | Tied to **TPoS**: records every paid TPoS receipt and makes them searchable |
+| **Shipping** | Shared shipping zones & rates for commerce extensions |
 | **WebShop** | Simple online sales |
 | **NostrMarket** | Nostr stalls & products on **NIP-15** (legacy) |
 | **Nostr Relay** | Run your own Nostr relay, e.g. a merchant inbox |
@@ -122,6 +123,11 @@ yellow external services. Source: docs/lnbits_architecture_overview.md
 > encrypted NIP-17 orders, succeeding NIP-15, with a production-grade checkout.
 
 Note:
+Orders auto-captures paid TPoS invoices as orders (line items, totals, tax,
+exchange rate, TPoS id and payment hash). Shipping holds shared shipping zones
+and rates that commerce extensions can reuse; Infinite Markets keeps its own
+shipping options today, and the Shipping extension is a roadmap integration.
+
 NIP-15 is marked unrecommended in the NIPs repo, which points new work to
 NIP-99. NostrMarket stays useful for existing NIP-15 merchants; Infinite
 Markets can import a nostrmarket JSON catalog as drafts. The Nostr Relay
@@ -478,7 +484,7 @@ Conduit interop is expected from shared Gamma kinds but has not been tested yet.
 
 **Next** [roadmap]
 - **Inventory** extension as a shared stock source across LNbits sales channels
-- **Shipping** extension integration for shipping rules & fulfillment
+- **Shipping** extension as a shared source of shipping zones & rates
 
 Note:
 Not implemented today: the extension doesn't read or write other LNbits

@@ -65,7 +65,9 @@ flowchart TB
 ```
 
 LNbits already offers **related merchant extensions**: TPoS (point of
-sale), Inventory (shared stock), Orders (receipts and notifications), WebShop,
+sale), Inventory (shared stock), Orders (tied to TPoS: it records every paid
+TPoS receipt and makes them searchable), Shipping (shared shipping zones and
+rates for commerce extensions), WebShop,
 NostrMarket (Nostr stalls and products on **NIP-15**, the legacy protocol),
 Nostr Relay (run your own relay), and Nostr Client (shared relay connections
 for other extensions). Infinite Markets is the next generation: **NIP-99 /
@@ -325,7 +327,7 @@ Conduit [spec-aligned], but this hasn't been tested yet [todo].
 ### Plugging into related LNbits extensions: today and next
 
 - **Today** [shipped]: payments through LNbits core, email through the host's SMTP settings, embeds through WebPages, and `nostrrelay` as a reference inbox relay. Inventory and shipping are native to Infinite Markets.
-- **Next** [roadmap]: use the LNbits **Inventory** extension as a shared stock source across LNbits sales channels, and integrate a **Shipping** extension for shipping rules and fulfillment.
+- **Next** [roadmap]: use the LNbits **Inventory** extension as a shared stock source across LNbits sales channels, and the LNbits **Shipping** extension as a shared source of shipping zones and rates.
 
 ## 7. Status, risks and what's next
 
