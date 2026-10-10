@@ -524,7 +524,7 @@
                       class="q-mb-sm"></q-skeleton>
         </div>
 
-        <q-tab-panels v-else v-model="gmCatalog.tab" animated>
+        <q-tab-panels v-else v-model="gmCatalog.tab" animated class="gm-catalog-panels">
           <q-tab-panel name="products" class="q-pa-none">
             <q-card v-if="gmCatalog.editor.show" flat bordered
                     class="gm-catalog-editor" data-gm-catalog-editor="product">
@@ -678,68 +678,69 @@
               <div v-if="!gmCatalog.products.length" class="q-pa-lg text-center">
                 <p>No products yet — create a product or save a draft to begin.</p>
               </div>
-              <q-table v-else dense flat bordered class="gm-catalog-table"
-                       data-gm-table="products" :rows="gmProductRows"
-                       :columns="gmCatalog.productColumns" row-key="id"
-                       selection="multiple" v-model:selected="gmCatalog.selectedProducts"
-                       :pagination="{ rowsPerPage: 20 }"
-                       :table-style="{ tableLayout: 'fixed', minWidth: '980px' }">
-                <template v-slot:body="props">
-                  <q-tr :props="props">
-                    <q-td auto-width>
-                      <q-checkbox v-model="props.selected"></q-checkbox>
-                    </q-td>
-                    <q-td key="actions" :props="props" data-col="actions">
-                      <q-btn flat dense round icon="edit" aria-label="Edit product"
-                             @click="gmEditProduct(props.row)">
-                        <q-tooltip>Edit</q-tooltip>
-                      </q-btn>
-                      <q-btn flat dense round icon="visibility" aria-label="Preview events"
-                             @click="gmDryRun(props.row)">
-                        <q-tooltip>Preview events (Nostr payload)</q-tooltip>
-                      </q-btn>
-                      <q-btn flat dense round icon="open_in_new"
-                             aria-label="Preview page"
-                             :href="'/infinitemarkets/preview/' + props.row.id"
-                             target="_blank" rel="noopener">
-                        <q-tooltip>Preview page — draft shown as published</q-tooltip>
-                      </q-btn>
-                    </q-td>
-                    <q-td key="title" :props="props" data-col="title">
-                      <q-btn v-if="props.row._variantCount" flat dense round
-                             size="sm" :icon="gmCatalog.expandedProducts.includes(props.row.id) ? 'expand_more' : 'chevron_right'"
-                             :aria-label="(gmCatalog.expandedProducts.includes(props.row.id) ? 'Collapse' : 'Expand') + ' options'"
-                             @click="gmToggleVariants(props.row.id)"></q-btn>
-                      <span v-if="props.row._isVariant" class="text-grey-7"
-                            aria-hidden="true">↳ </span>
-                      {{ props.row.title || props.row.d_tag }}
-                      <q-badge v-if="props.row._isVariant" color="info"
-                               text-color="dark" class="q-ml-xs"
-                               label="Option"></q-badge>
-                      <q-badge v-if="props.row._variantCount" color="secondary"
-                               text-color="white" class="q-ml-xs"
-                               :label="props.row._variantCount + ' options'"></q-badge>
-                      <q-badge v-if="props.row.draft" color="warning"
-                               text-color="dark" class="q-ml-xs"
-                               label="Draft — never published"></q-badge>
-                    </q-td>
-                    <q-td key="type" :props="props" data-col="type">
-                      {{ props.row.product_type }} / {{ props.row.format }}
-                    </q-td>
-                    <q-td key="price" :props="props" data-col="price">{{ props.row._price }}</q-td>
-                    <q-td key="stock" :props="props" data-col="stock">{{ props.row._stock }}</q-td>
-                    <q-td key="visibility" :props="props" data-col="visibility">{{ props.row.visibility }}</q-td>
-                    <q-td key="state" :props="props" data-col="state">{{ props.row.nip99_status }}</q-td>
-                    <q-td key="delete" :props="props" data-col="delete">
-                      <q-btn flat dense round color="negative" icon="delete"
-                             aria-label="Delete product"
-                             @click="gmAskDelete('product', props.row)">
-                        <q-tooltip>Delete</q-tooltip>
-                      </q-btn>
-                    </q-td>
-                  </q-tr>
-                </template>
-              </q-table>
+              <q-card v-else class="gm-table-card q-pa-md">
+                <q-table flat class="gm-catalog-table"
+                         data-gm-table="products" :rows="gmProductRows"
+                         :columns="gmCatalog.productColumns" row-key="id"
+                         selection="multiple" v-model:selected="gmCatalog.selectedProducts"
+                         :pagination="{ rowsPerPage: 20 }">
+                  <template v-slot:body="props">
+                    <q-tr :props="props">
+                      <q-td auto-width>
+                        <q-checkbox v-model="props.selected"></q-checkbox>
+                      </q-td>
+                      <q-td key="actions" :props="props" data-col="actions">
+                        <q-btn flat dense round icon="edit" aria-label="Edit product"
+                               @click="gmEditProduct(props.row)">
+                          <q-tooltip>Edit</q-tooltip>
+                        </q-btn>
+                        <q-btn flat dense round icon="visibility" aria-label="Preview events"
+                               @click="gmDryRun(props.row)">
+                          <q-tooltip>Preview events (Nostr payload)</q-tooltip>
+                        </q-btn>
+                        <q-btn flat dense round icon="open_in_new"
+                               aria-label="Preview page"
+                               :href="'/infinitemarkets/preview/' + props.row.id"
+                               target="_blank" rel="noopener">
+                          <q-tooltip>Preview page — draft shown as published</q-tooltip>
+                        </q-btn>
+                      </q-td>
+                      <q-td key="title" :props="props" data-col="title">
+                        <q-btn v-if="props.row._variantCount" flat dense round
+                               size="sm" :icon="gmCatalog.expandedProducts.includes(props.row.id) ? 'expand_more' : 'chevron_right'"
+                               :aria-label="(gmCatalog.expandedProducts.includes(props.row.id) ? 'Collapse' : 'Expand') + ' options'"
+                               @click="gmToggleVariants(props.row.id)"></q-btn>
+                        <span v-if="props.row._isVariant" class="text-grey-7"
+                              aria-hidden="true">↳ </span>
+                        {{ props.row.title || props.row.d_tag }}
+                        <q-badge v-if="props.row._isVariant" color="info"
+                                 text-color="dark" class="q-ml-xs"
+                                 label="Option"></q-badge>
+                        <q-badge v-if="props.row._variantCount" color="secondary"
+                                 text-color="white" class="q-ml-xs"
+                                 :label="props.row._variantCount + ' options'"></q-badge>
+                        <q-badge v-if="props.row.draft" color="warning"
+                                 text-color="dark" class="q-ml-xs"
+                                 label="Draft — never published"></q-badge>
+                      </q-td>
+                      <q-td key="type" :props="props" data-col="type">
+                        {{ props.row.product_type }} / {{ props.row.format }}
+                      </q-td>
+                      <q-td key="price" :props="props" data-col="price">{{ props.row._price }}</q-td>
+                      <q-td key="stock" :props="props" data-col="stock">{{ props.row._stock }}</q-td>
+                      <q-td key="visibility" :props="props" data-col="visibility">{{ props.row.visibility }}</q-td>
+                      <q-td key="state" :props="props" data-col="state">{{ props.row.nip99_status }}</q-td>
+                      <q-td key="delete" :props="props" data-col="delete">
+                        <q-btn flat dense round color="negative" icon="delete"
+                               aria-label="Delete product"
+                               @click="gmAskDelete('product', props.row)">
+                          <q-tooltip>Delete</q-tooltip>
+                        </q-btn>
+                      </q-td>
+                    </q-tr>
+                  </template>
+                </q-table>
+              </q-card>
             </template>
           </q-tab-panel>
 
@@ -777,36 +778,37 @@
             </q-card>
 
             <template v-else>
-              <q-table dense flat bordered class="gm-catalog-table"
-                       data-gm-table="categories" :rows="gmCatalogRows"
-                       :columns="gmCatalog.categoryColumns" row-key="id"
-                       :pagination="{ rowsPerPage: 20 }"
-                       :table-style="{ tableLayout: 'fixed', minWidth: '620px' }">
-                <template v-slot:body="props">
-                  <q-tr :props="props">
-                    <q-td key="name" :props="props" data-col="name">
-                      {{ props.row.name }}
-                    </q-td>
-                    <q-td key="products" :props="props" data-col="products">
-                      {{ props.row._products }}
-                    </q-td>
-                    <q-td key="description" :props="props" data-col="description">
-                      {{ props.row.description || '—' }}
-                    </q-td>
-                    <q-td key="actions" :props="props" data-col="actions">
-                      <q-btn flat dense round icon="edit" aria-label="Edit category"
-                             @click="gmEditCategory(props.row)">
-                        <q-tooltip>Edit</q-tooltip>
-                      </q-btn>
-                      <q-btn flat dense round color="negative" icon="delete"
-                             aria-label="Delete category"
-                             @click="gmAskDelete('category', props.row)">
-                        <q-tooltip>Delete</q-tooltip>
-                      </q-btn>
-                    </q-td>
-                  </q-tr>
-                </template>
-              </q-table>
+              <q-card class="gm-table-card q-pa-md">
+                <q-table flat class="gm-catalog-table"
+                         data-gm-table="categories" :rows="gmCatalogRows"
+                         :columns="gmCatalog.categoryColumns" row-key="id"
+                         :pagination="{ rowsPerPage: 20 }">
+                  <template v-slot:body="props">
+                    <q-tr :props="props">
+                      <q-td key="name" :props="props" data-col="name">
+                        {{ props.row.name }}
+                      </q-td>
+                      <q-td key="products" :props="props" data-col="products">
+                        {{ props.row._products }}
+                      </q-td>
+                      <q-td key="description" :props="props" data-col="description">
+                        {{ props.row.description || '—' }}
+                      </q-td>
+                      <q-td key="actions" :props="props" data-col="actions">
+                        <q-btn flat dense round icon="edit" aria-label="Edit category"
+                               @click="gmEditCategory(props.row)">
+                          <q-tooltip>Edit</q-tooltip>
+                        </q-btn>
+                        <q-btn flat dense round color="negative" icon="delete"
+                               aria-label="Delete category"
+                               @click="gmAskDelete('category', props.row)">
+                          <q-tooltip>Delete</q-tooltip>
+                        </q-btn>
+                      </q-td>
+                    </q-tr>
+                  </template>
+                </q-table>
+              </q-card>
             </template>
           </q-tab-panel>
 
@@ -852,33 +854,34 @@
               <div v-if="!gmCatalog.collections.length" class="q-pa-lg text-center">
                 <p>No collections yet — create a collection to group products; every published product belongs to at least one.</p>
               </div>
-              <q-table v-else dense flat bordered class="gm-catalog-table"
-                       data-gm-table="collections" :rows="gmCatalog.collections"
-                       :columns="gmCatalog.collectionColumns" row-key="id"
-                       :pagination="{ rowsPerPage: 20 }"
-                       :table-style="{ tableLayout: 'fixed', minWidth: '620px' }">
-                <template v-slot:body="props">
-                  <q-tr :props="props">
-                    <q-td key="title" :props="props" data-col="title">
-                      {{ props.row.title || props.row.d_tag }}
-                    </q-td>
-                    <q-td key="id" :props="props" data-col="id">
-                      {{ gmTrunc(props.row.d_tag, 8, 4) }}
-                    </q-td>
-                    <q-td key="actions" :props="props" data-col="actions">
-                      <q-btn flat dense round icon="edit" aria-label="Edit collection"
-                             @click="gmEditCollection(props.row)">
-                        <q-tooltip>Edit</q-tooltip>
-                      </q-btn>
-                      <q-btn flat dense round color="negative" icon="delete"
-                             aria-label="Delete collection"
-                             @click="gmAskDelete('collection', props.row)">
-                        <q-tooltip>Delete</q-tooltip>
-                      </q-btn>
-                    </q-td>
-                  </q-tr>
-                </template>
-              </q-table>
+              <q-card v-else class="gm-table-card q-pa-md">
+                <q-table flat class="gm-catalog-table"
+                         data-gm-table="collections" :rows="gmCatalog.collections"
+                         :columns="gmCatalog.collectionColumns" row-key="id"
+                         :pagination="{ rowsPerPage: 20 }">
+                  <template v-slot:body="props">
+                    <q-tr :props="props">
+                      <q-td key="title" :props="props" data-col="title">
+                        {{ props.row.title || props.row.d_tag }}
+                      </q-td>
+                      <q-td key="id" :props="props" data-col="id">
+                        {{ gmTrunc(props.row.d_tag, 8, 4) }}
+                      </q-td>
+                      <q-td key="actions" :props="props" data-col="actions">
+                        <q-btn flat dense round icon="edit" aria-label="Edit collection"
+                               @click="gmEditCollection(props.row)">
+                          <q-tooltip>Edit</q-tooltip>
+                        </q-btn>
+                        <q-btn flat dense round color="negative" icon="delete"
+                               aria-label="Delete collection"
+                               @click="gmAskDelete('collection', props.row)">
+                          <q-tooltip>Delete</q-tooltip>
+                        </q-btn>
+                      </q-td>
+                    </q-tr>
+                  </template>
+                </q-table>
+              </q-card>
             </template>
           </q-tab-panel>
 
@@ -976,41 +979,42 @@
               <div v-if="!gmCatalog.shipping.length" class="q-pa-lg text-center">
                 <p>No shipping options yet — create one for physical products.</p>
               </div>
-              <q-table v-else dense flat bordered class="gm-catalog-table"
-                       data-gm-table="shipping" :rows="gmCatalog.shipping"
-                       :columns="gmCatalog.shippingColumns" row-key="id"
-                       :pagination="{ rowsPerPage: 20 }"
-                       :table-style="{ tableLayout: 'fixed', minWidth: '820px' }">
-                <template v-slot:body="props">
-                  <q-tr :props="props">
-                    <q-td key="title" :props="props" data-col="title">{{ props.row.title }}</q-td>
-                    <q-td key="service" :props="props" data-col="service">{{ props.row.service }}</q-td>
-                    <q-td key="price" :props="props" data-col="price">
-                      {{ gmPrice(props.row.base_price_minor, props.row.currency, props.row.currency_decimals) }}
-                    </q-td>
-                    <q-td key="countries" :props="props" data-col="countries"
-                          :title="(props.row.countries || []).map(gmCountryLabel).join(', ')">
-                      {{ (props.row.countries || []).length > 3
-                        ? props.row.countries.length + ' countries'
-                        : (props.row.countries || []).map(gmCountryLabel).join(', ') || 'None' }}
-                    </q-td>
-                    <q-td key="active" :props="props" data-col="active">
-                      {{ props.row.active ? 'Yes' : 'No' }}
-                    </q-td>
-                    <q-td key="actions" :props="props" data-col="actions">
-                      <q-btn flat dense round icon="edit" aria-label="Edit shipping option"
-                             @click="gmEditShipping(props.row)">
-                        <q-tooltip>Edit</q-tooltip>
-                      </q-btn>
-                      <q-btn flat dense round color="negative" icon="delete"
-                             aria-label="Delete shipping option"
-                             @click="gmAskDelete('shipping', props.row)">
-                        <q-tooltip>Delete</q-tooltip>
-                      </q-btn>
-                    </q-td>
-                  </q-tr>
-                </template>
-              </q-table>
+              <q-card v-else class="gm-table-card q-pa-md">
+                <q-table flat class="gm-catalog-table"
+                         data-gm-table="shipping" :rows="gmCatalog.shipping"
+                         :columns="gmCatalog.shippingColumns" row-key="id"
+                         :pagination="{ rowsPerPage: 20 }">
+                  <template v-slot:body="props">
+                    <q-tr :props="props">
+                      <q-td key="title" :props="props" data-col="title">{{ props.row.title }}</q-td>
+                      <q-td key="service" :props="props" data-col="service">{{ props.row.service }}</q-td>
+                      <q-td key="price" :props="props" data-col="price">
+                        {{ gmPrice(props.row.base_price_minor, props.row.currency, props.row.currency_decimals) }}
+                      </q-td>
+                      <q-td key="countries" :props="props" data-col="countries"
+                            :title="(props.row.countries || []).map(gmCountryLabel).join(', ')">
+                        {{ (props.row.countries || []).length > 3
+                          ? props.row.countries.length + ' countries'
+                          : (props.row.countries || []).map(gmCountryLabel).join(', ') || 'None' }}
+                      </q-td>
+                      <q-td key="active" :props="props" data-col="active">
+                        {{ props.row.active ? 'Yes' : 'No' }}
+                      </q-td>
+                      <q-td key="actions" :props="props" data-col="actions">
+                        <q-btn flat dense round icon="edit" aria-label="Edit shipping option"
+                               @click="gmEditShipping(props.row)">
+                          <q-tooltip>Edit</q-tooltip>
+                        </q-btn>
+                        <q-btn flat dense round color="negative" icon="delete"
+                               aria-label="Delete shipping option"
+                               @click="gmAskDelete('shipping', props.row)">
+                          <q-tooltip>Delete</q-tooltip>
+                        </q-btn>
+                      </q-td>
+                    </q-tr>
+                  </template>
+                </q-table>
+              </q-card>
             </template>
           </q-tab-panel>
         </q-tab-panels>
@@ -3207,7 +3211,23 @@
   border-radius: 10px;
   background: rgba(128, 128, 128, 0.08);
 }
+/* Catalog tables follow the LNbits Payments table: a themed host card
+   (inherits the user's LNbits theme), no hard border, regular row height. */
+.gm-catalog-panels { background: transparent; }
+.gm-table-card { min-width: 0; max-width: 100%; overflow: hidden; }
+.gm-catalog-table { background: transparent; max-width: 100%; }
+.gm-catalog-table thead th { font-weight: 600; }
+.gm-catalog-table th,
+.gm-catalog-table td { padding-left: 8px; padding-right: 8px; }
+.gm-table-card .q-table__bottom { padding-top: 8px; }
 .gm-catalog-table .q-table__middle { overflow-x: auto; }
+/* Quasar puts table-style on the scroll wrapper, not the <table>, so set
+   layout and minimum widths here: the wrapper can then scroll sideways. */
+.gm-catalog-table table { table-layout: fixed; }
+.gm-catalog-table[data-gm-table="products"] table { min-width: 860px; }
+.gm-catalog-table[data-gm-table="categories"] table,
+.gm-catalog-table[data-gm-table="collections"] table { min-width: 620px; }
+.gm-catalog-table[data-gm-table="shipping"] table { min-width: 820px; }
 .gm-catalog-table th,
 .gm-catalog-table td { overflow: hidden; text-overflow: ellipsis; }
 .gm-catalog-table[data-gm-table="products"] th:first-child,
@@ -3368,8 +3388,10 @@
 }
 @media (max-width: 560px) {
   .gm-shell { flex-direction: column; }
-  .gm-nav { width: 100%; }
-  .gm-nav .q-list { display: flex; }
+  .gm-nav { width: 100%; min-width: 0; }
+  /* the section row scrolls on its own instead of widening the page */
+  .gm-nav .q-list { display: flex; overflow-x: auto; }
+  .gm-nav .q-item { flex: 0 0 auto; }
   .gm-nav .q-item__section:not(.q-item__section--avatar) { display: block; }
   .gm-workspace { grid-template-columns: 1fr; }
   .gm-editor-grid { grid-template-columns: 1fr; }

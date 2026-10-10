@@ -42,33 +42,33 @@
     return [item.value, item.label];
   }));
   var PRODUCT_COLUMNS = [
-    { name: "actions", label: "Actions", field: "id", align: "left", style: "width: 132px" },
-    { name: "title", label: "Title", field: "title", align: "left", sortable: true, style: "width: 240px" },
-    { name: "type", label: "Type", field: "_typeSort", align: "left", sortable: true, style: "width: 150px" },
-    { name: "price", label: "Price", field: "_priceSort", align: "left", sortable: true, style: "width: 120px" },
-    { name: "stock", label: "Stock", field: "_stockSort", align: "left", sortable: true, style: "width: 90px" },
-    { name: "visibility", label: "Visibility", field: "visibility", align: "left", sortable: true, style: "width: 110px" },
-    { name: "state", label: "State", field: "nip99_status", align: "left", sortable: true, style: "width: 100px" },
-    { name: "delete", label: "Delete", field: "id", align: "left", style: "width: 72px" }
+    { name: "actions", label: "Actions", field: "id", align: "left", style: "width: 124px", headerStyle: "width: 124px" },
+    { name: "title", label: "Title", field: "title", align: "left", sortable: true },
+    { name: "type", label: "Type", field: "_typeSort", align: "left", sortable: true, style: "width: 140px", headerStyle: "width: 140px" },
+    { name: "price", label: "Price", field: "_priceSort", align: "left", sortable: true, style: "width: 104px", headerStyle: "width: 104px" },
+    { name: "stock", label: "Stock", field: "_stockSort", align: "left", sortable: true, style: "width: 88px", headerStyle: "width: 88px" },
+    { name: "visibility", label: "Visibility", field: "visibility", align: "left", sortable: true, style: "width: 104px", headerStyle: "width: 104px" },
+    { name: "state", label: "State", field: "nip99_status", align: "left", sortable: true, style: "width: 90px", headerStyle: "width: 90px" },
+    { name: "delete", label: "Delete", field: "id", align: "left", style: "width: 68px", headerStyle: "width: 68px" }
   ];
   var CATEGORY_COLUMNS = [
-    { name: "name", label: "Name", field: "name", align: "left", sortable: true, style: "width: 240px" },
-    { name: "products", label: "Products", field: "_products", align: "left", style: "width: 100px" },
-    { name: "description", label: "Description", field: "description", align: "left", style: "width: 280px" },
-    { name: "actions", label: "Actions", field: "id", align: "left", style: "width: 120px" }
+    { name: "name", label: "Name", field: "name", align: "left", sortable: true, style: "width: 240px", headerStyle: "width: 240px" },
+    { name: "products", label: "Products", field: "_products", align: "left", style: "width: 100px", headerStyle: "width: 100px" },
+    { name: "description", label: "Description", field: "description", align: "left", style: "width: 280px", headerStyle: "width: 280px" },
+    { name: "actions", label: "Actions", field: "id", align: "left", style: "width: 120px", headerStyle: "width: 120px" }
   ];
   var COLLECTION_COLUMNS = [
-    { name: "title", label: "Title", field: "title", align: "left", sortable: true, style: "width: 280px" },
-    { name: "id", label: "ID", field: "d_tag", align: "left", style: "width: 220px" },
-    { name: "actions", label: "Actions", field: "id", align: "left", style: "width: 120px" }
+    { name: "title", label: "Title", field: "title", align: "left", sortable: true, style: "width: 280px", headerStyle: "width: 280px" },
+    { name: "id", label: "ID", field: "d_tag", align: "left", style: "width: 220px", headerStyle: "width: 220px" },
+    { name: "actions", label: "Actions", field: "id", align: "left", style: "width: 120px", headerStyle: "width: 120px" }
   ];
   var SHIPPING_COLUMNS = [
-    { name: "title", label: "Title", field: "title", align: "left", sortable: true, style: "width: 180px" },
-    { name: "service", label: "Service", field: "service", align: "left", style: "width: 110px" },
-    { name: "price", label: "Price", field: "base_price_minor", align: "left", style: "width: 120px" },
-    { name: "countries", label: "Countries", field: "countries", align: "left", style: "width: 180px" },
-    { name: "active", label: "Active", field: "active", align: "left", style: "width: 80px" },
-    { name: "actions", label: "Actions", field: "id", align: "left", style: "width: 150px" }
+    { name: "title", label: "Title", field: "title", align: "left", sortable: true, style: "width: 180px", headerStyle: "width: 180px" },
+    { name: "service", label: "Service", field: "service", align: "left", style: "width: 110px", headerStyle: "width: 110px" },
+    { name: "price", label: "Price", field: "base_price_minor", align: "left", style: "width: 120px", headerStyle: "width: 120px" },
+    { name: "countries", label: "Countries", field: "countries", align: "left", style: "width: 180px", headerStyle: "width: 180px" },
+    { name: "active", label: "Active", field: "active", align: "left", style: "width: 80px", headerStyle: "width: 80px" },
+    { name: "actions", label: "Actions", field: "id", align: "left", style: "width: 150px", headerStyle: "width: 150px" }
   ];
   /* Common codes offered as dropdown options — the backend accepts any
      ^[A-Z0-9]{3,8}$ code, so the editor also keeps free-text entry. */
