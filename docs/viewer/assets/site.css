@@ -236,6 +236,22 @@ article.md .edgeLabel { border: 0 !important; box-shadow: none !important; paddi
 article.md .node .nodeLabel, article.md .node .nodeLabel p { color: #111 !important; }
 article.md .tag { font-size: 11px; }
 
+/* built-on-LNbits cards: color band, tint, icon tile, chips */
+.site { --purple: #b48cff; }
+.lnb { position: relative; overflow: hidden; padding-top: 34px; display: flex; flex-direction: column;
+  background: color-mix(in srgb, var(--c) 16%, var(--paper)); }
+.lnb::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 12px; background: var(--c);
+  border-bottom: 2.5px solid var(--ink); }
+.lnb-icon { width: 50px; height: 50px; display: grid; place-items: center; font-size: 25px; font-weight: 700;
+  color: #111; background: var(--c); border: 2.5px solid var(--ink); border-radius: 14px;
+  box-shadow: 3px 3px 0 var(--ink); margin-bottom: 16px; }
+.lnb p { font-size: 15px; }
+.lnb .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.lnb .chips span { background: var(--paper); color: var(--ink); border: 2px solid var(--ink);
+  border-radius: 999px; padding: 4px 11px; font-weight: 700; font-size: 13px; box-shadow: 2px 2px 0 var(--ink); }
+.lnb .lnb-foot { margin-top: auto; padding-top: 16px; font-size: 13.5px; font-weight: 600; color: var(--text2); }
+.lnb .lnb-foot .tag { font-size: 10.5px; }
+
 /* ---------- responsive ---------- */
 @media (max-width: 980px) {
   .hero .container, .split { grid-template-columns: 1fr; }

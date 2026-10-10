@@ -198,11 +198,24 @@
     <p class="lede">LNbits is a free, open-source Lightning wallet and accounts system, in development
       since 2018. Infinite Markets only ever asks it to create invoices on your wallet; it never holds
       spending keys.</p>
-    <div class="grid g4">
-      <div class="card-x"><h3>Any funding source</h3><p>LND, Core Lightning, Phoenixd, Alby, Strike, Blink, NWC, Breez, Spark and more. Switch without touching balances.</p></div>
-      <div class="card-x"><h3>Isolated wallets</h3><p>Admin keys spend; invoice keys only receive. Apps get just what they need.</p></div>
-      <div class="card-x"><h3>Extension platform</h3><p>Real Python apps with their own database, routes, UI and always-on background tasks.</p></div>
-      <div class="card-x"><h3>Related merchant extensions</h3><p>TPoS, Inventory, Orders (paid TPoS receipts), Shipping (shared zones &amp; rates), WebShop, plus NostrMarket (NIP-15, legacy), Nostr Relay and Nostr Client. Infinite Markets is the NIP-99 next generation. Next: Inventory and Shipping integration <span class="tag tag-roadmap">roadmap</span></p></div>
+    <div class="grid g4 lnb-grid">
+      <div class="card-x lnb" style="--c: var(--yellow)"><span class="lnb-icon">↯</span>
+        <h3>Any funding source</h3>
+        <p>Switch backends any time without touching wallet balances.</p>
+        <div class="chips"><span>LND</span><span>Core Lightning</span><span>Phoenixd</span><span>Alby</span><span>Strike</span><span>Blink</span><span>NWC</span><span>Breez</span><span>Spark</span></div></div>
+      <div class="card-x lnb" style="--c: var(--orange)"><span class="lnb-icon">⚿</span>
+        <h3>Isolated wallets</h3>
+        <p>Every wallet has its own balance and keys. Apps get just what they need.</p>
+        <div class="chips"><span>Admin key · spends</span><span>Invoice key · receives</span></div></div>
+      <div class="card-x lnb" style="--c: var(--purple)"><span class="lnb-icon">⧉</span>
+        <h3>Extension platform</h3>
+        <p>Extensions are real Python apps that keep running when the browser is closed.</p>
+        <div class="chips"><span>Own database</span><span>Routes &amp; UI</span><span>Background tasks</span><span>Paid-invoice events</span></div></div>
+      <div class="card-x lnb" style="--c: var(--mint)"><span class="lnb-icon">⊕</span>
+        <h3>Related extensions</h3>
+        <p>LNbits building blocks that sit alongside Infinite Markets.</p>
+        <div class="chips"><span>Nostr Relay</span><span>Nostr Client</span><span>Inventory</span><span>Shipping</span></div>
+        <p class="lnb-foot">Inventory &amp; Shipping integration <span class="tag tag-roadmap">roadmap</span></p></div>
     </div>
   </div>
 </section>
