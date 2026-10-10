@@ -78,7 +78,13 @@ Selling for bitcoin on Nostr is possible today, but it's fragile:
 | **Browser-bound shops** | Orders wait until the merchant's tab or signer is online |
 | **Unreliable relays** | Publishing isn't delivery; deleted items linger; nothing records who accepted what |
 | **Legacy protocol** | NIP-15 is unrecommended; NIP-04 messages leak who buys from whom |
-| **Platform lock-in** | Marketplaces can end up owning the funds and the customer relationship |
+| **Manual / unbound invoicing** | Invoices sent by hand after an order arrives, or paid to a Lightning address that isn't tied to the order |
+| **Centralized platform lock-in** | Shopify-style platforms hold payouts and customer data, and make leaving costly |
+
+Nostr marketplaces such as Plebeian Market, Conduit Market and Shopstr are
+non-custodial: merchants bring their own Lightning wallet and keep their own
+key. The lock-in problem belongs to centralized platforms like Shopify, which
+is why Infinite Markets can import a Shopify CSV catalog as drafts.
 
 The ecosystem's answer at the protocol level is **NIP-99 listings plus the
 Gamma Markets spec**, written by the teams behind Shopstr, Cypher, Plebeian
@@ -280,8 +286,8 @@ What never leaves the merchant:
 |---|---|---|
 | **Inventory** | The extension database: on-hand and reserved stock per product and variant | One stock count across every channel, no overselling |
 | **Shipping** | Merchant-defined options, country zones and weight/volume rules, published as kind 30406 | Marketplaces quote the merchant's rules, not their own |
-| **Payments** | The merchant's LNbits wallet on their chosen funding source | No marketplace custody, no middleman fees |
-| **Customers** | Encrypted NIP-17 threads and email in the merchant's admin | No platform owns the relationship |
+| **Payments** | The merchant's LNbits wallet on their chosen funding source | Every marketplace order gets an invoice bound to it, automatically |
+| **Customers** | Encrypted NIP-17 threads and email in the merchant's admin | One place for every buyer conversation, whichever app they used |
 | **Identity** | The merchant's Nostr key, encrypted at rest | Portable across every Nostr app |
 
 The merchant profile tells marketplaces that payment is handled manually, so

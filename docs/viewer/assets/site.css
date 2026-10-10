@@ -97,6 +97,7 @@ body.site { overflow-x: hidden; height: auto; min-height: 100%;
 .pain .n { position: absolute; top: -16px; left: 20px; font: 500 12px var(--mono); color: #111;
   background: var(--pink); border: 2px solid var(--ink); border-radius: 999px; padding: 3px 11px; }
 .pain h3 { font-size: 20px; }
+.pain.wide { grid-column: 1 / -1; }
 .pain .ans { margin-top: 14px; padding-top: 14px; border-top: 2px dashed var(--dot);
   font-weight: 600; color: var(--ink); }
 .pain .ans::before { content: '→ '; color: var(--mint); font-weight: 800; }

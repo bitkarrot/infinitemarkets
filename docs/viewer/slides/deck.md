@@ -24,7 +24,7 @@ Authoring conventions
 
 A Lightning-settled commerce engine for LNbits. Sell on your own web shop
 and on Nostr marketplaces like Plebeian Market and Conduit Market,
-without giving up inventory, shipping, or payments.
+while inventory, shipping, and payments stay on your own LNbits.
 
 Note:
 Frame the talk in one sentence: the merchant keeps the shop's brain (catalog,
@@ -133,10 +133,18 @@ the "Plugging into the Merchant Stack" slide for shipped versus roadmap.
 | **Browser-bound shops** | Orders wait until the merchant's tab or signer is online |
 | **Unreliable relays** | Publish ≠ delivered; deleted items linger; no record of who accepted what |
 | **Legacy protocol** | NIP-15 is unrecommended; NIP-04 DMs leak who buys from whom |
-| **Platform lock-in** | Marketplaces can own the funds and the customer relationship |
+| **Manual / unbound invoicing** | Invoices sent by hand after an order arrives, or paid to a Lightning address that isn't tied to the order |
+| **Centralized platform lock-in** | Shopify-style platforms hold payouts and customer data, and make leaving costly |
 
 Note:
-Audience knows this; move quickly. Protocol context if asked: NIP-99 defines
+Audience knows this; move quickly. Nostr marketplaces (Plebeian, Conduit,
+Shopstr) are non-custodial: merchants bring their own Lightning and keep
+their key. The lock-in row is about centralized platforms like Shopify;
+Infinite Markets imports Shopify CSV catalogs as drafts. Unbound invoicing
+source: Conduit's site says merchants without a Lightning address "can still
+publish products and send an invoice after an order arrives", and paying a
+Lightning address directly isn't tied to an order (the Plebeian test suite
+records this as the payment-path-lnurlp-shim known delta). Protocol context if asked: NIP-99 defines
 only the listing. The Gamma Markets spec (authored by the Shopstr, Cypher,
 Plebeian Market and Conduit teams) adds collections (30405), shipping (30406),
 NIP-17 orders, payment requests and receipts. Legacy nostrmarket also
@@ -397,8 +405,8 @@ merchant fulfills from the same Orders workspace as web orders.
 |---|---|---|
 | **Inventory** | Extension DB: on-hand + reserved, per product/variant | One stock count across every channel, no oversell |
 | **Shipping** | Merchant-defined options, country zones, weight/volume rules, published as 30406 | Marketplaces quote the merchant's rules, not their own |
-| **Payments** | LNbits wallet on the merchant's chosen funding source | No marketplace custody, no middleman fees |
-| **Customers** | Encrypted NIP-17 threads + email in the merchant's admin | No platform owns the relationship |
+| **Payments** | LNbits wallet on the merchant's chosen funding source | Every marketplace order gets an invoice bound to it, automatically |
+| **Customers** | Encrypted NIP-17 threads + email in the merchant's admin | One place for every buyer conversation, whichever app they used |
 | **Identity** | Merchant Nostr key, encrypted at rest | Portable across every Nostr app |
 
 Note:
@@ -476,7 +484,8 @@ rule when deciding which extension owns stock.
 | Browser-bound shops | Durable background workers inside LNbits |
 | Unreliable relays | Outbox, per-relay ACK evidence, live catalog check |
 | Metadata-leaking DMs | NIP-17 gift-wrapped orders |
-| Platform lock-in | Merchant keeps key, stock, shipping, wallet, customers |
+| Manual / unbound invoicing | Every order gets an LNbits invoice bound to it, automatically |
+| Centralized platform lock-in | Shopify CSV import as drafts; key, stock, shipping & wallet stay yours |
 
 ---
 

@@ -37,8 +37,8 @@
       <h1>One inventory. Every storefront. <em>Your rails.</em></h1>
       <p class="lead">Infinite Markets runs your catalog, stock, shipping and Lightning checkout
         inside your own LNbits, then publishes it to Nostr so you can sell on your own web shop
-        <b>and</b> on marketplaces like Plebeian Market and Conduit Market, without handing over
-        your inventory, your customers, or your sats.</p>
+        <b>and</b> on marketplaces like Plebeian Market and Conduit Market, with one inventory and
+        every order invoiced from your own wallet.</p>
       <div class="ctas">
         <a class="pill-btn big lime" href="overview.html">Read the overview →</a>
         <a class="pill-btn big" href="slides.html">View the slides</a>
@@ -93,9 +93,12 @@
       <div class="card-x pain"><span class="n">05</span><h3>Leaky, legacy protocols</h3>
         <p>NIP-15 is unrecommended and NIP-04 messages reveal who buys from whom.</p>
         <p class="ans">NIP-99 + Gamma spec, with NIP-17 gift-wrapped orders.</p></div>
-      <div class="card-x pain"><span class="n">06</span><h3>Platform lock-in</h3>
-        <p>Marketplaces can end up holding the funds and owning the customer relationship.</p>
-        <p class="ans">You keep the key, the stock, the wallet and the customers.</p></div>
+      <div class="card-x pain"><span class="n">06</span><h3>Manual or unbound invoicing</h3>
+        <p>Invoices sent by hand after an order arrives, or paid to a Lightning address that isn't tied to the order.</p>
+        <p class="ans">Every order gets an LNbits invoice bound to it, automatically.</p></div>
+      <div class="card-x pain wide"><span class="n">07</span><h3>Centralized platform lock-in</h3>
+        <p>Shopify-style platforms hold payouts and customer data, and make leaving costly. (Nostr marketplaces don't: they're non-custodial and your key is portable.)</p>
+        <p class="ans">Import your Shopify CSV as drafts; your key, stock, shipping and wallet stay with you.</p></div>
     </div>
   </div>
 </section>
@@ -135,7 +138,7 @@
   <div class="container split">
     <div>
       <span class="kick" style="--k: var(--blue); color: #fff">Publish everywhere</span>
-      <h2>Marketplaces become storefronts, not landlords</h2>
+      <h2>Every marketplace becomes another storefront</h2>
       <p class="lede" style="margin-bottom: 0">Your catalog is published as standard Gamma / NIP-99
         events signed with your own key. Buyers check out in the marketplace they already use; the
         order arrives encrypted in your inbox and goes through the same reservation and invoice
@@ -143,8 +146,8 @@
       <ul class="own">
         <li><b style="--c: var(--mint)">Inventory</b>One stock count across every channel, held in your LNbits</li>
         <li><b style="--c: var(--yellow)">Shipping</b>Your zones and rules, published for marketplaces to quote</li>
-        <li><b style="--c: var(--lime)">Payments</b>Invoices from your wallet, on your funding source; no custody</li>
-        <li><b style="--c: var(--pink)">Customers</b>Encrypted threads and email in your own admin</li>
+        <li><b style="--c: var(--lime)">Payments</b>Every order invoiced from your wallet, bound to that order</li>
+        <li><b style="--c: var(--pink)">Customers</b>Every buyer conversation in your own admin, whichever app they used</li>
         <li><b style="--c: var(--orange)">Identity</b>Your Nostr key, portable across every Nostr app</li>
       </ul>
     </div>
