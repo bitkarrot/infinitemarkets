@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Infinite Markets — Illustrated overview</title>
+<meta name="description" content="A one-page illustrated overview of Infinite Markets: LNbits, the problem, how it works, publishing to Nostr marketplaces, status and risks.">
+<link rel="icon" href="img/logo-128.png">
+<script>document.documentElement.dataset.theme = localStorage.getItem('imv-theme') || 'dark';</script>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body class="site">
+
+<header class="site-nav">
+  <div class="container">
+    <a class="brand" href="index.html"><img src="img/logo-128.png" alt="">Infinite Markets</a>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="slides.html">Slides</a>
+      <a href="architecture.html">Architecture</a>
+      <a href="https://github.com/bitkarrot/infinitemarkets/blob/main/docs/viewer/overview.md" target="_blank" rel="noopener">Markdown source</a>
+      <button class="theme" id="themeBtn">☀ Light</button>
+    </nav>
+  </div>
+</header>
+
+<div class="article-wrap">
+  <aside class="toc">
+    <b>On this page</b>
+    <div id="toc"></div>
+    <div class="alt">
+      <a class="pill-btn pink" href="slides.html">▶ View as slides</a>
+      <a class="pill-btn" href="index.html">← Home</a>
+    </div>
+  </aside>
+  <article class="md" id="article"><p>Loading…</p></article>
+</div>
+
+<footer class="site-foot">
+  <div class="container">
+    <a class="brand" href="index.html"><img src="img/logo-128.png" alt="">Infinite Markets</a>
+    <p>Built on LNbits · MIT licensed · by <a href="https://github.com/bitkarrot" target="_blank" rel="noopener">bitkarrot</a></p>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="slides.html">Slides</a>
+      <a href="architecture.html">Architecture</a>
+      <a href="https://github.com/bitkarrot/infinitemarkets" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="assets/mermaid.min.js"></script>
+<script src="assets/md.js"></script>
+<script>
+(async function () {
+  const SRC = 'overview.md';
+  const PALETTE = ['#ffd23d', '#ff6a1f', '#ff5aa8', '#4fdc9a', '#2e6bff', '#c8f53c', '#ffd23d'];
+  const article = document.getElementById('article');
+  const toc = document.getElementById('toc');
+
+  const render = md => {
+    md = md.replace(/^\s*<!--[\s\S]*?-->\s*/, '');
+    let html = '', open = false, n = 0;
+    for (const b of MD.blocks(md)) {
+      if (b.t === 'h' && b.n === 2) {
+        if (open) html += '</section>';
+        html += `<section style="--accent:${PALETTE[n++ % PALETTE.length]}">`;
+        open = true;
+      }
+      html += b.t === 'img' && b.imgs.length > 1
+        ? `<div class="figs" style="--n:${b.imgs.length}">${MD.html(b)}</div>`
+        : MD.html(b);
+    }
+    return html + (open ? '</section>' : '');
+  };
+
+  try {
+    const res = await fetch(SRC);
+    if (!res.ok) throw new Error(`${SRC}: HTTP ${res.status}`);
+    article.innerHTML = render(await res.text());
+  } catch (e) {
+    article.innerHTML = `<h1>Could not load the overview</h1><p>${MD.esc(e.message)}</p>`;
+    return;
+  }
+
+  const h1 = article.querySelector('h1');
+  if (h1) document.title = h1.textContent + ' — Infinite Markets';
+  article.style.setProperty('--accent', '#c8f53c');
+
+  const heads = [...article.querySelectorAll('h2')];
+  toc.innerHTML = heads.map(h => `<a href="#${h.id}">${h.textContent}</a>`).join('');
+  const links = [...toc.querySelectorAll('a')];
+  const spy = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      links.forEach(a => a.classList.toggle('on', a.getAttribute('href') === `#${e.target.id}`));
+    });
+  }, { rootMargin: '-90px 0px -70% 0px' });
+  heads.forEach(h => spy.observe(h));
+
+  article.querySelectorAll('.figs').forEach(row => {
+    const imgs = [...row.querySelectorAll('img')];
+    const size = () => {
+      if (imgs.some(i => !i.naturalWidth)) return;
+      row.style.gridTemplateColumns = imgs.map(i => `${(i.naturalWidth / i.naturalHeight).toFixed(3)}fr`).join(' ');
+    };
+    imgs.forEach(i => i.complete ? size() : i.addEventListener('load', size));
+  });
+
+  const draw = () => MD.renderMermaid(article, box => getComputedStyle(box.closest('section') || article).getPropertyValue('--accent').trim());
+  MD.themeToggle(document.getElementById('themeBtn'), draw);
+  MD.lightbox(article);
+  await document.fonts.ready;
+  await draw();
+  if (location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView();
+})();
+</script>
+</body>
+</html>

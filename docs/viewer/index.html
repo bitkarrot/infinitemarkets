@@ -3,59 +3,293 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>infinitemarkets — Architecture Guide</title>
+<title>Infinite Markets — One inventory. Every storefront. Your rails.</title>
+<meta name="description" content="Infinite Markets is an open-source LNbits extension: one authoritative inventory, Lightning checkout, and Nostr-native selling on your own web shop and on marketplaces like Plebeian Market and Conduit Market.">
+<meta property="og:title" content="Infinite Markets">
+<meta property="og:description" content="One inventory. Every storefront. Your rails. An LNbits extension for Lightning checkout and Nostr-native commerce.">
+<meta property="og:image" content="img/demo-poster.png">
+<link rel="icon" href="img/logo-128.png">
 <script>document.documentElement.dataset.theme = localStorage.getItem('imv-theme') || 'dark';</script>
 <link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/site.css">
 </head>
-<body class="index">
-<div class="wrap">
-  <header>
-    <div class="kicker">infinitemarkets · architecture guide</div>
-    <h1>System Diagrams</h1>
-    <p>Color-rendered versions of the architecture diagrams from <code>docs/</code>,
-       with structured notes attached. This collection is the scaffold for a
-       long-form architecture guide and an eventual slideshow — each diagram's
-       content lives as structured data in <code>diagrams/*.js</code>.</p>
-  </header>
-  <button class="theme-fab" id="themeBtn">☀ Light</button>
-  <div class="cards" id="cards">
-    <a class="card" href="slides.html">
-      <div class="num" style="background:#c8f53c">00 · SLIDES</div>
-      <h2>Infinite Markets — The Deck</h2>
-      <div class="src">docs/viewer/slides/deck.md</div>
-      <p>25-slide presentation: an LNbits backgrounder, the pain points, how Infinite Markets works, and how it publishes to Plebeian, Conduit and other Gamma marketplaces while keeping inventory, shipping and payments on the merchant's own LNbits.</p>
-      <div class="open">Open slides →</div>
-    </a>
+<body class="site">
+
+<header class="site-nav">
+  <div class="container">
+    <a class="brand" href="index.html"><img src="img/logo-128.png" alt="">Infinite Markets</a>
+    <nav>
+      <a href="#how">How it works</a>
+      <a href="#everywhere">Marketplaces</a>
+      <a href="#tour">Tour</a>
+      <a href="overview.html">Overview</a>
+      <a href="slides.html">Slides</a>
+      <a href="https://github.com/bitkarrot/infinitemarkets" target="_blank" rel="noopener">GitHub</a>
+      <button class="theme" id="themeBtn">☀ Light</button>
+    </nav>
   </div>
-  <footer class="note">
-    Sources of truth: <code>docs/technical-specification.md</code> (normative contract)
-    and <code>docs/architecture-overview.md</code> (as-built state).<br>
-    Diagram data files in <code>docs/viewer/diagrams/</code> carry per-diagram bullet
-    sections designed to expand into long-form chapters or slide decks.
-  </footer>
+</header>
+
+<section class="hero">
+  <div class="container">
+    <div>
+      <span class="kick">LNbits extension · v0.5 · MIT</span>
+      <h1>One inventory. Every storefront. <em>Your rails.</em></h1>
+      <p class="lead">Infinite Markets runs your catalog, stock, shipping and Lightning checkout
+        inside your own LNbits, then publishes it to Nostr so you can sell on your own web shop
+        <b>and</b> on marketplaces like Plebeian Market and Conduit Market, without handing over
+        your inventory, your customers, or your sats.</p>
+      <div class="ctas">
+        <a class="pill-btn big lime" href="overview.html">Read the overview →</a>
+        <a class="pill-btn big" href="slides.html">View the slides</a>
+        <a class="pill-btn big ink" href="https://github.com/bitkarrot/infinitemarkets" target="_blank" rel="noopener">GitHub</a>
+      </div>
+      <div class="meta"><span>Lightning checkout</span><span>NIP-99 listings · NIP-17 orders</span><span>Self-hosted on LNbits</span></div>
+    </div>
+    <div class="collage" aria-label="Infinite Markets screenshots">
+      <div class="frame main"><div class="bar"><i></i><i></i><i></i>your-shop.example/infinitemarkets</div>
+        <img data-zoom src="img/store-home.jpg" alt="Infinite Markets storefront home page"></div>
+      <div class="frame admin"><div class="bar"><i></i><i></i><i></i>admin · orders</div>
+        <img data-zoom src="img/admin-orders.jpg" alt="Merchant Orders workspace"></div>
+      <div class="frame phone"><img data-zoom src="img/store-mobile.jpg" alt="Mobile storefront"></div>
+      <img class="sticker" src="img/logo-512.png" alt="Infinite Markets logo">
+    </div>
+  </div>
+</section>
+
+<div class="strip">
+  <div class="container">
+    <b>Sells through</b>
+    <span class="chip">Your web shop <span class="tag tag-shipped">shipped</span></span>
+    <span class="chip">Embeds &amp; WebPages <span class="tag tag-shipped">shipped</span></span>
+    <span class="chip">Plebeian Market <span class="tag tag-tested">tested</span></span>
+    <span class="chip">Conduit Market <span class="tag tag-todo">todo</span></span>
+    <span class="chip">Other Gamma / NIP-99 clients</span>
+    <span class="sep"></span>
+    <b>Settles on</b>
+    <span class="chip">LNbits ⚡ any funding source</span>
+  </div>
 </div>
-<script src="diagrams/registry.js"></script>
+
+<section class="band" id="why">
+  <div class="container">
+    <span class="kick" style="--k: var(--pink)">The problem</span>
+    <h2>Selling for bitcoin on Nostr is still fragile</h2>
+    <p class="lede">Every storefront wants its own copy of your shop, payments are hard to prove,
+      and relays forget. Infinite Markets fixes the plumbing.</p>
+    <div class="grid g3">
+      <div class="card-x pain"><span class="n">01</span><h3>Fragmented catalogs</h3>
+        <p>The web shop and each marketplace keep their own copy; stock drifts and you oversell.</p>
+        <p class="ans">One authoritative catalog, published as open Nostr events.</p></div>
+      <div class="card-x pain"><span class="n">02</span><h3>"Was it paid?"</h3>
+        <p>Nostr receipts and buyer-stated amounts aren't proof; retries create duplicate invoices.</p>
+        <p class="ans">Only settled LNbits payments confirm orders.</p></div>
+      <div class="card-x pain"><span class="n">03</span><h3>Browser-bound shops</h3>
+        <p>Orders wait until the merchant's tab or signer is online.</p>
+        <p class="ans">Background workers inside LNbits run 24/7.</p></div>
+      <div class="card-x pain"><span class="n">04</span><h3>Unreliable relays</h3>
+        <p>Publishing isn't delivery, deleted items linger, and nothing records who accepted what.</p>
+        <p class="ans">Durable outbox with per-relay evidence and a live catalog check.</p></div>
+      <div class="card-x pain"><span class="n">05</span><h3>Leaky, legacy protocols</h3>
+        <p>NIP-15 is unrecommended and NIP-04 messages reveal who buys from whom.</p>
+        <p class="ans">NIP-99 + Gamma spec, with NIP-17 gift-wrapped orders.</p></div>
+      <div class="card-x pain"><span class="n">06</span><h3>Platform lock-in</h3>
+        <p>Marketplaces can end up holding the funds and owning the customer relationship.</p>
+        <p class="ans">You keep the key, the stock, the wallet and the customers.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="band alt" id="how">
+  <div class="container">
+    <span class="kick" style="--k: var(--mint)">How it works</span>
+    <h2>Two rails, one pipeline</h2>
+    <p class="lede">Infinite Markets is the commerce authority: catalog, inventory, shipping, orders
+      and messages. LNbits core stays the settlement authority: invoices, payment records and your
+      funding source.</p>
+    <div class="grid g3">
+      <div class="card-x rail"><span class="top" style="background: var(--mint)">Rail 1 · web</span>
+        <h3>A storefront you own</h3>
+        <ul><li>Categories, collections, filters and sorting</li>
+          <li>Lightning checkout with private order links</li>
+          <li>Sign in with Nostr or an email magic link</li>
+          <li>Theme presets, 4 layouts, dark mode, embeds</li></ul></div>
+      <div class="card-x rail"><span class="top" style="background: var(--blue)">Rail 2 · Nostr</span>
+        <h3>Native Nostr commerce</h3>
+        <ul><li>NIP-99 listings, collections and shipping options</li>
+          <li>Encrypted NIP-17 orders to your own inbox relays</li>
+          <li>NIP-89 handler: clients deep-link to your pages</li>
+          <li>Merchant profile with NIP-05 and Lightning address</li></ul></div>
+      <div class="card-x rail"><span class="top" style="background: var(--yellow)">Shared pipeline</span>
+        <h3>Every order, same path</h3>
+        <ol class="steps"><li>Validate and reprice from current data</li>
+          <li>Reserve stock atomically (15-minute hold)</li>
+          <li>LNbits creates an invoice bound to the order</li>
+          <li>Settlement confirms; expiry releases stock</li></ol></div>
+    </div>
+    <div class="callout">No duplicate invoices. No double allocation. Relay delivery is never mistaken for payment truth.</div>
+  </div>
+</section>
+
+<section class="band" id="everywhere">
+  <div class="container split">
+    <div>
+      <span class="kick" style="--k: var(--blue); color: #fff">Publish everywhere</span>
+      <h2>Marketplaces become storefronts, not landlords</h2>
+      <p class="lede" style="margin-bottom: 0">Your catalog is published as standard Gamma / NIP-99
+        events signed with your own key. Buyers check out in the marketplace they already use; the
+        order arrives encrypted in your inbox and goes through the same reservation and invoice
+        pipeline as a web order.</p>
+      <ul class="own">
+        <li><b style="--c: var(--mint)">Inventory</b>One stock count across every channel, held in your LNbits</li>
+        <li><b style="--c: var(--yellow)">Shipping</b>Your zones and rules, published for marketplaces to quote</li>
+        <li><b style="--c: var(--lime)">Payments</b>Invoices from your wallet, on your funding source; no custody</li>
+        <li><b style="--c: var(--pink)">Customers</b>Encrypted threads and email in your own admin</li>
+        <li><b style="--c: var(--orange)">Identity</b>Your Nostr key, portable across every Nostr app</li>
+      </ul>
+    </div>
+    <figure class="shot">
+      <div class="frame"><div class="bar"><i></i><i></i><i></i>plebeian.market</div>
+        <img src="img/plebeian-listing.png" alt="Infinite Markets listings on plebeian.market" loading="lazy"></div>
+      <figcaption>Live on plebeian.market (Oct 9): listings published by Infinite Markets.
+        Scripted Plebeian checkout suite: 14/14 passing. Conduit Market: same spec, testing to do.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="band alt" id="tour">
+  <div class="container">
+    <span class="kick" style="--k: var(--yellow)">Product tour</span>
+    <h2>A real shop and a real back office</h2>
+    <p class="lede">Everything a merchant needs to run day to day, with background workers that keep
+      going when the browser is closed. Click any screenshot to enlarge it.</p>
+    <div class="grid g3 tour">
+      <figure><div class="frame"><img src="img/store-product.jpg" alt="Product page" loading="lazy"></div>
+        <figcaption>Product pages<span>Lightning checkout, stock and shipping</span></figcaption></figure>
+      <figure><div class="frame"><img src="img/store-dark.jpg" alt="Dark mode storefront" loading="lazy"></div>
+        <figcaption>Themes &amp; dark mode<span>Presets, layouts and contrast-checked colors</span></figcaption></figure>
+      <figure><div class="frame"><img src="img/store-embed.jpg" alt="Embedded product cards" loading="lazy"></div>
+        <figcaption>Embed anywhere<span>Two lines of code, no iframe</span></figcaption></figure>
+      <figure><div class="frame"><img src="img/admin-orders.jpg" alt="Orders workspace" loading="lazy"></div>
+        <figcaption>Orders<span>List and detail with the full order history</span></figcaption></figure>
+      <figure><div class="frame"><img src="img/admin-categories.jpg" alt="Catalog" loading="lazy"></div>
+        <figcaption>Catalog<span>Sortable products, drafts and previews</span></figcaption></figure>
+      <figure><div class="frame"><img src="img/admin-messages.jpg" alt="Messages" loading="lazy"></div>
+        <figcaption>Messages<span>Encrypted customer threads (demo conversation)</span></figcaption></figure>
+      <figure><div class="frame"><img src="img/admin-publications.jpg" alt="Publications" loading="lazy"></div>
+        <figcaption>Publications<span>Per-relay delivery evidence and catalog check</span></figcaption></figure>
+      <figure><div class="frame"><img src="img/admin-migration.jpg" alt="Catalog import" loading="lazy"></div>
+        <figcaption>Bring your catalog<span>Shopify CSV, nostrmarket JSON, NIP-15, as drafts</span></figcaption></figure>
+      <figure><div class="frame"><img src="img/admin-appearance.jpg" alt="Appearance settings" loading="lazy"></div>
+        <figcaption>Appearance<span>Brand, hero, footer and fine-tune controls</span></figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="lnbits">
+  <div class="container">
+    <span class="kick" style="--k: var(--orange)">Built on LNbits</span>
+    <h2>The wallet platform underneath</h2>
+    <p class="lede">LNbits is a free, open-source Lightning wallet and accounts system, in development
+      since 2018. Infinite Markets only ever asks it to create invoices on your wallet; it never holds
+      spending keys.</p>
+    <div class="grid g4">
+      <div class="card-x"><h3>Any funding source</h3><p>LND, Core Lightning, Phoenixd, Alby, Strike, Blink, NWC, Breez, Spark and more. Switch without touching balances.</p></div>
+      <div class="card-x"><h3>Isolated wallets</h3><p>Admin keys spend; invoice keys only receive. Apps get just what they need.</p></div>
+      <div class="card-x"><h3>Extension platform</h3><p>Real Python apps with their own database, routes, UI and always-on background tasks.</p></div>
+      <div class="card-x"><h3>Merchant Stack</h3><p>TPoS, Inventory, Orders, WebShop, Tabs, SaaS. Next for Infinite Markets: Inventory and Shipping integration <span class="tag tag-roadmap">roadmap</span></p></div>
+    </div>
+  </div>
+</section>
+
+<section class="band alt" id="explore">
+  <div class="container">
+    <span class="kick">Go deeper</span>
+    <h2>Read, present, or dig into the design</h2>
+    <p class="lede">The same story at three depths, plus a demo of the real thing.</p>
+    <div class="grid g4 explore">
+      <a class="card-x" href="overview.html" style="--c: var(--lime)"><span class="icon">✎</span>
+        <h3>Illustrated overview</h3><p>One page with screenshots and diagrams: LNbits, the problem, how it works, marketplaces, status and risks.</p>
+        <span class="go">Read the overview →</span></a>
+      <a class="card-x" href="slides.html" style="--c: var(--pink)"><span class="icon">▶</span>
+        <h3>Slide deck</h3><p>25 slides for presenting, with speaker notes, keyboard navigation and dark/light themes.</p>
+        <span class="go">Open the slides →</span></a>
+      <a class="card-x" href="architecture.html" style="--c: var(--yellow)"><span class="icon">⌘</span>
+        <h3>Architecture diagrams</h3><p>Zoomable system diagrams of the LNbits integration and every component, with notes.</p>
+        <span class="go">View the diagrams →</span></a>
+      <a class="card-x" href="https://github.com/bitkarrot/infinitemarkets/blob/main/docs/assets/infinitemarkets_demo.mp4" target="_blank" rel="noopener" style="--c: var(--mint)">
+        <span class="poster"><img src="img/demo-poster.png" alt="Demo video poster" loading="lazy"></span>
+        <h3>Demo video</h3><p>About 3.5 minutes: key import, publishing to relays, a live Lightning purchase and encrypted messaging.</p>
+        <span class="go">Watch on GitHub →</span></a>
+    </div>
+  </div>
+</section>
+
+<section class="band status" id="status">
+  <div class="container">
+    <span class="kick" style="--k: var(--pink)">Status &amp; risks</span>
+    <h2>Honest about where it stands</h2>
+    <div class="grid g3" style="margin-top: 32px">
+      <div class="card-x"><h3>Where it stands</h3>
+        <ul><li>Web commerce, Nostr orders, buyer accounts and catalog import/export implemented</li>
+          <li>v0.5 published via an LNbits extension manifest (sha256-verified)</li>
+          <li>Conformance suite plus Plebeian tests and a live listing check</li></ul></div>
+      <div class="card-x"><h3>Risks</h3>
+        <ol><li><b>Experimental software:</b> v0.5 on a draft spec; start small</li>
+          <li><b>Needs the community:</b> interop depends on marketplaces, the spec group, and real merchants</li>
+          <li><b>Maintenance costs:</b> tracking LNbits, spec and client changes takes ongoing time</li></ol></div>
+      <div class="card-x"><h3>What's next</h3>
+        <ul><li><b>Seeking testers and active users:</b> run it, send feedback, <a href="https://github.com/bitkarrot/infinitemarkets/issues" target="_blank" rel="noopener">file issues</a></li>
+          <li>Live plebeian.market checkout; Conduit and Shopstr testing</li>
+          <li>Structured addresses for marketplace physical orders</li>
+          <li>LNbits Inventory and Shipping integration</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<section class="band alt" id="start">
+  <div class="container split" style="align-items: start">
+    <div>
+      <span class="kick">Get started</span>
+      <h2>Install in three steps</h2>
+      <p class="lede">You need LNbits 1.6.0 or newer and a wallet to receive payments. Try it with small
+        amounts first.</p>
+      <a class="pill-btn big lime" href="https://github.com/bitkarrot/infinitemarkets#installation" target="_blank" rel="noopener">Full install guide →</a>
+    </div>
+    <div class="steps-big">
+      <div><div><h3>Add the manifest</h3>
+        <p>In LNbits: <b>Server → Extensions → Manifest sources</b>.</p>
+        <div class="copy"><code id="manifest">https://raw.githubusercontent.com/bitkarrot/infinitemarkets/main/manifest.json</code><button data-copy="manifest">Copy</button></div></div></div>
+      <div><div><h3>Set four host variables</h3>
+        <p><code>INFINITEMARKETS_MASTER_KEYS</code>, <code>…_ACTIVE_KEY_VERSION</code>, <code>…_PRIVACY_KEY</code> and <code>…_PUBLIC_BASE_URL</code>. The extension won't start without them.</p></div></div>
+      <div><div><h3>Bind a wallet and publish</h3>
+        <p>Pick the merchant wallet, add a product, and it appears on your storefront and on Nostr.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<footer class="site-foot">
+  <div class="container">
+    <a class="brand" href="index.html"><img src="img/logo-128.png" alt="">Infinite Markets</a>
+    <p>Built on LNbits · MIT licensed · by <a href="https://github.com/bitkarrot" target="_blank" rel="noopener">bitkarrot</a></p>
+    <nav>
+      <a href="overview.html">Overview</a>
+      <a href="slides.html">Slides</a>
+      <a href="architecture.html">Architecture</a>
+      <a href="https://github.com/bitkarrot/infinitemarkets" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/bitkarrot/infinitemarkets/issues" target="_blank" rel="noopener">Issues</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="assets/md.js"></script>
 <script>
-  const tb = document.getElementById('themeBtn');
-  const paint = () => tb.textContent = document.documentElement.dataset.theme === 'dark' ? '☀ Light' : '☾ Dark';
-  tb.onclick = () => {
-    const t = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-    document.documentElement.dataset.theme = t;
-    localStorage.setItem('imv-theme', t);
-    paint();
-  };
-  paint();
-  const el = document.getElementById('cards');
-  window.DIAGRAMS.forEach(d => {
-    el.insertAdjacentHTML('beforeend', `
-      <a class="card" href="view.html?d=${d.id}">
-        <div class="num" style="background:${d.accent}">${d.num} · ${d.kind.toUpperCase()}</div>
-        <h2>${d.title}</h2>
-        <div class="src">${d.source}</div>
-        <p>${d.summary}</p>
-        <div class="open">Open diagram →</div>
-      </a>`);
-  });
+  MD.themeToggle(document.getElementById('themeBtn'));
+  MD.lightbox(document.body);
+  document.querySelectorAll('[data-copy]').forEach(btn => btn.addEventListener('click', async () => {
+    await navigator.clipboard.writeText(document.getElementById(btn.dataset.copy).textContent);
+    btn.textContent = 'Copied'; setTimeout(() => { btn.textContent = 'Copy'; }, 1600);
+  }));
 </script>
 </body>
 </html>

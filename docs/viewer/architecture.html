@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Infinite Markets — Architecture diagrams</title>
+<link rel="icon" href="img/logo-128.png">
+<script>document.documentElement.dataset.theme = localStorage.getItem('imv-theme') || 'dark';</script>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body class="index">
+<div class="wrap">
+  <header>
+    <div class="kicker">infinitemarkets · architecture guide</div>
+    <p class="crumb"><a href="index.html">← Infinite Markets home</a></p>
+    <h1>System Diagrams</h1>
+    <p>Color-rendered versions of the architecture diagrams from <code>docs/</code>,
+       with structured notes attached. This collection is the scaffold for a
+       long-form architecture guide and the <a href="slides.html">slide deck</a> — each
+       diagram's content lives as structured data in <code>diagrams/*.js</code>.</p>
+  </header>
+  <button class="theme-fab" id="themeBtn">☀ Light</button>
+  <div class="cards" id="cards">
+    <a class="card" href="slides.html">
+      <div class="num" style="background:#c8f53c">00 · SLIDES</div>
+      <h2>Infinite Markets — The Deck</h2>
+      <div class="src">docs/viewer/slides/deck.md</div>
+      <p>25-slide presentation: an LNbits backgrounder, the pain points, how Infinite Markets works, and how it publishes to Plebeian, Conduit and other Gamma marketplaces while keeping inventory, shipping and payments on the merchant's own LNbits.</p>
+      <div class="open">Open slides →</div>
+    </a>
+  </div>
+  <footer class="note">
+    Sources of truth: <code>docs/technical-specification.md</code> (normative contract)
+    and <code>docs/architecture-overview.md</code> (as-built state).<br>
+    Diagram data files in <code>docs/viewer/diagrams/</code> carry per-diagram bullet
+    sections designed to expand into long-form chapters or slide decks.
+  </footer>
+</div>
+<script src="diagrams/registry.js"></script>
+<script>
+  const tb = document.getElementById('themeBtn');
+  const paint = () => tb.textContent = document.documentElement.dataset.theme === 'dark' ? '☀ Light' : '☾ Dark';
+  tb.onclick = () => {
+    const t = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = t;
+    localStorage.setItem('imv-theme', t);
+    paint();
+  };
+  paint();
+  const el = document.getElementById('cards');
+  window.DIAGRAMS.forEach(d => {
+    el.insertAdjacentHTML('beforeend', `
+      <a class="card" href="view.html?d=${d.id}">
+        <div class="num" style="background:${d.accent}">${d.num} · ${d.kind.toUpperCase()}</div>
+        <h2>${d.title}</h2>
+        <div class="src">${d.source}</div>
+        <p>${d.summary}</p>
+        <div class="open">Open diagram →</div>
+      </a>`);
+  });
+</script>
+</body>
+</html>

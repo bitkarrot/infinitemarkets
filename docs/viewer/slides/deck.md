@@ -10,7 +10,7 @@ Authoring conventions
   kicker="..." (the mono pill above the headline).
 - split: content groups (a bold-only line starts a group) or text + image
   become two columns. Blockquotes always render full width at the bottom.
-- Images: ![alt](img/<file> "caption"), paths relative to this file.
+- Images: ![alt](../img/<file> "caption"), paths relative to this file.
 - A line containing only "Note:" starts speaker notes (press N in the deck).
 - Fenced mermaid blocks render as diagrams in the slide's accent color.
 - Status tags in bullets render as chips: [shipped] [tested] [spec-aligned] [todo] [roadmap].
@@ -274,16 +274,16 @@ flowchart LR
 - **Relay catalog check** classifies live copies: missing / divergent / stale-deleted
 - One click **re-requests deletions** for stale copies
 
-![Publications tab with per-relay delivery evidence](img/admin-publications.jpg "Publications: per-relay evidence and catalog check")
+![Publications tab with per-relay delivery evidence](../img/admin-publications.jpg "Publications: per-relay evidence and catalog check")
 
 ---
 
 <!-- slide: layout=gallery accent=mint kicker="part 3 · merchant operations" -->
 # A real back office
 
-![Orders workspace](img/admin-orders.jpg "Orders: split list/detail with full chronology")
-![Catalog products table](img/admin-categories.jpg "Catalog: sortable products, drafts, preview")
-![Messages workspace](img/admin-messages.jpg "Messages: encrypted customer threads with verified profiles")
+![Orders workspace](../img/admin-orders.jpg "Orders: split list/detail with full chronology")
+![Catalog products table](../img/admin-categories.jpg "Catalog: sortable products, drafts, preview")
+![Messages workspace](../img/admin-messages.jpg "Messages: encrypted customer threads with verified profiles")
 
 - Background workers keep running with the browser closed: outbox (5 s), relay manager (30 s), reservation expiry (30 s), reconciliation (60 s), email (5 s), retention (24 h)
 
@@ -296,8 +296,8 @@ has no buyer traffic).
 <!-- slide: layout=gallery accent=mint kicker="part 3 · embed anywhere" -->
 # Embed anywhere
 
-![Product cards embedded in a static page](img/store-embed.jpg "Two lines of code drop product cards into any page, no iframe")
-![Embed snippets in Settings](img/admin-embed.jpg "Copy-ready snippets: link grid, modal grid, iframe")
+![Product cards embedded in a static page](../img/store-embed.jpg "Two lines of code drop product cards into any page, no iframe")
+![Embed snippets in Settings](../img/admin-embed.jpg "Copy-ready snippets: link grid, modal grid, iframe")
 
 - `gm-embed.js` renders cards in the host page's own DOM; modal mode keeps shoppers on-page
 - Chrome-free iframe option with auto-height; works with the LNbits **WebPages** extension
@@ -313,7 +313,7 @@ has no buyer traffic).
 - Imports land as **hidden drafts**; review, then publish through the normal Catalog flow
 - Round-trippable CSV export; optional media upload & relink
 
-![Migration tab with a Shopify CSV preview](img/admin-migration.jpg "Shopify CSV preview: 2 products to review, imported as drafts")
+![Migration tab with a Shopify CSV preview](../img/admin-migration.jpg "Shopify CSV preview: 2 products to review, imported as drafts")
 
 Note:
 No cutover or old-order reconciliation. If the old store keeps selling, the
@@ -398,7 +398,7 @@ the merchant's LNbits does, bound to the order.
 - Live checkout & order run on `plebeian.market`: **not yet run** [todo]
 - Known gap: physical orders with free-text addresses are **rejected before reservation**, with a clear reply
 
-![Infinite Markets listings on plebeian.market](img/plebeian-listing.png "Listings published by Infinite Markets, rendered on plebeian.market")
+![Infinite Markets listings on plebeian.market](../img/plebeian-listing.png "Listings published by Infinite Markets, rendered on plebeian.market")
 
 Note:
 Other recorded deltas: Plebeian's live checkout sends a single recipient-only
