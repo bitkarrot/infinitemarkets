@@ -279,15 +279,23 @@ page and checkout.
 # Quote → reserve → invoice → settle
 
 ```mermaid
+%%{init: {"flowchart": {"rankSpacing": 36, "nodeSpacing": 40}}}%%
 flowchart LR
-    Q[Order received] --> V{Validate & reprice<br/>from current state}
-    V -->|reject| X[Rejected]
-    V --> RS[Reserve stock<br/>atomic, sorted locks]
-    RS --> INV[LNbits create_invoice<br/>external_id = order]
-    INV --> AP[Awaiting payment]
-    AP -->|core says paid| C[Confirmed]
-    AP -->|TTL expires| E[Expired · stock released]
-    C --> PR[Processing] --> DONE[Completed]
+    Q["Order<br/>received"] --> V{{"Validate &<br/>reprice"}}
+    V -->|reject| X["Rejected"]
+    V --> RS["Reserve<br/>stock"]
+    RS --> INV["LNbits<br/>invoice"]
+    INV --> AP["Awaiting<br/>payment"]
+    AP -->|core says<br/>paid| C["Confirmed<br/>→ processing<br/>→ completed"]
+    AP -->|hold<br/>expires| E["Expired<br/>stock released"]
+    classDef im fill:#b48cff,color:#111111
+    classDef core fill:#ff6a1f,color:#111111
+    classDef ok fill:#4fdc9a,color:#111111
+    classDef stop fill:#ff8fc4,color:#111111
+    class Q,V,RS,AP im
+    class INV core
+    class C ok
+    class X,E stop
 ```
 
 - Reservation hold defaults to **15 min**; stock is consumed exactly once on settlement
@@ -431,11 +439,18 @@ the merchant's LNbits does, bound to the order.
 - **Scripted matrix** against a pinned `PlebeianApp/market` clone: **14/14 probes pass**, covering checkout → NIP-17 intake → invoice → settlement [tested]
 - **Live on `plebeian.market`** (Oct 9): merchant profile and listings render with images, sat prices and stock [tested]
 - Live checkout & order run on `plebeian.market`: **not yet run** [todo]
-- Known gap: physical orders with free-text addresses are **rejected before reservation**, with a clear reply
+- Physical-item orders from Plebeian are declined for now (its address format has no machine-readable country); digital items work end to end
 
 ![Infinite Markets listings on plebeian.market](../img/plebeian-listing.png "Listings published by Infinite Markets, rendered on plebeian.market")
 
 Note:
+Why physical orders are declined: Plebeian sends the whole shipping address
+as one free-text string, but Infinite Markets needs an ISO country code (and
+optional region) to check shipping coverage and price shipping. Rather than
+guess, it declines the order before reserving stock or invoicing and sends the
+buyer an encrypted "rejected" status message with the reason. Clients that
+send separate country/region fields work for physical items.
+
 Other recorded deltas: Plebeian's live checkout sends a single recipient-only
 wrap to its app relay (the strict transport resolves both kind-10050 lists);
 public receipt events are invisible to the NIP-17 inbox. All six are kept in

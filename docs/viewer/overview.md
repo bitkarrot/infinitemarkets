@@ -200,15 +200,23 @@ Orders, invoices and buyer data are never published.
 Every order, from either rail, goes through the same steps:
 
 ```mermaid
-flowchart LR
-    Q[Order received] --> V{Validate & reprice<br/>from current state}
-    V -->|reject| X[Rejected]
-    V --> RS[Reserve stock]
-    RS --> INV[LNbits invoice<br/>bound to the order]
-    INV --> AP[Awaiting payment]
-    AP -->|core says paid| C[Confirmed]
-    AP -->|hold expires| E[Expired · stock released]
-    C --> PR[Processing] --> DONE[Completed]
+%%{init: {"flowchart": {"rankSpacing": 40, "nodeSpacing": 50}}}%%
+flowchart TB
+    Q["Order<br/>received"] --> V{{"Validate &<br/>reprice"}}
+    V -->|reject| X["Rejected"]
+    V --> RS["Reserve<br/>stock"]
+    RS --> INV["LNbits<br/>invoice"]
+    INV --> AP["Awaiting<br/>payment"]
+    AP -->|core says paid| C["Confirmed<br/>→ processing<br/>→ completed"]
+    AP -->|hold expires| E["Expired<br/>stock released"]
+    classDef im fill:#b48cff,color:#111111
+    classDef core fill:#ff6a1f,color:#111111
+    classDef ok fill:#4fdc9a,color:#111111
+    classDef stop fill:#ff8fc4,color:#111111
+    class Q,V,RS,AP im
+    class INV core
+    class C ok
+    class X,E stop
 ```
 
 - Stock is held for **15 minutes** by default and consumed exactly once when payment settles.
@@ -307,7 +315,7 @@ creates the invoice; the merchant's LNbits does, bound to the order.
 - A scripted test suite drives a pinned copy of the Plebeian Market code through checkout, encrypted order intake, invoicing and settlement: **14 of 14 checks pass** [tested]
 - On **plebeian.market** itself (October 9), the merchant profile and listings render with images, sat prices and stock [tested]
 - A live checkout and order on plebeian.market hasn't been run yet [todo]
-- Known gap: physical orders with free-text addresses are rejected before stock is reserved, with a clear reply to the buyer
+- Physical-item orders from Plebeian are declined for now (its address format has no machine-readable country); digital items work end to end.
 
 ### Conduit Market: same open spec
 
