@@ -185,49 +185,43 @@ paid/shipped booleans.
 # Who owns what
 
 ```mermaid
+%%{init: {"flowchart": {"rankSpacing": 34, "nodeSpacing": 26}}}%%
 flowchart LR
-    subgraph Clients["Clients & network"]
-        M[Merchant browser]
-        B[Buyer browser / Nostr client]
-        R[Nostr relays]
-        L[Lightning Network]
-    end
-    subgraph Core["LNbits core · settlement authority"]
-        H[FastAPI host & loader]
-        I[Invoice & payment services]
-        P[(Core payment records)]
-        F[Funding source]
-        T[Invoice dispatcher]
-    end
-    subgraph Ext["infinitemarkets · commerce authority"]
-        S[Checkout, catalog, orders, settlement]
-        W[Inbox · outbox · reconciliation workers]
-        D[(Extension DB)]
-        X[Nostr transport]
-    end
-    M --> H
-    B --> H
-    H --> S
-    S --> D
-    S -->|create_invoice| I
+    M["Merchant<br/>browser"]
+    B["Buyer browser<br/>/ Nostr client"]
+    R["Nostr<br/>relays"]
+    S["Checkout<br/>catalog · orders<br/>settlement"]
+    X["Nostr<br/>transport"]
+    W["Background<br/>workers"]
+    I["Invoice &<br/>payment<br/>services"]
+    P[("Payment<br/>records")]
+    F["Funding<br/>source"]
+    L["Lightning<br/>Network"]
+    M -->|HTTP| S
+    B -->|HTTP| S
+    R <-->|"signed events<br/>NIP-17"| X
+    S -->|outbox| X
+    S ~~~ W
+    S -->|create_<br/>invoice| I
+    W -->|reconcile| I
     I --> P
+    P -->|invoice<br/>paid| S
     I --> F
     F <--> L
-    P --> T
-    T -->|invoice paid| S
-    W -->|reconcile| I
-    D --> X
-    X <-->|signed events · NIP-17| R
     classDef client fill:#4fdc9a,color:#111111
     classDef core fill:#ff6a1f,color:#111111
     classDef ext fill:#b48cff,color:#111111
     class M,B,R,L client
-    class H,I,P,F,T core
-    class S,W,D,X ext
-    %% nudge: create_invoice 60 0
+    class I,P,F core
+    class S,W,X ext
 ```
 
+Legend: green=Clients & network | purple=Infinite Markets · commerce authority | orange=LNbits core · settlement authority
+
 Note:
+Simplified for the slide: catalog and order data live in the extension's own
+database, and the outbox publishes from it (see the overview diagram).
+
 Full version with numbered flow: viewer diagram 01 (lnbits-integration).
 The extension never writes core payment tables and never calls outgoing-payment APIs.
 
@@ -376,33 +370,30 @@ merchant manages overlapping stock before publishing.
 # Publish once, appear everywhere
 
 ```mermaid
+%%{init: {"flowchart": {"rankSpacing": 56, "nodeSpacing": 18}}}%%
 flowchart LR
-    LN[LNbits core<br/>wallet · invoices]
-    IM[Infinite Markets<br/>catalog · stock · shipping]
-    RL((Nostr relays))
-    WEB[Own web storefront]
-    EMB[Embeds / WebPages]
-    PM[Plebeian Market]
-    CM[Conduit Market]
-    OT[Other Gamma / NIP-99 clients]
+    LN["LNbits core<br/>wallet · invoices"]
+    IM["Infinite Markets<br/>catalog · stock<br/>shipping"]
+    RL(["Nostr relays"])
+    PM["Plebeian Market"]
+    CM["Conduit Market"]
+    OT["Other Gamma /<br/>NIP-99 clients"]
+    WEB["Own web storefront"]
+    EMB["Embeds / WebPages"]
     LN <--> IM
-    IM --> WEB
-    IM --> EMB
-    IM <-->|listings out · orders in| RL
+    IM <-->|"listings out<br/>orders in"| RL
     RL <--> PM
     RL <--> CM
     RL <--> OT
+    IM ---> WEB
+    IM ---> EMB
     classDef relay fill:#b48cff,color:#111111
     classDef market fill:#ff8fc4,color:#111111
     class RL relay
     class PM,CM,OT market
 ```
 
-- Standard NIP-99 / Gamma events, signed with the **merchant's own key**
-- Buyers check out **in the marketplace they already use**; orders land in the merchant's inbox
-- Every order enters the **same reservation & invoice pipeline** as a web order
-
-> The marketplace is a view. The merchant's LNbits is the source of truth.
+> Signed with the merchant's own key · buyers check out where they already shop · every order enters the same reservation & invoice pipeline. **The marketplace is a view; the merchant's LNbits is the source of truth.**
 
 Note:
 End-to-end marketplace order: (1) buyer finds the kind-30402 listing on

@@ -188,3 +188,7 @@ footer.note { margin-top: 52px; padding-top: 22px; border-top: 2px solid var(--i
 .lb-diagram .edgeLabel { border: 0 !important; box-shadow: none !important; padding: 0 2px !important; }
 .lb-diagram .node .nodeLabel, .lb-diagram .node .nodeLabel p { color: #111 !important; }
 .mermaid-box { cursor: zoom-in; }
+.legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 22px;
+  font-weight: 600; font-size: .78em; color: var(--text2); }
+.legend .sw { display: inline-block; width: .9em; height: .9em; border-radius: 4px;
+  border: 2px solid var(--ink); margin-right: 8px; vertical-align: -.1em; }

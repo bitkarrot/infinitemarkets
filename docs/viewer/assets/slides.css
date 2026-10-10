@@ -143,3 +143,9 @@ body.deck #controls a.btn:hover { transform: translate(1.5px, 1.5px); box-shadow
 .slide[data-accent="blue"] .kicker, .slide[data-accent="blue"] .num,
 .slide[data-accent="blue"] blockquote, .slide[data-accent="blue"] blockquote b { color: #fff; }
 .slide[data-accent="blue"] blockquote code { background: #fff; color: #111; }
+
+/* diagram slides: a lighter heading block leaves more room for the diagram */
+.slide.l-diagram { padding-top: 44px; padding-bottom: 48px; }
+.slide.l-diagram h1 { font-size: 2.05em; margin-bottom: .32em; }
+.slide.l-diagram .kicker { margin-bottom: .5em; }
+.slide.l-diagram .body { gap: .55em; }

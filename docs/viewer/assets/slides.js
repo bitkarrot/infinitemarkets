@@ -25,8 +25,8 @@
     return gs;
   }
   function body(layout, bs) {
-    const quotes = bs.filter(b => b.t === 'quote');
-    const rest = bs.filter(b => b.t !== 'quote');
+    const quotes = bs.filter(b => b.t === 'quote' || b.t === 'legend');
+    const rest = bs.filter(b => b.t !== 'quote' && b.t !== 'legend');
     const imgs = rest.filter(b => b.t === 'img');
     const mer = rest.filter(b => b.t === 'code' && b.lang === 'mermaid');
     const text = rest.filter(b => !imgs.includes(b) && !mer.includes(b));

@@ -117,45 +117,40 @@ Five design principles hold the system together:
 5. **Compatibility is testable:** proven against real marketplace clients, not just matching event numbers.
 
 ```mermaid
-flowchart LR
-    subgraph Clients["Clients & network"]
-        M[Merchant browser]
-        B[Buyer browser / Nostr client]
-        R[Nostr relays]
-        L[Lightning Network]
-    end
-    subgraph Core["LNbits core · settlement authority"]
-        H[FastAPI host & loader]
-        I[Invoice & payment services]
-        P[(Core payment records)]
-        F[Funding source]
-    end
-    subgraph Ext["infinitemarkets · commerce authority"]
-        S[Checkout, catalog, orders, settlement]
-        W[Inbox · outbox · reconciliation workers]
-        D[(Extension DB)]
-        X[Nostr transport]
-    end
-    M --> H
-    B --> H
-    H --> S
+%%{init: {"flowchart": {"rankSpacing": 46, "nodeSpacing": 30}}}%%
+flowchart TB
+    M["Merchant<br/>browser"]
+    B["Buyer browser /<br/>Nostr client"]
+    R["Nostr<br/>relays"]
+    S["Checkout · catalog<br/>orders · settlement"]
+    X["Nostr<br/>transport"]
+    D[("Extension<br/>DB")]
+    W["Background<br/>workers"]
+    I["Invoice &<br/>payment services"]
+    P[("Payment<br/>records")]
+    F["Funding<br/>source"]
+    L["Lightning<br/>Network"]
+    M -->|HTTP| S
+    B -->|HTTP| S
+    R <-->|"signed events<br/>NIP-17"| X
     S --> D
+    D --> X
+    S ~~~ W
     S -->|create_invoice| I
+    W -->|reconcile| I
     I --> P
+    P -->|invoice paid| S
     I --> F
     F <--> L
-    P -->|invoice paid| S
-    W -->|reconcile| I
-    D --> X
-    X <-->|signed events · NIP-17| R
     classDef client fill:#4fdc9a,color:#111111
     classDef core fill:#ff6a1f,color:#111111
     classDef ext fill:#b48cff,color:#111111
     class M,B,R,L client
-    class H,I,P,F core
+    class I,P,F core
     class S,W,D,X ext
-    %% nudge: create_invoice 60 0
 ```
+
+Legend: green=Clients & network | purple=Infinite Markets · commerce authority | orange=LNbits core · settlement authority
 
 The extension never writes LNbits' payment tables and never calls
 outgoing-payment APIs. The [architecture diagrams](architecture.html) show the
@@ -270,22 +265,23 @@ arrives as an encrypted NIP-17 message in the merchant's own inbox and enters
 the **same reservation and invoice pipeline** as a web order.
 
 ```mermaid
-flowchart LR
-    LN[LNbits core<br/>wallet · invoices]
-    IM[Infinite Markets<br/>catalog · stock · shipping]
-    RL((Nostr relays))
-    WEB[Own web storefront]
-    EMB[Embeds / WebPages]
-    PM[Plebeian Market]
-    CM[Conduit Market]
-    OT[Other Gamma / NIP-99 clients]
+%%{init: {"flowchart": {"rankSpacing": 40, "nodeSpacing": 36}}}%%
+flowchart TB
+    LN["LNbits core<br/>wallet · invoices"]
+    IM["Infinite Markets<br/>catalog · stock<br/>shipping"]
+    RL(["Nostr relays"])
+    PM["Plebeian<br/>Market"]
+    CM["Conduit<br/>Market"]
+    OT["Other Gamma /<br/>NIP-99 clients"]
+    WEB["Own web<br/>storefront"]
+    EMB["Embeds /<br/>WebPages"]
     LN <--> IM
-    IM --> WEB
-    IM --> EMB
-    IM <-->|listings out · orders in| RL
+    IM <-->|"listings out<br/>orders in"| RL
     RL <--> PM
     RL <--> CM
     RL <--> OT
+    IM ---> WEB
+    IM ---> EMB
     classDef relay fill:#b48cff,color:#111111
     classDef market fill:#ff8fc4,color:#111111
     class RL relay

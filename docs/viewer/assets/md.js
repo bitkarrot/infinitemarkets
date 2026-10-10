@@ -18,7 +18,9 @@
   }
 
   const IMG = /^!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)$/;
-  const isBlockStart = l => /^(```|#{1,6}\s|\||>|\s*[-*]\s|\s*\d+\.\s|!\[|<!--)/.test(l);
+  const isBlockStart = l => /^(```|#{1,6}\s|\||>|\s*[-*]\s|\s*\d+\.\s|!\[|<!--|Legend:)/.test(l);
+  const SWATCH = { green: '#4fdc9a', orange: '#ff6a1f', purple: '#b48cff', pink: '#ff8fc4',
+                   yellow: '#ffd23d', lime: '#c8f53c', blue: '#8eaeff' };
 
   function blocks(md) {
     const L = md.split('\n'), out = [];
@@ -31,6 +33,10 @@
         const buf = []; i++;
         while (i < L.length && !L[i].startsWith('```')) buf.push(L[i++]);
         out.push({ t: 'code', lang: m[1], text: buf.join('\n') }); i++; continue;
+      }
+      if ((m = l.match(/^Legend:\s*(.*)/))) {
+        out.push({ t: 'legend', items: m[1].split('|').map(x => x.trim().split('=')).filter(x => x.length === 2) });
+        i++; continue;
       }
       if ((m = l.match(/^(#{1,6})\s+(.*)/))) { out.push({ t: 'h', n: m[1].length, text: m[2] }); i++; continue; }
       if (l.startsWith('|')) {
@@ -76,6 +82,9 @@
       case 'h': return `<h${b.n} id="${slug(b.text)}">${inline(b.text)}</h${b.n}>`;
       case 'p': return `<p${b.label ? ' class="label"' : ''}>${inline(b.text)}</p>`;
       case 'quote': return `<blockquote>${inline(b.text)}</blockquote>`;
+      case 'legend':
+        return `<div class="legend">${b.items.map(([c, t]) =>
+          `<span><i class="sw" style="background:${SWATCH[c.trim()] || esc(c.trim())}"></i>${inline(t)}</span>`).join('')}</div>`;
       case 'ul': case 'ol':
         return `<${b.t}>${b.items.map(x => `<li>${x.split('\n').map(inline).join('<br>')}</li>`).join('')}</${b.t}>`;
       case 'table':

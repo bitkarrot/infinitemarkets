@@ -258,3 +258,4 @@ article.md .tag { font-size: 11px; }
   .collage .main { position: static; width: 100%; transform: none; }
   .collage .sticker { display: none; }
 }
+article.md .legend { margin: -12px 0 26px; font-size: 14px; }
