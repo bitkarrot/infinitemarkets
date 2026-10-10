@@ -312,7 +312,7 @@ own Lightning. Infinite Markets publishes the same listing, collection and
 shipping event types and receives orders over NIP-17, so it should work with
 Conduit [spec-aligned], but this hasn't been tested yet [todo].
 
-### The LNbits Merchant Stack: today and next
+### Plugging into related LNbits extensions: today and next
 
 - **Today** [shipped]: payments through LNbits core, email through the host's SMTP settings, embeds through WebPages, and `nostrrelay` as a reference inbox relay. Inventory and shipping are native to Infinite Markets.
 - **Next** [roadmap]: use the LNbits **Inventory** extension as a shared stock source across LNbits sales channels, and integrate a **Shipping** extension for shipping rules and fulfillment.

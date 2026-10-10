@@ -119,7 +119,7 @@ Markets can import a nostrmarket JSON catalog as drafts. The Nostr Relay
 extension is the reference inbox relay in the conformance tests but isn't a
 runtime dependency, and Infinite Markets uses its own relay transport rather
 than Nostr Client. It doesn't integrate with Inventory or Orders today; see
-the "Plugging into the Merchant Stack" slide for shipped versus roadmap.
+the "Plugging into related LNbits extensions" slide for shipped versus roadmap.
 
 ---
 
@@ -452,8 +452,8 @@ Conduit interop is expected from shared Gamma kinds but has not been tested yet.
 
 ---
 
-<!-- slide: layout=split accent=blue kicker="part 4 · lnbits merchant stack" -->
-# Plugging into the LNbits Merchant Stack
+<!-- slide: layout=split accent=blue kicker="part 4 · lnbits extensions" -->
+# Plugging into related LNbits extensions
 
 **Today** [shipped]
 - Payments via **LNbits core** (invoices, settlement, reconciliation)

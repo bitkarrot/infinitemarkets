@@ -90,10 +90,10 @@
       <div class="card-x pain"><span class="n">04</span><h3>Unreliable relays</h3>
         <p>Publishing isn't delivery, deleted items linger, and nothing records who accepted what.</p>
         <p class="ans">Durable outbox with per-relay evidence and a live catalog check.</p></div>
-      <div class="card-x pain"><span class="n">05</span><h3>Leaky, legacy protocols</h3>
+      <div class="card-x pain"><span class="n">05</span><h3>Legacy protocol</h3>
         <p>NIP-15 is unrecommended and NIP-04 messages reveal who buys from whom.</p>
         <p class="ans">NIP-99 + Gamma spec, with NIP-17 gift-wrapped orders.</p></div>
-      <div class="card-x pain"><span class="n">06</span><h3>Manual or unbound invoicing</h3>
+      <div class="card-x pain"><span class="n">06</span><h3>Manual / unbound invoicing</h3>
         <p>Invoices sent by hand after an order arrives, or paid to a Lightning address that isn't tied to the order.</p>
         <p class="ans">Every order gets an LNbits invoice bound to it, automatically.</p></div>
       <div class="card-x pain wide"><span class="n">07</span><h3>Centralized platform lock-in</h3>
@@ -155,7 +155,9 @@
       <div class="frame"><div class="bar"><i></i><i></i><i></i>plebeian.market</div>
         <img src="img/plebeian-listing.png" alt="Infinite Markets listings on plebeian.market" loading="lazy"></div>
       <figcaption>Live on plebeian.market (Oct 9): listings published by Infinite Markets.
-        Scripted Plebeian checkout suite: 14/14 passing. Conduit Market: same spec, testing to do.</figcaption>
+        Scripted Plebeian checkout suite: 14/14 passing; a live checkout hasn't been run yet, and
+        physical orders with free-text addresses are declined with a clear reply.
+        Conduit Market: same spec, testing to do.</figcaption>
     </figure>
   </div>
 </section>
@@ -236,7 +238,8 @@
       <div class="card-x"><h3>Where it stands</h3>
         <ul><li>Web commerce, Nostr orders, buyer accounts and catalog import/export implemented</li>
           <li>v0.5 published via an LNbits extension manifest (sha256-verified)</li>
-          <li>Conformance suite plus Plebeian tests and a live listing check</li></ul></div>
+          <li>Conformance suite plus Plebeian tests and a live listing check</li>
+          <li>Out of scope for v1: escrow, fiat custody, automated refunds, subscriptions, reviews</li></ul></div>
       <div class="card-x"><h3>Risks</h3>
         <ol><li><b>Experimental software:</b> v0.5 on a draft spec; start small</li>
           <li><b>Needs the community:</b> interop depends on marketplaces, the spec group, and real merchants</li>
@@ -245,7 +248,8 @@
         <ul><li><b>Seeking testers and active users:</b> run it, send feedback, <a href="https://github.com/bitkarrot/infinitemarkets/issues" target="_blank" rel="noopener">file issues</a></li>
           <li>Live plebeian.market checkout; Conduit and Shopstr testing</li>
           <li>Structured addresses for marketplace physical orders</li>
-          <li>LNbits Inventory and Shipping integration</li></ul></div>
+          <li>LNbits Inventory and Shipping integration</li>
+          <li>Follow the Open Markets Protocol as the Gamma draft evolves</li></ul></div>
     </div>
   </div>
 </section>
