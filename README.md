@@ -221,7 +221,7 @@ Copy-ready snippets for all three options (link grid, modal grid, iframe) are in
 
 Release-B evidence is reproducible: the scripted conformance matrix (`tests/conformance/run_matrix.sh matrix`) runs a real recipient-gated `nostrrelay` environment, egress/NIP-42/paid-write/overload drills, and an independent external-client matrix against a pinned `PlebeianApp/market` clone — 14/14 probes with a recorded 6-entry known-delta register (`evidence/conformance/`).
 
-**Outstanding manual gate**: the live `plebeian.market` public-relay smoke is a manual checklist (`tests/conformance/README.md`) recorded as pending in `.planning/phases/03-release-b-gamma-nip-17-orders/03-VERIFICATION.md`.
+**Live `plebeian.market` smoke (manual, partial)**: on 2026-10-09 the merchant profile and kind-30402 listings published by the extension were confirmed rendering on `plebeian.market` (checklist steps 1–2). The live checkout and order steps (3–4) have not been run yet; see `tests/conformance/README.md` and `.planning/phases/03-release-b-gamma-nip-17-orders/03-VERIFICATION.md`.
 
 ## Development
 

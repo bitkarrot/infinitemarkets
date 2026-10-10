@@ -140,6 +140,12 @@ scripted pass. Record results into
    external id, wrap ids, pass/fail + notes. Expected divergences: the
    known-delta register above applies verbatim.
 
+### Run log
+
+| Date | Steps covered | Result | Notes |
+|---|---|---|---|
+| 2026-10-09 | 1–2 (listing only) | pass | Merchant profile ("Infinite Markets", `npub10rtl…779uxx`) and its kind-30402 listings (name, image, sat price, stock) render on `plebeian.market`. Checkout and order steps 3–4 not run; no order id or wrap ids to record. |
+
 ## D-33 note
 
 §9.5's literal "OS/container egress policy" is narrowed for Release-B

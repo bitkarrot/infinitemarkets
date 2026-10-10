@@ -65,9 +65,15 @@ conformance env cannot ship an OS-level egress policy).
 
 - **Live `plebeian.market` public-relay smoke** — checklist authored at
   `tests/conformance/README.md` §"Live `plebeian.market` smoke
-  checklist". **Status: PENDING — not yet executed.** Record results
-  here when run (date, host, merchant npub, product naddr, order id,
-  wrap ids, pass/fail, notes).
+  checklist". **Status: PARTIAL — listing verified, checkout/order
+  pending.** Record results here when run (date, host, merchant npub,
+  product naddr, order id, wrap ids, pass/fail, notes).
+  - **2026-10-09 — steps 1–2 (listing only): pass.** The merchant
+    profile ("Infinite Markets", `npub10rtl…779uxx`) and its kind-30402
+    listings (name, image, sat price, stock) render on
+    `plebeian.market`. Steps 3–4 (live checkout, order intake, payment
+    request, settlement, status wraps) were not run, so no order id or
+    wrap ids exist for this run.
 
 ## Verification commands run
 
