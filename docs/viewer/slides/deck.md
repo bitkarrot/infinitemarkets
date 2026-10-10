@@ -1,16 +1,19 @@
 <!--
-Deck source for the infinitemarkets slideshow (rendered later by slides.html
-using docs/viewer/assets/style.css).
+Deck source for the infinitemarkets slideshow, rendered by ../slides.html
+(assets/slides.js + assets/slides.css on top of assets/style.css).
 
 Authoring conventions
-- Slides are separated by a line containing only `---`.
-- The first line of a slide may carry a metadata comment:
-    <!-- slide: layout=<title|section|bullets|split|diagram|table|quote|cta> accent=<lime|yellow|orange|pink|mint|blue> kicker="..." -->
-  `accent` maps to the viewer palette tokens (--lime, --yellow, ...).
-  `kicker` renders as the mono pill above the headline (like the index page).
-- `Note:` starts speaker notes; everything after it on that slide is notes only.
-- ```mermaid blocks render with the viewer's brutalist node styling.
-- Status tags used in bullets: [shipped] [tested] [spec-aligned] [roadmap].
+- Slides are separated by a line containing only three dashes.
+- A slide's first line may be an HTML comment starting with "slide:" that sets
+  layout=title|bullets|split|diagram|table|gallery|cta,
+  accent=lime|yellow|orange|pink|mint|blue (viewer palette tokens), and
+  kicker="..." (the mono pill above the headline).
+- split: content groups (a bold-only line starts a group) or text + image
+  become two columns. Blockquotes always render full width at the bottom.
+- Images: ![alt](img/<file> "caption"), paths relative to this file.
+- A line containing only "Note:" starts speaker notes (press N in the deck).
+- Fenced mermaid blocks render as diagrams in the slide's accent color.
+- Status tags in bullets render as chips: [shipped] [tested] [spec-aligned] [todo] [roadmap].
 -->
 
 <!-- slide: layout=title accent=lime kicker="infinitemarkets · v0.5 · LNbits extension" -->
@@ -18,7 +21,7 @@ Authoring conventions
 
 ## One inventory. Every storefront. Your rails.
 
-A Lightning-settled commerce engine for LNbits — sell on your own web shop
+A Lightning-settled commerce engine for LNbits. Sell on your own web shop
 and on Nostr marketplaces like Plebeian Market and Conduit Market,
 without giving up inventory, shipping, or payments.
 
@@ -29,99 +32,33 @@ and every storefront, theirs or a marketplace's, is just a window onto it.
 
 ---
 
-<!-- slide: layout=bullets accent=yellow kicker="agenda" -->
-# What we'll cover
-
-1. **LNbits backgrounder**: the wallet and extension platform underneath
-2. **The pain**: why selling with Bitcoin on Nostr is hard today
-3. **Infinite Markets**: what it is and how it works
-4. **Publish everywhere**: Plebeian, Conduit & other Gamma marketplaces
-5. **Own your rails**: inventory, shipping, payments stay with the merchant
-6. **Status, evidence & roadmap**
-
----
-
-<!-- slide: layout=section accent=orange kicker="part 1" -->
-# LNbits backgrounder
-
-The platform Infinite Markets is built on
-
----
-
-<!-- slide: layout=bullets accent=orange kicker="lnbits · what it is" -->
+<!-- slide: layout=split accent=orange kicker="part 1 · lnbits" -->
 # What is LNbits?
 
 - **Free, open-source (MIT)** Lightning wallet & accounts system, in development since 2018
 - Sits **on top of any Lightning funding source** and splits it into many isolated wallets
-- **Clean REST API** for invoices, payments, and wallet management
-- **Multi-user accounts** with role-based access: admin key, invoice key, custom ACLs
-- **Extension platform**: install or build apps that add features on top of wallets
-- Runs on a Raspberry Pi, a VPS, node platforms, or **hosted SaaS** (my.lnbits.com)
+- **REST API** for invoices & payments; **admin keys** spend, **invoice keys** only receive
+- Accounts via email, username, or **Nostr pubkey**
+- Runs on a Pi, a VPS, node platforms, or **hosted SaaS** (my.lnbits.com)
+
+**Bring your own backend**
+- **Nodes:** LND, Core Lightning, Eclair, Phoenixd
+- **Services:** Alby, Strike, Blink, OpenNode, ZBD
+- **Advanced:** NWC, Breez SDK, Spark L2, Boltz
+- **Fiat:** Stripe, PayPal
 
 Note:
-Key concept: LNbits is a layer of abstraction between users and the node. One
-node serves many users; each wallet tracks its own balance and has its own keys;
-switching the funding source doesn't touch user balances.
+LNbits is a layer of abstraction between users and the node. One node serves
+many users; each wallet tracks its own balance and keys; switching the funding
+source doesn't touch user balances. A merchant can start on a hosted service or
+NWC and move to their own node later; Infinite Markets doesn't change, it only
+asks LNbits core to create invoices on the merchant's bound wallet, never
+holding spend keys.
 
 ---
 
-<!-- slide: layout=split accent=orange kicker="lnbits · how it works" -->
-# One node, many wallets
-
-**Concepts**
-
-| Concept | Meaning |
-|---|---|
-| Account | Identity via email, username, or **Nostr pubkey** |
-| Wallet | Virtual Lightning wallet with its own balance & keys |
-| Admin key | Full access, can spend |
-| Invoice key | Read + receive only |
-| Extension | Plugin with its own API, UI, DB tables |
-| Funding source | The backend that actually moves sats |
-
-**Why it matters for merchants**
-
-- One shop wallet per business line or channel
-- Extensions get invoice creation **without holding spend keys**
-- Swap backends without migrating balances
-
----
-
-<!-- slide: layout=split accent=orange kicker="lnbits · funding sources" -->
-# Bring your own backend
-
-**Self-hosted nodes**
-- LND (gRPC / REST), Core Lightning (RPC / CLNRest), Eclair, Phoenixd
-
-**Hosted Lightning services**
-- Alby, Strike, Blink, OpenNode, ZBD, LNPay, and more
-
-**Advanced**
-- Nostr Wallet Connect (NWC), Breez SDK, Spark L2, Boltz swaps
-
-**Fiat providers**
-- Stripe and PayPal integrations for card payments
-
-Note:
-A merchant can start on a hosted service or NWC and graduate to their own node
-later. Nothing in Infinite Markets changes when they do: it only ever asks
-LNbits core to create an invoice on the merchant's bound wallet.
-
----
-
-<!-- slide: layout=bullets accent=orange kicker="lnbits · extensions" -->
+<!-- slide: layout=diagram accent=orange kicker="part 1 · lnbits" -->
 # An extension platform, not just a wallet
-
-- Python extensions are first-class apps: **own routes, DB migrations, UI, start/stop hooks**
-- **Permanent background tasks**: work keeps running while the merchant's browser is closed
-- Payment events dispatched to extensions via core's **invoice listener**
-- Installed from **manifest sources** with sha256-verified release archives
-- Ecosystem: POS, paywalls, tickets, LNURL, Nostr relay/client, WebPages, and more
-
----
-
-<!-- slide: layout=diagram accent=orange kicker="lnbits · architecture" -->
-# LNbits at a glance
 
 ```mermaid
 flowchart LR
@@ -147,118 +84,80 @@ flowchart LR
     market -.->|install / update| ext
 ```
 
+- Python extensions get **their own routes, DB migrations, UI, and background tasks**
+- Core dispatches **invoice-paid events** to the extension that created the invoice
+- Installed from **manifest sources** with sha256-verified archives
+
 Note:
-Source: docs/lnbits_architecture_overview.md (conceptual, not a payment-flow diagram).
+Source: docs/lnbits_architecture_overview.md (conceptual, not a payment-flow
+diagram). Background tasks matter: they keep the shop running while the
+merchant's browser is closed.
 
 ---
 
-<!-- slide: layout=table accent=orange kicker="lnbits · merchant stack" -->
+<!-- slide: layout=table accent=orange kicker="part 1 · lnbits merchant stack" -->
 # The LNbits Merchant Stack
 
 | Piece | Role |
 |---|---|
 | **TPoS** | In-person checkout |
 | **Inventory** | Shared products & stock across extensions |
-| **Orders** | Receipts, order history, notifications, shipping status |
+| **Orders** | Receipts, order history, notifications |
 | **WebShop** | Simple online sales |
 | **Tabs** | Open balances, deferred settlement |
 | **SaaS** | Hosted LNbits instance, no server to run |
 
-> Infinite Markets adds the missing piece: **Nostr-native, multi-marketplace
+> Infinite Markets adds what's missing: **Nostr-native, multi-marketplace
 > commerce** with a production-grade checkout.
 
----
-
-<!-- slide: layout=section accent=pink kicker="part 2" -->
-# The pain points
-
-Why selling with Bitcoin on Nostr is still hard
+Note:
+Infinite Markets is not integrated with these extensions today; see the
+"Plugging into the Merchant Stack" slide for what's shipped versus roadmap.
 
 ---
 
-<!-- slide: layout=bullets accent=pink kicker="pain · fragmentation" -->
-# 1 · Every storefront wants its own catalog
+<!-- slide: layout=table accent=pink kicker="part 2 · the pain" -->
+# The pain, in one slide
 
-- Web shop, Plebeian, Conduit, Shopstr… each one becomes **another copy of the catalog**
-- Stock counts drift between channels, so the merchant **oversells** or under-lists
-- Price, shipping, and visibility edits have to be repeated everywhere
-- Hosted marketplaces can own the **customer relationship** and sometimes the funds
-
----
-
-<!-- slide: layout=bullets accent=pink kicker="pain · payments" -->
-# 2 · "Was this actually paid?"
-
-- On Nostr, a receipt message or a relay event **is not proof of payment**
-- Buyer-supplied amounts can't be trusted
-- Duplicate invoices from retries or crashes lead to double charges or orphaned payments
-- Payments that land after expiry or cancellation get silently lost or mis-applied
-
----
-
-<!-- slide: layout=bullets accent=pink kicker="pain · operations" -->
-# 3 · Shops that only work while a tab is open
-
-- Many Nostr commerce clients need the **merchant's browser/signer online** to answer orders and issue invoices
-- Relays are unreliable: publish ≠ delivered, and nothing records **which relay accepted what**
-- Deleted products keep showing up on relays that ignore deletions
-- Order DMs over NIP-04 leak **who is buying from whom**
-
----
-
-<!-- slide: layout=table accent=pink kicker="pain · protocol" -->
-# 4 · The protocol ground moved
-
-| | NIP-15 (legacy `nostrmarket`) | NIP-99 + Gamma spec |
-|---|---|---|
-| Status | Draft, **unrecommended** | Ecosystem direction |
-| Grouping | Stall-centric | Independent collections (30405) |
-| Shipping | Embedded in stall | Addressable options (30406) |
-| Variants | None | Variable / variation products |
-| Private messages | NIP-04 (leaks metadata) | NIP-17 gift-wrapped (NIP-44/59) |
-| Order state | `paid` / `shipped` booleans | Full status & shipping lifecycle |
-| Inventory | Decrement after payment, no reservation | Reservation → invoice → settle |
+| Pain | What it looks like |
+|---|---|
+| **Fragmented catalogs** | Web shop + every marketplace keeps its own copy; stock drifts, merchants oversell |
+| **"Was it paid?"** | Nostr receipts and buyer-stated amounts aren't proof; retries create duplicate invoices |
+| **Browser-bound shops** | Orders wait until the merchant's tab or signer is online |
+| **Unreliable relays** | Publish ≠ delivered; deleted items linger; no record of who accepted what |
+| **Legacy protocol** | NIP-15 is unrecommended; NIP-04 DMs leak who buys from whom |
+| **Platform lock-in** | Marketplaces can own the funds and the customer relationship |
 
 Note:
-NIP-99 alone defines only the listing. The Gamma Markets spec (authored by
-the Shopstr, Cypher, Plebeian Market and Conduit teams) adds the commerce
-layer: collections, shipping, NIP-17 orders, payment requests, receipts.
+Audience knows this; move quickly. Protocol context if asked: NIP-99 defines
+only the listing. The Gamma Markets spec (authored by the Shopstr, Cypher,
+Plebeian Market and Conduit teams) adds collections (30405), shipping (30406),
+NIP-17 orders, payment requests and receipts. Legacy nostrmarket also
+decremented stock after payment with no reservation and modeled orders as
+paid/shipped booleans.
 
 ---
 
-<!-- slide: layout=section accent=mint kicker="part 3" -->
-# Infinite Markets
-
-One inventory, two rails
-
----
-
-<!-- slide: layout=bullets accent=mint kicker="infinite markets · what it is" -->
+<!-- slide: layout=split accent=mint kicker="part 3 · infinite markets" -->
 # What it is
 
-- A **standard Python LNbits extension** (`infinitemarkets`), MIT, v0.5, LNbits ≥ 1.6.0
+- A **standard Python LNbits extension**, MIT, v0.5, LNbits ≥ 1.6.0
 - **Commerce authority**: catalog, inventory, shipping, orders, messages, publication
-- **LNbits core stays the settlement authority**: invoices, payment records, funding source
-- Rail 1: a **classic web storefront** with Lightning checkout
-- Rail 2: a **native Nostr/Gamma channel** with NIP-17 encrypted ordering
-- Both rails share **one pricing, reservation, invoice & settlement pipeline**
+- **LNbits core stays settlement authority**: invoices, payment records, funding source
+- Two rails, **one pipeline**: a web storefront and a native Nostr/Gamma channel share pricing, reservation, invoicing & settlement
+
+**Design principles**
+1. **Domain before protocol**: Nostr events are projections of commerce records
+2. **One writer per catalog**: one extension owns stock and invoices
+3. **Payment truth comes from LNbits**, never from relays or receipts
+4. **Relays are eventually consistent**: outbox, ACK evidence, retries
+5. **Compatibility is testable** against real clients
 
 > No duplicate invoices. No double allocation. Relay delivery is never mistaken for payment truth.
 
 ---
 
-<!-- slide: layout=bullets accent=mint kicker="infinite markets · principles" -->
-# Five design principles
-
-1. **Domain before protocol**: products & orders are commerce records; Nostr events are projections of them
-2. **Exactly one writer per catalog**: one extension owns stock and invoice creation
-3. **Payment truth comes from LNbits**: only settled core payments confirm orders
-4. **Relays are eventually consistent transport**: outbox, ACK evidence, retries
-5. **Compatibility is testable**: proven against real clients, not just matching kind numbers
-
----
-
-<!-- slide: layout=diagram accent=mint kicker="infinite markets · architecture" -->
+<!-- slide: layout=diagram accent=mint kicker="part 3 · architecture" -->
 # Who owns what
 
 ```mermaid
@@ -313,33 +212,39 @@ The extension never writes core payment tables and never calls outgoing-payment 
 - Dark/light toggle, mobile-first layouts
 
 **For merchants**
-- Theme presets, 4 layouts, brand logo/hero/footer
-- Point-and-click Fine-tune with **WCAG contrast gates**
+- Theme presets, 4 layouts, brand logo/hero/footer, **WCAG contrast gates**
 - Email notifications for order events
+- 4 storefront modes: `full`, `showcase`, `browse_only`, `nostr_only`
+
+Note:
+Modes: showcase turns web checkout into a guided "Order via Nostr";
+nostr_only shows a notice on the web and sells only via Nostr. Private order
+links and in-flight invoices keep working in every mode.
 
 ---
 
 <!-- slide: layout=table accent=mint kicker="rail 2 · nostr" -->
 # Rail 2: native Nostr commerce
 
-| Kind | Published / handled | Purpose |
+| Kind | Direction | Purpose |
 |---|---|---|
 | `30402` | out | NIP-99 product listing (price, stock, images, specs) |
-| `30405` | out | Collection |
-| `30406` | out | Shipping option |
+| `30405` / `30406` | out | Collections / shipping options |
 | `0` | out | Merchant profile (name, bio, NIP-05, lud16) |
 | `10050` | out | Inbox relays (where to send orders) |
-| `31989/31990` | out | NIP-89 handler: deep-link to merchant pages |
+| `31989` / `31990` | out | NIP-89 handler: deep-link to merchant pages |
 | `1059` | in & out | NIP-17 gift-wrapped orders, payment requests, status |
 | `5` | out | Deletion / tombstone |
 
 Note:
 Optional NIP-15 projection (30017/30018) exists per category for legacy clients.
-Orders, invoices, and buyer data are never exposed publicly.
+Orders, invoices, and buyer data are never exposed publicly. NIP-89 lets
+marketplace clients deep-link naddr products to the merchant's own product
+page and checkout.
 
 ---
 
-<!-- slide: layout=diagram accent=mint kicker="checkout saga" -->
+<!-- slide: layout=diagram accent=mint kicker="part 3 · checkout saga" -->
 # Quote → reserve → invoice → settle
 
 ```mermaid
@@ -360,64 +265,63 @@ flowchart LR
 
 ---
 
-<!-- slide: layout=bullets accent=mint kicker="durable delivery" -->
+<!-- slide: layout=split accent=mint kicker="part 3 · durable delivery" -->
 # Relays you can audit
 
 - Every catalog change becomes a **durable outbox intent**
-- Worker rebuilds the event from **current** state, signs it, sends it, and records **per-relay ACK/reject/timeout**
-- **Publications** tab shows the evidence; zero ACKs mean retry with backoff
-- **Relay catalog check** verifies live relay copies: missing / divergent / stale-deleted
-- One click **re-requests deletions** for stale copies (fresh kind-5)
+- Worker rebuilds the event from **current** state, signs it, and records **per-relay ACK / reject / timeout**
+- Zero ACKs mean retry with backoff
+- **Relay catalog check** classifies live copies: missing / divergent / stale-deleted
+- One click **re-requests deletions** for stale copies
+
+![Publications tab with per-relay delivery evidence](img/admin-publications.jpg "Publications: per-relay evidence and catalog check")
 
 ---
 
-<!-- slide: layout=split accent=mint kicker="merchant operations" -->
+<!-- slide: layout=gallery accent=mint kicker="part 3 · merchant operations" -->
 # A real back office
 
-**Admin workspaces**
-- Orders: split list/detail with full chronology
-- Catalog: sortable products, drafts, preview
-- Publications: relay evidence & catalog check
-- Messages: encrypted customer threads with verified profiles
-- Appearance & Embed
+![Orders workspace](img/admin-orders.jpg "Orders: split list/detail with full chronology")
+![Catalog products table](img/admin-categories.jpg "Catalog: sortable products, drafts, preview")
+![Messages workspace](img/admin-messages.jpg "Messages: encrypted customer threads with verified profiles")
 
-**Background workers**
-- Outbox publisher (5 s), relay manager (30 s)
-- Reservation expiry (30 s), reconciliation (60 s)
-- Email sender (5 s), retention pruner (24 h)
+- Background workers keep running with the browser closed: outbox (5 s), relay manager (30 s), reservation expiry (30 s), reconciliation (60 s), email (5 s), retention (24 h)
+
+Note:
+Messages screenshot uses a clearly fictional demo conversation (the e2e relay
+has no buyer traffic).
 
 ---
 
-<!-- slide: layout=table accent=mint kicker="storefront modes" -->
-# Choose how you sell
+<!-- slide: layout=gallery accent=mint kicker="part 3 · embed anywhere" -->
+# Embed anywhere
 
-| Mode | Web browse | Web checkout | Nostr listings | Nostr orders |
-|---|---|---|---|---|
-| `full` (default) | ✓ | ✓ | ✓ | ✓ |
-| `showcase` | ✓ | guided "Order via Nostr" | ✓ | ✓ |
-| `browse_only` | ✓ | — | paused | — |
-| `nostr_only` | notice only | — | ✓ | ✓ |
+![Product cards embedded in a static page](img/store-embed.jpg "Two lines of code drop product cards into any page, no iframe")
+![Embed snippets in Settings](img/admin-embed.jpg "Copy-ready snippets: link grid, modal grid, iframe")
 
-Private order links and in-flight invoices keep working in **every** mode.
+- `gm-embed.js` renders cards in the host page's own DOM; modal mode keeps shoppers on-page
+- Chrome-free iframe option with auto-height; works with the LNbits **WebPages** extension
+- Checkout always lands on the merchant's hosted pages
 
 ---
 
-<!-- slide: layout=split accent=mint kicker="embed & import" -->
-# Meet merchants where they are
+<!-- slide: layout=split accent=mint kicker="part 3 · bring your catalog" -->
+# Bring your catalog
 
-**Embed anywhere**
-- `gm-embed.js` drops product cards into any page (no iframe)
-- Modal mode, or a chrome-free iframe with auto-height
-- Works with the LNbits **WebPages** extension
+- Import **Shopify CSV**, native CSV, **`nostrmarket` JSON**, or signed **NIP-15** event dumps
+- Preview before import; set currency where the file lacks one
+- Imports land as **hidden drafts**; review, then publish through the normal Catalog flow
+- Round-trippable CSV export; optional media upload & relink
 
-**Bring your catalog**
-- Shopify CSV, native CSV, `nostrmarket` JSON, signed NIP-15 dumps
-- Imports land as **hidden drafts** for review, then publish normally
-- Round-trippable CSV export, media relink
+![Migration tab with a Shopify CSV preview](img/admin-migration.jpg "Shopify CSV preview: 2 products to review, imported as drafts")
+
+Note:
+No cutover or old-order reconciliation. If the old store keeps selling, the
+merchant manages overlapping stock before publishing.
 
 ---
 
-<!-- slide: layout=bullets accent=mint kicker="security & privacy" -->
+<!-- slide: layout=bullets accent=mint kicker="part 3 · security & privacy" -->
 # Secure by construction
 
 - **Never spends**: no outgoing-payment API calls; paid-relay invoices surfaced, not paid
@@ -429,64 +333,54 @@ Private order links and in-flight invoices keep working in **every** mode.
 
 ---
 
-<!-- slide: layout=section accent=blue kicker="part 4" -->
-# Publish everywhere, own your rails
-
-Marketplaces become storefronts, not landlords
-
----
-
-<!-- slide: layout=bullets accent=blue kicker="the big idea" -->
+<!-- slide: layout=diagram accent=blue kicker="part 4 · publish everywhere" -->
 # Publish once, appear everywhere
-
-- Infinite Markets signs **standard NIP-99 / Gamma events** with the merchant's key
-- Any Gamma-compatible marketplace reading those relays **shows the listings**: Plebeian Market, Conduit Market, Shopstr and others
-- Buyers check out **in the marketplace they already use**
-- The order arrives as a **NIP-17 message in the merchant's own inbox**
-- From there it enters the **same reservation & invoice pipeline** as a web order
-
-> The marketplace is a view. The merchant's LNbits is the source of truth.
-
----
-
-<!-- slide: layout=diagram accent=blue kicker="one inventory, many storefronts" -->
-# One inventory, many storefronts
 
 ```mermaid
 flowchart LR
-    subgraph Home["Merchant's LNbits"]
-        IM[Infinite Markets<br/>catalog · stock · shipping]
-        LN[LNbits core<br/>wallet · invoices]
-        IM <--> LN
-    end
+    LN[LNbits core<br/>wallet · invoices]
+    IM[Infinite Markets<br/>catalog · stock · shipping]
     RL((Nostr relays))
     WEB[Own web storefront]
     EMB[Embeds / WebPages]
     PM[Plebeian Market]
     CM[Conduit Market]
     OT[Other Gamma / NIP-99 clients]
-    IM -->|signed listings| RL
+    LN <--> IM
     IM --> WEB
     IM --> EMB
-    RL --> PM
-    RL --> CM
-    RL --> OT
-    PM -. NIP-17 order .-> RL
-    CM -. NIP-17 order .-> RL
-    RL -. inbox .-> IM
+    IM <-->|listings out · orders in| RL
+    RL <--> PM
+    RL <--> CM
+    RL <--> OT
 ```
+
+- Standard NIP-99 / Gamma events, signed with the **merchant's own key**
+- Buyers check out **in the marketplace they already use**; orders land in the merchant's inbox
+- Every order enters the **same reservation & invoice pipeline** as a web order
+
+> The marketplace is a view. The merchant's LNbits is the source of truth.
+
+Note:
+End-to-end marketplace order: (1) buyer finds the kind-30402 listing on
+Plebeian / Conduit; (2) the marketplace sends a gift-wrapped order to the
+merchant's kind-10050 inbox relays; (3) Infinite Markets verifies, dedupes and
+reprices from current state; (4) stock is reserved and LNbits creates an
+order-bound invoice; (5) a payment request goes back over NIP-17; (6) LNbits
+reports settlement, the order is confirmed, status updates follow; (7) the
+merchant fulfills from the same Orders workspace as web orders.
 
 ---
 
-<!-- slide: layout=table accent=blue kicker="what stays yours" -->
+<!-- slide: layout=table accent=blue kicker="part 4 · own your rails" -->
 # What never leaves the merchant
 
 | Rail | Where it lives | Why it matters |
 |---|---|---|
 | **Inventory** | Extension DB: on-hand + reserved, per product/variant | One stock count across every channel, no oversell |
 | **Shipping** | Merchant-defined options, country zones, weight/volume rules, published as 30406 | Marketplaces quote the merchant's rules, not their own |
-| **Payments** | LNbits wallet on the merchant's chosen funding source | Self-custody option, no marketplace custody, no fees in the middle |
-| **Customers** | Encrypted NIP-17 threads + email in the merchant's admin | Relationship isn't owned by a platform |
+| **Payments** | LNbits wallet on the merchant's chosen funding source | No marketplace custody, no middleman fees |
+| **Customers** | Encrypted NIP-17 threads + email in the merchant's admin | No platform owns the relationship |
 | **Identity** | Merchant Nostr key, encrypted at rest | Portable across every Nostr app |
 
 Note:
@@ -496,35 +390,25 @@ the merchant's LNbits does, bound to the order.
 
 ---
 
-<!-- slide: layout=bullets accent=blue kicker="walkthrough" -->
-# A marketplace order, end to end
-
-1. Buyer finds the product on **Plebeian / Conduit** (kind 30402 from relays)
-2. Marketplace sends a **gift-wrapped order** to the merchant's kind-10050 inbox relays
-3. Infinite Markets verifies, deduplicates, and **reprices from current state**
-4. Stock is **reserved**; LNbits creates an **order-bound invoice**
-5. A **payment request** (type 2) goes back to the buyer over NIP-17
-6. LNbits reports settlement, the order is **confirmed**, and status updates (type 3) follow
-7. The merchant fulfills from the **same Orders workspace** used for web orders
-
----
-
-<!-- slide: layout=split accent=blue kicker="plebeian market" -->
+<!-- slide: layout=split accent=blue kicker="part 4 · plebeian market" -->
 # Plebeian Market: proven interop
 
-**What's tested** [tested]
-- Scripted matrix against a **pinned `PlebeianApp/market` clone**: 14/14 probes pass
-- Real checkout path → NIP-17 intake → invoice → settlement → confirmed
-- Strict dual-copy transport and buyer read-back verified
+- **Scripted matrix** against a pinned `PlebeianApp/market` clone: **14/14 probes pass**, covering checkout → NIP-17 intake → invoice → settlement [tested]
+- **Live on `plebeian.market`** (Oct 9): merchant profile and listings render with images, sat prices and stock [tested]
+- Live checkout & order run on `plebeian.market`: **not yet run** [todo]
+- Known gap: physical orders with free-text addresses are **rejected before reservation**, with a clear reply
 
-**Known deltas (recorded, not hidden)**
-- Physical orders with opaque free-text addresses are **rejected before reservation**, with a clear reply
-- Live checkout sends a recipient-only wrap to the app relay
-- Live `plebeian.market` public smoke: **manual gate, pending**
+![Infinite Markets listings on plebeian.market](img/plebeian-listing.png "Listings published by Infinite Markets, rendered on plebeian.market")
+
+Note:
+Other recorded deltas: Plebeian's live checkout sends a single recipient-only
+wrap to its app relay (the strict transport resolves both kind-10050 lists);
+public receipt events are invisible to the NIP-17 inbox. All six are kept in
+the known-delta register in tests/conformance/README.md.
 
 ---
 
-<!-- slide: layout=split accent=blue kicker="conduit market" -->
+<!-- slide: layout=split accent=blue kicker="part 4 · conduit market" -->
 # Conduit Market: same open spec
 
 **About Conduit**
@@ -532,28 +416,17 @@ the merchant's LNbits does, bound to the order.
 - Gamma spec co-author; works with the Open Markets Foundation on a shared commerce spec (draft)
 - Not the seller, custodian, carrier or escrow; merchants bring their own Lightning
 
-**Fit with Infinite Markets** [spec-aligned]
+**Fit with Infinite Markets** [spec-aligned] [todo]
 - Same listing, collection & shipping kinds (30402 / 30405 / 30406)
 - NIP-17 orders to the merchant inbox; merchant issues the invoice
-- **Next step:** add Conduit to the conformance matrix, as was done for Plebeian
+- **To do:** add Conduit to the conformance matrix, as was done for Plebeian
 
 Note:
-Be precise: Conduit interop is expected from shared Gamma kinds but has not
-been exercised by the repo's conformance suite yet. Plebeian has.
+Conduit interop is expected from shared Gamma kinds but has not been tested yet.
 
 ---
 
-<!-- slide: layout=bullets accent=blue kicker="nip-89" -->
-# Marketplaces can hand off to the merchant
-
-- Merchant publishes a **NIP-89 handler** (31990) and recommendation (31989)
-- Clients can deep-link `naddr` products straight to **the merchant's own product page & checkout**
-- `showcase` mode adds a guided **"Order via Nostr"** for web visitors
-- Result: discovery happens anywhere; checkout can happen on the merchant's terms
-
----
-
-<!-- slide: layout=split accent=blue kicker="lnbits merchant stack · roadmap" -->
+<!-- slide: layout=split accent=blue kicker="part 4 · lnbits merchant stack" -->
 # Plugging into the LNbits Merchant Stack
 
 **Today** [shipped]
@@ -563,14 +436,13 @@ been exercised by the repo's conformance suite yet. Plebeian has.
 - Inventory & shipping are **native to Infinite Markets**
 
 **Next** [roadmap]
-- **Inventory** extension as a shared stock source with TPoS / WebShop
-- **Orders** extension for receipts, labels, and staff notifications
-- **TPoS** in-person sales drawing from the same stock
+- **Inventory** extension as a shared stock source across LNbits sales channels
+- **Shipping** extension integration for shipping rules & fulfillment
 
 Note:
-Not implemented today: the extension doesn't read or write the Inventory or
-Orders extensions. This slide is the integration vision; keep "one writer per
-catalog" as the guiding rule when deciding which extension owns stock.
+Not implemented today: the extension doesn't read or write other LNbits
+inventory or shipping extensions. Keep "one writer per catalog" as the guiding
+rule when deciding which extension owns stock.
 
 ---
 
@@ -583,7 +455,7 @@ catalog" as the guiding rule when deciding which extension owns stock.
 | Overselling across channels | Atomic reservations shared by web & Nostr orders |
 | "Was it paid?" | Only settled LNbits payments confirm orders |
 | Duplicate / lost invoices | Saga + exact-id reconciliation, never a blind 2nd invoice |
-| Shop needs an open browser | Durable background workers inside LNbits |
+| Browser-bound shops | Durable background workers inside LNbits |
 | Unreliable relays | Outbox, per-relay ACK evidence, live catalog check |
 | Metadata-leaking DMs | NIP-17 gift-wrapped orders |
 | Platform lock-in | Merchant keeps key, stock, shipping, wallet, customers |
@@ -595,25 +467,37 @@ catalog" as the guiding rule when deciding which extension owns stock.
 
 - **Releases A, B, 03.1 and C implemented**: web commerce, Gamma NIP-17 orders, buyer accounts, catalog import/export
 - Published **v0.5** via LNbits extension manifest (sha256-verified)
-- Conformance suite: gated `nostrrelay` env, egress/NIP-42/paid-relay drills, **Plebeian matrix**
+- Conformance: gated `nostrrelay` env, egress / NIP-42 / paid-relay drills, **Plebeian matrix**, plus a live `plebeian.market` listing check
 - Pinned host (LNbits `v1.6.2-rc1`), pinned Gamma spec & NIPs, recorded decisions
 - Out of scope for v1: escrow, fiat custody, automated refunds, subscriptions, reviews
 
 ---
 
-<!-- slide: layout=bullets accent=lime kicker="roadmap" -->
+<!-- slide: layout=bullets accent=pink kicker="risks" -->
+# Risks
+
+1. **This is experimental software**: v0.5, built on a draft marketplace spec; start with small amounts
+2. **Contingent on community support and feedback**: interop depends on marketplace clients, the spec working group, and real merchants using it
+3. **Maintenance has a cost**: tracking LNbits releases, spec revisions, marketplace client changes, and security updates takes ongoing time and resources
+
+---
+
+<!-- slide: layout=bullets accent=lime kicker="what's next" -->
 # What's next
 
-- Close the **live `plebeian.market`** public-relay smoke
+- **Seeking testers and active users**: run the extension, validate it, send feedback, and file issues
+- Run a **live checkout & order** on `plebeian.market`
 - Add **Conduit Market** (and Shopstr) to the external-client matrix
 - Structured-address interop so marketplace **physical orders** flow end to end
-- LNbits **Merchant Stack** integration: Inventory, Orders, TPoS
+- LNbits **Inventory** and **Shipping** extension integration
 - Track the **Open Markets Protocol** as the Gamma draft evolves
+
+> Issues & feedback: github.com/bitkarrot/infinitemarkets/issues
 
 ---
 
 <!-- slide: layout=cta accent=lime kicker="get started" -->
-# Try it
+# One inventory. Every storefront. Your rails.
 
 - Add the manifest in **LNbits → Server → Extensions → Manifest sources**:
   `https://raw.githubusercontent.com/bitkarrot/infinitemarkets/main/manifest.json`
@@ -621,13 +505,8 @@ catalog" as the guiding rule when deciding which extension owns stock.
 - Bind a merchant wallet, then publish your first product
 
 **Links**
-- Source: github.com/bitkarrot/infinitemarkets
+- Source & issues: github.com/bitkarrot/infinitemarkets
 - Architecture guide: infinitemarkets-docs.vercel.app
 - Demo video (~3.5 min): `docs/assets/infinitemarkets_demo.mp4`
-
----
-
-<!-- slide: layout=title accent=pink kicker="thank you" -->
-# One inventory. Every storefront. Your rails.
 
 Infinite Markets · built on LNbits · MIT · by bitkarrot

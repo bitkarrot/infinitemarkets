@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>infinitemarkets — Slides</title>
+<script>document.documentElement.dataset.theme = localStorage.getItem('imv-theme') || 'dark';</script>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/slides.css">
+</head>
+<body class="deck">
+
+<div id="progress"><span></span></div>
+
+<main id="stage-wrap">
+  <div id="stage" aria-live="polite"></div>
+</main>
+
+<div id="controls">
+  <a class="btn" href="index.html" title="Back to the architecture guide">← Guide</a>
+  <button id="prev" title="Previous (←)">‹</button>
+  <span id="zoomPct" class="counter">1 / 1</span>
+  <button id="next" title="Next (→ or space)">›</button>
+  <button id="notesBtn" title="Speaker notes (N)">Notes</button>
+  <button id="themeBtn" title="Toggle dark / light (T)">☀ Light</button>
+  <button id="fsBtn" title="Fullscreen (F)">⛶</button>
+</div>
+
+<aside id="notes">
+  <button id="closeNotes" title="Close">×</button>
+  <div class="notes-head">
+    <h2 id="notesTitle">Speaker notes</h2>
+    <p id="notesSrc"></p>
+  </div>
+  <div id="notesBody"></div>
+</aside>
+
+<div id="lightbox" hidden><img alt=""></div>
+
+<script src="assets/mermaid.min.js"></script>
+<script src="assets/slides.js"></script>
+</body>
+</html>
