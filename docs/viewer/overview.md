@@ -133,6 +133,12 @@ flowchart LR
     W -->|reconcile| I
     D --> X
     X <-->|signed events · NIP-17| R
+    classDef client fill:#4fdc9a,color:#111111
+    classDef core fill:#ff6a1f,color:#111111
+    classDef ext fill:#b48cff,color:#111111
+    class M,B,R,L client
+    class H,I,P,F core
+    class S,W,D,X ext
 ```
 
 The extension never writes LNbits' payment tables and never calls
