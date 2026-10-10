@@ -129,7 +129,8 @@
         const { svg } = await mermaid.render(`md-m${n}-${Date.now()}`, decodeURIComponent(box.dataset.src));
         box.innerHTML = svg;
         const el = box.querySelector('svg');
-        el.removeAttribute('width'); el.removeAttribute('height'); el.style.maxWidth = '100%';
+        el.removeAttribute('width'); el.removeAttribute('height');
+        el.style.maxWidth = `min(100%, ${Math.ceil(el.viewBox.baseVal.width)}px)`;
         el.classList.add('mermaid');
         el.querySelectorAll('.edgeLabel').forEach(l => { if (!l.textContent.trim()) l.style.display = 'none'; });
         nudgeLabels(el, decodeURIComponent(box.dataset.src));

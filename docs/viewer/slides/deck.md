@@ -62,37 +62,46 @@ holding spend keys.
 # An extension platform, not just a wallet
 
 ```mermaid
+%%{init: {"flowchart": {"rankSpacing": 38, "nodeSpacing": 34}}}%%
 flowchart LR
-    users["Users · Merchants · Apps"]
+    users["Users<br/>Merchants<br/>Apps"]
+    market["Extension<br/>marketplace"]
     subgraph lnbits["LNbits instance"]
-        interface["Web UI · REST API"]
-        core["Core: wallets, payments, admin"]
-        ext["Installed extensions"]
-        ln["Lightning integration"]
-        fiat["Fiat integration"]
-        interface --> core
-        interface --> ext
-        ext -->|payment requests| core
-        core --> ln
-        core --> fiat
+        interface["Web UI<br/>REST API"]
+        ext["Installed extensions<br/>Infinite Markets<br/>TPoS, …"]
+        core["Core<br/>wallets<br/>payments · admin"]
     end
-    nodes["Nodes & hosted LN services"]
-    providers["Stripe · PayPal"]
-    market["Extension marketplace"]
+    nodes["Lightning nodes<br/>& hosted<br/>services"]
+    providers["Stripe<br/>PayPal"]
     users --> interface
-    ln <--> nodes
-    fiat <--> providers
-    market -.->|install / update| ext
+    users --> ext
+    market -.->|install /<br/>update| ext
+    interface --> core
+    ext -->|payment<br/>requests| core
+    core <-->|Lightning| nodes
+    core <-->|Fiat| providers
+    classDef client fill:#4fdc9a,color:#111111
+    classDef core fill:#ff6a1f,color:#111111
+    classDef ext fill:#b48cff,color:#111111
+    classDef outside fill:#ffd23d,color:#111111
+    class users client
+    class interface,core core
+    class ext,market ext
+    class nodes,providers outside
 ```
 
-- Python extensions get **their own routes, DB migrations, UI, and background tasks**
-- Core dispatches **invoice-paid events** to the extension that created the invoice
-- Installed from **manifest sources** with sha256-verified archives
+> Extensions are real Python apps: their own routes, database, UI and always-on background tasks, and core tells them when their invoices are paid.
 
 Note:
-Source: docs/lnbits_architecture_overview.md (conceptual, not a payment-flow
-diagram). Background tasks matter: they keep the shop running while the
-merchant's browser is closed.
+Read left to right: users reach LNbits through the web UI / REST API and
+through installed extensions (Infinite Markets, TPoS, ...), which ask core for
+invoices;
+core talks to the Lightning or fiat backends (labels on the arrows). Extensions come from manifest
+sources with sha256-verified archives. Background tasks matter: they keep
+the shop running while the merchant's browser is closed. Colors match the
+"Who owns what" slide: green users, orange LNbits core, purple extensions,
+yellow external services. Source: docs/lnbits_architecture_overview.md
+(conceptual, not a payment-flow diagram).
 
 ---
 

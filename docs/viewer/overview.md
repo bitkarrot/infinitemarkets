@@ -37,25 +37,31 @@ without ever holding spending power.
 - **Runs anywhere:** a Raspberry Pi, a VPS, node platforms, or hosted SaaS at my.lnbits.com.
 
 ```mermaid
-flowchart LR
+flowchart TB
     users["Users · Merchants · Apps"]
+    market["Extension marketplace"]
     subgraph lnbits["LNbits instance"]
         interface["Web UI · REST API"]
-        core["Core: wallets, payments, admin"]
-        ext["Installed extensions"]
-        ln["Lightning integration"]
-        fiat["Fiat integration"]
-        interface --> core
-        interface --> ext
-        ext -->|payment requests| core
-        core --> ln
-        core --> fiat
+        ext["Installed extensions<br/>Infinite Markets, TPoS, …"]
+        core["Core<br/>wallets · payments · admin"]
     end
-    nodes["Nodes & hosted LN services"]
+    nodes["Lightning nodes &<br/>hosted services"]
     providers["Stripe · PayPal"]
     users --> interface
-    ln <--> nodes
-    fiat <--> providers
+    users --> ext
+    market -.->|install / update| ext
+    interface --> core
+    ext -->|payment requests| core
+    core <-->|Lightning| nodes
+    core <-->|Fiat| providers
+    classDef client fill:#4fdc9a,color:#111111
+    classDef core fill:#ff6a1f,color:#111111
+    classDef ext fill:#b48cff,color:#111111
+    classDef outside fill:#ffd23d,color:#111111
+    class users client
+    class interface,core core
+    class ext,market ext
+    class nodes,providers outside
 ```
 
 LNbits already offers **related merchant extensions**: TPoS (point of

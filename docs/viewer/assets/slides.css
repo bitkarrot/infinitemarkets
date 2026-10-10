@@ -87,7 +87,7 @@ body.deck #controls a.btn:hover { transform: translate(1.5px, 1.5px); box-shadow
   object-fit: cover; object-position: top left; }
 
 .slide .mermaid-box { position: absolute; inset: 0; display: grid; place-items: center; }
-.slide .mermaid-box svg { width: 100%; height: 100%; max-width: 100%; }
+.slide .mermaid-box svg { width: 100%; height: 100%; max-width: 100% !important; }
 .slide .diagram-only .mermaid-box { inset: 0; }
 
 /* ---------- title / cta ---------- */
