@@ -93,14 +93,19 @@ body.site { overflow-x: hidden; height: auto; min-height: 100%;
 .strip .sep { width: 2px; height: 26px; background: var(--muted); margin: 0 8px; }
 
 /* pain → answer cards */
-.pain { position: relative; padding-top: 22px; }
-.pain .n { position: absolute; top: -16px; left: 20px; font: 500 12px var(--mono); color: #111;
-  background: var(--pink); border: 2px solid var(--ink); border-radius: 999px; padding: 3px 11px; }
+.pain { position: relative; overflow: hidden; display: flex; flex-direction: column; padding-top: 34px;
+  background: color-mix(in srgb, var(--c, var(--pink)) 16%, var(--paper)); }
+.pain::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 12px; background: var(--c, var(--pink));
+  border-bottom: 2.5px solid var(--ink); }
+.pain .n { align-self: flex-start; font: 500 12px var(--mono); color: #111; background: var(--c, var(--pink));
+  border: 2px solid var(--ink); border-radius: 999px; padding: 3px 11px; box-shadow: 2px 2px 0 var(--ink);
+  margin-bottom: 14px; }
 .pain h3 { font-size: 20px; }
 .pain.wide { grid-column: 1 / -1; }
-.pain .ans { margin-top: 14px; padding-top: 14px; border-top: 2px dashed var(--dot);
-  font-weight: 600; color: var(--ink); }
-.pain .ans::before { content: '→ '; color: var(--mint); font-weight: 800; }
+.pain .ans { margin: auto -24px -24px; padding: 14px 24px 16px; background: var(--paper);
+  border-top: 2.5px solid var(--ink); font-weight: 700; color: var(--ink); }
+.pain > p:not(.ans) { margin-bottom: 18px; }
+.pain .ans::before { content: '→ '; font-weight: 800; }
 
 /* how it works */
 .rail ul { margin: 12px 0 0; padding-left: 20px; color: var(--text2); line-height: 1.65; }

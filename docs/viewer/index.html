@@ -78,25 +78,25 @@
     <p class="lede">Every storefront wants its own copy of your shop, payments are hard to prove,
       and relays forget. Infinite Markets fixes the plumbing.</p>
     <div class="grid g3">
-      <div class="card-x pain"><span class="n">01</span><h3>Fragmented catalogs</h3>
+      <div class="card-x pain" style="--c: var(--pink)"><span class="n">01</span><h3>Fragmented catalogs</h3>
         <p>The web shop and each marketplace keep their own copy; stock drifts and you oversell.</p>
         <p class="ans">One authoritative catalog, published as open Nostr events.</p></div>
-      <div class="card-x pain"><span class="n">02</span><h3>"Was it paid?"</h3>
+      <div class="card-x pain" style="--c: var(--orange)"><span class="n">02</span><h3>"Was it paid?"</h3>
         <p>Nostr receipts and buyer-stated amounts aren't proof; retries create duplicate invoices.</p>
         <p class="ans">Only settled LNbits payments confirm orders.</p></div>
-      <div class="card-x pain"><span class="n">03</span><h3>Browser-bound shops</h3>
+      <div class="card-x pain" style="--c: var(--yellow)"><span class="n">03</span><h3>Browser-bound shops</h3>
         <p>Orders wait until the merchant's tab or signer is online.</p>
         <p class="ans">Background workers inside LNbits run 24/7.</p></div>
-      <div class="card-x pain"><span class="n">04</span><h3>Unreliable relays</h3>
+      <div class="card-x pain" style="--c: #8eaeff"><span class="n">04</span><h3>Unreliable relays</h3>
         <p>Publishing isn't delivery, deleted items linger, and nothing records who accepted what.</p>
         <p class="ans">Durable outbox with per-relay evidence and a live catalog check.</p></div>
-      <div class="card-x pain"><span class="n">05</span><h3>Legacy protocol</h3>
+      <div class="card-x pain" style="--c: var(--purple)"><span class="n">05</span><h3>Legacy protocol</h3>
         <p>NIP-15 is unrecommended and NIP-04 messages reveal who buys from whom.</p>
         <p class="ans">NIP-99 + Gamma spec, with NIP-17 gift-wrapped orders.</p></div>
-      <div class="card-x pain"><span class="n">06</span><h3>Manual / unbound invoicing</h3>
+      <div class="card-x pain" style="--c: var(--mint)"><span class="n">06</span><h3>Manual / unbound invoicing</h3>
         <p>Invoices sent by hand after an order arrives, or paid to a Lightning address that isn't tied to the order.</p>
         <p class="ans">Every order gets an LNbits invoice bound to it, automatically.</p></div>
-      <div class="card-x pain wide"><span class="n">07</span><h3>Centralized platform lock-in</h3>
+      <div class="card-x pain wide" style="--c: var(--lime)"><span class="n">07</span><h3>Centralized platform lock-in</h3>
         <p>Shopify-style platforms hold payouts and customer data, and make leaving costly. (Nostr marketplaces don't: they're non-custodial and your key is portable.)</p>
         <p class="ans">Import your Shopify CSV as drafts; your key, stock, shipping and wallet stay with you.</p></div>
     </div>
