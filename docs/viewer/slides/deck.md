@@ -163,7 +163,7 @@ paid/shipped booleans.
 ---
 
 <!-- slide: layout=split accent=mint kicker="part 3 · infinite markets" -->
-# What it is
+# Infinite Markets - What it is
 
 - A **standard Python LNbits extension**, MIT, v0.5, LNbits ≥ 1.6.0
 - **Commerce authority**: catalog, inventory, shipping, orders, messages, publication
