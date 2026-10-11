@@ -89,4 +89,4 @@ This document evolves at phase transitions and milestone boundaries.
 3. Update context, constraints, and decision outcomes.
 
 ---
-*Last updated: 2026-10-10 after Release C/v0.6 verification*
+*Last updated: 2026-10-10 after Release C/v0.6.1 verification*

@@ -5,7 +5,7 @@ milestone_name: milestone
 current_phase: 04
 current_phase_name: Release C — Catalog Import and Export
 status: complete
-stopped_at: Release C and post-release merchant operations verified; preparing v0.6 release
+stopped_at: Release C and post-release merchant operations verified; preparing v0.6.1 release
 last_updated: "2026-10-10"
 last_activity: 2026-10-09
 last_activity_desc: Catalog-only import/export, merchant profile controls, email history tooling, message profiles, live relay reconciliation, and fresh kind-5 tombstone reissue verified
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-10-09)
 
 Phase: 4 (Release C — Catalog Import and Export) — COMPLETE
 Status: Phases 1, 2, 3, 03.1, and 4 complete; legacy freeze/reconciliation plans remain superseded historical records
-Last activity: 2026-10-09 — catalog-only workflow verified, live relay reconciliation/tombstone reissue deployed, Publications UX hardened, v0.5 released, Catalog tables restyled, and v0.6 release packaging prepared
+Last activity: 2026-10-09 — catalog-only workflow verified, live relay reconciliation/tombstone reissue deployed, Publications UX hardened, v0.5 released, Catalog tables restyled, v0.6 released, and v0.6.1 Catalog badge fix packaged
 
 Progress: [██████████] 100% of roadmap phases (5/5)
 
-**Ad-hoc work since 03.1 (not phase-planned, committed + deployed, released as v0.1/v0.2/v0.3/v0.4/v0.5 and packaged for v0.6):** storefront filters + collection links; configurable index hero; dark/light shopper toggle; Messages list+thread redesign and counterparty kind-0 profiles; Publications timestamps/row detail, live relay catalog check, filters/sorting, and fresh kind-5 reissue; brand logo URL + footer copy; point-and-click Fine-tune + accent move; single-column merchant settings; primary-colored settings buttons; embeddable shop component (`gm-embed.js` + public products API + CORS), iframe embed with widened CSP, admin Embed snippets; About/More section + screenshots; outbox history prune control; Merchant Nostr Profile (avatar, bio, banner, NIP-05, Lightning address) and owner-only `nsec` reveal; redacted email previews + terminal-history cleanup; sortable Catalog columns and first-column quick actions; searchable country/EU shipping picker; LNbits-style Catalog tables and scrolling mobile section nav; Releases v0.1, v0.2, v0.3, v0.4, v0.5.
+**Ad-hoc work since 03.1 (not phase-planned, committed + deployed, released as v0.1/v0.2/v0.3/v0.4/v0.5/v0.6 and packaged for v0.6.1):** storefront filters + collection links; configurable index hero; dark/light shopper toggle; Messages list+thread redesign and counterparty kind-0 profiles; Publications timestamps/row detail, live relay catalog check, filters/sorting, and fresh kind-5 reissue; brand logo URL + footer copy; point-and-click Fine-tune + accent move; single-column merchant settings; primary-colored settings buttons; embeddable shop component (`gm-embed.js` + public products API + CORS), iframe embed with widened CSP, admin Embed snippets; About/More section + screenshots; outbox history prune control; Merchant Nostr Profile (avatar, bio, banner, NIP-05, Lightning address) and owner-only `nsec` reveal; redacted email previews + terminal-history cleanup; sortable Catalog columns and first-column quick actions; searchable country/EU shipping picker; LNbits-style Catalog tables and scrolling mobile section nav; Releases v0.1, v0.2, v0.3, v0.4, v0.5, v0.6.
 
 ## Performance Metrics
 
@@ -128,5 +128,5 @@ Decisions are logged in PROJECT.md and the normative specification.
 ## Session Continuity
 
 Last session: 2026-10-09
-Stopped at: v1 roadmap and Phase 4 verified; preparing the v0.6 release artifacts and manifest
+Stopped at: v1 roadmap and Phase 4 verified; preparing the v0.6.1 release artifacts and manifest
 Resume file: .planning/phases/04-release-c-migration-and-cutover/04-VERIFICATION.md
