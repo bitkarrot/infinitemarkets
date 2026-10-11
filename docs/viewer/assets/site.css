@@ -72,6 +72,9 @@ body.site { overflow-x: hidden; height: auto; min-height: 100%;
 .hero .meta { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 8px 18px;
   font: 500 13px var(--mono); color: var(--muted); }
 .hero .meta span::before { content: '●'; color: var(--orange); margin-right: 7px; }
+.page-head { padding: 64px 0 48px; }
+.page-head h1 { font-family: var(--display); font-weight: 800; font-size: clamp(38px, 4.9vw, 62px);
+  letter-spacing: -.05em; line-height: .98; margin: 20px 0 18px; max-width: 18ch; }
 .collage { position: relative; aspect-ratio: 1 / .9; }
 .collage .main { position: absolute; top: 6%; right: 0; width: 84%; transform: rotate(1deg); }
 .collage .admin { position: absolute; left: 0; bottom: 2%; width: 62%; transform: rotate(-2deg); }
@@ -153,6 +156,7 @@ figure.shot figcaption { margin-top: 14px; font: 500 12.5px var(--mono); color: 
 .band.screen .pill-btn { border-color: var(--paper); box-shadow: 4px 4px 0 var(--paper); }
 .band.screen .pill-btn:hover { box-shadow: 2px 2px 0 var(--paper); }
 .band.screen figcaption { color: var(--paper); opacity: .72; }
+.band.screen .tour figcaption span { color: var(--paper); }
 .band.screen .ctas { display: flex; flex-wrap: wrap; gap: 14px; }
 .frame video { display: block; width: 100%; aspect-ratio: 16 / 9; background: #000; }
 

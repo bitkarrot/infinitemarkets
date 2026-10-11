@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Infinite Markets — Project details: LNbits, status &amp; risks</title>
+<meta name="description" content="The platform underneath Infinite Markets (LNbits), an honest look at status and risks, and where to go deeper: overview, slides, architecture diagrams and the demo.">
+<meta property="og:title" content="Infinite Markets — Project details">
+<meta property="og:description" content="Built on LNbits, honest about status and risks — plus where to read, present, or dig into the design.">
+<meta property="og:image" content="https://infinitemarkets-docs.vercel.app/media/demo-poster.jpg">
+<meta property="og:image:width" content="1600">
+<meta property="og:image:height" content="900">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://infinitemarkets-docs.vercel.app/details.html">
+<meta property="og:site_name" content="Infinite Markets">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Infinite Markets — Project details">
+<meta name="twitter:description" content="Built on LNbits, honest about status and risks — plus where to read, present, or dig into the design.">
+<meta name="twitter:image" content="https://infinitemarkets-docs.vercel.app/media/demo-poster.jpg">
+<meta property="og:locale" content="en_US">
+<meta name="robots" content="index,follow">
+<meta name="theme-color" content="#1e1d18">
+<link rel="canonical" href="https://infinitemarkets-docs.vercel.app/details.html">
+<link rel="apple-touch-icon" href="img/logo-512.png">
+<link rel="icon" href="img/logo-128.png">
+<script>document.documentElement.dataset.theme = localStorage.getItem('imv-theme') || 'dark';</script>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body class="site">
+
+<header class="site-nav">
+  <div class="container">
+    <a class="brand" href="index.html"><img src="img/logo-128.png" alt="">Infinite Markets</a>
+    <nav class="primary" aria-label="Main">
+      <a href="#lnbits" data-spy="lnbits">Built on LNbits</a>
+      <a href="#status" data-spy="status">Status &amp; risks</a>
+      <a href="#explore" data-spy="explore">Go deeper</a>
+      <span class="nav-sep" aria-hidden="true"></span>
+      <a href="index.html">Home</a>
+      <a href="overview.html">Overview</a>
+      <a href="slides.html">Slides</a>
+      <a href="https://github.com/bitkarrot/infinitemarkets" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+    <button class="theme" id="themeBtn">☀ Light</button>
+    <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="siteMenu" aria-label="Menu">☰ <span class="lbl">Menu</span></button>
+    <div class="site-menu" id="siteMenu" hidden>
+      <div><b>On this page</b>
+        <a href="#lnbits" data-spy="lnbits">Built on LNbits</a>
+        <a href="#status" data-spy="status">Status &amp; risks</a>
+        <a href="#explore" data-spy="explore">Go deeper</a>
+      </div>
+      <div><b>More</b>
+        <a href="index.html">Home</a>
+        <a href="index.html#start">Get started</a>
+        <a href="overview.html">Illustrated overview</a>
+        <a href="slides.html">Slide deck</a>
+        <a href="architecture.html">Architecture diagrams</a>
+        <a href="https://github.com/bitkarrot/infinitemarkets" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/bitkarrot/infinitemarkets/issues" target="_blank" rel="noopener">Issues &amp; feedback</a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section class="band page-head">
+  <div class="container">
+    <span class="kick">Project details</span>
+    <h1>The platform underneath, and where it stands</h1>
+    <p class="lede">Why Infinite Markets is built on LNbits, an honest assessment of status and
+      risks, and pointers to everything else: the overview, slide deck, architecture diagrams and demo.</p>
+  </div>
+</section>
+
+<section class="band alt" id="lnbits">
+  <div class="container">
+    <span class="kick" style="--k: var(--orange)">Built on LNbits</span>
+    <h2>The wallet platform underneath</h2>
+    <p class="lede">LNbits is a free, open-source Lightning wallet and accounts system, in development
+      since 2018. Infinite Markets only ever asks it to create invoices on your wallet; it never holds
+      spending keys.</p>
+    <div class="grid g4 lnb-grid">
+      <div class="card-x lnb" style="--c: var(--yellow)"><span class="lnb-icon">↯</span>
+        <h3>Any funding source</h3>
+        <p>Switch backends any time without touching wallet balances.</p>
+        <div class="chips"><span>LND</span><span>Core Lightning</span><span>Phoenixd</span><span>Alby</span><span>Strike</span><span>Blink</span><span>NWC</span><span>Breez</span><span>Spark</span></div></div>
+      <div class="card-x lnb" style="--c: var(--orange)"><span class="lnb-icon">⚿</span>
+        <h3>Isolated wallets</h3>
+        <p>Every wallet has its own balance and keys. Apps get just what they need.</p>
+        <div class="chips"><span>Admin key · spends</span><span>Invoice key · receives</span></div></div>
+      <div class="card-x lnb" style="--c: var(--purple)"><span class="lnb-icon">⧉</span>
+        <h3>Extension platform</h3>
+        <p>Extensions are real Python apps that keep running when the browser is closed.</p>
+        <div class="chips"><span>Own database</span><span>Routes &amp; UI</span><span>Background tasks</span><span>Paid-invoice events</span></div></div>
+      <div class="card-x lnb" style="--c: var(--mint)"><span class="lnb-icon">⊕</span>
+        <h3>Related extensions</h3>
+        <p>LNbits building blocks that sit alongside Infinite Markets.</p>
+        <div class="chips"><span>Nostr Relay</span><span>Nostr Client</span><span>Inventory</span><span>Shipping</span></div>
+        <p class="lnb-foot">Inventory &amp; Shipping integration <span class="tag tag-roadmap">roadmap</span></p></div>
+    </div>
+  </div>
+</section>
+
+<section class="band status" id="status">
+  <div class="container">
+    <span class="kick" style="--k: var(--pink)">Status &amp; risks</span>
+    <h2>Honest about where it stands</h2>
+    <div class="grid g3" style="margin-top: 32px">
+      <div class="card-x"><h3>Where it stands</h3>
+        <ul><li>Web commerce, Nostr orders, buyer accounts and catalog import/export implemented</li>
+          <li>v0.5 published via an LNbits extension manifest (sha256-verified)</li>
+          <li>Conformance suite plus Plebeian tests and a live listing check</li>
+          <li>Out of scope for v1: escrow, fiat custody, automated refunds, subscriptions, reviews</li></ul></div>
+      <div class="card-x"><h3>Risks</h3>
+        <ol><li><b>Experimental software:</b> v0.5 on a draft spec; start small</li>
+          <li><b>Needs the community:</b> interop depends on marketplaces, the spec group, and real merchants</li>
+          <li><b>Maintenance costs:</b> tracking LNbits, spec and client changes takes ongoing time</li></ol></div>
+      <div class="card-x"><h3>What's next</h3>
+        <ul><li><b>Seeking testers and active users:</b> run it, send feedback, <a href="https://github.com/bitkarrot/infinitemarkets/issues" target="_blank" rel="noopener">file issues</a></li>
+          <li>Live plebeian.market checkout; Conduit and Shopstr testing</li>
+          <li>Structured addresses for marketplace physical orders</li>
+          <li>LNbits Inventory and Shipping integration</li>
+          <li>Follow the Open Markets Protocol as the Gamma draft evolves</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<section class="band alt" id="explore">
+  <div class="container">
+    <span class="kick">Go deeper</span>
+    <h2>Read, present, or dig into the design</h2>
+    <p class="lede">The same story at three depths, plus a demo of the real thing.</p>
+    <div class="grid g4 explore">
+      <a class="card-x" href="overview.html" style="--c: var(--lime)"><span class="icon">✎</span>
+        <h3>Illustrated overview</h3><p>One page with screenshots and diagrams: LNbits, the problem, how it works, marketplaces, status and risks.</p>
+        <span class="go">Read the overview →</span></a>
+      <a class="card-x" href="slides.html" style="--c: var(--pink)"><span class="icon">▶</span>
+        <h3>Slide deck</h3><p>25 slides for presenting, with speaker notes, keyboard navigation and dark/light themes.</p>
+        <span class="go">Open the slides →</span></a>
+      <a class="card-x" href="architecture.html" style="--c: var(--yellow)"><span class="icon">⌘</span>
+        <h3>Architecture diagrams</h3><p>Zoomable system diagrams of the LNbits integration and every component, with notes.</p>
+        <span class="go">View the diagrams →</span></a>
+      <a class="card-x" href="media/infinite-markets-demo.mp4" data-play="demo" style="--c: var(--mint)">
+        <span class="poster"><img width="1600" height="900" src="media/demo-poster.jpg" alt="Product demo poster" loading="lazy"><span class="play-badge" aria-hidden="true">▶</span></span>
+        <h3>Demo video</h3><p>About 2 minutes: set up, catalog, publishing to relays and marketplaces, a live 210‑sat Lightning purchase, orders and messages.</p>
+        <span class="go">Watch the demo →</span></a>
+    </div>
+  </div>
+</section>
+
+<footer class="site-foot">
+  <div class="container foot-sections">
+    <b>On this page</b>
+    <a href="#lnbits">Built on LNbits</a><a href="#status">Status &amp; risks</a><a href="#explore">Go deeper</a><a href="index.html#start">Get started</a>
+  </div>
+  <div class="container">
+    <a class="brand" href="index.html"><img src="img/logo-128.png" alt="">Infinite Markets</a>
+    <p>Built on LNbits · MIT licensed · by <a href="https://github.com/bitkarrot" target="_blank" rel="noopener">bitkarrot</a></p>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="overview.html">Overview</a>
+      <a href="slides.html">Slides</a>
+      <a href="architecture.html">Architecture</a>
+      <a href="https://github.com/bitkarrot/infinitemarkets" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/bitkarrot/infinitemarkets/issues" target="_blank" rel="noopener">Issues</a>
+    </nav>
+  </div>
+</footer>
+
+<dialog class="player" id="demoPlayer" aria-label="Infinite Markets product demo">
+  <div class="player-bar"><span>infinite markets · product demo · 1:56</span>
+    <button class="pill-btn" type="button" data-close>Close ✕</button></div>
+  <video controls playsinline preload="none" poster="media/demo-poster.jpg" src="media/infinite-markets-demo.mp4"></video>
+</dialog>
+
+<button class="to-top" id="toTop" aria-label="Back to top" hidden>↑ Top</button>
+<script src="assets/md.js"></script>
+<script>
+  MD.themeToggle(document.getElementById('themeBtn'));
+  MD.lightbox(document.body);
+
+  /* narrow-screen menu */
+  const menuBtn = document.getElementById('menuBtn'), menu = document.getElementById('siteMenu');
+  const setMenu = open => { menu.hidden = !open; menuBtn.setAttribute('aria-expanded', open); menuBtn.innerHTML = open ? '✕ <span class="lbl">Close</span>' : '☰ <span class="lbl">Menu</span>'; };
+  menuBtn.addEventListener('click', () => setMenu(menu.hidden));
+  menu.addEventListener('click', e => { if (e.target.closest('a')) setMenu(false); });
+  addEventListener('keydown', e => { if (e.key === 'Escape') setMenu(false); });
+  document.addEventListener('click', e => { if (!menu.hidden && !e.target.closest('#siteMenu, #menuBtn')) setMenu(false); });
+
+  /* highlight the nav item for the section in view */
+  const spyLinks = [...document.querySelectorAll('[data-spy]')];
+  const mark = id => spyLinks.forEach(a => a.classList.toggle('on', a.dataset.spy === id));
+  const spy = new IntersectionObserver(entries => entries.forEach(e => { if (e.isIntersecting) mark(e.target.id); }),
+    { rootMargin: '-45% 0px -50% 0px' });
+  document.querySelectorAll('section[id]').forEach(s => spy.observe(s));
+  new IntersectionObserver(([e]) => { if (e.isIntersecting) mark(null); document.getElementById('toTop').hidden = e.isIntersecting; })
+    .observe(document.querySelector('.page-head'));
+
+  /* back to top */
+  document.getElementById('toTop').addEventListener('click', () => scrollTo({ top: 0, behavior: 'smooth' }));
+
+  /* 2-minute demo: plays in a dialog (served from media/), opened by [data-play] links or #demo */
+  const player = document.getElementById('demoPlayer'), demo = player.querySelector('video');
+  const openDemo = autoplay => {
+    document.querySelectorAll('video').forEach(v => { if (v !== demo) v.pause(); });
+    if (!player.open) player.showModal();
+    if (autoplay) demo.play().catch(() => {});
+  };
+  document.querySelectorAll('[data-play="demo"]').forEach(a => a.addEventListener('click', e => {
+    e.preventDefault(); history.replaceState(null, '', '#demo'); openDemo(true);
+  }));
+  player.querySelector('[data-close]').addEventListener('click', () => player.close());
+  player.addEventListener('click', e => { if (e.target === player) player.close(); });
+  player.addEventListener('close', () => {
+    demo.pause();
+    if (location.hash === '#demo') history.replaceState(null, '', location.pathname + location.search);
+  });
+  if (location.hash === '#demo') openDemo(false);
+</script>
+</body>
+</html>

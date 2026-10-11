@@ -78,10 +78,10 @@
       <a href="#why" data-spy="why">Problem</a>
       <a href="#how" data-spy="how">How it works</a>
       <a href="#everywhere" data-spy="everywhere">Marketplaces</a>
-      <a href="#tour" data-spy="tour">Tour</a>
-      <a href="#trailer" data-spy="trailer">Demo</a>
+      <a href="#trailer" data-spy="trailer">Tour</a>
       <span class="nav-sep" aria-hidden="true"></span>
       <a href="overview.html">Overview</a>
+      <a href="details.html">Details</a>
       <a href="slides.html">Slides</a>
       <a href="https://github.com/bitkarrot/infinitemarkets" target="_blank" rel="noopener">GitHub</a>
     </nav>
@@ -92,14 +92,14 @@
         <a href="#why" data-spy="why">Problem</a>
         <a href="#how" data-spy="how">How it works</a>
         <a href="#everywhere" data-spy="everywhere">Marketplaces</a>
-        <a href="#trailer" data-spy="trailer">Demo</a>
-        <a href="#tour" data-spy="tour">Tour</a>
-        <a href="#lnbits" data-spy="lnbits">Built on LNbits</a>
-        <a href="#explore" data-spy="explore">Go deeper</a>
-        <a href="#status" data-spy="status">Status &amp; risks</a>
+        <a href="#trailer" data-spy="trailer">Tour</a>
         <a href="#start" data-spy="start">Get started</a>
       </div>
       <div><b>More</b>
+        <a href="details.html">Project details</a>
+        <a href="details.html#lnbits">Built on LNbits</a>
+        <a href="details.html#status">Status &amp; risks</a>
+        <a href="details.html#explore">Go deeper</a>
         <a href="overview.html">Illustrated overview</a>
         <a href="slides.html">Slide deck</a>
         <a href="architecture.html">Architecture diagrams</a>
@@ -259,10 +259,7 @@
       <figcaption>Original music and sound · 1920×1080</figcaption>
     </figure>
   </div>
-</section>
-
-<section class="band alt" id="tour">
-  <div class="container">
+  <div class="container" style="margin-top: 80px">
     <span class="kick" style="--k: var(--yellow)">Product tour</span>
     <h2>A real shop and a real back office</h2>
     <p class="lede">Everything a merchant needs to run day to day, with background workers that keep
@@ -290,83 +287,7 @@
   </div>
 </section>
 
-<section class="band" id="lnbits">
-  <div class="container">
-    <span class="kick" style="--k: var(--orange)">Built on LNbits</span>
-    <h2>The wallet platform underneath</h2>
-    <p class="lede">LNbits is a free, open-source Lightning wallet and accounts system, in development
-      since 2018. Infinite Markets only ever asks it to create invoices on your wallet; it never holds
-      spending keys.</p>
-    <div class="grid g4 lnb-grid">
-      <div class="card-x lnb" style="--c: var(--yellow)"><span class="lnb-icon">↯</span>
-        <h3>Any funding source</h3>
-        <p>Switch backends any time without touching wallet balances.</p>
-        <div class="chips"><span>LND</span><span>Core Lightning</span><span>Phoenixd</span><span>Alby</span><span>Strike</span><span>Blink</span><span>NWC</span><span>Breez</span><span>Spark</span></div></div>
-      <div class="card-x lnb" style="--c: var(--orange)"><span class="lnb-icon">⚿</span>
-        <h3>Isolated wallets</h3>
-        <p>Every wallet has its own balance and keys. Apps get just what they need.</p>
-        <div class="chips"><span>Admin key · spends</span><span>Invoice key · receives</span></div></div>
-      <div class="card-x lnb" style="--c: var(--purple)"><span class="lnb-icon">⧉</span>
-        <h3>Extension platform</h3>
-        <p>Extensions are real Python apps that keep running when the browser is closed.</p>
-        <div class="chips"><span>Own database</span><span>Routes &amp; UI</span><span>Background tasks</span><span>Paid-invoice events</span></div></div>
-      <div class="card-x lnb" style="--c: var(--mint)"><span class="lnb-icon">⊕</span>
-        <h3>Related extensions</h3>
-        <p>LNbits building blocks that sit alongside Infinite Markets.</p>
-        <div class="chips"><span>Nostr Relay</span><span>Nostr Client</span><span>Inventory</span><span>Shipping</span></div>
-        <p class="lnb-foot">Inventory &amp; Shipping integration <span class="tag tag-roadmap">roadmap</span></p></div>
-    </div>
-  </div>
-</section>
-
-<section class="band alt" id="explore">
-  <div class="container">
-    <span class="kick">Go deeper</span>
-    <h2>Read, present, or dig into the design</h2>
-    <p class="lede">The same story at three depths, plus a demo of the real thing.</p>
-    <div class="grid g4 explore">
-      <a class="card-x" href="overview.html" style="--c: var(--lime)"><span class="icon">✎</span>
-        <h3>Illustrated overview</h3><p>One page with screenshots and diagrams: LNbits, the problem, how it works, marketplaces, status and risks.</p>
-        <span class="go">Read the overview →</span></a>
-      <a class="card-x" href="slides.html" style="--c: var(--pink)"><span class="icon">▶</span>
-        <h3>Slide deck</h3><p>25 slides for presenting, with speaker notes, keyboard navigation and dark/light themes.</p>
-        <span class="go">Open the slides →</span></a>
-      <a class="card-x" href="architecture.html" style="--c: var(--yellow)"><span class="icon">⌘</span>
-        <h3>Architecture diagrams</h3><p>Zoomable system diagrams of the LNbits integration and every component, with notes.</p>
-        <span class="go">View the diagrams →</span></a>
-      <a class="card-x" href="media/infinite-markets-demo.mp4" data-play="demo" style="--c: var(--mint)">
-        <span class="poster"><img width="1600" height="900" src="media/demo-poster.jpg" alt="Product demo poster" loading="lazy"><span class="play-badge" aria-hidden="true">▶</span></span>
-        <h3>Demo video</h3><p>About 2 minutes: set up, catalog, publishing to relays and marketplaces, a live 210‑sat Lightning purchase, orders and messages.</p>
-        <span class="go">Watch the demo →</span></a>
-    </div>
-  </div>
-</section>
-
-<section class="band status" id="status">
-  <div class="container">
-    <span class="kick" style="--k: var(--pink)">Status &amp; risks</span>
-    <h2>Honest about where it stands</h2>
-    <div class="grid g3" style="margin-top: 32px">
-      <div class="card-x"><h3>Where it stands</h3>
-        <ul><li>Web commerce, Nostr orders, buyer accounts and catalog import/export implemented</li>
-          <li>v0.5 published via an LNbits extension manifest (sha256-verified)</li>
-          <li>Conformance suite plus Plebeian tests and a live listing check</li>
-          <li>Out of scope for v1: escrow, fiat custody, automated refunds, subscriptions, reviews</li></ul></div>
-      <div class="card-x"><h3>Risks</h3>
-        <ol><li><b>Experimental software:</b> v0.5 on a draft spec; start small</li>
-          <li><b>Needs the community:</b> interop depends on marketplaces, the spec group, and real merchants</li>
-          <li><b>Maintenance costs:</b> tracking LNbits, spec and client changes takes ongoing time</li></ol></div>
-      <div class="card-x"><h3>What's next</h3>
-        <ul><li><b>Seeking testers and active users:</b> run it, send feedback, <a href="https://github.com/bitkarrot/infinitemarkets/issues" target="_blank" rel="noopener">file issues</a></li>
-          <li>Live plebeian.market checkout; Conduit and Shopstr testing</li>
-          <li>Structured addresses for marketplace physical orders</li>
-          <li>LNbits Inventory and Shipping integration</li>
-          <li>Follow the Open Markets Protocol as the Gamma draft evolves</li></ul></div>
-    </div>
-  </div>
-</section>
-
-<section class="band alt" id="start">
+<section class="band" id="start">
   <div class="container split" style="align-items: start">
     <div>
       <span class="kick">Get started</span>
@@ -390,13 +311,14 @@
 <footer class="site-foot">
   <div class="container foot-sections">
     <b>On this page</b>
-    <a href="#why">Problem</a><a href="#how">How it works</a><a href="#everywhere">Marketplaces</a><a href="#tour">Tour</a><a href="#lnbits">Built on LNbits</a><a href="#explore">Go deeper</a><a href="#status">Status &amp; risks</a><a href="#start">Get started</a>
+    <a href="#why">Problem</a><a href="#how">How it works</a><a href="#everywhere">Marketplaces</a><a href="#trailer">Tour</a><a href="#start">Get started</a><a href="details.html">Details</a>
   </div>
   <div class="container">
     <a class="brand" href="index.html"><img src="img/logo-128.png" alt="">Infinite Markets</a>
     <p>Built on LNbits · MIT licensed · by <a href="https://github.com/bitkarrot" target="_blank" rel="noopener">bitkarrot</a></p>
     <nav>
       <a href="overview.html">Overview</a>
+      <a href="details.html">Details</a>
       <a href="slides.html">Slides</a>
       <a href="architecture.html">Architecture</a>
       <a href="https://github.com/bitkarrot/infinitemarkets" target="_blank" rel="noopener">GitHub</a>
