@@ -91,7 +91,7 @@ html[data-theme="dark"] {
 - **Screening band** `.band.screen` — an inverted ink band (like `.strip`) for video. Frames, kickers and pill buttons inside it swap their ink borders and shadows for `--paper` so they stay visible, the same way the lightbox does.
 - **Video frame** — a `.frame` holding `<video controls playsinline preload="metadata" poster>` at 16:9. Never autoplay; sound is part of the videos.
 - **Player dialog** `dialog.player` — a native `<dialog>` with a 3px ink border, a 12px offset shadow, a mono title bar and a `.pill-btn` close button. `[data-play="demo"]` links open it (their `href` points at the MP4 as a no-JS fallback), and so does a `#demo` URL hash. Closing pauses the video.
-- **Media** — videos and posters live in `media/` and are served by the Vercel deployment. Link to the site (`https://infinitemarkets-docs.vercel.app/#demo`), never to GitHub blob or raw URLs.
+- **Media** — videos and posters live in `media/` and are served by the Vercel deployment. Link to the site (`https://infinitemarkets-docs.vercel.app/#demo`), never to GitHub blob or raw URLs. In the markdown sources (`overview.md`), a `Video:` directive embeds one inline: `Video: <src> | <poster> | <caption>` (poster and caption optional), rendered as an article figure with the same border/shadow as images.
 - **Callout / blockquote** — an accent fill, bold 18px, hard shadow.
 
 ## CTA voice

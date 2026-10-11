@@ -257,6 +257,8 @@ article.md tr:nth-child(even) td { background: color-mix(in srgb, var(--accent) 
 article.md figure { margin: 22px 0 26px; }
 article.md figure img { display: block; width: 100%; border: 2.5px solid var(--ink); border-radius: 14px;
   box-shadow: 6px 6px 0 var(--ink); cursor: zoom-in; background: var(--bg); }
+article.md figure video { display: block; width: 100%; aspect-ratio: 16 / 9; background: #000;
+  border: 2.5px solid var(--ink); border-radius: 14px; box-shadow: 6px 6px 0 var(--ink); }
 article.md figcaption { margin-top: 12px; font: 500 12.5px var(--mono); color: var(--muted); text-align: center; }
 article.md .figs { display: grid; gap: 24px; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); align-items: start; }
 article.md .figs figure { margin: 22px 0 26px; }

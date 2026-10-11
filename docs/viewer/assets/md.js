@@ -18,7 +18,7 @@
   }
 
   const IMG = /^!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)$/;
-  const isBlockStart = l => /^(```|#{1,6}\s|\||>|\s*[-*]\s|\s*\d+\.\s|!\[|<!--|Legend:)/.test(l);
+  const isBlockStart = l => /^(```|#{1,6}\s|\||>|\s*[-*]\s|\s*\d+\.\s|!\[|<!--|Legend:|Video:)/.test(l);
   const SWATCH = { green: '#4fdc9a', orange: '#ff6a1f', purple: '#b48cff', pink: '#ff8fc4',
                    yellow: '#ffd23d', lime: '#c8f53c', blue: '#8eaeff' };
 
@@ -37,6 +37,9 @@
       if ((m = l.match(/^Legend:\s*(.*)/))) {
         out.push({ t: 'legend', items: m[1].split('|').map(x => x.trim().split('=')).filter(x => x.length === 2) });
         i++; continue;
+      }
+      if ((m = l.match(/^Video:\s*(\S+)(?:\s*\|\s*(\S+))?(?:\s*\|\s*(.*))?$/))) {
+        out.push({ t: 'video', src: m[1], poster: m[2], cap: m[3] || '' }); i++; continue;
       }
       if ((m = l.match(/^(#{1,6})\s+(.*)/))) { out.push({ t: 'h', n: m[1].length, text: m[2] }); i++; continue; }
       if (l.startsWith('|')) {
@@ -93,6 +96,10 @@
       case 'img':
         return b.imgs.map(x => `<figure><img src="${base}${esc(x.src)}" alt="${esc(x.alt)}" loading="lazy">` +
           (x.cap ? `<figcaption>${inline(x.cap)}</figcaption>` : '') + `</figure>`).join('');
+      case 'video':
+        return `<figure><video controls playsinline preload="metadata" src="${base}${esc(b.src)}"` +
+          (b.poster ? ` poster="${base}${esc(b.poster)}"` : '') + `></video>` +
+          (b.cap ? `<figcaption>${inline(b.cap)}</figcaption>` : '') + `</figure>`;
       case 'code':
         return b.lang === 'mermaid'
           ? `<div class="mermaid-box" data-src="${encodeURIComponent(b.text)}"></div>`

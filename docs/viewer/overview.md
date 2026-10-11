@@ -13,6 +13,8 @@ messages inside their own LNbits instance, then publishes that catalog to the
 open Nostr network so it can be sold through the merchant's own web shop and
 through Nostr marketplaces such as Plebeian Market and Conduit Market.
 
+Video: media/infinite-markets-demo.mp4 | media/demo-poster.jpg | The 2-minute product demo: merchant setup, catalog, publishing to relays and marketplaces, a live 210-sat Lightning purchase, orders and messages.
+
 ![The Infinite Markets storefront](img/store-home.jpg "A merchant storefront served by the extension, with Lightning checkout")
 
 | | |
