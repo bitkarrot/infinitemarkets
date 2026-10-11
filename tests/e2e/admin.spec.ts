@@ -1,4 +1,4 @@
-import {expect, test} from '@playwright/test'
+import {expect, test, type Locator, type Page} from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -9,6 +9,17 @@ import path from 'node:path'
 const seed = JSON.parse(
   fs.readFileSync(path.resolve(__dirname, process.env.GM_E2E_SEED_PATH || '.seed.json'), 'utf8')
 )
+
+/* The admin app sets gm_csrf after it mounts, so wait for the cookie rather
+   than reading it straight after navigation. */
+async function csrfToken(page: Page): Promise<string> {
+  let token = ''
+  await expect.poll(async () => {
+    token = (await page.context().cookies()).find(c => c.name === 'gm_csrf')?.value || ''
+    return token.length > 0
+  }, {message: 'gm_csrf cookie is set', timeout: 15_000}).toBe(true)
+  return token
+}
 
 test.describe.configure({mode: 'serial'})
 
@@ -47,33 +58,36 @@ test('catalog header keeps its title clear of actions at narrow widths', async (
   const title = header.locator('h1')
   for (const width of [1440, 1280, 1120, 1024, 900, 768, 390]) {
     await page.setViewportSize({width, height: 900})
-    await page.evaluate(() => new Promise(resolve =>
-      requestAnimationFrame(() => requestAnimationFrame(resolve))
-    ))
     await expect(title).toBeVisible()
-    const fits = await title.evaluate(el => el.scrollWidth <= el.clientWidth)
-    expect(fits, `Catalog title clipped at ${width}px`).toBe(true)
-    const heading = await title.evaluate(el => {
+    // Polled: below 1024px the host drawer slides closed, so the content
+    // shifts for a few frames; judge the layout once it has settled.
+    await expect.poll(() => header.evaluate((el, viewport) => {
+      const h1 = el.querySelector('h1')!
+      if (h1.scrollWidth > h1.clientWidth) return 'title clipped'
       const range = document.createRange()
-      range.selectNodeContents(el)
-      return range.getBoundingClientRect().toJSON()
-    })
-    for (const button of await header.locator('.q-btn').all()) {
-      const action = await button.boundingBox()
-      expect(action, `Catalog action hidden at ${width}px`).not.toBeNull()
-      expect(action!.x + action!.width).toBeLessThanOrEqual(width + 1)
-      expect(
-        heading!.x + heading!.width <= action!.x ||
-        action!.x + action!.width <= heading!.x ||
-        heading!.y + heading!.height <= action!.y ||
-        action!.y + action!.height <= heading!.y,
-        `Catalog title overlaps an action at ${width}px`
-      ).toBe(true)
-    }
+      range.selectNodeContents(h1)
+      const heading = range.getBoundingClientRect()
+      for (const button of el.querySelectorAll('.q-btn')) {
+        const action = button.getBoundingClientRect()
+        if (!action.width) return 'action hidden'
+        if (action.right > viewport + 1) return 'action off-screen'
+        const apart = heading.right <= action.left || action.right <= heading.left ||
+          heading.bottom <= action.top || action.bottom <= heading.top
+        if (!apart) return 'title overlaps an action'
+      }
+      return 'ok'
+    }, width), {message: `Catalog header layout at ${width}px`, timeout: 5_000}).toBe('ok')
   }
 })
 
-test('migration wizard dry-runs and stages Shopify drafts without publication', async ({page}) => {
+/* Import is catalog-only (spec §13): a file becomes hidden drafts for review
+   in Catalog. There is no cutover, freeze, or old-order step. */
+async function useUniqueSource(migration: Locator, prefix: string) {
+  await migration.getByText('Advanced import options').click()
+  await migration.getByLabel('Source identifier (optional)').fill(prefix + crypto.randomUUID())
+}
+
+test('migration previews a Shopify CSV and imports hidden drafts without publishing', async ({page}) => {
   await page.goto('/infinitemarkets/')
   await page.locator('[data-gm-nav="migration"]').click()
   const migration = page.locator('[data-gm-surface="migration"]')
@@ -81,21 +95,27 @@ test('migration wizard dry-runs and stages Shopify drafts without publication', 
   await migration.locator('#gm-shopify-file').setInputFiles(
     path.resolve(__dirname, '../fixtures/shopify_products_sample.csv')
   )
-  await migration.getByLabel('Source store identifier').fill('e2e-' + crypto.randomUUID())
-  await migration.getByLabel('Source currency (three-letter code)').fill('USD')
-  await migration.getByRole('button', {name: 'Preview / dry-run'}).click()
+  const preview = migration.getByRole('button', {name: 'Preview products'})
+  await expect(preview).toBeDisabled()
+  const currency = migration.getByLabel('Currency (required)')
+  await currency.click()
+  await currency.fill('USD')
+  await page.locator('.q-menu .q-item', {hasText: /^USD$/}).first().click()
+  await useUniqueSource(migration, 'e2e-')
+  await preview.click()
   await expect(migration.locator('[data-gm="migration-preview"]')).toContainText(
     '2 products to review'
   )
-  await migration.getByRole('button', {name: 'Import as blocked drafts'}).click()
-  await expect(migration).toContainText('Imported 2 products as blocked drafts.')
-  await expect(migration.locator('[data-gm="migration-audit"]')).toContainText(
-    'Cutover verified: No'
-  )
+  await migration.getByRole('button', {name: 'Import as drafts'}).click()
+  await expect(migration).toContainText('Imported 2 products as drafts.')
+
+  await page.locator('[data-gm-nav="catalog"]').click()
+  const row = page.locator('[data-gm-table="products"] tbody tr').filter({hasText: 'Ceramic Mug'}).first()
+  await expect(row).toContainText('Draft — never published')
+  await expect(row.locator('[data-col="visibility"]')).toHaveText('hidden')
 })
 
-
-test('legacy move preparation never claims to stop the old extension', async ({page}) => {
+test('nostrmarket import stages drafts and never offers to stop the old store', async ({page}) => {
   await page.goto('/infinitemarkets/')
   await page.locator('[data-gm-nav="migration"]').click()
   const migration = page.locator('[data-gm-surface="migration"]')
@@ -110,28 +130,15 @@ test('legacy move preparation never claims to stop the old extension', async ({p
       orders: []
     }))
   })
-  await migration.getByLabel('Source store identifier').fill('e2e-old-' + crypto.randomUUID())
-  await migration.getByLabel('Source currency (three-letter code)').fill('USD')
-  await migration.getByRole('button', {name: 'Preview / dry-run'}).click()
+  await useUniqueSource(migration, 'e2e-old-')
+  await migration.getByRole('button', {name: 'Preview products'}).click()
   await expect(migration.locator('[data-gm="migration-preview"]')).toContainText(
     '1 products to review'
   )
-  await migration.getByRole('button', {name: 'Import as blocked drafts'}).click()
-  await expect(migration.locator('[data-gm="migration-audit"]')).toContainText(
-    'Cutover verified: No'
-  )
-  await migration.getByRole('button', {name: 'Prepare to move old products'}).click()
-  const freeze = migration.locator('[data-gm="migration-freeze"]')
-  await expect(freeze).toContainText('Old invoices checked: No')
-  await expect(freeze).toContainText('Still running or cannot be checked')
-  await freeze.getByRole('button', {name: 'Record freeze request (does not disable)'}).click()
-  await expect(freeze).toContainText('freeze_requested')
-  await expect(freeze).toContainText('Products available for sale: No')
-  await freeze.getByRole('button', {name: 'Compare old invoices (preview only)'}).click()
-  await expect(migration.locator('.bg-negative')).toContainText(
-    'Old extension must be disabled before inspection'
-  )
-  await expect(migration.locator('[data-gm="migration-source-check"]')).toHaveCount(0)
+  await migration.getByRole('button', {name: 'Import as drafts'}).click()
+  await expect(migration).toContainText('Imported 1 products as drafts.')
+  await expect(migration.getByRole('button', {name: /freeze|cutover|move old products|disable/i})).toHaveCount(0)
+  await expect(migration).not.toContainText(/cutover verified|old invoices checked/i)
 })
 
 
@@ -253,8 +260,7 @@ test('closed orders can be selected, archived, and restored', async ({page, requ
   await expect(page.locator('[placeholder="Search order or buyer"]')).toBeVisible({
     timeout: 20_000
   })
-  const cookies = await page.context().cookies()
-  const csrf = cookies.find(cookie => cookie.name === 'gm_csrf')?.value || ''
+  const csrf = await csrfToken(page)
   const headers = {Origin: seed.base_url, 'X-CSRF-Token': csrf}
   const ordersUrl = `/infinitemarkets/api/v1/merchants/${seed.merchant_id}/orders`
   const before = await page.request.get(ordersUrl)
@@ -413,7 +419,7 @@ test('product editor attaches and removes shipping options without unpublishing'
   expect(Boolean(product.draft)).toBe(false)
   expect(product.visibility).toBe('on-sale')
 
-  const csrf = (await page.context().cookies()).find(c => c.name === 'gm_csrf')?.value || ''
+  const csrf = await csrfToken(page)
   const updated = await page.request.patch(`/infinitemarkets/api/v1/products/${seed.physical.id}`, {
     headers: {Origin: seed.base_url, 'X-CSRF-Token': csrf},
     data: {shipping_option_ids: [{id: seed.shipping.id, extra_cost_minor: 125}]}
@@ -426,18 +432,32 @@ test('product editor attaches and removes shipping options without unpublishing'
   await editor.getByRole('button', {name: 'Save product'}).click()
   detail = await page.request.get(`/infinitemarkets/api/v1/products/${seed.physical.id}`)
   expect((await detail.json()).shipping_options[0].extra_cost_minor).toBe(125)
+
+  // Restore the seeded surcharge so later suites see the seed's shipping price.
+  const restored = await page.request.patch(`/infinitemarkets/api/v1/products/${seed.physical.id}`, {
+    headers: {Origin: seed.base_url, 'X-CSRF-Token': csrf},
+    data: {shipping_option_ids: [{id: seed.shipping.id, extra_cost_minor: 0}]}
+  })
+  expect(restored.status()).toBe(200)
 })
 
 test('product table sorts stock numerically', async ({page}) => {
   await page.goto('/infinitemarkets/')
   await page.locator('[data-gm-nav="catalog"]').click()
   const table = page.locator('[data-gm-table="products"]')
-  const firstTitle = table.locator('tbody tr [data-col="title"]').first()
+  const titles = table.locator('tbody tr [data-col="title"]')
   const stock = table.getByRole('columnheader', {name: 'Stock'})
+  // Compare the seeded pair's relative order: other tests may add drafts.
+  const physicalFirst = async () => {
+    const all = await titles.allInnerTexts()
+    const physical = all.findIndex(t => t.includes(seed.physical.title))
+    const digital = all.findIndex(t => t.includes(seed.digital.title))
+    return physical >= 0 && digital >= 0 ? physical < digital : null
+  }
   await stock.click()
-  await expect(firstTitle).toContainText(seed.physical.title)
+  await expect.poll(physicalFirst).toBe(true)
   await stock.click()
-  await expect(firstTitle).toContainText(seed.digital.title)
+  await expect.poll(physicalFirst).toBe(false)
 })
 
 test('product quick actions precede title while delete stays at the right edge', async ({page}) => {
@@ -523,9 +543,12 @@ test('shipping country picker stays usable at 390px', async ({page}) => {
   const zone = editor.getByRole('checkbox', {name: 'European Union (27 countries)'})
   for (const control of [picker, zone]) {
     await expect(control).toBeVisible()
-    const box = await control.boundingBox()
-    expect(box!.x).toBeGreaterThanOrEqual(0)
-    expect(box!.x + box!.width).toBeLessThanOrEqual(391)
+    // Polled: the host drawer slides closed after the resize; measure the
+    // settled layout rather than a mid-animation frame.
+    await expect.poll(async () => {
+      const box = await control.boundingBox()
+      return !!box && box.x >= 0 && box.x + box.width <= 391
+    }, {message: 'country controls fit inside 390px', timeout: 5_000}).toBe(true)
   }
   await picker.fill('United States')
   await page.getByRole('option', {name: 'United States (US)'}).click()
@@ -567,7 +590,7 @@ test('catalog editors stay in-pane and bulk tools update selected products', asy
   expect(Math.abs((shippingHeading?.width || 0) - (firstShipping?.width || 0))).toBeLessThanOrEqual(1)
   await page.getByRole('tab', {name: 'Products'}).click()
 
-  const csrf = (await page.context().cookies()).find(c => c.name === 'gm_csrf')?.value || ''
+  const csrf = await csrfToken(page)
   const headers = {Origin: seed.base_url, 'X-CSRF-Token': csrf}
   for (const [title, amount] of [['bulk alpha', 100], ['bulk beta', 200]] as const) {
     const response = await page.request.post('/infinitemarkets/api/v1/products', {
@@ -637,9 +660,7 @@ test('gallery layout is selectable and keeps the editorial checkout flow', async
   await expect(layouts.getByRole('radio', {name: 'Gallery'})).toBeVisible({
     timeout: 15_000
   })
-
-  const cookies = await page.context().cookies()
-  const csrf = cookies.find(cookie => cookie.name === 'gm_csrf')?.value || ''
+  const csrf = await csrfToken(page)
   const headers = {Origin: seed.base_url, 'X-CSRF-Token': csrf}
   const url = `/infinitemarkets/api/v1/merchants/${seed.merchant_id}`
   const set = (layout: string) =>
@@ -660,8 +681,7 @@ test('gallery layout is selectable and keeps the editorial checkout flow', async
 
 test('all layouts preserve browse filters and sorting on mobile', async ({page}) => {
   await page.goto('/infinitemarkets/')
-  const cookies = await page.context().cookies()
-  const csrf = cookies.find(cookie => cookie.name === 'gm_csrf')?.value || ''
+  const csrf = await csrfToken(page)
   const merchantUrl = `/infinitemarkets/api/v1/merchants/${seed.merchant_id}`
   const categories = await page.request.get('/infinitemarkets/api/v1/categories')
   expect(categories.status()).toBe(200)
@@ -726,8 +746,7 @@ test('price slider filters one currency and wide filters stay open', async ({pag
 
 test('nav scheme toggle flips dark and light on every layout', async ({page}) => {
   await page.goto('/infinitemarkets/')
-  const cookies = await page.context().cookies()
-  const csrf = cookies.find(cookie => cookie.name === 'gm_csrf')?.value || ''
+  const csrf = await csrfToken(page)
   const url = `/infinitemarkets/api/v1/merchants/${seed.merchant_id}`
   const set = (layout: string) => page.request.patch(url, {
     headers: {Origin: seed.base_url, 'X-CSRF-Token': csrf},
@@ -764,8 +783,7 @@ test('nav scheme toggle flips dark and light on every layout', async ({page}) =>
 
 test('gallery listing cards stay scoped and adapt to mobile', async ({page}) => {
   await page.goto('/infinitemarkets/')
-  const cookies = await page.context().cookies()
-  const csrf = cookies.find(cookie => cookie.name === 'gm_csrf')?.value || ''
+  const csrf = await csrfToken(page)
   const url = `/infinitemarkets/api/v1/merchants/${seed.merchant_id}`
   const set = (layout: string) => page.request.patch(url, {
     headers: {Origin: seed.base_url, 'X-CSRF-Token': csrf},
@@ -871,8 +889,13 @@ test('settings surface: identity, relays, notifications, appearance', async ({
   await settings.getByLabel('Nostr address (NIP-05)').fill('shop@example.com')
   await settings.getByLabel('Lightning address (LUD-16)').fill('shop@wallet.example')
   await settings.getByRole('button', {name: 'Save identity'}).click()
-  const merchant = await page.request.get('/infinitemarkets/api/v1/merchants/current')
-  const profile = JSON.parse((await merchant.json()).profile_json)
+  // The save is an async PATCH: read the profile back once it has landed.
+  let profile: Record<string, string> = {}
+  await expect.poll(async () => {
+    const merchant = await page.request.get('/infinitemarkets/api/v1/merchants/current')
+    profile = JSON.parse((await merchant.json()).profile_json || '{}') || {}
+    return profile.picture
+  }, {message: 'identity save is stored', timeout: 10_000}).toBe('https://cdn.example/avatar.png')
   expect(profile.picture).toBe('https://cdn.example/avatar.png')
   expect(profile.banner).toBe('https://cdn.example/header.png')
   expect(profile.about).toBe('Handmade goods from the shop.')
@@ -905,8 +928,7 @@ test('settings surface: identity, relays, notifications, appearance', async ({
 
 test('configurable hero renders on the index page only', async ({page}) => {
   await page.goto('/infinitemarkets/')
-  const cookies = await page.context().cookies()
-  const csrf = cookies.find(cookie => cookie.name === 'gm_csrf')?.value || ''
+  const csrf = await csrfToken(page)
   const url = `/infinitemarkets/api/v1/merchants/${seed.merchant_id}`
   const set = (data: object) => page.request.patch(url, {
     headers: {Origin: seed.base_url, 'X-CSRF-Token': csrf},
@@ -963,7 +985,7 @@ test('order states are colour-coded with labels and closed orders explain themse
   await page.goto('/infinitemarkets/')
   // The CSRF cookie is issued by the shell's first admin API read.
   await expect(page.locator('[data-gm="store-bar"]')).toBeVisible({timeout: 20_000})
-  const csrf = (await page.context().cookies()).find(c => c.name === 'gm_csrf')?.value || ''
+  const csrf = await csrfToken(page)
   const checkout = await page.request.post('/infinitemarkets/api/v1/public/checkout', {
     headers: {'Idempotency-Key': crypto.randomUUID() + crypto.randomUUID(), Origin: seed.base_url},
     data: {merchant_pubkey: seed.pubkey, items: [{d_tag: seed.digital.d_tag, quantity: 1}]}
