@@ -103,6 +103,9 @@ html[data-theme="dark"] {
 - Transitions: 120–150ms using `--ease`, on `transform` and `box-shadow` only.
 - Page-level effects: smooth anchor scrolling, the slide `slideIn` (fade + 10px rise, 280ms), and the 250ms notes drawer. No scroll-triggered reveals.
 
+## Share cards
+- Every page carries OpenGraph + `twitter:card` (`summary_large_image`) meta with **absolute** `media/` URLs. Card image is `media/trailer-poster.jpg` (1600×900); `index.html` and `overview.html` also declare `og:video*` pointing at the trailer MP4 so Discord/Slack/Facebook previews can play it inline.
+
 ## Content voice
 - Plain and factual. Show status honestly with tags ("tested", "todo",
   "roadmap"). Kickers are short labels, and headlines are statements without
