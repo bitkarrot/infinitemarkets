@@ -16,7 +16,7 @@ tokens.
 ## Pages and macrostructures
 | Page | Body class | Macrostructure | Notes |
 |---|---|---|---|
-| `index.html` | `site` | Workbench | Split hero with a tilted screenshot collage, then alternating `.band` / `.band.alt` sections built from cards and framed screenshots |
+| `index.html` | `site` | Workbench | Split hero with a tilted screenshot collage, then alternating `.band` / `.band.alt` sections built from cards and framed screenshots. The 39 s overview plays in an inverted `.band.screen` right above the Tour; the 2-minute product demo opens in a `dialog.player` from the Go deeper card (and from `#demo` links) |
 | `overview.html` | `site` | Long Document | Sticky TOC + one `article.md` card rendered from `overview.md`; each `h2` section gets the next accent from the palette |
 | `architecture.html` | `index` | Index-First | A grid of `.card` links, one per diagram in `diagrams/registry.js` |
 | `view.html` | `viewer` | Map / Diagram | A full-viewport pan/zoom Mermaid canvas with floating HUD, controls, legend and notes drawer |
@@ -88,6 +88,10 @@ html[data-theme="dark"] {
 - **Frame** `.frame` — a screenshot in a browser-chrome bar with pink/yellow/mint dots. Images open in the shared lightbox (`MD.lightbox`).
 - **Status tag** `.tag-shipped` mint · `.tag-tested` lime · `.tag-spec-aligned` yellow · `.tag-todo` pink · `.tag-roadmap` orange. Use them for status only, never decoration.
 - **Strip** `.strip` — an inverted ink band with `.chip`s.
+- **Screening band** `.band.screen` — an inverted ink band (like `.strip`) for video. Frames, kickers and pill buttons inside it swap their ink borders and shadows for `--paper` so they stay visible, the same way the lightbox does.
+- **Video frame** — a `.frame` holding `<video controls playsinline preload="metadata" poster>` at 16:9. Never autoplay; sound is part of the videos.
+- **Player dialog** `dialog.player` — a native `<dialog>` with a 3px ink border, a 12px offset shadow, a mono title bar and a `.pill-btn` close button. `[data-play="demo"]` links open it (their `href` points at the MP4 as a no-JS fallback), and so does a `#demo` URL hash. Closing pauses the video.
+- **Media** — videos and posters live in `media/` and are served by the Vercel deployment. Link to the site (`https://infinitemarkets-docs.vercel.app/#demo`), never to GitHub blob or raw URLs.
 - **Callout / blockquote** — an accent fill, bold 18px, hard shadow.
 
 ## CTA voice

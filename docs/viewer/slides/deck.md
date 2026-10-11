@@ -556,6 +556,6 @@ rule when deciding which extension owns stock.
 - Step-by-step install: [infinitemarkets-docs.vercel.app/#start](https://infinitemarkets-docs.vercel.app/#start)
 - Source & issues: github.com/bitkarrot/infinitemarkets
 - Architecture guide: infinitemarkets-docs.vercel.app
-- Demo video (~3.5 min): `docs/assets/infinitemarkets_demo.mp4`
+- Demo video (~2 min): infinitemarkets-docs.vercel.app/#demo
 
 Infinite Markets · built on LNbits · MIT · by bitkarrot

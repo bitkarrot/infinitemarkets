@@ -7,7 +7,7 @@
 <meta name="description" content="Infinite Markets is an open-source LNbits extension: one authoritative inventory, Lightning checkout, and Nostr-native selling on your own web shop and on marketplaces like Plebeian Market and Conduit Market.">
 <meta property="og:title" content="Infinite Markets">
 <meta property="og:description" content="One inventory. Every storefront. Your rails. An LNbits extension for Lightning checkout and Nostr-native commerce.">
-<meta property="og:image" content="img/demo-poster.png">
+<meta property="og:image" content="https://infinitemarkets-docs.vercel.app/media/trailer-poster.jpg">
 <link rel="icon" href="img/logo-128.png">
 <script>document.documentElement.dataset.theme = localStorage.getItem('imv-theme') || 'dark';</script>
 <link rel="stylesheet" href="assets/style.css">
@@ -184,6 +184,26 @@
   </div>
 </section>
 
+<section class="band screen" id="trailer">
+  <div class="container split">
+    <div>
+      <span class="kick" style="--k: var(--yellow)">Overview · 0:39</span>
+      <h2>Infinite Markets in 40 seconds</h2>
+      <p class="lede">The problem, the two rails and where your listings show up, in one short clip.
+        Then watch the 2-minute product demo: set up, catalog, publishing, a live 210‑sat
+        Lightning purchase, orders and messages.</p>
+      <div class="ctas">
+        <a class="pill-btn big lime" href="media/infinite-markets-demo.mp4" data-play="demo">Watch the 2-minute demo →</a>
+      </div>
+    </div>
+    <figure class="shot">
+      <div class="frame"><div class="bar"><i></i><i></i><i></i>infinite markets · overview</div>
+        <video controls playsinline preload="metadata" poster="media/trailer-poster.jpg" src="media/infinite-markets-trailer.mp4"></video></div>
+      <figcaption>Original music and sound · 1920×1080</figcaption>
+    </figure>
+  </div>
+</section>
+
 <section class="band alt" id="tour">
   <div class="container">
     <span class="kick" style="--k: var(--yellow)">Product tour</span>
@@ -257,10 +277,10 @@
       <a class="card-x" href="architecture.html" style="--c: var(--yellow)"><span class="icon">⌘</span>
         <h3>Architecture diagrams</h3><p>Zoomable system diagrams of the LNbits integration and every component, with notes.</p>
         <span class="go">View the diagrams →</span></a>
-      <a class="card-x" href="https://github.com/bitkarrot/infinitemarkets/blob/main/docs/assets/infinitemarkets_demo.mp4" target="_blank" rel="noopener" style="--c: var(--mint)">
-        <span class="poster"><img width="1440" height="900" src="img/demo-poster.png" alt="Demo video poster" loading="lazy"></span>
-        <h3>Demo video</h3><p>About 3.5 minutes: key import, publishing to relays, a live Lightning purchase and encrypted messaging.</p>
-        <span class="go">Watch on GitHub →</span></a>
+      <a class="card-x" href="media/infinite-markets-demo.mp4" data-play="demo" style="--c: var(--mint)">
+        <span class="poster"><img width="1600" height="900" src="media/demo-poster.jpg" alt="Product demo poster" loading="lazy"><span class="play-badge" aria-hidden="true">▶</span></span>
+        <h3>Demo video</h3><p>About 2 minutes: set up, catalog, publishing to relays and marketplaces, a live 210‑sat Lightning purchase, orders and messages.</p>
+        <span class="go">Watch the demo →</span></a>
     </div>
   </div>
 </section>
@@ -328,6 +348,12 @@
   </div>
 </footer>
 
+<dialog class="player" id="demoPlayer" aria-label="Infinite Markets product demo">
+  <div class="player-bar"><span>infinite markets · product demo · 1:56</span>
+    <button class="pill-btn" type="button" data-close>Close ✕</button></div>
+  <video controls playsinline preload="none" poster="media/demo-poster.jpg" src="media/infinite-markets-demo.mp4"></video>
+</dialog>
+
 <button class="to-top" id="toTop" aria-label="Back to top" hidden>↑ Top</button>
 <script src="assets/md.js"></script>
 <script>
@@ -357,6 +383,24 @@
 
   /* back to top */
   document.getElementById('toTop').addEventListener('click', () => scrollTo({ top: 0, behavior: 'smooth' }));
+
+  /* 2-minute demo: plays in a dialog (served from media/), opened by [data-play] links or #demo */
+  const player = document.getElementById('demoPlayer'), demo = player.querySelector('video');
+  const openDemo = autoplay => {
+    document.querySelectorAll('video').forEach(v => { if (v !== demo) v.pause(); });
+    if (!player.open) player.showModal();
+    if (autoplay) demo.play().catch(() => {});
+  };
+  document.querySelectorAll('[data-play="demo"]').forEach(a => a.addEventListener('click', e => {
+    e.preventDefault(); history.replaceState(null, '', '#demo'); openDemo(true);
+  }));
+  player.querySelector('[data-close]').addEventListener('click', () => player.close());
+  player.addEventListener('click', e => { if (e.target === player) player.close(); });
+  player.addEventListener('close', () => {
+    demo.pause();
+    if (location.hash === '#demo') history.replaceState(null, '', location.pathname + location.search);
+  });
+  if (location.hash === '#demo') openDemo(false);
 </script>
 </body>
 </html>

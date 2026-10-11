@@ -8,9 +8,9 @@ An [LNbits](https://github.com/lnbits/lnbits) extension that gives a merchant on
 
 ## Demo
 
-<video src="https://github.com/bitkarrot/infinitemarkets/raw/main/docs/assets/infinitemarkets_demo.mp4" controls muted playsinline width="100%"></video>
+[![Infinite Markets product demo](docs/viewer/media/demo-poster.jpg)](https://infinitemarkets-docs.vercel.app/#demo)
 
-[▶ Watch the demo](docs/assets/infinitemarkets_demo.mp4) (~3.5 min) — merchant key import, product listing publication to public relays, a live Lightning purchase, and encrypted order messaging, all on a live host.
+[▶ Watch the demo](https://infinitemarkets-docs.vercel.app/#demo) (~2 min) — merchant setup, catalog, publishing to public relays and Nostr marketplaces, a live 210-sat Lightning purchase, orders and encrypted messages, all on a live host. There's also a [40-second overview](https://infinitemarkets-docs.vercel.app/#trailer).
 
 ## Screenshots
 

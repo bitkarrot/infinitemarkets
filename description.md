@@ -46,7 +46,7 @@ delivery is never mistaken for payment truth.
 
 - Source, issues and releases:
   https://github.com/bitkarrot/infinitemarkets
-- Demo video (~3.5 min):
-  https://github.com/bitkarrot/infinitemarkets/blob/main/docs/assets/infinitemarkets_demo.mp4
+- Demo video (~2 min):
+  https://infinitemarkets-docs.vercel.app/#demo
 
 Created by [bitkarrot](https://github.com/bitkarrot) · MIT licensed

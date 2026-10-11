@@ -63,9 +63,9 @@
           href: REPO + "/issues", icon: "bug_report",
           note: "Open an issue on GitHub" },
         { label: "Demo video",
-          href: REPO + "/blob/main/docs/assets/infinitemarkets_demo.mp4",
+          href: "https://infinitemarkets-docs.vercel.app/#demo",
           icon: "smart_display",
-          note: "Key import, publishing, a live Lightning purchase" }
+          note: "Setup, publishing, a live Lightning purchase" }
       ]
     },
     {
