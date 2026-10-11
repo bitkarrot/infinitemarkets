@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://infinitemarkets-docs.vercel.app/sitemap.xml
