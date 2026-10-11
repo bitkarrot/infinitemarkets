@@ -25,19 +25,53 @@
 <link rel="icon" href="img/logo-128.png">
 <script>document.documentElement.dataset.theme = localStorage.getItem('imv-theme') || 'dark';</script>
 <link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/site.css">
 </head>
-<body class="index">
+<body class="index site">
+<header class="site-nav">
+  <div class="container">
+    <a class="brand" href="index.html"><img src="img/logo-128.png" alt="">Infinite Markets</a>
+    <nav class="primary" aria-label="Main">
+      <a href="#cards">Diagrams</a>
+      <span class="nav-sep" aria-hidden="true"></span>
+      <a href="index.html">Home</a>
+      <a href="overview.html">Overview</a>
+      <a href="details.html">Details</a>
+      <a href="slides.html">Slides</a>
+      <a href="https://github.com/bitkarrot/infinitemarkets" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+    <button class="theme" id="themeBtn">☀ Light</button>
+    <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="siteMenu" aria-label="Menu">☰ <span class="lbl">Menu</span></button>
+    <div class="site-menu" id="siteMenu" hidden>
+      <div><b>On this page</b>
+        <a href="#">Top</a>
+        <a href="#cards">Diagrams</a>
+      </div>
+      <div><b>More</b>
+        <a href="index.html">Home</a>
+        <a href="index.html#start">Get started</a>
+        <a href="overview.html">Illustrated overview</a>
+        <a href="slides.html">Slide deck</a>
+        <a href="https://github.com/bitkarrot/infinitemarkets" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/bitkarrot/infinitemarkets/issues" target="_blank" rel="noopener">Issues &amp; feedback</a>
+        <hr class="menu-sep">
+        <a href="details.html">Project details</a>
+        <a href="details.html#lnbits">Built on LNbits</a>
+        <a href="details.html#status">Status &amp; risks</a>
+        <a href="details.html#explore">Go deeper</a>
+      </div>
+    </div>
+  </div>
+</header>
 <div class="wrap">
   <header>
     <div class="kicker">infinitemarkets · architecture guide</div>
-    <p class="crumb"><a href="index.html">← Infinite Markets home</a></p>
     <h1>System Diagrams</h1>
     <p>Color-rendered versions of the architecture diagrams from <code>docs/</code>,
        with structured notes attached. This collection is the scaffold for a
        long-form architecture guide and the <a href="slides.html">slide deck</a> — each
        diagram's content lives as structured data in <code>diagrams/*.js</code>.</p>
   </header>
-  <button class="theme-fab" id="themeBtn">☀ Light</button>
   <div class="cards" id="cards">
     <a class="card" href="slides.html">
       <div class="num" style="background:#c8f53c">00 · SLIDES</div>
@@ -65,6 +99,15 @@
     paint();
   };
   paint();
+
+  /* site menu */
+  const menuBtn = document.getElementById('menuBtn'), menu = document.getElementById('siteMenu');
+  const setMenu = open => { menu.hidden = !open; menuBtn.setAttribute('aria-expanded', open); menuBtn.innerHTML = open ? '✕ <span class="lbl">Close</span>' : '☰ <span class="lbl">Menu</span>'; };
+  menuBtn.addEventListener('click', () => setMenu(menu.hidden));
+  menu.addEventListener('click', e => { if (e.target.closest('a')) setMenu(false); });
+  addEventListener('keydown', e => { if (e.key === 'Escape') setMenu(false); });
+  document.addEventListener('click', e => { if (!menu.hidden && !e.target.closest('#siteMenu, #menuBtn')) setMenu(false); });
+
   const el = document.getElementById('cards');
   window.DIAGRAMS.forEach(d => {
     el.insertAdjacentHTML('beforeend', `

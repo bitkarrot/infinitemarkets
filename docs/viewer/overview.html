@@ -61,14 +61,34 @@
 <header class="site-nav">
   <div class="container">
     <a class="brand" href="index.html"><img src="img/logo-128.png" alt="">Infinite Markets</a>
-    <nav>
+    <nav class="primary" aria-label="Main">
       <a href="index.html">Home</a>
       <a href="index.html#start">Get started</a>
       <a href="slides.html">Slides</a>
       <a href="architecture.html">Architecture</a>
       <a href="https://github.com/bitkarrot/infinitemarkets/blob/main/docs/viewer/overview.md" target="_blank" rel="noopener">Markdown source</a>
-      <button class="theme" id="themeBtn">☀ Light</button>
     </nav>
+    <button class="theme" id="themeBtn">☀ Light</button>
+    <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="siteMenu" aria-label="Menu">☰ <span class="lbl">Menu</span></button>
+    <div class="site-menu" id="siteMenu" hidden>
+      <div><b>On this page</b>
+        <div id="menuToc"><a href="index.html">Home</a><a href="index.html#start">Get started</a></div>
+      </div>
+      <div><b>More</b>
+        <a href="index.html">Home</a>
+        <a href="index.html#start">Get started</a>
+        <a href="https://github.com/bitkarrot/infinitemarkets/blob/main/docs/viewer/overview.md" target="_blank" rel="noopener">Markdown source</a>
+        <a href="slides.html">Slide deck</a>
+        <a href="architecture.html">Architecture diagrams</a>
+        <a href="https://github.com/bitkarrot/infinitemarkets" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/bitkarrot/infinitemarkets/issues" target="_blank" rel="noopener">Issues &amp; feedback</a>
+        <hr class="menu-sep">
+        <a href="details.html">Project details</a>
+        <a href="details.html#lnbits">Built on LNbits</a>
+        <a href="details.html#status">Status &amp; risks</a>
+        <a href="details.html#explore">Go deeper</a>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -100,6 +120,14 @@
 <script src="assets/mermaid.min.js"></script>
 <script src="assets/md.js"></script>
 <script>
+/* narrow-screen menu */
+const menuBtn = document.getElementById('menuBtn'), menu = document.getElementById('siteMenu');
+const setMenu = open => { menu.hidden = !open; menuBtn.setAttribute('aria-expanded', open); menuBtn.innerHTML = open ? '✕ <span class="lbl">Close</span>' : '☰ <span class="lbl">Menu</span>'; };
+menuBtn.addEventListener('click', () => setMenu(menu.hidden));
+menu.addEventListener('click', e => { if (e.target.closest('a')) setMenu(false); });
+addEventListener('keydown', e => { if (e.key === 'Escape') setMenu(false); });
+document.addEventListener('click', e => { if (!menu.hidden && !e.target.closest('#siteMenu, #menuBtn')) setMenu(false); });
+
 (async function () {
   const SRC = 'overview.md';
   const PALETTE = ['#ffd23d', '#ff6a1f', '#ff5aa8', '#4fdc9a', '#2e6bff', '#c8f53c', '#ffd23d'];
@@ -137,6 +165,7 @@
 
   const heads = [...article.querySelectorAll('h2')];
   toc.innerHTML = heads.map(h => `<a href="#${h.id}">${h.textContent}</a>`).join('');
+  document.getElementById('menuToc').innerHTML = toc.innerHTML;
   const links = [...toc.querySelectorAll('a')];
   const spy = new IntersectionObserver(entries => {
     entries.forEach(e => {

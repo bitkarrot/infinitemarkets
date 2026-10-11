@@ -295,7 +295,7 @@ article.md .tag { font-size: 11px; }
 
 /* ---------- navigation: section nav, menu, footer index, back to top ---------- */
 html { scroll-behavior: smooth; }
-.site section[id] { scroll-margin-top: 70px; }
+.site [id] { scroll-margin-top: 80px; }
 .site-nav .container { position: relative; }
 .site-nav nav a.on { background: var(--ink); color: var(--paper); }
 .nav-sep { width: 2px; height: 22px; background: var(--dot); margin: 0 6px; }
@@ -311,6 +311,13 @@ html { scroll-behavior: smooth; }
   padding: 6px 10px; border-radius: 10px; }
 .site .site-menu a:hover { background: var(--bg); }
 .site .site-menu a.on { background: var(--ink); color: var(--paper); }
+.site-menu .menu-sep { border: 0; border-top: 2px solid var(--dot); margin: 4px 0; }
+/* floating menu dock for pages without a .site-nav bar */
+.menu-dock { position: fixed; top: 16px; right: 18px; z-index: 40; display: flex; gap: 10px; align-items: center; }
+.menu-dock .menu-btn { display: inline-flex; }
+.menu-dock .site-menu { top: 100%; right: 0; margin-top: 14px; }
+.menu-dock .theme-fab { position: static; }
+.site-menu.float { position: fixed; top: 64px; right: 18px; }
 .foot-sections { flex-wrap: wrap; gap: 6px 18px !important; padding-bottom: 22px; margin-bottom: 22px;
   border-bottom: 2px solid var(--dot); }
 .foot-sections b { font: 500 11.5px var(--mono); text-transform: uppercase; letter-spacing: .1em; color: var(--muted);
@@ -334,6 +341,7 @@ html { scroll-behavior: smooth; }
   .menu-btn { padding: 7px 12px; font-size: 13px; }
   .menu-btn .lbl { display: none; }
   .site-menu { left: 12px; right: 12px; min-width: 0; grid-template-columns: 1fr; }
+  .menu-dock .site-menu, .site-menu.float { position: fixed; top: 64px; left: 12px; right: 12px; margin-top: 0; }
 }
 
 /* ---------- responsive ---------- */
