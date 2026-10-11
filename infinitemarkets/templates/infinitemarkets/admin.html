@@ -712,16 +712,18 @@
                                @click="gmToggleVariants(props.row.id)"></q-btn>
                         <span v-if="props.row._isVariant" class="text-grey-7"
                               aria-hidden="true">↳ </span>
-                        {{ props.row.title || props.row.d_tag }}
-                        <q-badge v-if="props.row._isVariant" color="info"
-                                 text-color="dark" class="q-ml-xs"
-                                 label="Option"></q-badge>
-                        <q-badge v-if="props.row._variantCount" color="secondary"
-                                 text-color="white" class="q-ml-xs"
-                                 :label="props.row._variantCount + ' options'"></q-badge>
-                        <q-badge v-if="props.row.draft" color="warning"
-                                 text-color="dark" class="q-ml-xs"
-                                 label="Draft — never published"></q-badge>
+                        <span class="gm-title-text" :title="props.row.title || props.row.d_tag">{{ props.row.title || props.row.d_tag }}</span>
+                        <div v-if="props.row._isVariant || props.row._variantCount || props.row.draft"
+                             class="gm-title-badges">
+                          <q-badge v-if="props.row._isVariant" color="info"
+                                   text-color="black" label="Option"></q-badge>
+                          <q-badge v-if="props.row._variantCount" color="secondary"
+                                   text-color="white"
+                                   :label="props.row._variantCount + ' options'"></q-badge>
+                          <q-badge v-if="props.row.draft" color="warning"
+                                   text-color="black"
+                                   label="Draft — never published"></q-badge>
+                        </div>
                       </q-td>
                       <q-td key="type" :props="props" data-col="type">
                         {{ props.row.product_type }} / {{ props.row.format }}
@@ -3211,6 +3213,9 @@
   border-radius: 10px;
   background: rgba(128, 128, 128, 0.08);
 }
+/* LNbits redefines --q-dark as a 30%-opacity grey inside cards, which turns
+   Quasar's text-dark into faint text on warning/info fills. Keep it solid. */
+#gm-admin-root .text-dark { color: #1d1d1d !important; }
 /* Catalog tables follow the LNbits Payments table: a themed host card
    (inherits the user's LNbits theme), no hard border, regular row height. */
 .gm-catalog-panels { background: transparent; }
@@ -3224,12 +3229,18 @@
 /* Quasar puts table-style on the scroll wrapper, not the <table>, so set
    layout and minimum widths here: the wrapper can then scroll sideways. */
 .gm-catalog-table table { table-layout: fixed; }
-.gm-catalog-table[data-gm-table="products"] table { min-width: 860px; }
+/* fixed columns total ~770px; the floor keeps ~230px for title + badges */
+.gm-catalog-table[data-gm-table="products"] table { min-width: 1000px; }
 .gm-catalog-table[data-gm-table="categories"] table,
 .gm-catalog-table[data-gm-table="collections"] table { min-width: 620px; }
 .gm-catalog-table[data-gm-table="shipping"] table { min-width: 820px; }
 .gm-catalog-table th,
 .gm-catalog-table td { overflow: hidden; text-overflow: ellipsis; }
+/* Title cell: the title truncates on its own line; status badges get a
+   second line so a long title can never clip them. */
+.gm-catalog-table td[data-col="title"] { white-space: nowrap; }
+.gm-catalog-table .gm-title-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;
+  white-space: normal; }
 .gm-catalog-table[data-gm-table="products"] th:first-child,
 .gm-catalog-table[data-gm-table="products"] td:first-child { width: 48px; }
 .gm-preview {
