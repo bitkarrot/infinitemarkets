@@ -104,7 +104,7 @@ html[data-theme="dark"] {
 - Page-level effects: smooth anchor scrolling, the slide `slideIn` (fade + 10px rise, 280ms), and the 250ms notes drawer. No scroll-triggered reveals.
 
 ## Share cards and SEO
-- Every page carries OpenGraph + `twitter:card` (`summary_large_image`) meta with **absolute** `media/` URLs. Card image is `media/trailer-poster.jpg` (1600×900); `index.html` and `overview.html` also declare `og:video*` pointing at the trailer MP4 so Discord/Slack/Facebook previews can play it inline.
+- Every page carries OpenGraph + `twitter:card` (`summary_large_image`) meta with **absolute** `media/` URLs. Card image is `media/demo-poster.jpg` (1600×900); `index.html` and `overview.html` also declare `og:video*` pointing at the trailer MP4 so Discord/Slack/Facebook previews can play it inline.
 - Every page also carries `<link rel="canonical">` (absolute URL), `robots` (`index,follow`), `theme-color` (`#1e1d18`, the default dark background), `og:locale` and an `apple-touch-icon` (`img/logo-512.png`). `index.html` embeds `SoftwareApplication` + `VideoObject` JSON-LD; `overview.html` embeds `TechArticle` + `VideoObject`. `robots.txt` allows all and points at `sitemap.xml`, which lists the five pages. Update the sitemap `lastmod` when a page changes materially.
 
 ## Content voice
