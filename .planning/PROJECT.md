@@ -98,4 +98,4 @@ This document evolves at phase transitions and milestone boundaries.
 3. Update context, constraints, and decision outcomes.
 
 ---
-*Last updated: 2026-10-11 — user approved hardening-first closeout; Phase 5 is next, with no implementation changes or new release certification.*
+*Last updated: 2026-10-12 after Phase-5 hardening tranche; preparing v0.6.3*
