@@ -218,10 +218,11 @@ async def test_order_status_after_confirmation(runtime_env):
         ))
     import importlib
 
+    from test_order_saga import _settle_core_payment
+
     settlement = importlib.import_module("infinitemarkets.services.settlement")
-    await settlement.confirm_settlement(
-        order_id=order["id"], source="test"
-    )
+    paid = await _settle_core_payment(order["id"], order["total_sat"])
+    await settlement.invoice_listener(paid)
     resp = await runtime_env["client"].get(
         f"{PUBLIC}/order-status", headers={"X-Order-Token": token}
     )

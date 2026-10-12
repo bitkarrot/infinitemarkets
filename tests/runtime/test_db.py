@@ -347,3 +347,119 @@ async def test_categories_upgrade_keeps_products_and_publication_history(tmp_pat
             assert publication == {"outbox_event_id": "intent", "event_id": "event", "result": "ok"}
     finally:
         settings.lnbits_data_folder = previous
+
+
+async def test_inbox_scope_backlog_index_upgrade(tmp_path):
+    """m016 adds idx_inbox_scope_backlog on
+    (merchant_id, source_relay_url, processed_state): additive,
+    repeat-safe, and preserves existing inbox rows."""
+    from lnbits.db import POSTGRES, Database
+    from lnbits.settings import settings
+
+    from infinitemarkets.migrations import (
+        m001_initial,
+        m002_orders,
+        m016_inbox_scope_backlog,
+    )
+
+    previous = settings.lnbits_data_folder
+    settings.lnbits_data_folder = str(tmp_path)
+    try:
+        database = Database(f"ext_m016_{uuid.uuid4().hex[:12]}")
+        async with database.connect() as conn:
+            s = conn.references_schema
+            await m001_initial(conn)
+            await m002_orders(conn)
+            await conn.execute(
+                f"INSERT INTO {s}merchants "
+                "(id, user_id, pubkey, key_ref, wallet_id_enc, wallet_id_hash) "
+                "VALUES ('merchant', 'user', 'pubkey', 'key', :wallet, 'hash')",
+                {"wallet": b"opaque-wallet"},
+            )
+            await conn.execute(
+                f"INSERT INTO {s}inbox_events "
+                "(id, outer_event_id, merchant_id, source_relay_url,"
+                " processed_state, received_at) VALUES "
+                "('row', 'outer', 'merchant', 'wss://r.example',"
+                " 'received', 1)"
+            )
+            await m016_inbox_scope_backlog(conn)
+            await m016_inbox_scope_backlog(conn)
+            if database.type == POSTGRES:
+                index = await conn.fetchone(
+                    "SELECT indexname AS name FROM pg_indexes"
+                    " WHERE schemaname = :s"
+                    " AND indexname = 'idx_inbox_scope_backlog'",
+                    {"s": database.schema},
+                )
+            else:
+                index = await conn.fetchone(
+                    "SELECT name FROM sqlite_master WHERE type = 'index'"
+                    " AND name = 'idx_inbox_scope_backlog'"
+                )
+            assert index is not None
+            row = await conn.fetchone(
+                f"SELECT processed_state, source_relay_url"
+                f" FROM {s}inbox_events WHERE id = 'row'"
+            )
+            assert row == {
+                "processed_state": "received",
+                "source_relay_url": "wss://r.example",
+            }
+    finally:
+        settings.lnbits_data_folder = previous
+
+
+async def test_hard07_guarded_inner_error_still_cancels_worker(ext_db):
+    """An inner exception raised inside the post-cancel drain must not
+    replace the cancellation — otherwise the worker loop swallows it as
+    an ordinary tick failure and keeps running unowned (WR-05a)."""
+    from infinitemarkets.services import tasks
+
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def op():
+        entered.set()
+        await release.wait()
+        raise RuntimeError("drain-time failure")
+
+    worker = asyncio.ensure_future(tasks._guarded(op()))  # noqa: SLF001
+    await entered.wait()
+    worker.cancel()
+    release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await worker
+    assert worker.cancelled() or worker.exception() is None or isinstance(
+        worker.exception(), asyncio.CancelledError
+    )
+
+
+async def test_hard07_guarded_second_cancel_cannot_reach_inner(ext_db):
+    """A second cancel while the drain awaits inner must not propagate
+    into the in-flight operation — that is the original CI-01 orphan
+    path recreated (WR-05b)."""
+    from infinitemarkets.services import tasks
+
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    inner_cancelled = False
+
+    async def op():
+        nonlocal inner_cancelled
+        entered.set()
+        try:
+            await release.wait()
+        except asyncio.CancelledError:
+            inner_cancelled = True
+            raise
+
+    worker = asyncio.ensure_future(tasks._guarded(op()))  # noqa: SLF001
+    await entered.wait()
+    worker.cancel()
+    await asyncio.sleep(0)
+    worker.cancel()
+    release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await worker
+    assert not inner_cancelled

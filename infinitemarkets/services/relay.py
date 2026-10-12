@@ -1065,7 +1065,11 @@ async def prune_outbox(merchant_id: str, older_than_days: int) -> dict:
     Deletes terminal rows (published / superseded / failed) whose last
     touch is older than `older_than_days`, plus their dependency edges
     and per-relay delivery evidence (the FKs are ON DELETE RESTRICT, so
-    dependents go first). In-flight rows — pending, claimed,
+    dependents go first). Prerequisite rows still needed by a retained
+    intent — bound dependency targets, transitively, and any published
+    same-scope replacement that could prove an edge — are never part of
+    the deletion set, so a blocked dependent can never come back
+    dependency-free. In-flight rows — pending, claimed,
     partially_published — are never touched, and order/financial/audit
     tables are entirely out of scope."""
     days = int(older_than_days)
@@ -1078,13 +1082,57 @@ async def prune_outbox(merchant_id: str, older_than_days: int) -> dict:
     deleted = 0
     async with DomainTransaction() as tx:
         rows = await tx.fetch_all(
-            f"SELECT id FROM {tx.table('outbox_events')} "
+            f"SELECT id, merchant_id, aggregate_type, aggregate_id,"
+            f" event_kind, aggregate_revision, state"
+            f" FROM {tx.table('outbox_events')} "
             "WHERE merchant_id = :m "
             "AND state IN ('published', 'superseded', 'failed') "
             "AND updated_at <= :c",
             {"m": merchant_id, "c": cutoff},
         )
-        ids = [r["id"] for r in rows]
+        candidates = {r["id"] for r in rows}
+        edges = await tx.fetch_all(
+            f"SELECT outbox_event_id AS c,"
+            f" depends_on_outbox_event_id AS t"
+            f" FROM {tx.table('outbox_dependencies')}"
+        )
+        dep_rows = await tx.fetch_all(
+            f"SELECT id, merchant_id, aggregate_type, aggregate_id,"
+            f" event_kind, aggregate_revision FROM {tx.table('outbox_events')}"
+            f" WHERE id IN (SELECT depends_on_outbox_event_id"
+            f" FROM {tx.table('outbox_dependencies')})"
+        )
+        dep_by_id = {r["id"]: dict(r) for r in dep_rows}
+        published_candidates = [
+            dict(r) for r in rows if r["state"] == "published"
+        ]
+        protected: set[str] = set()
+        changed = True
+        while changed:
+            changed = False
+            for edge in edges:
+                dependent, target_id = edge["c"], edge["t"]
+                if dependent in candidates and dependent not in protected:
+                    continue
+                if target_id in candidates and target_id not in protected:
+                    protected.add(target_id)
+                    changed = True
+                target = dep_by_id.get(target_id)
+                if target is None:
+                    continue
+                for proof in published_candidates:
+                    if (
+                        proof["id"] not in protected
+                        and proof["merchant_id"] == target["merchant_id"]
+                        and proof["aggregate_type"] == target["aggregate_type"]
+                        and proof["aggregate_id"] == target["aggregate_id"]
+                        and proof["event_kind"] == target["event_kind"]
+                        and proof["aggregate_revision"]
+                        >= target["aggregate_revision"]
+                    ):
+                        protected.add(proof["id"])
+                        changed = True
+        ids = [r["id"] for r in rows if r["id"] not in protected]
         for i in range(0, len(ids), 500):
             marks = ids[i : i + 500]
             params = {f"x{j}": v for j, v in enumerate(marks)}

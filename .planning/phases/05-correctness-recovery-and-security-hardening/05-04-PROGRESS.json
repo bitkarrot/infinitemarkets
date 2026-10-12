@@ -1,0 +1,132 @@
+{
+  "plan": "05-04",
+  "status": "partial-checks-passed-review-pending",
+  "completion_summary_created": false,
+  "updated_at": "2026-10-12T21:45:00+00:00",
+  "scope": "Authorized 05-04 tranche only: F4 revision-bound dependency satisfaction + dependency-safe pruning, F5 no-route retry eligibility. No F6/CI-01/05-06, no live relay writes, no vendor/deps/config/security changes, no Git mutations (parent commits), no historical-record sweep or repair.",
+  "provenance": {
+    "base_revision": "3c0c237871b3bc937fb364721e0c6604f2f619d1 (committed F1-F3 HEAD at task start; tracked tree otherwise clean)",
+    "host_revision": "e336fe14b841d6f0c940e75b3d343e3ab5cf8433 (inherited pin, unmodified)",
+    "working_tree": "Uncommitted F4/F5 changes; parent owns staging/commit",
+    "preexisting_committed_change": "outbox.py enqueue_intent/enqueue supersession tx.now() DB-epoch lines ~57,65,98 preserved untouched"
+  },
+  "environment": {
+    "common": "UV_NO_ENV_FILE=1 UV_NO_SYNC=1 UV_OFFLINE=1 TZ=UTC; no dependency installs or .env reads; deterministic LocalRelay intra-test only",
+    "sqlite": {
+      "LNBITS_DATABASE_URL": "",
+      "LNBITS_DATA_FOLDER": "/tmp/im-f4f5-sqlite-core (fresh synthetic core folder)"
+    },
+    "postgres": {
+      "identity_verified": true,
+      "version": "PostgreSQL 17.9 (Homebrew) aarch64",
+      "data_directory": "/tmp/infinitemarkets-phase5-pg-1ae80f8/data",
+      "listen_addresses": "empty (socket-only)",
+      "timezone": "UTC",
+      "socket_dir": "/tmp/infinitemarkets-phase5-pg-1ae80f8/socket",
+      "database": "infinitemarkets_phase5",
+      "PGPASSFILE_PGSERVICEFILE": "/dev/null (benign 'not a plain file' warnings only)",
+      "teardown": "fixture DROP SCHEMA in the synthetic database only; parent owns cluster stop/removal"
+    }
+  },
+  "tasks": {
+    "05-04-01": {
+      "name": "Revision-bound dependency satisfaction",
+      "red": "05-04-RED-01.json \u2014 checker verdict RED_EVIDENCE_OK target_test_failed: four behavioral assertion failures ('published' == 'pending') proving stale rev1, foreign-merchant, wrong-kind tombstone and pre-republish tombstone releases under baseline _deps_published",
+      "green": "post-fix all revision/scope/kind/merchant/failed cases block or release correctly",
+      "fix": "outbox.py _deps_published now requires the published row p to match the JOINED intended dependency row e on merchant_id, aggregate_type, aggregate_id and event_kind, with p.aggregate_revision >= e.aggregate_revision; no required_revision schema change (existing FK row carries the revision)"
+    },
+    "05-04-02": {
+      "name": "Dependency-safe terminal history pruning",
+      "red": "05-04-RED-02.json \u2014 checker verdict RED_EVIDENCE_OK: baseline prune deleted all 5 old terminal rows incl. bound deps B/D, superseded B2 and proof P2 (assert 5 == 1), erasing edges and freeing blocked children",
+      "green": "pruned == 1 (only the genuinely safe row); all retained prerequisites, transitive chain and replacement proof durable; blocked child still blocked; foreign-merchant rows out of scope; bounds 7-3650 unchanged",
+      "fix": "relay.py prune_outbox computes a fixpoint of protected ids: edge targets of retained dependents (transitive) plus published same-merchant/aggregate/kind >=revision candidate rows that could prove satisfaction; edges deleted only for genuinely deleted dependents"
+    },
+    "05-04-03": {
+      "name": "No-route waits keep retry eligibility for the 48h window",
+      "red": "05-04-RED-03.json \u2014 checker verdict RED_EVIDENCE_OK: first controlled tick asserts attempts 1 == 0; baseline burns the 20-attempt failed-send budget on waits so the intent goes unclaimable ~5h into 48h",
+      "green": "21 controlled 15-min-cadence waits keep attempts == 0 and claim eligibility; route arrival inside window delivers real recipient+sender accepted copies; exact created_at+172800 boundary is terminal failed; real send failures still exhaust the 20 budget",
+      "fix": "outbox.py _publish_order_msg no-route requeue now calls _cas_state(..., bump_attempts=False); deadline/cadence/created_at anchor unchanged; no other no-route branch consumes the budget outside real sends (second branch unreachable with recipient unaccepted since the no-route branch returns first)"
+    }
+  },
+  "checks": {
+    "sqlite": {
+      "focused_task1": "tests/runtime/test_outbox.py + test_catalog_events.py -k 'hard04 or dependency or supersed or delet': 9 passed, exit 0",
+      "focused_task3": "tests/runtime/test_nip17_outbox.py + test_intake_abuse.py -k 'hard05 or no_route or dual_copy or partial_acceptance': 6 passed, exit 0",
+      "full_files": "test_outbox.py + test_catalog_events.py + test_nip17_outbox.py: 42 passed in 44.47s, exit 0; test_intake_abuse.py + test_relay_config_api.py: 17 passed in 4.60s, exit 0; post-final-edit rerun test_outbox.py + test_catalog_events.py + test_relay_config_api.py: 44 passed in 46.09s, exit 0",
+      "adjacent_outbox_consumers": "test_catalog_api.py + test_inbox_activation.py: 24 passed in 40.16s, exit 0",
+      "lint": "uv run ruff check . : All checks passed, exit 0",
+      "protocol": "uv run pytest -m protocol -q: 69 passed, 2 expected skips (external smoke disabled + subset-evidence), exit 0 in 10.57s"
+    },
+    "postgres": {
+      "focused_task1": "same -k: 9 passed, exit 0",
+      "focused_task2_relay": "test_relay_config_api.py -k 'prune': 1 passed, exit 0; outbox+catalog -k 'hard04 or prune or dependency or delet': 8 passed, exit 0",
+      "full_files": "test_outbox.py + test_catalog_events.py + test_nip17_outbox.py: 42 passed in 46.33s, exit 0; test_intake_abuse.py + test_relay_config_api.py: 17 passed in 4.21s, exit 0; post-final-edit rerun test_outbox.py + test_catalog_events.py + test_relay_config_api.py: 44 passed in 43.78s, exit 0",
+      "adjacent_outbox_consumers": "test_catalog_api.py + test_inbox_activation.py: 24 passed in 39.88s, exit 0",
+      "note": "PGPASSFILE/PGSERVICEFILE=/dev/null produced only benign UserWarnings"
+    },
+    "not_run": [
+      "make verify-runtime (CI-01 hang unresolved; focused-file runs used instead per validation contract)",
+      "test_db.py + test_install.py pair (known CI-01 hang pair, excluded from scoped feedback)",
+      "browser/conformance/live relay or real-funds checks (out of tranche scope)"
+    ]
+  },
+  "files_changed": {
+    "infinitemarkets/services/outbox.py": "863dbd324bb0e2c051fbcaf00a23f032604b9f1ceb80aabc1ed30ea31474c22a \u2014 _deps_published revision/scope/kind/merchant binding; no-route _cas_state bump_attempts=False",
+    "infinitemarkets/services/relay.py": "e5f862cf0b34be4870d60647b4cb32812c8eb6055d7dd4b07dd09e87a3c86bb1 \u2014 dependency-safe prune closure over retained prerequisites and published proof",
+    "tests/runtime/test_outbox.py": "b932fb4265863e6f736ec44676c6143a7673b788f7a876ba032a4308ee6d9dd6 \u2014 rewrote defective any-revision expectation; added 4 permanent test_hard04_* regressions + catalog seed helpers",
+    "tests/runtime/test_catalog_events.py": "26e4430f39e3705b80b28133756278b93292bdf5e22e1c122384ff51e16299e2 \u2014 test_hard04_edge_binds_intended_revision_row",
+    "tests/runtime/test_nip17_outbox.py": "45831e7e663041bb09c072367af088a1078813f55e237d34ab1cc718d8e49e03 \u2014 2 permanent test_hard05_* regressions with controlled DB-time clock and real LocalRelay ACK evidence",
+    "tests/runtime/test_relay_config_api.py": "7c515cf25581a526adf221755bd0d7dbc3e56636b6f02032ab3d4a52915e9b63 \u2014 corrected defective prune expectation: prerequisite of retained pending row survives (pruned 2, edge + evidence durable)"
+  },
+  "test_artifacts": {
+    "permanent_regressions": [
+      "test_hard04_stale_revision_cannot_publish_dependent",
+      "test_hard04_dependency_scope_kind_merchant_and_failed",
+      "test_hard04_reference_removal_republish_before_tombstone",
+      "test_hard04_prune_preserves_retained_dependencies",
+      "test_hard04_edge_binds_intended_revision_row",
+      "test_dependency_met_when_aggregate_has_published_revision (rewritten revision-bound)",
+      "test_hard05_route_after_twenty_waits_still_delivers",
+      "test_hard05_real_send_failures_still_exhaust_budget"
+    ],
+    "red_records": [
+      "05-04-RED-01.json",
+      "05-04-RED-02.json",
+      "05-04-RED-03.json"
+    ],
+    "controlled_time": "DomainTransaction.now monkeypatched to a controllable epoch for 48h/15m scenarios; no wall-clock waits; deadline evaluated at exact created_at+172800 boundary"
+  },
+  "defective_expectations_corrected": [
+    "test_dependency_met_when_aggregate_has_published_revision (test_outbox.py): old docstring blessed ANY published revision; rewrote to require intended-revision coverage (still proves superseded-dep non-wedge via a real qualifying replacement)",
+    "test_outbox_prune_history (test_relay_config_api.py): old expectation deleted a prerequisite still bound to a retained pending row; now asserts pruned==2 with edge and publication evidence durable"
+  ],
+  "remaining_gates": [
+    "Independent source/security review of the F4/F5 changes (parent-owned; this is self-execution evidence only)",
+    "05-05 (HARD-06/CI-01) requires separate authorization",
+    "Full make verify-runtime / make verify deferred until CI-01 diagnosis",
+    "HISTORICAL-PAID-ORDER-AUDIT unchanged: OPEN / NOT AUTHORIZED / NOT PERFORMED; no actual-record access occurred in this tranche",
+    "Live Plebeian UAT and release clearance unchanged and still blocked"
+  ],
+  "honesty_notes": [
+    "RED-01 covers four behavioral failures in one wrapped TAP run; the named target test failed (checker-verified)",
+    "The superseded-dep positive case remains green: qualifying newer published replacements still release dependents",
+    "No required_revision migration, no public routing fallback, no attempt-budget widening, no comment churn beyond docstrings describing the changed functions"
+  ],
+  "parent_closeout": {
+    "updated_at": "2026-10-12T23:03:53+00:00",
+    "plan": "05-04",
+    "status": "complete-reviewed",
+    "completion_summary_created": false,
+    "summary": "F4 revision-bound dependencies, dependency-safe pruning and F5 no-route non-consumption implemented; independent wave-4/5 review PASSED; WR-05 lifecycle residual found and resolved with regressions",
+    "verification": {
+      "verify_runtime_sqlite": "751 passed,6 expected PG-only skips,exit0",
+      "verify_sqlite": "982 passed,8 skipped,exit0",
+      "verify_postgres": "987 passed,3 skipped,exit0",
+      "verify_runtime_postgres_credited": "439-file financial + focused selections exit0",
+      "process_exit_regression": "14 passed natural exit",
+      "lint": "exit0"
+    },
+    "review": "05-REVIEW.md wave 4/5 PASSED; WR-05 resolved; WR-01/03/04 remain open",
+    "gates": "Historical audit OPEN/NOT AUTHORIZED/NOT PERFORMED; live Plebeian pending; no release clearance"
+  }
+}

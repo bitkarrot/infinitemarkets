@@ -933,6 +933,38 @@ def crypto_enc_placeholder():
     return b"x"
 
 
+async def _plant_inbox_rows(mid: str, relay_url: str, count: int,
+                            state: str, now: int) -> None:
+    """Synthetic backlog rows in one (merchant, relay) scope — admission
+    is bypassed so the durable depth being tested is exact."""
+    from infinitemarkets.db import DomainTransaction
+
+    async with DomainTransaction() as tx:
+        for _ in range(count):
+            await tx.execute(
+                f"INSERT INTO {tx.table('inbox_events')} "
+                "(id, outer_event_id, merchant_id, source_relay_url,"
+                " received_at, processed_state, raw_json) "
+                "VALUES (:i, :o, :m, :r, :t, :s, 'x')",
+                {
+                    "i": uuid.uuid4().hex, "o": uuid.uuid4().hex,
+                    "m": mid, "r": relay_url, "t": now, "s": state,
+                },
+            )
+
+
+async def _scope_depth(env: dict, mid: str, relay_url: str) -> int:
+    """Durable pending (received+validated) depth for one scope."""
+    async with env["ext_module"].db.connect() as conn:
+        row = await conn.fetchone(
+            "SELECT COUNT(*) AS n FROM infinitemarkets.inbox_events"
+            " WHERE merchant_id = :m AND source_relay_url = :r"
+            " AND processed_state IN ('received', 'validated')",
+            {"m": mid, "r": relay_url},
+        )
+    return int(row["n"])
+
+
 async def _set_relays_helper(env: dict, mid: str, configs: list[dict]):
     client = env["client"]
     resp = await client.patch(
@@ -941,3 +973,168 @@ async def _set_relays_helper(env: dict, mid: str, configs: list[dict]):
         headers=_headers(env, client.cookies.get("gm_csrf") or ""),
     )
     assert resp.status_code == 200, resp.text
+
+
+# --- hard06: durable per-(merchant,relay) backlog bound (F6) --------------------
+
+
+async def test_hard06_pending_scope_cap_rejects_before_decrypt(
+    runtime_env, monkeypatch, frozen_inbox_clock
+):
+    """§15 queue depth 1,000 per (merchant, relay): received AND
+    validated rows count toward the bound, terminal rows and other
+    scopes do not. A new valid signed wrap at depth 1,000 is rejected
+    before any insert/decrypt — bounded metric only, no new row."""
+    from infinitemarkets.db import DomainTransaction
+    from infinitemarkets.services import inbox, metrics
+
+    env = runtime_env
+    merchant = await _merchant(env)
+    mid, mpk = merchant["id"], merchant["pubkey"]
+    relay_url = f"wss://cap-{uuid.uuid4().hex[:8]}.example"
+    other_url = f"wss://cap-side-{uuid.uuid4().hex[:8]}.example"
+    now = int(time.time())
+
+    # 999 pending in mixed states + terminal noise in-scope + a pending
+    # row in a DIFFERENT scope — only the mixed bucket counts.
+    await _plant_inbox_rows(mid, relay_url, 600, "received", now)
+    await _plant_inbox_rows(mid, relay_url, 399, "validated", now)
+    await _plant_inbox_rows(mid, relay_url, 4, "processed", now)
+    await _plant_inbox_rows(mid, relay_url, 3, "quarantined", now)
+    await _plant_inbox_rows(mid, relay_url, 3, "rejected", now)
+    await _plant_inbox_rows(mid, other_url, 25, "validated", now)
+    assert await _scope_depth(env, mid, relay_url) == 999
+
+    backlog_before = metrics.get("inbox.admission.backlog_limited")
+
+    # Depth 999 -> the 1,000th pending wrap still admits.
+    wrap_a, _ra = await _order_wrap(
+        f"cap-a-{uuid.uuid4().hex[:6]}", mpk,
+        order_id=f"cap-a-{uuid.uuid4().hex[:8]}", items=[], amount=0,
+    )
+    assert await inbox.admit_event(
+        relay_url, wrap_a, _ref(merchant)
+    ) == "received"
+    assert await _scope_depth(env, mid, relay_url) == 1000
+
+    # At 1,000 a NEW valid signed wrap drops pre-insert/pre-decrypt.
+    wrap_b, _rb = await _order_wrap(
+        f"cap-b-{uuid.uuid4().hex[:6]}", mpk,
+        order_id=f"cap-b-{uuid.uuid4().hex[:8]}", items=[], amount=0,
+    )
+    unwrap_before = metrics.get("inbox.drain.unwrap")
+    assert await inbox.admit_event(
+        relay_url, wrap_b, _ref(merchant)
+    ) == "rejected"
+    assert await _scope_depth(env, mid, relay_url) == 1000
+    assert await _row_for_wrap(env, mid, wrap_b) is None
+    assert metrics.get("inbox.drain.unwrap") == unwrap_before
+    assert (
+        metrics.get("inbox.admission.backlog_limited")
+        == backlog_before + 1
+    )
+
+    # A resend of the ADMITTED wrap stays a duplicate even at cap.
+    assert await inbox.admit_event(
+        relay_url, wrap_a, _ref(merchant)
+    ) == "duplicate"
+    assert await _scope_depth(env, mid, relay_url) == 1000
+
+    # A terminal transition frees exactly one slot.
+    row_a = await _row_for_wrap(env, mid, wrap_a)
+    async with DomainTransaction() as tx:
+        await tx.execute(
+            f"UPDATE {tx.table('inbox_events')}"
+            " SET processed_state = 'processed', processed_at = :t"
+            " WHERE id = :i",
+            {"t": now, "i": row_a["id"]},
+        )
+    assert await _scope_depth(env, mid, relay_url) == 999
+    wrap_c, _rc = await _order_wrap(
+        f"cap-c-{uuid.uuid4().hex[:6]}", mpk,
+        order_id=f"cap-c-{uuid.uuid4().hex[:8]}", items=[], amount=0,
+    )
+    assert await inbox.admit_event(
+        relay_url, wrap_c, _ref(merchant)
+    ) == "received"
+    assert await _scope_depth(env, mid, relay_url) == 1000
+
+    # The other scope kept its own headroom the whole time.
+    wrap_d, _rd = await _order_wrap(
+        f"cap-d-{uuid.uuid4().hex[:6]}", mpk,
+        order_id=f"cap-d-{uuid.uuid4().hex[:8]}", items=[], amount=0,
+    )
+    assert await inbox.admit_event(
+        other_url, wrap_d, _ref(merchant)
+    ) == "received"
+    assert await _scope_depth(env, mid, other_url) == 26
+
+
+async def test_hard06_concurrent_admission_at999(runtime_env, monkeypatch):
+    """Two independent connections racing the 1,000th slot of the same
+    scope admit at most one — the durable depth ends at 1,000, never
+    1,001."""
+    from infinitemarkets.db import DomainTransaction, dialect
+    from infinitemarkets.services import inbox
+
+    env = runtime_env
+    merchant = await _merchant(env)
+    mid, mpk = merchant["id"], merchant["pubkey"]
+    relay_url = f"wss://race-{uuid.uuid4().hex[:8]}.example"
+    now = int(time.time())
+
+    await _plant_inbox_rows(mid, relay_url, 500, "received", now)
+    await _plant_inbox_rows(mid, relay_url, 499, "validated", now)
+    assert await _scope_depth(env, mid, relay_url) == 999
+
+    wrap_a, _ = await _order_wrap(
+        f"race-a-{uuid.uuid4().hex[:6]}", mpk,
+        order_id=f"race-a-{uuid.uuid4().hex[:8]}", items=[], amount=0,
+    )
+    wrap_b, _ = await _order_wrap(
+        f"race-b-{uuid.uuid4().hex[:6]}", mpk,
+        order_id=f"race-b-{uuid.uuid4().hex[:8]}", items=[], amount=0,
+    )
+
+    enter = DomainTransaction.__aenter__
+    participants, arrived, connections = set(), set(), set()
+    ready = asyncio.Event()
+
+    async def controlled_enter(self):
+        task = asyncio.current_task()
+        if task in participants and task not in arrived:
+            arrived.add(task)
+            if len(arrived) == 2:
+                ready.set()
+            await asyncio.wait_for(ready.wait(), 5)
+        tx = await enter(self)
+        if task in participants and dialect() == "postgres":
+            row = await self.fetch_one("SELECT pg_backend_pid() AS pid")
+            connections.add(row["pid"])
+        return tx
+
+    monkeypatch.setattr(DomainTransaction, "__aenter__", controlled_enter)
+    first = asyncio.create_task(
+        inbox.admit_event(relay_url, wrap_a, _ref(merchant)))
+    second = asyncio.create_task(
+        inbox.admit_event(relay_url, wrap_b, _ref(merchant)))
+    participants.update((first, second))
+    try:
+        results = await asyncio.wait_for(
+            asyncio.gather(first, second, return_exceptions=True), 30
+        )
+    finally:
+        for task in (first, second):
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(first, second, return_exceptions=True)
+    assert len(arrived) == 2, "both contenders must reach the barrier"
+    if dialect() == "postgres":
+        assert len(connections) == 2, (
+            "PostgreSQL contention requires independent connections"
+        )
+    assert not any(
+        isinstance(r, BaseException) for r in results
+    ), results
+    assert sorted(results) == ["received", "rejected"]
+    assert await _scope_depth(env, mid, relay_url) == 1000

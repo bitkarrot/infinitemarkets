@@ -105,6 +105,35 @@ async def _run_leased(name: str, token: int, operation):
         ACTIVE_TASK_LEASE.reset(context)
 
 
+async def _guarded(operation):
+    """One worker operation; cancellation lands after it completes.
+
+    A bare ``task.cancel()`` can arrive inside a ``db.connect()``/
+    ``DomainTransaction`` engine checkout: the connection is created
+    but never bound to a context, so nothing closes it — on SQLite the
+    orphaned aiosqlite connection keeps a non-daemon worker thread
+    alive and the process cannot exit (CI-01). Shielding lets the
+    in-flight operation finish and close its handles before the worker
+    unwinds."""
+    import asyncio as real_asyncio
+
+    inner = real_asyncio.ensure_future(operation)
+    try:
+        return await real_asyncio.shield(inner)
+    except real_asyncio.CancelledError:
+        while not inner.done():
+            try:
+                await real_asyncio.wait({inner})
+            except real_asyncio.CancelledError:
+                continue
+        if not inner.cancelled() and inner.exception() is not None:
+            logger.debug(
+                f"infinitemarkets worker drain error:"
+                f" {type(inner.exception()).__name__}"
+            )
+        raise
+
+
 async def outbox_publisher() -> None:
     """§8.6 publisher loop — claim, build-from-current-state, sign, send,
     persist per-relay evidence."""
@@ -112,7 +141,7 @@ async def outbox_publisher() -> None:
 
     while True:
         try:
-            result = await outbox.worker_tick(WORKER_ID)
+            result = await _guarded(outbox.worker_tick(WORKER_ID))
             if result["claimed"]:
                 logger.debug(
                     f"infinitemarkets outbox: claimed={result['claimed']} "
@@ -134,7 +163,7 @@ async def relay_manager() -> None:
 
     while True:
         try:
-            targets = await relay_service.all_public_targets()
+            targets = await _guarded(relay_service.all_public_targets())
             tport = transport()
             if tport.client is None:
                 await tport.start(targets)
@@ -156,9 +185,11 @@ async def email_sender() -> None:
     try:
         while True:
             try:
-                await email_service.recover_stale_claims(database=wdb)
-                result = await email_service.worker_tick(
-                    WORKER_ID, database=wdb
+                await _guarded(
+                    email_service.recover_stale_claims(database=wdb)
+                )
+                result = await _guarded(
+                    email_service.worker_tick(WORKER_ID, database=wdb)
                 )
                 if result["claimed"]:
                     logger.debug(
@@ -181,11 +212,13 @@ async def inbox_processor() -> None:
 
     while True:
         try:
-            token = await _acquire_lease("inbox_processor")
+            token = await _guarded(_acquire_lease("inbox_processor"))
             if token is not None:
-                report = await _run_leased(
-                    "inbox_processor", token,
-                    inbox_service.drain_and_process,
+                report = await _guarded(
+                    _run_leased(
+                        "inbox_processor", token,
+                        inbox_service.drain_and_process,
+                    )
                 )
                 if any(report.values()):
                     logger.debug(
@@ -209,7 +242,7 @@ async def inbox_listener() -> None:
 
     while True:
         try:
-            await inbox_runtime().reconcile()
+            await _guarded(inbox_runtime().reconcile())
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -226,10 +259,13 @@ async def reservation_expiry() -> None:
 
     while True:
         try:
-            token = await _acquire_lease("reservation_expiry")
+            token = await _guarded(_acquire_lease("reservation_expiry"))
             if token is not None:
-                result = await _run_leased(
-                    "reservation_expiry", token, settlement.reservation_expiry_pass,
+                result = await _guarded(
+                    _run_leased(
+                        "reservation_expiry", token,
+                        settlement.reservation_expiry_pass,
+                    )
                 )
                 if result["released"] or result["expired_orders"]:
                     logger.debug(
@@ -259,17 +295,24 @@ async def reconciliation() -> None:
     while True:
         try:
             if started_at is None:
-                async with DomainTransaction() as tx:
-                    started_at = await tx.now()
-            token = await _acquire_lease("reconciliation")
+                async def _epoch() -> int:
+                    async with DomainTransaction() as tx:
+                        return await tx.now()
+
+                started_at = await _guarded(_epoch())
+            token = await _guarded(_acquire_lease("reconciliation"))
             if token is not None:
-                report = await _run_leased("reconciliation", token, settlement.reconcile)
+                report = await _guarded(
+                    _run_leased("reconciliation", token, settlement.reconcile)
+                )
                 if any(report.values()):
                     logger.debug(f"infinitemarkets reconcile: {report}")
                 now_mono = _now()
                 if now_mono - last_peer_refresh >= PEER_RELAY_REFRESH_INTERVAL_S:
                     last_peer_refresh = now_mono
-                    stats = await peer_relays.refresh_stale_peer_relays()
+                    stats = await _guarded(
+                        peer_relays.refresh_stale_peer_relays()
+                    )
                     if any(stats.values()):
                         logger.debug(
                             f"infinitemarkets peer-relay refresh: {stats}"
@@ -281,12 +324,18 @@ async def reconciliation() -> None:
                 # Another worker holds the lease — readiness still flips
                 # once that worker completes its first pass; poll again
                 # quickly rather than waiting the full interval.
-                async with db.connect() as conn:
-                    completed = await conn.fetchone(
-                        f"SELECT updated_at FROM {table('task_leases')}"
-                        " WHERE name = 'reconciliation_complete'",
+                async def _marker() -> bool:
+                    async with db.connect() as conn:
+                        completed = await conn.fetchone(
+                            f"SELECT updated_at FROM {table('task_leases')}"
+                            " WHERE name = 'reconciliation_complete'",
+                        )
+                    return bool(
+                        completed
+                        and completed["updated_at"] >= started_at
                     )
-                if completed and completed["updated_at"] >= started_at:
+
+                if await _guarded(_marker()):
                     readiness.mark_reconciled()
                     first = False
                 else:
@@ -307,10 +356,16 @@ async def retention_pruner() -> None:
 
     while True:
         try:
-            token = await _acquire_lease("retention_pruner",
-                                       ttl=LEASE_TTL_S * 4)
+            token = await _guarded(
+                _acquire_lease("retention_pruner", ttl=LEASE_TTL_S * 4)
+            )
             if token is not None:
-                report = await _run_leased("retention_pruner", token, settlement.retention_prune)
+                report = await _guarded(
+                    _run_leased(
+                        "retention_pruner", token,
+                        settlement.retention_prune,
+                    )
+                )
                 if any(report.values()):
                     logger.debug(f"infinitemarkets retention: {report}")
         except asyncio.CancelledError:

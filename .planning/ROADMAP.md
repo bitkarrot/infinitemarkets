@@ -206,8 +206,8 @@ separate approval; local synthetic verification is not release clearance.
 - [ ] 05-01: Source/runtime implemented and reviewed; pinned-host admin no-pageerror qualification remains open.
 - [x] 05-02: Scoped stock accounting, current post-lock expiry and repeat-safe causal acceptance verified on SQLite/PostgreSQL; no release clearance.
 - [ ] 05-03: Source/runtime and buyer recovery verified; original browser RED chronology warning retained; financial-tranche pause.
-- [ ] 05-04: Revision-bound dependencies, dependency-safe pruning and 48-hour no-route eligibility.
-- [ ] 05-05: Atomic same-scope inbox bound and diagnosed CI-01 process-lifecycle repair.
+- [x] 05-04: Revision-bound dependencies, dependency-safe pruning and 48-hour no-route eligibility; reviewed, both DBs.
+- [x] 05-05: Atomic same-scope inbox bound verified under contention; CI-01 diagnosed (orphaned aiosqlite worker from cancelled checkout) and fixed with bounded process-exit regression.
 - [ ] 05-06: Fresh qualification, independent security review, operator historical-order audit and separately authorized live checkout.
 
 **Scope decision:** Hardening first, approved 2026-10-11. No external inventory/
@@ -230,4 +230,4 @@ re-execute superseded Phase 4 cutover plans.
 | 3. Release B — Gamma NIP-17 Orders | 4/4 historical; assurance and live UAT open | In Progress | Delivery 2026-09-29 |
 | 03.1. Buyer accounts (INSERTED) | 3/3 | Complete   | 2026-10-07 |
 | 4. Release C — Catalog Import and Export | 4 historical plans dispositioned; catalog-only delivery verified | Complete | 2026-10-09 |
-| 5. Correctness, Recovery, and Security Hardening | 1/6 scoped plan complete; financial source verified, 2 plans partial | In Progress / Paused | — |
+| 5. Correctness, Recovery, and Security Hardening | 3/6 plans complete; 2 partial (host-browser + chronology gates) | In Progress | — |

@@ -518,6 +518,104 @@ async def test_backlog_drains_in_bounded_batches(runtime_env, monkeypatch):
     assert metrics.get("inbox.drain.unwrap") >= 1300
 
 
+async def _plant_inbox_rows(mid: str, relay_url: str, count: int,
+                            state: str, now: int,
+                            received_at: int | None = None) -> None:
+    """Synthetic backlog rows in one (merchant, relay) scope — admission
+    is bypassed so the durable depth being tested is exact."""
+    from infinitemarkets.db import DomainTransaction
+
+    stamp = now if received_at is None else received_at
+    async with DomainTransaction() as tx:
+        for i in range(count):
+            await tx.execute(
+                f"INSERT INTO {tx.table('inbox_events')} "
+                "(id, outer_event_id, merchant_id, source_relay_url,"
+                " received_at, processed_state, raw_json) "
+                "VALUES (:i, :o, :m, :r, :t, :s, 'x')",
+                {
+                    "i": uuid.uuid4().hex, "o": uuid.uuid4().hex,
+                    "m": mid, "r": relay_url, "t": stamp + i, "s": state,
+                },
+            )
+
+
+async def _scope_depth(env: dict, mid: str, relay_url: str) -> int:
+    """Durable pending (received+validated) depth for one scope."""
+    async with env["ext_module"].db.connect() as conn:
+        row = await conn.fetchone(
+            "SELECT COUNT(*) AS n FROM infinitemarkets.inbox_events"
+            " WHERE merchant_id = :m AND source_relay_url = :r"
+            " AND processed_state IN ('received', 'validated')",
+            {"m": mid, "r": relay_url},
+        )
+    return int(row["n"])
+
+
+async def test_hard06_minute_rollover_keeps_backlog_cap(
+    runtime_env, monkeypatch
+):
+    """A fresh fixed minute window resets only the rate buckets — the
+    durable (merchant, relay) backlog still rejects at depth 1,000.
+    A real drain to terminal states frees capacity again."""
+    from infinitemarkets.services import inbox, metrics
+
+    env = runtime_env
+    merchant = await _merchant(env)
+    mid, pubkey = merchant["id"], merchant["pubkey"]
+    relay_url = f"wss://rollover-{uuid.uuid4().hex[:8]}.example"
+    now = int(time.time())
+
+    await _plant_inbox_rows(
+        mid, relay_url, 1000, "received", now,
+        received_at=now - 200000,
+    )
+    assert await _scope_depth(env, mid, relay_url) == 1000
+    monkeypatch.setattr(inbox, "_now", lambda: now)
+
+    backlog_before = metrics.get("inbox.admission.backlog_limited")
+    rate_before = metrics.get("inbox.admission.relay_rate_limited")
+
+    wrap_a = await _wrap(
+        pubkey, order_id=f"ro-a-{uuid.uuid4().hex[:8]}",
+        buyer_secret_hex=_buyer_secret(10000 + uuid.uuid4().int % 9000),
+    )
+    assert await inbox.admit_event(
+        relay_url, wrap_a, {"id": mid, "pubkey": pubkey}
+    ) == "rejected"
+
+    # Roll the minute window forward: the rate bucket resets but the
+    # durable depth cannot — the next valid wrap still drops.
+    monkeypatch.setattr(inbox, "_now", lambda: now + 61)
+    wrap_b = await _wrap(
+        pubkey, order_id=f"ro-b-{uuid.uuid4().hex[:8]}",
+        buyer_secret_hex=_buyer_secret(20000 + uuid.uuid4().int % 9000),
+    )
+    assert await inbox.admit_event(
+        relay_url, wrap_b, {"id": mid, "pubkey": pubkey}
+    ) == "rejected"
+    assert await _scope_depth(env, mid, relay_url) == 1000
+    assert (
+        metrics.get("inbox.admission.backlog_limited")
+        == backlog_before + 2
+    )
+    assert (
+        metrics.get("inbox.admission.relay_rate_limited") == rate_before
+    )
+
+    # Drain flips planted rows to terminal states — capacity frees and a
+    # valid wrap admits again under the same bound.
+    await inbox.drain_received()
+    assert await _scope_depth(env, mid, relay_url) < 1000
+    wrap_c = await _wrap(
+        pubkey, order_id=f"ro-c-{uuid.uuid4().hex[:8]}",
+        buyer_secret_hex=_buyer_secret(30000 + uuid.uuid4().int % 9000),
+    )
+    assert await inbox.admit_event(
+        relay_url, wrap_c, {"id": mid, "pubkey": pubkey}
+    ) == "received"
+
+
 # ---------------------------------------------------------------------------
 # (e) egress matrix — validation + connect/reconnect boundary
 # ---------------------------------------------------------------------------

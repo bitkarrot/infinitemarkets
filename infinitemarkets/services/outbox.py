@@ -213,11 +213,14 @@ async def claim_batch(now: int, worker_id: str,
 
 
 async def _deps_published(tx, intent_id: str) -> bool:
-    """The edge is met once ANY revision of the depended-on aggregate is
-    published — a superseded dep intent does not wedge dependents
-    forever (the aggregate's newer revision is what actually landed).
-    No published revision at all (pending, superseded-only, failed)
-    still blocks — ordering cannot be guaranteed without one."""
+    """The edge is met by the JOINED intended row's own publication or a
+    published replacement that actually covers it — same merchant,
+    aggregate, event kind and ``aggregate_revision`` at-or-above the
+    revision the intent recorded when the edge was bound. A stale or
+    foreign publication, a wrong-kind/tombstone row, a failed intent or
+    a superseded row without such a replacement can never satisfy it —
+    a superseded dep intent does not wedge dependents forever, but only
+    a revision that truly landed unblocks them."""
     row = await tx.fetch_one(
         f"SELECT COUNT(*) AS n FROM {tx.table('outbox_dependencies')} d "
         f"JOIN {tx.table('outbox_events')} e "
@@ -225,9 +228,12 @@ async def _deps_published(tx, intent_id: str) -> bool:
         "WHERE d.outbox_event_id = :i "
         "AND NOT EXISTS ("
         f"  SELECT 1 FROM {tx.table('outbox_events')} p "
-        "  WHERE p.aggregate_type = e.aggregate_type"
+        "  WHERE p.merchant_id = e.merchant_id"
+        "    AND p.aggregate_type = e.aggregate_type"
         "    AND p.aggregate_id = e.aggregate_id"
+        "    AND p.event_kind = e.event_kind"
         "    AND p.state = 'published'"
+        "    AND p.aggregate_revision >= e.aggregate_revision"
         ")",
         {"i": intent_id},
     )
@@ -890,6 +896,7 @@ async def _publish_order_msg(row: dict, *, transport, keystore,
                 tx, row, "pending", now,
                 next_attempt_at=now + ORDER_MSG_NO_ROUTE_REFRESH_S,
                 last_error="no_inbox_relays",
+                bump_attempts=False,
             )
             return "pending"
 

@@ -255,7 +255,8 @@ async def test_outbox_listing_and_retry_routes(runtime_env):
 
 async def test_outbox_prune_history(runtime_env):
     """Prune deletes only terminal outbox rows past the window, with
-    their relay evidence and dependency edges; in-flight rows survive."""
+    their relay evidence and dependency edges; in-flight rows survive —
+    and so do prerequisite rows a retained intent still depends on."""
     import time
 
     from infinitemarkets.db import db, table
@@ -310,21 +311,32 @@ async def test_outbox_prune_history(runtime_env):
         headers=_headers(env, csrf),
     )
     assert resp.status_code == 200, resp.text
-    assert resp.json()["pruned"] == 3
-    assert (await listed()) & mine == {"pr-3", "pr-4", "pr-5"}
+    # pr-0 survives: the retained pending pr-4 still depends on it —
+    # pruning must never free a dependent by erasing its prerequisite.
+    assert resp.json()["pruned"] == 2
+    assert (await listed()) & mine == {"pr-0", "pr-3", "pr-4", "pr-5"}
 
-    # evidence + edge rows went with the deleted events — including the
-    # edge where the pruned row was the dependency (either-side match)
+    # evidence + edge rows went only with the deleted events; pr-0's
+    # proof row and the retained child's edge stay durable.
     async with db.connect() as conn:
         assert (await conn.fetchone(
             f"SELECT COUNT(*) n FROM {table('relay_publications')} "
-            "WHERE outbox_event_id IN ('pr-0', 'pr-1', 'pr-2')"
+            "WHERE outbox_event_id IN ('pr-1', 'pr-2')"
+        ))["n"] == 0
+        assert (await conn.fetchone(
+            f"SELECT COUNT(*) n FROM {table('relay_publications')} "
+            "WHERE outbox_event_id = 'pr-0'"
+        ))["n"] == 1
+        assert (await conn.fetchone(
+            f"SELECT COUNT(*) n FROM {table('outbox_dependencies')} "
+            "WHERE outbox_event_id IN ('pr-1', 'pr-2') "
+            "OR depends_on_outbox_event_id IN ('pr-1', 'pr-2')"
         ))["n"] == 0
         assert (await conn.fetchone(
             f"SELECT COUNT(*) n FROM {table('outbox_dependencies')} "
-            "WHERE outbox_event_id IN ('pr-0', 'pr-1', 'pr-2') "
-            "OR depends_on_outbox_event_id IN ('pr-0', 'pr-1', 'pr-2')"
-        ))["n"] == 0
+            "WHERE outbox_event_id = 'pr-4'"
+            " AND depends_on_outbox_event_id = 'pr-0'"
+        ))["n"] == 1
 
     # bounds are enforced
     for bad in (0, 6, 4000):

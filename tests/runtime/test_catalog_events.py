@@ -409,3 +409,36 @@ async def test_outbox_dependency_edges(keystore_env):
             {"e": orphan},
         )
     assert edges == []
+
+
+async def test_hard04_edge_binds_intended_revision_row(keystore_env):
+    """HARD-04 contract: the edge's FK-bound row is the revision carrier
+    — satisfaction must consult the JOINED row's own merchant,
+    aggregate, kind and aggregate_revision, not just any publication."""
+    old = await _enqueue(keystore_env, "collections", "c9", 30405,
+                         revision=1)
+    new = await _enqueue(keystore_env, "collections", "c9", 30405,
+                         revision=2)
+    child = await _enqueue(
+        keystore_env, "products", "p9", 30402, revision=1,
+        deps=[("collections", "c9")],
+    )
+    db_mod = importlib.import_module("infinitemarkets.db")
+    async with db_mod.db.connect() as conn:
+        bound = await conn.fetchone(
+            "SELECT e.* FROM infinitemarkets.outbox_dependencies d "
+            "JOIN infinitemarkets.outbox_events e "
+            "ON e.id = d.depends_on_outbox_event_id "
+            "WHERE d.outbox_event_id = :e",
+            {"e": child},
+        )
+    assert bound["id"] == new
+    # The bound row carries rev2/merchant/kind — the superseded rev1 is
+    # below the revision any satisfaction check must consult.
+    assert bound["aggregate_revision"] == 2
+    assert bound["event_kind"] == 30405
+    assert bound["merchant_id"] == _MID
+    intents = await _intents(keystore_env, "c9")
+    by_id = {i["id"]: i for i in intents}
+    assert by_id[old]["aggregate_revision"] == 1
+    assert by_id[old]["state"] == "superseded"

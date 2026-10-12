@@ -1,0 +1,89 @@
+{
+  "plan": "05-05",
+  "status": "in_progress_blocked_on_out_of_scope_failure",
+  "head": "3c0c237",
+  "tasks": {
+    "F6_HARD06": "implemented+green",
+    "contention_tests": "implemented+green",
+    "CI01_HARD07": "diagnosed+fixed+green"
+  },
+  "red_records": [
+    ".planning/phases/05-correctness-recovery-and-security-hardening/05-05-RED-01.json",
+    ".planning/phases/05-correctness-recovery-and-security-hardening/05-05-RED-02.json",
+    ".planning/phases/05-correctness-recovery-and-security-hardening/05-05-RED-03.json"
+  ],
+  "f6": {
+    "cap": "SCOPE_BACKLOG_CAP=1000 pending received+validated per (merchant_id, source_relay_url)",
+    "atomicity": "merchant-row FOR NO KEY UPDATE -> dedupe check -> COUNT -> INSERT inside one DomainTransaction; SQLite BEGIN IMMEDIATE serialization; PostgreSQL row lock serializes scope contenders",
+    "ordering": "after signature/blocklist/author-bucket checks; before INSERT and before any decrypt/unwrap (drain stays post-admission)",
+    "duplicates": "resend of admitted wrap returns 'duplicate' even at cap (pre-check + ON CONFLICT belt)",
+    "metrics": [
+      "inbox.admission.backlog_limited",
+      "inbox.admission.merchant_gone"
+    ],
+    "migration": "m016_inbox_scope_backlog additive IF NOT EXISTS composite index (merchant_id, source_relay_url, processed_state)",
+    "red": "baseline admitted valid signed wrap at depth 1000 (received != rejected) and admitted both contested wraps at 999 ([received,received]); rollover admitted post-window",
+    "green_sqlite": "5 passed intake -k hard06+admission+flood+per_author; 6 passed drills selection; 13 passed test_db+intake_abuse; 39 passed release_b_drills+test_db",
+    "green_pg": "6 passed focused selection; 13 passed test_db+intake_abuse; 38 passed 1 skipped release_b_drills+test_db on approved PG17 socket"
+  },
+  "ci01": {
+    "root_cause": "infinitemarkets_relay_manager worker task cancelled inside Database.connect() engine checkout (__aenter__ FAIL CancelledError): AsyncConnection created but never bound -> orphaned aiosqlite _connection_worker_thread (non-daemon) -> threading._shutdown join -> process prints passes then never exits",
+    "evidence": "DBCONNECT aenter START/FAIL task=infinitemarkets_relay_manager err=CancelledError; owner tagged thread alive on ext_infinitemarkets.sqlite3; faulthandler dump in RED-03 shows identical _connection_worker_thread + _shutdown stacks in BOTH file orders",
+    "fix": "services/tasks.py _guarded(): shield each worker tick's DB-bearing operation so cancellation cannot interrupt an in-flight engine checkout/DomainTransaction; local asyncio import keeps _guarded immune to tests that monkeypatch tasks.asyncio",
+    "regression": "tests/test_runtime_process_exit.py parametrized both file orders; sys.executable -m pytest child (direct pytest, signallable), 120s deadline, fresh LNBITS_DATA_FOLDER, GAMMA_QUAL_EVIDENCE popped, SIGABRT stack capture on timeout, exit!=0 or timeout always FAIL",
+    "red": "baseline tasks.py: both orders printed 20 passed then hung past 120s; SIGABRT stacks show aiosqlite worker thread + _shutdown join; 2 failed exit1",
+    "green": "2 passed in 9.38s; direct pair commands: db-then-install 20 passed exit0; install-then-db 20 passed exit0; natural termination"
+  },
+  "blocker": {
+    "file": "tests/runtime/test_status_api.py::test_order_status_after_confirmation",
+    "status": "PRE-EXISTING on HEAD 3c0c237 \u2014 proven by reverting 05-05 source files to HEAD and re-running (identical awaiting_payment != confirmed failure)",
+    "cause": "stale test calls confirm_settlement(source='test') without paying the invoice; F1-F3 commit 3c0c237 added the canonical originals[0].success correlation gate -> mismatch -> _inventory_review -> state stays awaiting_payment",
+    "in_scope": false,
+    "action": "STOP-and-report per authorization; file is not in 05-05 files_modified",
+    "impact": "make verify-runtime: 1 failed, 750 passed, 6 skipped (264.82s); make verify pending same single failure"
+  },
+  "file_hashes": {
+    "infinitemarkets/services/inbox.py": "f433934318026e5a4f8b6f2a6bb29cdc17bbacfcf8226bb6c70e71b7091944fa",
+    "infinitemarkets/migrations.py": "f0188c8dabc0986af24a76fdb76b5f7fcdbed0a95664337e166c0b052c8ee43b",
+    "infinitemarkets/services/tasks.py": "f5d9164fce83c09ae3a85785cda6c6b27443e100094fc815beb469e4c0fa15dd",
+    "tests/runtime/test_intake_abuse.py": "38857318667f39115ceaa87da570f26bb860862eed075302565e0f1f650cada4",
+    "tests/runtime/test_release_b_drills.py": "2ca01d3e3fa1a8cf90111da78c4e883cb405cdf818b84ded48de97c04fe4f4e5",
+    "tests/runtime/test_db.py": "e9d081fe0e3daf458dd0f18f820d68c9e108e52b3957f5645146e2259476cd53",
+    "tests/test_runtime_process_exit.py": "33a559ac400d822815ea8dcc87cbce77683af6ebd49b24d5eadf6666976b9398"
+  },
+  "remaining_gates": [
+    "make verify (running \u2014 will fail only on the out-of-scope stale status test unless other pre-existing failures surface)",
+    "historical paid-order audit OPEN/NOT AUTHORIZED",
+    "live Plebeian UAT open",
+    "browser/conformance qualification open",
+    "ASVS review open",
+    "independent review of F6/CI-01 not claimed"
+  ],
+  "verification": {
+    "make_lint": "ruff: All checks passed, exit0",
+    "pair_order_db_then_install": "20 passed in 2.74s, natural exit0, fresh LNBITS_DATA_FOLDER",
+    "pair_order_install_then_db": "20 passed in 2.67s, natural exit0, fresh LNBITS_DATA_FOLDER",
+    "child_regression": "2 passed in 9.38s (both parametrized orders, children natural exit0 with nonempty passed summaries)",
+    "focused_sqlite": "intake -k selection 5 passed; drills selection 6 passed; test_db+intake_abuse 13 passed; release_b_drills+test_db 39 passed \u2014 all natural exit0",
+    "focused_pg17": "focused 6 passed; test_db+intake_abuse 13 passed; release_b_drills+test_db 38 passed 1 skipped (sqlite-only drill) on approved socket \u2014 natural exit0",
+    "make_verify_runtime": "1 failed, 750 passed, 6 skipped in 264.82s \u2014 sole failure is out-of-scope pre-existing test_status_api stale test; process terminated naturally",
+    "make_verify": "1 failed, 981 passed, 8 skipped in 295.46s \u2014 same sole out-of-scope failure; process terminated naturally; 8 skips are env-gated (postgres drills, smoke relay, private shopify sample)"
+  },
+  "parent_closeout": {
+    "updated_at": "2026-10-12T23:03:53+00:00",
+    "plan": "05-05",
+    "status": "complete-reviewed",
+    "completion_summary_created": false,
+    "summary": "F6 atomic 1000-scope inbox cap + m016 index verified both DBs incl. contested 999 admissions; CI-01 root cause demonstrated (cancelled engine checkout orphaned aiosqlite worker thread) and fixed via shielded drain in tasks.py; pair orders + runtime + full make verify exit0 both profiles; WR-05 drain residual also resolved",
+    "verification": {
+      "verify_runtime_sqlite": "751 passed,6 expected PG-only skips,exit0",
+      "verify_sqlite": "982 passed,8 skipped,exit0",
+      "verify_postgres": "987 passed,3 skipped,exit0",
+      "verify_runtime_postgres_credited": "439-file financial + focused selections exit0",
+      "process_exit_regression": "14 passed natural exit",
+      "lint": "exit0"
+    },
+    "review": "05-REVIEW.md wave 4/5 PASSED; WR-05 resolved; WR-01/03/04 remain open",
+    "gates": "Historical audit OPEN/NOT AUTHORIZED/NOT PERFORMED; live Plebeian pending; no release clearance"
+  }
+}

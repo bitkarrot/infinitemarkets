@@ -20,9 +20,9 @@ must not be summed as distinct vulnerabilities. No finding is accepted or waived
 | F1 | High | Reopens T-204-02 and T-205-01 | Authenticated merchant status cannot confirm unpaid orders or release buyer delivery; cancellation releases held stock once; test owner/API, token and authenticated-history surfaces | Open; HARD-01 |
 | F2 | High | Additional recovery-availability failure, not covered by a blanket old closure | Invoice created then response lost; recover the same invoice, settle, clear only the resolved uncertainty and retain unrelated holds | Open; HARD-02 |
 | F3 | High | Reopens critical T-203-01 inventory assurance | Expire/release holds before recovery/settlement; verify complete stock accounting or explicit exception, duplicate-callback safety and concurrency | Open; HARD-03 |
-| F4 | Medium | Additional publication-ordering failure; claim fencing alone is insufficient | Published revision 1 cannot satisfy pending revision 2; cover superseded dependency, reference removal and tombstone ordering | Open; HARD-04 |
-| F5 | Medium | Additional private-delivery liveness failure | >20 no-route waits, late route arrival before 48h, exact deadline and separate send-error budget; preserve independent copy routing and no public fallback | Open; HARD-05 |
-| F6 | Medium | Reopens backlog portion of high T-302-01; also T-304-04 | Atomic 1,000-pending limit per merchant/relay, two concurrent admitters at 999, other-scope isolation, rate-window rollover, counted pre-decrypt drops | Open; HARD-06 |
+| F4 | Medium | Additional publication-ordering failure; claim fencing alone is insufficient | Published revision 1 cannot satisfy pending revision 2; cover superseded dependency, reference removal and tombstone ordering | Mitigated 2026-10-12 (local, both DBs; independent review PASSED); HARD-04 |
+| F5 | Medium | Additional private-delivery liveness failure | >20 no-route waits, late route arrival before 48h, exact deadline and separate send-error budget; preserve independent copy routing and no public fallback | Mitigated 2026-10-12 (local, both DBs; independent review PASSED); HARD-05 |
+| F6 | Medium | Reopens backlog portion of high T-302-01; also T-304-04 | Atomic 1,000-pending limit per merchant/relay, two concurrent admitters at 999, other-scope isolation, rate-window rollover, counted pre-decrypt drops | Mitigated 2026-10-12 (local, both DBs; contested 999 proof; independent review PASSED); HARD-06 |
 
 F1 requires authenticated merchant access; it is not a demonstrated anonymous
 buyer exploit. CI-01 is separate test-lifecycle debt, not a demonstrated
@@ -98,3 +98,16 @@ and high/critical blocking policy are unchanged.
   or live-funds/relay operation was performed.
 - F4–F6, CI-01, full platform/matrix/qualification and live Plebeian remain
   pending. Local commit authorizes neither deployment nor further execution.
+
+## Wave 4/5 disposition (F4/F5/F6 + CI-01)
+
+F4 revision-bound dependencies, F5 no-route retry eligibility and F6 atomic
+inbox backlog bound are implemented and independently reviewed; CI-01's
+lifecycle root cause (cancelled engine checkout orphaning an aiosqlite worker
+thread) is demonstrated and fixed, including the WR-05 drain residual. Full
+`make verify` passes on both profiles (SQLite 982/8 skips; PG 987/3 skips).
+These rows are mitigations verified locally — threat rows close only under the
+05-06 qualification gates. WR-04 token revocation/expiry remains
+MEDIUM / OPEN / NOT FIXED / NOT WAIVED. Historical audit remains
+OPEN / NOT AUTHORIZED / NOT PERFORMED (evidence NONE). Live Plebeian,
+browser host qualification and release clearance remain pending.

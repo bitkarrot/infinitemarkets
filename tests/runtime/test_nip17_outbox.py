@@ -556,3 +556,236 @@ async def test_no_buyer_10050_no_route_policy(runtime_env, monkeypatch):
     finally:
         await public.stop()
         await merchant_relay.stop()
+
+
+# --- HARD-05: no-route waits are not failed sends -------------------------------
+
+async def _dm_intent(env, mid: str, buyer_hex: str, label: str) -> dict:
+    """A real order_msg intent + descriptor via the production enqueue."""
+    from infinitemarkets.db import DomainTransaction
+    from infinitemarkets.services import order_messages
+
+    merchant = await _merchant(env)
+    async with DomainTransaction() as tx:
+        intent_id = await order_messages.enqueue_order_msg(
+            tx, mid, None,
+            {
+                "rumor_kind": order_messages.KIND_DM,
+                "author_pubkey": merchant["pubkey"],
+                "recipient_pubkey": buyer_hex,
+                "content": f"hard05 {label}",
+                "semantic": "dm",
+            },
+            0,
+            aggregate_id=f"dm:{uuid.uuid4().hex[:16]}",
+            conversation_id=f"unknown:{label}",
+        )
+    rows = await _outbox_rows(env, mid, aggregate_prefix="dm:")
+    return next(r for r in rows if r["id"] == intent_id)
+
+
+async def _controlled_clock(monkeypatch, start: int):
+    """Drive every ``tx.now()`` inside worker transactions from one
+    controllable epoch — the 48h/15m scenario runs on database time,
+    never wall-clock sleeps."""
+    from infinitemarkets.db import DomainTransaction
+
+    clock = {"t": start}
+    real_now = DomainTransaction.now
+
+    async def fake_now(self):
+        return clock["t"]
+
+    monkeypatch.setattr(DomainTransaction, "now", fake_now)
+    clock["restore"] = lambda: monkeypatch.setattr(
+        DomainTransaction, "now", real_now
+    )
+    return clock
+
+
+async def test_hard05_route_after_twenty_waits_still_delivers(
+    runtime_env, monkeypatch
+):
+    """HARD-05: 21+ no-route discovery waits at the 15-min cadence keep
+    claim eligibility and the 20-attempt send budget untouched; a route
+    arriving inside 48h still delivers both copies; the exact 48h
+    boundary is terminal."""
+    from harness import relay as relay_module
+    from infinitemarkets.services import outbox
+    from infinitemarkets.services.transport import transport
+
+    env = runtime_env
+    merchant = await _merchant(env)
+    mid, mpk = merchant["id"], merchant["pubkey"]
+    buyer_label = f"buyer-hard05-{uuid.uuid4().hex[:8]}"
+    buyer_hex = _buyer_keys(buyer_label).public_key().to_hex()
+    stale_label = f"buyer-hard05s-{uuid.uuid4().hex[:8]}"
+    stale_hex = _buyer_keys(stale_label).public_key().to_hex()
+
+    async with relay_module.LocalRelay(
+        mode=relay_module.RelayMode.ACCEPTING
+    ) as buyer_relay, relay_module.LocalRelay(
+        mode=relay_module.RelayMode.ACCEPTING, canned_events=[]
+    ) as public, relay_module.LocalRelay(
+        mode=relay_module.RelayMode.ACCEPTING
+    ) as merchant_relay:
+        monkeypatch.setenv("INFINITEMARKETS_RELAY_IO", "on")
+        monkeypatch.setenv("INFINITEMARKETS_ALLOW_INSECURE_RELAYS", "1")
+        await _set_relays(env, mid, [
+            {"relay_url": public.url, "direction": "public"},
+            {"relay_url": merchant_relay.url, "direction": "inbox"},
+        ])
+        await transport().start([])
+
+        intent = await _dm_intent(env, mid, buyer_hex, "late")
+        base = int(intent["created_at"])
+        clock = await _controlled_clock(monkeypatch, base)
+
+        # 21 no-route discovery waits on the exact 15-min cadence.
+        for i in range(21):
+            clock["t"] = base + i * outbox.ORDER_MSG_NO_ROUTE_REFRESH_S
+            await outbox.worker_tick("hard05-worker", now=clock["t"])
+            rows = await _outbox_rows(env, mid, aggregate_prefix="dm:")
+            row = next(r for r in rows if r["id"] == intent["id"])
+            assert row["state"] == "pending"
+            # A no-route wait is not a send failure — the 20-attempt
+            # budget must be untouched or the row goes unclaimable
+            # inside the 48h window.
+            assert row["attempts"] == 0
+            assert row["last_error"] == "no_inbox_relays"
+            assert (
+                row["next_attempt_at"]
+                == clock["t"] + outbox.ORDER_MSG_NO_ROUTE_REFRESH_S
+            )
+        assert _wrap_events(buyer_relay) == []
+        assert _wrap_events(merchant_relay) == []
+
+        # The buyer advertises a kind-10050 inside the window: the next
+        # attempt has routes and BOTH copies land.
+        public.canned_events.append(
+            await _buyer_10050_event(buyer_label, buyer_relay.url)
+        )
+        clock["t"] = base + 21 * outbox.ORDER_MSG_NO_ROUTE_REFRESH_S
+        await outbox.worker_tick("hard05-worker", now=clock["t"])
+        rows = await _outbox_rows(env, mid, aggregate_prefix="dm:")
+        row = next(r for r in rows if r["id"] == intent["id"])
+        assert row["state"] == "published"
+        pubs = await _publications(env, intent["id"])
+        assert {
+            (p["delivery_copy"], p["result"]) for p in pubs
+        } == {("recipient", "accepted"), ("sender", "accepted")}
+        assert {p["relay_url"] for p in pubs} == {
+            buyer_relay.url, merchant_relay.url,
+        }
+        assert len(_wrap_events(buyer_relay)) == 1
+        assert len(_wrap_events(merchant_relay)) == 1
+        buyer_p = [
+            t[1] for t in _wrap_events(buyer_relay)[0]["tags"]
+            if t[0] == "p"
+        ]
+        sender_p = [
+            t[1] for t in _wrap_events(merchant_relay)[0]["tags"]
+            if t[0] == "p"
+        ]
+        assert buyer_p == [buyer_hex]
+        assert sender_p == [mpk]
+
+        # Exact deadline: just inside the window still waits; at
+        # created_at+172800 the intent fails terminally.
+        late = await _dm_intent(env, mid, stale_hex, "stale")
+        late_base = int(late["created_at"])
+        async with env["ext_module"].db.connect() as conn:
+            await conn.execute(
+                "UPDATE infinitemarkets.outbox_events"
+                " SET next_attempt_at = 0 WHERE id = :i",
+                {"i": late["id"]},
+            )
+        clock["t"] = late_base + outbox.ORDER_MSG_NO_ROUTE_DEADLINE_S - 1
+        await outbox.worker_tick("hard05-worker", now=clock["t"])
+        rows = await _outbox_rows(env, mid, aggregate_prefix="dm:")
+        row = next(r for r in rows if r["id"] == late["id"])
+        assert row["state"] == "pending"
+        assert row["attempts"] == 0
+        assert row["last_error"] == "no_inbox_relays"
+
+        async with env["ext_module"].db.connect() as conn:
+            await conn.execute(
+                "UPDATE infinitemarkets.outbox_events"
+                " SET next_attempt_at = 0 WHERE id = :i",
+                {"i": late["id"]},
+            )
+        clock["t"] = late_base + outbox.ORDER_MSG_NO_ROUTE_DEADLINE_S
+        await outbox.worker_tick("hard05-worker", now=clock["t"])
+        rows = await _outbox_rows(env, mid, aggregate_prefix="dm:")
+        row = next(r for r in rows if r["id"] == late["id"])
+        assert row["state"] == "failed"
+        assert row["last_error"] == "no_inbox_relays"
+        clock["restore"]()
+
+
+async def test_hard05_real_send_failures_still_exhaust_budget(
+    runtime_env, monkeypatch
+):
+    """HARD-05 retention: genuine send failures — not waits — consume
+    the 20-attempt budget; the 20th real failure lands terminal
+    'failed' with verbatim rejection evidence."""
+    from harness import relay as relay_module
+    from infinitemarkets.services import outbox
+    from infinitemarkets.services.transport import transport
+
+    env = runtime_env
+    merchant = await _merchant(env)
+    mid = merchant["id"]
+    buyer_label = f"buyer-hard05f-{uuid.uuid4().hex[:8]}"
+    buyer_hex = _buyer_keys(buyer_label).public_key().to_hex()
+
+    async with relay_module.LocalRelay(
+        mode=relay_module.RelayMode.REJECTING
+    ) as buyer_relay:
+        canned = [
+            await _buyer_10050_event(buyer_label, buyer_relay.url)
+        ]
+        public = relay_module.LocalRelay(
+            mode=relay_module.RelayMode.ACCEPTING, canned_events=canned
+        )
+        merchant_relay = relay_module.LocalRelay(
+            mode=relay_module.RelayMode.REJECTING
+        )
+        await public.start()
+        await merchant_relay.start()
+        try:
+            monkeypatch.setenv("INFINITEMARKETS_RELAY_IO", "on")
+            monkeypatch.setenv("INFINITEMARKETS_ALLOW_INSECURE_RELAYS", "1")
+            await _set_relays(env, mid, [
+                {"relay_url": public.url, "direction": "public"},
+                {"relay_url": merchant_relay.url, "direction": "inbox"},
+            ])
+            await transport().start([])
+
+            intent = await _dm_intent(env, mid, buyer_hex, "fail")
+            base = int(intent["created_at"])
+            clock = await _controlled_clock(monkeypatch, base)
+            # recipient copy: the declared buyer relay rejects; sender
+            # copy: the merchant inbox relay rejects — both are genuine
+            # send outcomes, not no-route waits.
+            attempts = None
+            for i in range(outbox.OUTBOX_MAX_ATTEMPTS):
+                clock["t"] = base + i * 2000
+                await outbox.worker_tick(
+                    "hard05-worker", now=clock["t"]
+                )
+                rows = await _outbox_rows(env, mid, aggregate_prefix="dm:")
+                row = next(r for r in rows if r["id"] == intent["id"])
+                attempts = row["attempts"]
+            rows = await _outbox_rows(env, mid, aggregate_prefix="dm:")
+            row = next(r for r in rows if r["id"] == intent["id"])
+            assert row["state"] == "failed"
+            assert row["attempts"] == outbox.OUTBOX_MAX_ATTEMPTS
+            assert attempts == outbox.OUTBOX_MAX_ATTEMPTS
+            pubs = await _publications(env, intent["id"])
+            assert pubs
+            assert all(p["result"] != "accepted" for p in pubs)
+            clock["restore"]()
+        finally:
+            await public.stop()
+            await merchant_relay.stop()

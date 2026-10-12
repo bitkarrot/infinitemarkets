@@ -5,15 +5,15 @@ milestone_name: Core Commerce and Hardening
 current_phase: "05"
 current_phase_name: Correctness, Recovery, and Security Hardening
 status: paused
-stopped_at: Financial F1/F3/F2 source verified and reviewed; local commit then mandatory pause
-last_updated: "2026-10-12T21:07:09+00:00"
+stopped_at: F1–F6 source corrections verified and reviewed; 05-06 qualification/audit/live gates remain
+last_updated: "2026-10-12T23:03:53+00:00"
 last_activity: 2026-10-12
-last_activity_desc: CR-01–06 source corrections verified locally; financial pause with qualification and audit gates open
+last_activity_desc: F4/F5/F6 fixed+reviewed, CI-01 root cause fixed; full make verify green both profiles; 05-06 gates open
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 24
-  completed_plans: 15
+  completed_plans: 17
 ---
 
 # Project State
@@ -28,14 +28,14 @@ See: .planning/PROJECT.md (updated 2026-10-11)
 ## Current Position
 
 Phase: 5 of 6 (Correctness, Recovery, and Security Hardening)
-Plan: Financial 05-01 → 05-02 → 05-03 source implemented and reviewed; 05-02 scoped tasks complete, 05-01/03 qualification/procedural gates open
-Status: Paused after approved financial tranche; no auto-advance to 05-04, production or historical operations
-Last activity: 2026-10-12 — ten-file financial SQLite 433 passed/6 PG-only skips; PG 439 passed/no skips; finite independent source review passed; CR-01–06 resolved
+Plan: 05-06 qualification remains; 05-01/03 partial gates (host browser, RED chronology); WR-04 token follow-up open
+Status: In progress — F1–F6 + CI-01 repaired and reviewed; 05-06 qualification, operator audit and live UAT remain
+Last activity: 2026-10-12 — F4/F5/F6 + CI-01 repaired; make verify 982p/8s SQLite, 987p/3s PG, both natural exit0; independent review PASSED
 
 Progress: 3 phase acceptance scopes closed, 2 reopened, 1 in progress. Phase 5 has six reviewed plans; 05-02 scoped tasks complete, financial source implemented, and 05-01/03 still partial. No overall
-acceptance percentage is implied by plan/artifact counters. There are 15 executed plan
+acceptance percentage is implied by plan/artifact counters. There are 17 executed plan
 summaries plus 4 explicitly superseded/re-scoped Phase 4 disposition records;
-19 summary files do not mean 19 original plans were executed. GSD may display
+21 summary files do not mean 21 original plans were executed. GSD may display
 100% for that artifact ratio; it is not milestone acceptance or Phase 5 progress.
 
 **Ad-hoc work since 03.1 (not phase-planned, committed + deployed, released as v0.1/v0.2/v0.3/v0.4/v0.5/v0.6/v0.6.1 and packaged for v0.6.2):** storefront filters + collection links; configurable index hero; dark/light shopper toggle; Messages list+thread redesign and counterparty kind-0 profiles; Publications timestamps/row detail, live relay catalog check, filters/sorting, and fresh kind-5 reissue; brand logo URL + footer copy; point-and-click Fine-tune + accent move; single-column merchant settings; primary-colored settings buttons; embeddable shop component (`gm-embed.js` + public products API + CORS), iframe embed with widened CSP, admin Embed snippets; About/More section + screenshots; outbox history prune control; Merchant Nostr Profile (avatar, bio, banner, NIP-05, Lightning address) and owner-only `nsec` reveal; redacted email previews + terminal-history cleanup; sortable Catalog columns and first-column quick actions; searchable country/EU shipping picker; LNbits-style Catalog tables and scrolling mobile section nav; Releases v0.1, v0.2, v0.3, v0.4, v0.5, v0.6, v0.6.1.
@@ -58,7 +58,7 @@ summaries plus 4 explicitly superseded/re-scoped Phase 4 disposition records;
 | 3 | 4 | - | - |
 | 03.1 | 3 | - | - |
 | 4 | 4 historical disposition records | - | - |
-| 5 | 6 reviewed; financial source implemented, 1 scoped plan complete, 2 partial | - | - |
+| 5 | 6 reviewed; 3 plans complete (05-02/04/05), 2 partial (05-01 host browser, 05-03 chronology), 05-06 pending | - | - |
 
 **Recent Trend:**
 
@@ -109,15 +109,15 @@ Decisions are logged in PROJECT.md and the normative specification.
 - [x] Current pre-fix CI observed: run 38194415581 on `a7082c7`, all four Linux SQLite/PostgreSQL profiles plus lint passed. This does not test all F1–F6 regressions.
 - [x] Existing account/catalog delivery checked: 70 passed, 1 optional private-Shopify-sample skip, process exit 0; lint passed.
 - [x] Historical Phase 4 cutover plans explicitly dispositioned; no removed feature is reinstated.
-- [ ] F1–F6 fixed and permanently regression-tested; reopened security threats verified closed.
-- [ ] CI-01 paired-test lifecycle fixed; 19 assertions passed but the process still hung at the 60-second diagnostic bound.
-- [ ] Fresh repaired-revision database/platform, browser and conformance evidence recorded.
+- [x] F1–F6 fixed and permanently regression-tested on both DB profiles; reopened security threats mitigated per local review — threat closure still gated on 05-06 qualification.
+- [x] CI-01 paired-test lifecycle fixed: root cause (cancelled engine checkout orphaning aiosqlite worker thread) demonstrated; bounded subprocess regression + both orders + full suites exit0.
+- [x] Fresh repaired-revision database/platform evidence recorded (SQLite 982/8s, PG 987/3s exit0; evidence bundle regenerated). Browser/conformance items tracked separately under open gates.
 - [ ] Operator read-only historical paid-order audit authorized and performed before production exposure, record disposition or release; NONE performed during synthetic implementation.
 - [ ] Phase 3 live Plebeian checkout/payment UAT completed with operator authorization; only listing smoke is recorded so far.
 
 ### Blockers/Concerns
 
-- F1–F3 source corrections pass scoped local runtime and independent review; qualification remains open. F4–F6 remain unimplemented. See Phase 5 review/evidence and `docs/spec-conformance-analysis.md`.
+- F1–F6 source corrections pass local runtime + independent review (05-REVIEW.md); CI-01 root cause fixed with process-exit regression; full make verify green both profiles. 05-06 gates remain: pinned-host browser errors, WR-01 chronology, WR-04 token follow-up, historical audit, live Plebeian, release clearance.
 - WR-04: pre-existing in-flight token rotation/expiry race remains MEDIUM / OPEN / NOT FIXED / NOT WAIVED; no fresh revoked-token admission after committed rotation demonstrated. Separate authorization follow-up before broader security clearance.
 - F1 pinned-host admin pageerrors and F2 original browser RED chronology remain open; do not turn scoped source GREEN into plan/phase/release acceptance.
 - Security configuration remains unchanged: ASVS level 1, enforcement enabled, block on high. Old zero-open-threat claims are superseded, not treated as waivers.
@@ -147,5 +147,5 @@ Decisions are logged in PROJECT.md and the normative specification.
 ## Session Continuity
 
 Last session: 2026-10-12
-Stopped at: Financial source reviewed and verified; locally commit only, then pause before F4–F6
+Stopped at: F4–F6/CI-01 tranche committed locally; pause before 05-06 qualification work
 Resume file: .planning/phases/05-correctness-recovery-and-security-hardening/05-REVIEW.md

@@ -67,6 +67,7 @@ RUMOR_CONTENT_MAX_BYTES = 8 * 1024
 RUMOR_TAGS_MAX = 128
 RUMOR_TAG_ELEMENT_MAX_BYTES = 2 * 1024
 RATE_WRAP_RELAY_PER_MINUTE = 300
+SCOPE_BACKLOG_CAP = 1000
 DRAIN_BATCH = 64
 
 #: Muted-author audit window: the first dropped wrap per burst leaves a
@@ -199,6 +200,31 @@ async def admit_event(relay_url: str, event, merchant: dict,
             cap=settings.inbox_author_cap, now=now,
         ):
             metrics.incr("inbox.admission.author_rate_limited")
+            return "rejected"
+        merchant_row = await tx.fetch_one(
+            f"SELECT id FROM {tx.table('merchants')} WHERE id = :m"
+            f"{tx.for_no_key_update}",
+            {"m": merchant_id},
+        )
+        if merchant_row is None:
+            metrics.incr("inbox.admission.merchant_gone")
+            return "rejected"
+        exists = await tx.fetch_one(
+            f"SELECT 1 AS x FROM {tx.table('inbox_events')}"
+            " WHERE outer_event_id = :o",
+            {"o": raw_data["id"]},
+        )
+        if exists is not None:
+            metrics.incr("inbox.admission.duplicate")
+            return "duplicate"
+        pending = await tx.fetch_one(
+            f"SELECT COUNT(*) AS n FROM {tx.table('inbox_events')} "
+            "WHERE merchant_id = :m AND source_relay_url = :r "
+            "AND processed_state IN ('received', 'validated')",
+            {"m": merchant_id, "r": relay_url},
+        )
+        if int(pending["n"]) >= SCOPE_BACKLOG_CAP:
+            metrics.incr("inbox.admission.backlog_limited")
             return "rejected"
         inserted = await tx.fetch_one(
             f"INSERT INTO {tx.table('inbox_events')} "

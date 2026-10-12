@@ -468,42 +468,69 @@ async def test_dependency_gate_blocks_until_published(worker_env):
 
 
 async def test_dependency_met_when_aggregate_has_published_revision(worker_env):
-    """A superseded dep intent does not wedge the child once ANY revision
-    of the dep aggregate is published — the newer revision is what landed
-    (production wedge: products stuck behind superseded collection revs)."""
+    """The edge binds to the intended dep row's OWN revision: a stale
+    published revision never satisfies, but a superseded bound intent is
+    released by a qualifying published replacement — same merchant /
+    aggregate / kind at-or-above the intended revision (the production
+    wedge case: products behind superseded collection revs still
+    unblock, only through a revision that actually covers the edge)."""
     from harness import relay as relay_module
 
     async with relay_module.LocalRelay(
         mode=relay_module.RelayMode.ACCEPTING
     ) as accepting:
         mid = await _merchant(worker_env)
+        dep = await _merchant(worker_env)
         await _relay_config(worker_env["db"], mid, accepting.url)
+        await _relay_config(worker_env["db"], dep, accepting.url)
         from infinitemarkets.db import DomainTransaction, table
         from infinitemarkets.services.outbox import enqueue_intent
 
-        cid = uuid.uuid4().hex
         async with DomainTransaction() as tx:
-            # An older revision of the collection already landed.
-            old = await enqueue_intent(tx, mid, "collections", cid, 30405)
-        async with worker_env["db"].connect() as conn:
-            await conn.execute(
-                f"UPDATE {table('outbox_events')} SET state = 'published'"
-                " WHERE id = :i",
-                {"i": old},
-            )
-        async with DomainTransaction() as tx:
-            # The dep edge binds to THIS newer intent, which the worker
-            # will supersede (no collection row exists to render).
-            await enqueue_intent(tx, mid, "collections", cid, 30405)
-            child = await enqueue_intent(
-                tx, mid, "merchant_profile", mid, 0,
-                depends_on=[("collections", cid)],
+            rev1 = await enqueue_intent(
+                tx, dep, "merchant_profile", dep, 0, revision=1
             )
         await worker_env["transport"].start([accepting.url])
         await worker_env["outbox"].worker_tick("w-test")
+        assert (await _state(worker_env["db"], rev1))["row"]["state"] \
+            == "published"
+        assert len(accepting.received_events) == 1
+
+        async with DomainTransaction() as tx:
+            # The dep edge binds to the intended rev2 intent — keep it
+            # claim-ineligible so the child is evaluated while NO
+            # qualifying publication exists yet.
+            rev2 = await enqueue_intent(
+                tx, dep, "merchant_profile", dep, 0, revision=2
+            )
+            child = await enqueue_intent(
+                tx, mid, "merchant_profile", mid, 0,
+                depends_on=[("merchant_profile", dep)],
+            )
+        async with worker_env["db"].connect() as conn:
+            await conn.execute(
+                f"UPDATE {table('outbox_events')} SET next_attempt_at = :n"
+                " WHERE id = :i",
+                {"n": int(time.time()) + 10000, "i": rev2},
+            )
+        await worker_env["outbox"].worker_tick("w-test")
+        state = await _state(worker_env["db"], child)
+        # The published rev1 is STALE — it must not release a rev2 edge.
+        assert state["row"]["state"] == "pending"
+        assert state["row"]["attempts"] == 0
+        assert len(accepting.received_events) == 1
+
+        # A rev3 intent supersedes the bound rev2; once it actually
+        # publishes it is a qualifying replacement and the child goes.
+        async with DomainTransaction() as tx:
+            await enqueue_intent(
+                tx, dep, "merchant_profile", dep, 0, revision=3
+            )
+        await worker_env["outbox"].worker_tick("w-test")
+        await worker_env["outbox"].worker_tick("w-test")
         state = await _state(worker_env["db"], child)
         assert state["row"]["state"] == "published"
-        assert len(accepting.received_events) == 1
+        assert len(accepting.received_events) == 3
 
 
 async def test_retry_intent_resets_failed_and_skips_accepted(worker_env):
@@ -719,3 +746,475 @@ async def test_lease_expiry_during_send_cannot_commit_evidence(worker_env):
     state = await _state(worker_env["db"], intent)
     assert state["row"]["state"] == "claimed"
     assert state["pubs"] == []
+
+
+# --- HARD-04: revision-bound dependency satisfaction ---------------------------
+
+async def _catalog_seed(db, mid: str) -> dict:
+    """Minimal renderable catalog: category -> product -> collection."""
+    from infinitemarkets.db import table
+
+    now = int(time.time())
+    ids = {
+        "category": uuid.uuid4().hex,
+        "product": uuid.uuid4().hex,
+        "collection": uuid.uuid4().hex,
+    }
+    async with db.connect() as conn:
+        await conn.execute(
+            f"INSERT INTO {table('categories')} "
+            "(id, merchant_id, name, publish_gamma, publish_nip15,"
+            " created_at, updated_at)"
+            " VALUES (:i, :m, 'cat', FALSE, FALSE, :t, :t)",
+            {"i": ids["category"], "m": mid, "t": now},
+        )
+        await conn.execute(
+            f"INSERT INTO {table('products')} "
+            "(id, merchant_id, category_id, d_tag, product_type, format,"
+            " title, visibility, draft, stock_on_hand, stock_reserved,"
+            " published_at, revision, created_at, updated_at)"
+            " VALUES (:i, :m, :c, 'pa', 'simple', 'physical', 'prod a',"
+            " 'on-sale', FALSE, 10, 0, :t, 0, :t, :t)",
+            {"i": ids["product"], "m": mid, "c": ids["category"], "t": now},
+        )
+        await conn.execute(
+            f"INSERT INTO {table('collections')} "
+            "(id, merchant_id, d_tag, title, revision, created_at,"
+            " updated_at) VALUES (:i, :m, 'col1', 'col', 0, :t, :t)",
+            {"i": ids["collection"], "m": mid, "t": now},
+        )
+        await conn.execute(
+            f"INSERT INTO {table('product_collections')} "
+            "(id, product_id, collection_id) VALUES (:i, :p, :c)",
+            {
+                "i": uuid.uuid4().hex,
+                "p": ids["product"],
+                "c": ids["collection"],
+            },
+        )
+    return ids
+
+
+async def _pubkey(db, mid: str) -> str:
+    from infinitemarkets.db import table
+
+    async with db.connect() as conn:
+        row = await conn.fetchone(
+            f"SELECT pubkey FROM {table('merchants')} WHERE id = :m",
+            {"m": mid},
+        )
+    return row["pubkey"]
+
+
+async def _events_of_kind(relay, kind: int) -> list[dict]:
+    return [
+        e["event"] for e in relay.received_events
+        if isinstance(e.get("event"), dict) and e["event"].get("kind") == kind
+    ]
+
+
+async def test_hard04_stale_revision_cannot_publish_dependent(worker_env):
+    """HARD-04: published rev1 of the dep aggregate must NOT release a
+    child whose edge binds to pending rev2. Only the intended
+    publication — or a real published replacement at-or-above the
+    intended revision with the same merchant/aggregate/kind — does."""
+    from harness import relay as relay_module
+    from infinitemarkets.db import DomainTransaction
+    from infinitemarkets.services.outbox import enqueue_intent
+
+    async with relay_module.LocalRelay(
+        mode=relay_module.RelayMode.ACCEPTING
+    ) as accepting:
+        mid = await _merchant(worker_env)
+        await _relay_config(worker_env["db"], mid, accepting.url)
+        ids = await _catalog_seed(worker_env["db"], mid)
+        cid = ids["collection"]
+        pubkey = await _pubkey(worker_env["db"], mid)
+        addr = f"30405:{pubkey}:col1"
+
+        # Revision 1 of the collection lands for real.
+        async with DomainTransaction() as tx:
+            rev1 = await enqueue_intent(
+                tx, mid, "collections", cid, 30405,
+                revision=1, event_address=addr,
+            )
+        await worker_env["transport"].start([accepting.url])
+        await worker_env["outbox"].worker_tick("w-test")
+        assert (await _state(worker_env["db"], rev1))["row"]["state"] \
+            == "published"
+        assert len(await _events_of_kind(accepting, 30405)) == 1
+
+        # Break renderability (zero members -> superseded) and enqueue
+        # the intended rev2 + the dependent child.
+        async with worker_env["db"].connect() as conn:
+            from infinitemarkets.db import table
+
+            await conn.execute(
+                f"DELETE FROM {table('product_collections')}"
+                " WHERE collection_id = :c",
+                {"c": cid},
+            )
+        async with DomainTransaction() as tx:
+            rev2 = await enqueue_intent(
+                tx, mid, "collections", cid, 30405,
+                revision=2, event_address=addr,
+            )
+            child = await enqueue_intent(
+                tx, mid, "merchant_profile", mid, 0,
+                depends_on=[("collections", cid)],
+            )
+        await worker_env["outbox"].worker_tick("w-test")
+        rev2_state = await _state(worker_env["db"], rev2)
+        assert rev2_state["row"]["state"] == "superseded"
+        state = await _state(worker_env["db"], child)
+        # The stale published rev1 must NOT have released the child.
+        assert state["row"]["state"] == "pending"
+        assert state["row"]["attempts"] == 0
+        assert state["pubs"] == []
+        assert len(await _events_of_kind(accepting, 0)) == 0
+
+        # Restore renderability; a real rev3 publish is a qualifying
+        # replacement for the superseded bound intent.
+        async with worker_env["db"].connect() as conn:
+            await conn.execute(
+                f"INSERT INTO {table('product_collections')} "
+                "(id, product_id, collection_id) VALUES (:i, :p, :c)",
+                {"i": uuid.uuid4().hex,
+                 "p": ids["product"], "c": cid},
+            )
+        async with DomainTransaction() as tx:
+            await enqueue_intent(
+                tx, mid, "collections", cid, 30405,
+                revision=3, event_address=addr,
+            )
+        await worker_env["outbox"].worker_tick("w-test")
+        await worker_env["outbox"].worker_tick("w-test")
+        state = await _state(worker_env["db"], child)
+        assert state["row"]["state"] == "published"
+        assert len(await _events_of_kind(accepting, 30405)) == 2
+        assert len(await _events_of_kind(accepting, 0)) == 1
+
+
+async def test_hard04_dependency_scope_kind_merchant_and_failed(worker_env):
+    """HARD-04 negatives: a published tombstone (wrong kind), a foreign
+    merchant's publication of the same aggregate identity, and a failed
+    newer replacement never satisfy the bound edge — with only a stale
+    published revision to tempt the old check."""
+    from harness import relay as relay_module
+    from infinitemarkets.db import DomainTransaction, table
+    from infinitemarkets.services.outbox import enqueue_intent
+
+    async with relay_module.LocalRelay(
+        mode=relay_module.RelayMode.ACCEPTING
+    ) as accepting:
+        mid = await _merchant(worker_env)
+        dep = await _merchant(worker_env)
+        foreign = uuid.uuid4().hex  # merchants row never needed
+        await _relay_config(worker_env["db"], mid, accepting.url)
+        await _relay_config(worker_env["db"], dep, accepting.url)
+        pubkey = await _pubkey(worker_env["db"], dep)
+        col_a, col_b, col_c = (uuid.uuid4().hex for _ in range(3))
+
+        # (a) wrong-kind: bound to a kind-30405 rev2 intent; a published
+        # kind-5 tombstone rev9 supersedes it but must not satisfy.
+        async with DomainTransaction() as tx:
+            t_a = await enqueue_intent(
+                tx, dep, "collections", col_a, 30405, revision=2,
+            )
+            child_a = await enqueue_intent(
+                tx, mid, "merchant_profile", mid, 0,
+                depends_on=[("collections", col_a)],
+            )
+            await enqueue_intent(
+                tx, dep, "collections", col_a, 5, revision=9,
+                event_address=f"30405:{pubkey}:tombA",
+            )
+        # (b) foreign merchant: bound to dep's pending rev2; a DIFFERENT
+        # merchant's published rev9 of the same aggregate identity must
+        # not satisfy.
+        async with DomainTransaction() as tx:
+            t_b = await enqueue_intent(
+                tx, dep, "collections", col_b, 30405, revision=2,
+            )
+            child_b = await enqueue_intent(
+                tx, mid, "merchant_profile", mid, 31989,
+                depends_on=[("collections", col_b)],
+            )
+            f_b = await enqueue_intent(
+                tx, foreign, "collections", col_b, 30405, revision=9,
+            )
+        # (c) failed replacement: bound to rev2; a FAILED rev3 plus a
+        # stale published rev1 must not satisfy.
+        async with DomainTransaction() as tx:
+            old_c = await enqueue_intent(
+                tx, dep, "collections", col_c, 30405, revision=1,
+            )
+            t_c = await enqueue_intent(
+                tx, dep, "collections", col_c, 30405, revision=2,
+            )
+            child_c = await enqueue_intent(
+                tx, mid, "merchant_profile", mid, 31990,
+                depends_on=[("collections", col_c)],
+            )
+            f_c = await enqueue_intent(
+                tx, dep, "collections", col_c, 30405, revision=3,
+            )
+        async with worker_env["db"].connect() as conn:
+            await conn.execute(
+                f"UPDATE {table('outbox_events')} SET state = 'published'"
+                " WHERE id = :i",
+                {"i": f_b},
+            )
+            await conn.execute(
+                f"UPDATE {table('outbox_events')} SET state = 'published'"
+                " WHERE id = :i",
+                {"i": old_c},
+            )
+            await conn.execute(
+                f"UPDATE {table('outbox_events')} SET state = 'failed'"
+                " WHERE id = :i",
+                {"i": f_c},
+            )
+        await worker_env["transport"].start([accepting.url])
+        await worker_env["outbox"].worker_tick("w-test")
+        await worker_env["outbox"].worker_tick("w-test")
+        for name, cid_intent in (
+            ("a", child_a), ("b", child_b), ("c", child_c),
+        ):
+            state = await _state(worker_env["db"], cid_intent)
+            assert state["row"]["state"] == "pending", name
+            assert state["row"]["attempts"] == 0, name
+            assert state["pubs"] == [], name
+        # Only the tombstone actually landed on the relay.
+        assert len(await _events_of_kind(accepting, 5)) == 1
+        for bound in (t_a, t_b, t_c):
+            bound_state = await _state(worker_env["db"], bound)
+            assert bound_state["row"]["state"] == "superseded"
+
+
+async def test_hard04_reference_removal_republish_before_tombstone(
+    worker_env,
+):
+    """HARD-04 ordering: the actual ``_delete_product_locked`` enqueue
+    puts the surviving collection republish BEFORE the product tombstone;
+    the worker must hold the tombstone while only a stale published
+    revision exists, then emit republish -> tombstone on the wire."""
+    from harness import relay as relay_module
+    from infinitemarkets.db import DomainTransaction, table
+    from infinitemarkets.services import catalog
+    from infinitemarkets.services.outbox import enqueue_intent
+
+    async with relay_module.LocalRelay(
+        mode=relay_module.RelayMode.ACCEPTING
+    ) as accepting:
+        mid = await _merchant(worker_env)
+        await _relay_config(worker_env["db"], mid, accepting.url)
+        ids = await _catalog_seed(worker_env["db"], mid)
+        cid = ids["collection"]
+        doomed = uuid.uuid4().hex
+        pubkey = await _pubkey(worker_env["db"], mid)
+        now = int(time.time())
+        async with worker_env["db"].connect() as conn:
+            await conn.execute(
+                f"INSERT INTO {table('products')} "
+                "(id, merchant_id, category_id, d_tag, product_type,"
+                " format, title, visibility, draft, stock_on_hand,"
+                " stock_reserved, published_at, revision, created_at,"
+                " updated_at) VALUES (:i, :m, :c, 'pb', 'simple',"
+                " 'physical', 'prod b', 'on-sale', FALSE, 5, 0, :t, 0,"
+                " :t, :t)",
+                {"i": doomed, "m": mid, "c": ids["category"], "t": now},
+            )
+            await conn.execute(
+                f"INSERT INTO {table('product_collections')} "
+                "(id, product_id, collection_id) VALUES (:i, :p, :c)",
+                {"i": uuid.uuid4().hex, "p": doomed, "c": cid},
+            )
+
+        # Collection rev1 already published before the reference removal.
+        async with DomainTransaction() as tx:
+            rev1 = await enqueue_intent(
+                tx, mid, "collections", cid, 30405,
+                revision=1, event_address=f"30405:{pubkey}:col1",
+            )
+        await worker_env["transport"].start([accepting.url])
+        await worker_env["outbox"].worker_tick("w-test")
+        assert (await _state(worker_env["db"], rev1))["row"]["state"] \
+            == "published"
+        assert len(await _events_of_kind(accepting, 30405)) == 1
+
+        # The domain row tracks what is live on relays: rev1.
+        async with worker_env["db"].connect() as conn:
+            await conn.execute(
+                f"UPDATE {table('collections')} SET revision = 1"
+                " WHERE id = :c",
+                {"c": cid},
+            )
+
+        # Actual catalog delete: republish enqueued before the tombstone.
+        async with DomainTransaction() as tx:
+            await catalog._delete_product_locked(tx, mid, doomed, pubkey)
+        async with worker_env["db"].connect() as conn:
+            rows = await conn.fetchall(
+                f"SELECT id, event_kind, aggregate_revision, state"
+                f" FROM {table('outbox_events')}"
+                " WHERE aggregate_id IN (:c, :p) ORDER BY created_at, id",
+                {"c": cid, "p": doomed},
+            )
+            edges = await conn.fetchall(
+                f"SELECT outbox_event_id AS c,"
+                f" depends_on_outbox_event_id AS d"
+                f" FROM {table('outbox_dependencies')}",
+            )
+        republish = next(
+            r for r in rows
+            if r["event_kind"] == 30405 and r["aggregate_revision"] > 1
+        )
+        tombstone = next(r for r in rows if r["event_kind"] == 5)
+        assert {"c": tombstone["id"], "d": republish["id"]} in [
+            {"c": e["c"], "d": e["d"]} for e in edges
+        ]
+
+        # Hold the republish claim-ineligible: the tombstone must wait —
+        # the stale published rev1 is not a substitute.
+        async with worker_env["db"].connect() as conn:
+            await conn.execute(
+                f"UPDATE {table('outbox_events')} SET next_attempt_at = :n"
+                " WHERE id = :i",
+                {"n": now + 10000, "i": republish["id"]},
+            )
+        await worker_env["outbox"].worker_tick("w-test")
+        state = await _state(worker_env["db"], tombstone["id"])
+        assert state["row"]["state"] == "pending"
+        assert state["row"]["attempts"] == 0
+        assert len(await _events_of_kind(accepting, 5)) == 0
+
+        # Release the republish: it lands first, the tombstone follows.
+        async with worker_env["db"].connect() as conn:
+            await conn.execute(
+                f"UPDATE {table('outbox_events')} SET next_attempt_at = 0"
+                " WHERE id = :i",
+                {"i": republish["id"]},
+            )
+        await worker_env["outbox"].worker_tick("w-test")
+        await worker_env["outbox"].worker_tick("w-test")
+        assert (await _state(worker_env["db"], republish["id"]))[
+            "row"]["state"] == "published"
+        assert (await _state(worker_env["db"], tombstone["id"]))[
+            "row"]["state"] == "published"
+        kinds = [
+            e["event"]["kind"] for e in accepting.received_events
+            if isinstance(e.get("event"), dict)
+        ]
+        assert kinds == [30405, 30405, 5]
+
+
+async def test_hard04_prune_preserves_retained_dependencies(worker_env):
+    """HARD-04 prune: manual history flush must not delete prerequisites
+    a retained intent still needs — the bound dep row, transitive
+    prerequisites, and the published replacement rows that prove an
+    edge. A blocked child must never come back dependency-free."""
+    from harness import relay as relay_module
+    from infinitemarkets.db import DomainTransaction, table
+    from infinitemarkets.services.outbox import enqueue_intent
+
+    async with relay_module.LocalRelay(
+        mode=relay_module.RelayMode.ACCEPTING
+    ) as accepting:
+        mid = await _merchant(worker_env)
+        foreign = uuid.uuid4().hex
+        await _relay_config(worker_env["db"], mid, accepting.url)
+        now = int(time.time())
+        old = now - 100 * 86400
+
+        async with DomainTransaction() as tx:
+            # Chain: A -> B -> D. B is old+superseded, D is old+published;
+            # A is a live retained child that still needs both.
+            d_row = await enqueue_intent(
+                tx, mid, "collections", "dep-d", 30405, revision=1,
+            )
+            b_row = await enqueue_intent(
+                tx, mid, "merchant_profile", "dep-b", 0, revision=2,
+                depends_on=[("collections", "dep-d")],
+            )
+            a_row = await enqueue_intent(
+                tx, mid, "merchant_profile", mid, 0,
+                depends_on=[("merchant_profile", "dep-b")],
+            )
+            # Proof chain: A2 -> B2(superseded rev2); P2 published rev3
+            # is the qualifying replacement that will release A2.
+            b2_row = await enqueue_intent(
+                tx, mid, "merchant_profile", "dep-b2", 31989, revision=2,
+            )
+            a2_row = await enqueue_intent(
+                tx, mid, "merchant_profile", mid, 31989,
+                depends_on=[("merchant_profile", "dep-b2")],
+            )
+            p2_row = await enqueue_intent(
+                tx, mid, "merchant_profile", "dep-b2", 31989, revision=3,
+            )
+            # Genuinely prunable + a foreign row outside merchant scope.
+            u_row = await enqueue_intent(
+                tx, mid, "merchant_profile", "dep-u", 31990, revision=1,
+            )
+            f_row = await enqueue_intent(
+                tx, foreign, "merchant_profile", "dep-f", 31990,
+                revision=1,
+            )
+        async with worker_env["db"].connect() as conn:
+            for i, s in (
+                (d_row, "published"), (b_row, "superseded"),
+                (b2_row, "superseded"), (p2_row, "published"),
+                (u_row, "failed"), (f_row, "published"),
+            ):
+                await conn.execute(
+                    f"UPDATE {table('outbox_events')} SET state = :s,"
+                    " updated_at = :o WHERE id = :i",
+                    {"s": s, "o": old, "i": i},
+                )
+
+        report = await worker_env["relay"].prune_outbox(mid, 30)
+        assert report["pruned"] == 1
+        async with worker_env["db"].connect() as conn:
+            surviving = {
+                r["id"]
+                for r in await conn.fetchall(
+                    f"SELECT id FROM {table('outbox_events')}"
+                    " WHERE id IN (:a, :b, :c, :d, :e, :f, :g)",
+                    {
+                        "a": a_row, "b": b_row, "c": a2_row, "d": d_row,
+                        "e": b2_row, "f": p2_row, "g": f_row,
+                    },
+                )
+            }
+            u_gone = await conn.fetchone(
+                f"SELECT COUNT(*) AS n FROM {table('outbox_events')}"
+                " WHERE id = :i",
+                {"i": u_row},
+            )
+            edges = {
+                (e["outbox_event_id"], e["depends_on_outbox_event_id"])
+                for e in await conn.fetchall(
+                    f"SELECT * FROM {table('outbox_dependencies')}"
+                )
+            }
+        # Every prerequisite of a retained intent survived — bound rows,
+        # the transitive D, and the P2 replacement proof.
+        assert surviving == {
+            a_row, b_row, a2_row, d_row, b2_row, p2_row, f_row,
+        }
+        assert u_gone["n"] == 0
+        assert (a_row, b_row) in edges
+        assert (b_row, d_row) in edges
+        assert (a2_row, b2_row) in edges
+
+        # Worker truth: A still blocked (no published rev>=2 for dep-b),
+        # A2 released by the retained P2 replacement proof.
+        await worker_env["transport"].start([accepting.url])
+        await worker_env["outbox"].worker_tick("w-test")
+        await worker_env["outbox"].worker_tick("w-test")
+        a_state = await _state(worker_env["db"], a_row)
+        assert a_state["row"]["state"] == "pending"
+        assert a_state["row"]["attempts"] == 0
+        a2_state = await _state(worker_env["db"], a2_row)
+        assert a2_state["row"]["state"] == "published"

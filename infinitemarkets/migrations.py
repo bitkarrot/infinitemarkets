@@ -1422,3 +1422,13 @@ async def m015_counterparty_profiles(db: Connection):
         f"fetched_at {int_t} NOT NULL, expires_at {int_t} NOT NULL, "
         "UNIQUE (merchant_id, pubkey_hash))"
     )
+
+
+async def m016_inbox_scope_backlog(db: Connection):
+    """Additive index for the §15 per-(merchant, relay) pending-scope
+    admission count (received/validated backlog bound)."""
+    s = db.references_schema
+    await db.execute(
+        f"CREATE INDEX IF NOT EXISTS idx_inbox_scope_backlog "
+        f"ON {s}inbox_events(merchant_id, source_relay_url, processed_state)"
+    )
