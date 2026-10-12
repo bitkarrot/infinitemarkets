@@ -289,3 +289,90 @@ async def test_checkout_gated_by_readiness(runtime_env):
         assert resp.status_code == 503
     finally:
         readiness.mark_reconciled()
+
+
+async def _stale_token_admission(runtime_env, token: str):
+    """Resolve a token, then rotate/expiry-commit it — returns the stale
+    admitted order row plus order id, simulating a request that passed
+    _order_for_token before the revocation landed."""
+    from infinitemarkets.crypto import token_lookup_hash
+    from infinitemarkets.db import db
+
+    async with db.connect() as conn:
+        row = await conn.fetchone(
+            "SELECT * FROM infinitemarkets.orders"
+            " WHERE public_token_hash = :h",
+            {"h": token_lookup_hash(token)},
+        )
+    return dict(row)
+
+
+async def test_rotated_token_inflight_status_denied(runtime_env, monkeypatch):
+    """WR-04: a request admitted before rotation must not render the
+    invoice/delivery after the merchant reissues the order link."""
+    from infinitemarkets import views_public_api
+
+    client, anon = runtime_env["client"], runtime_env["anon"]
+    body = await _checkout(runtime_env)
+    token = body["public_token"]
+    stale = await _stale_token_admission(runtime_env, token)
+
+    if not client.cookies.get("gm_csrf"):
+        await client.get(f"{API}/merchants/current")
+    resp = await client.post(
+        f"{API}/merchants/{runtime_env['merchant_id']}/orders/"
+        f"{stale['id']}/public-token/reissue",
+        headers={
+            "Origin": ORIGIN,
+            "X-CSRF-Token": client.cookies.get("gm_csrf"),
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    async def stale_lookup(token_arg):
+        return stale
+
+    monkeypatch.setattr(views_public_api, "_order_for_token", stale_lookup)
+    resp = await anon.get(
+        f"{PUBLIC}/order-status", headers={"X-Order-Token": token}
+    )
+    assert resp.status_code == 401
+
+
+async def test_rotated_token_inflight_opt_out_denied(runtime_env, monkeypatch):
+    """WR-04: admission before rotation must not mutate the order."""
+    from infinitemarkets import views_public_api
+    from infinitemarkets.db import db
+
+    client, anon = runtime_env["client"], runtime_env["anon"]
+    body = await _checkout(runtime_env)
+    token = body["public_token"]
+    stale = await _stale_token_admission(runtime_env, token)
+
+    if not client.cookies.get("gm_csrf"):
+        await client.get(f"{API}/merchants/current")
+    resp = await client.post(
+        f"{API}/merchants/{runtime_env['merchant_id']}/orders/"
+        f"{stale['id']}/public-token/reissue",
+        headers={
+            "Origin": ORIGIN,
+            "X-CSRF-Token": client.cookies.get("gm_csrf"),
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    async def stale_lookup(token_arg):
+        return stale
+
+    monkeypatch.setattr(views_public_api, "_order_for_token", stale_lookup)
+    resp = await anon.post(
+        f"{PUBLIC}/order-email-opt-out", headers={"X-Order-Token": token}
+    )
+    assert resp.status_code == 401
+    async with db.connect() as conn:
+        row = await conn.fetchone(
+            "SELECT email_opt_in, public_token_enc"
+            " FROM infinitemarkets.orders WHERE id = :i",
+            {"i": stale["id"]},
+        )
+    assert row["email_opt_in"] and row["public_token_enc"]

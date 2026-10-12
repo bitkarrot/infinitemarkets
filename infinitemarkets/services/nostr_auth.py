@@ -1349,7 +1349,8 @@ CLAIM_INVALID = ProblemError(
 
 
 async def claim_order(
-    session: dict, order: dict, *, settings=None, now: int | None = None
+    session: dict, order: dict, *, settings=None, now: int | None = None,
+    presented_token_hash: bytes | None = None,
 ) -> dict:
     """Bind the session account's offered identities to a token-resolved
     order (D-04, D-05).
@@ -1380,7 +1381,9 @@ async def claim_order(
         existing = order.get(column)
         if existing and not hmac.compare_digest(existing, bound):
             raise CLAIM_INVALID
-    if all(order.get(column) for column in offered):
+    if presented_token_hash is None and all(
+        order.get(column) for column in offered
+    ):
         return {
             "claimed": True,
             "order_id": order["id"],
@@ -1413,6 +1416,35 @@ async def claim_order(
         if not order.get("buyer_email_hash"):
             sets.append("buyer_email_hash = :beh")
     async with DomainTransaction() as tx:
+        if presented_token_hash is not None:
+            fresh = await tx.fetch_one(
+                f"SELECT * FROM {tx.table('orders')} WHERE id = :i"
+                + tx.for_update,
+                {"i": order["id"]},
+            )
+            fresh_now = await tx.now()
+            if (
+                not fresh
+                or not crypto.tokens_equal(
+                    fresh["public_token_hash"], presented_token_hash
+                )
+                or (
+                    fresh["public_token_expires_at"] is not None
+                    and fresh["public_token_expires_at"] <= fresh_now
+                )
+            ):
+                raise CLAIM_INVALID
+            order = dict(fresh)
+            for column, bound in offered.items():
+                existing = order.get(column)
+                if existing and not hmac.compare_digest(existing, bound):
+                    raise CLAIM_INVALID
+        if all(order.get(column) for column in offered):
+            return {
+                "claimed": True,
+                "order_id": order["id"],
+                "already_linked": True,
+            }
         rc = await tx.execute(
             f"UPDATE {tx.table('orders')} SET {', '.join(sets)}"
             f" WHERE {' AND '.join(wheres)}",

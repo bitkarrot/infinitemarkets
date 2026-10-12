@@ -318,15 +318,19 @@ _TOKEN_INVALID = ProblemError(
 )
 
 
-async def _order_for_token(token: str | None) -> dict:
-    """Resolve the order by bearer token — identical failure for every
-    invalid shape (no existence oracle, §11.4/§5.4)."""
+def _token_digest(token: str | None) -> bytes:
     if not token:
         raise _TOKEN_INVALID
     try:
-        digest = crypto.token_lookup_hash(token)
+        return crypto.token_lookup_hash(token)
     except crypto.CryptoError:
         raise _TOKEN_INVALID from None
+
+
+async def _order_for_token(token: str | None) -> dict:
+    """Resolve the order by bearer token — identical failure for every
+    invalid shape (no existence oracle, §11.4/§5.4)."""
+    digest = _token_digest(token)
     async with db.connect() as conn:
         row = await conn.fetchone(
             f"SELECT * FROM {table('orders')} "
@@ -345,6 +349,26 @@ async def _order_for_token(token: str | None) -> dict:
     return order
 
 
+async def _locked_order_for_token(tx, order_id: str, digest: bytes) -> dict:
+    """Re-validate the presented bearer token under the order lock —
+    a rotation/expiry committed after admission revokes this response."""
+    row = await tx.fetch_one(
+        f"SELECT * FROM {tx.table('orders')} WHERE id = :i" + tx.for_update,
+        {"i": order_id},
+    )
+    now = await tx.now()
+    if (
+        not row
+        or not crypto.tokens_equal(row["public_token_hash"], digest)
+        or (
+            row["public_token_expires_at"] is not None
+            and row["public_token_expires_at"] <= now
+        )
+    ):
+        raise _TOKEN_INVALID
+    return dict(row)
+
+
 @infinitemarkets_public_api_router.get("/order-status")
 @public_boundary
 async def public_order_status(request: Request, response: Response):
@@ -357,11 +381,14 @@ async def public_order_status(request: Request, response: Response):
     echoes.
     """
     await _guard(request, response)
-    order = await _order_for_token(request.headers.get("x-order-token"))
+    token = request.headers.get("x-order-token")
+    digest = _token_digest(token)
+    order = await _order_for_token(token)
     from .db import DomainTransaction
     from .services.orders import digital_delivery
 
     async with DomainTransaction() as tx:
+        order = await _locked_order_for_token(tx, order["id"], digest)
         delivery = await digital_delivery(tx, order)
         items = await tx.fetch_all(
             f"SELECT title, quantity, line_total_sat FROM"
@@ -384,10 +411,13 @@ async def public_order_email_opt_out(request: Request, response: Response):
     """§8.8 opt-out — sets email_opt_in=false and cancels queued customer
     rows for the order (never a signal beyond the bearer token)."""
     await _guard(request, response)
-    order = await _order_for_token(request.headers.get("x-order-token"))
+    token = request.headers.get("x-order-token")
+    digest = _token_digest(token)
+    order = await _order_for_token(token)
     from .db import DomainTransaction
 
     async with DomainTransaction() as tx:
+        order = await _locked_order_for_token(tx, order["id"], digest)
         await tx.execute(
             f"UPDATE {tx.table('orders')} SET email_opt_in = FALSE,"
             " public_token_enc = NULL, updated_at = :n WHERE id = :i",
@@ -1009,8 +1039,11 @@ async def nostr_claim(
     )
     nostr_auth.require_origin(request)
     session = await _buyer_session(request)
+    digest = _token_digest(body.token)
     order = await _order_for_token(body.token)
     if order["merchant_id"] != session["merchant_id"]:
         # Cross-merchant token resolution is an identical invalid outcome.
         raise _TOKEN_INVALID
-    return await nostr_auth.claim_order(session, order)
+    return await nostr_auth.claim_order(
+        session, order, presented_token_hash=digest
+    )

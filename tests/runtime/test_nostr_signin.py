@@ -970,3 +970,97 @@ async def test_nsec_signin_gated_and_mints_session(runtime_env, monkeypatch):
             headers={"Origin": ORIGIN},
         )
         assert resp.status_code == 401, resp.text
+
+
+async def test_claim_rotated_token_inflight_denied(runtime_env, monkeypatch):
+    """WR-04: a claim admitted before token rotation must not bind —
+    the locked recheck turns it into the identical 401."""
+    import httpx
+
+    from infinitemarkets import views_public_api
+
+    env = runtime_env
+    product = await env["make_product"](f"claimwr-{uuid.uuid4().hex[:6]}", 5)
+    order, token = await _web_order(env, product["d_tag"])
+    stale = await views_public_api._order_for_token(token)
+
+    client = env["client"]
+    if not client.cookies.get("gm_csrf"):
+        await client.get(f"{API}/merchants/current")
+    resp = await client.post(
+        f"{API}/merchants/{env['merchant_id']}/orders/{order['id']}"
+        "/public-token/reissue",
+        headers={
+            "Origin": ORIGIN,
+            "X-CSRF-Token": client.cookies.get("gm_csrf"),
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    async def stale_lookup(token_arg):
+        return stale
+
+    monkeypatch.setattr(views_public_api, "_order_for_token", stale_lookup)
+    transport = httpx.ASGITransport(app=env["app"])
+    async with httpx.AsyncClient(
+        transport=transport, base_url=ORIGIN
+    ) as fresh:
+        await _signin(fresh, "claimer-wr04")
+        resp = await fresh.post(
+            f"{PUB}/nostr/claim",
+            json={"token": token},
+            headers={"Origin": ORIGIN},
+        )
+    assert resp.status_code == 401, resp.text
+
+    async with env["ext_module"].db.connect() as conn:
+        row = await conn.fetchone(
+            "SELECT buyer_pubkey_hash FROM infinitemarkets.orders"
+            " WHERE id = :o",
+            {"o": order["id"]},
+        )
+    assert row["buyer_pubkey_hash"] is None
+
+
+async def test_claim_foreign_bound_during_inflight_window(runtime_env, monkeypatch):
+    """WR-04 residual: bindings landing between admission and the claim
+    lock must hit the identical 401 — never report success for a fresh
+    row bound to a different identity."""
+    import httpx
+
+    from infinitemarkets import views_public_api
+
+    env = runtime_env
+    product = await env["make_product"](f"claimfw-{uuid.uuid4().hex[:6]}", 5)
+    async with env["ext_module"].db.connect() as conn:
+        open_order = await conn.fetchone(
+            "SELECT id FROM infinitemarkets.orders"
+            " WHERE merchant_id = :m AND state = 'awaiting_payment'"
+            " ORDER BY created_at LIMIT 1",
+            {"m": env["merchant_id"]},
+        )
+        if open_order:
+            await conn.execute(
+                "UPDATE infinitemarkets.orders SET state = 'expired'"
+                " WHERE id = :o",
+                {"o": open_order["id"]},
+            )
+    order, token = await _web_order(env, product["d_tag"])
+    stale = await views_public_api._order_for_token(token)
+    await _bind_buyer(env, order["id"], _buyer_hex("foreign-racer"))
+
+    async def stale_lookup(token_arg):
+        return stale
+
+    monkeypatch.setattr(views_public_api, "_order_for_token", stale_lookup)
+    transport = httpx.ASGITransport(app=env["app"])
+    async with httpx.AsyncClient(
+        transport=transport, base_url=ORIGIN
+    ) as fresh:
+        await _signin(fresh, "claimer-foreign-window")
+        resp = await fresh.post(
+            f"{PUB}/nostr/claim",
+            json={"token": token},
+            headers={"Origin": ORIGIN},
+        )
+    assert resp.status_code == 401, resp.text

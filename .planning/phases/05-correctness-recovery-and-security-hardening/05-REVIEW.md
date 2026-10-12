@@ -47,9 +47,9 @@ files_reviewed_list:
   - tests/test_runtime_process_exit.py
 findings:
   critical: 0
-  warning: 3
+  warning: 2
   info: 0
-  total: 3
+  total: 2
 status: passed
 source_status: passed
 qualification_status: blocked
@@ -59,7 +59,7 @@ qualification_status: blocked
 
 ## Summary and provenance
 
-**SOURCE REVIEW: PASSED within the finite approved F1/F3/F2 financial scope. No remaining source blocker identified. QUALIFICATION: BLOCKED.** CR-01–06 and source robustness warning WR-02 are resolved on the current tree. Three open warnings track evidence chronology, admin host/browser qualification and a pre-existing MEDIUM token-revocation/expiry follow-up (WR-04), not a newly introduced CR-05/06 financial source regression. WR-04 is not fixed or security-waived by this finite pass. The frontmatter pass is local source disposition only: it is not full Phase 05, ASVS-level, requirements, production or release clearance.
+**SOURCE REVIEW: PASSED within the finite approved F1/F3/F2 financial scope. No remaining source blocker identified. QUALIFICATION: BLOCKED.** CR-01–06 and source robustness warning WR-02 are resolved on the current tree. Two open warnings track evidence chronology and admin host/browser qualification. WR-04 (pre-existing MEDIUM token revocation/expiry boundary) and the wave-4/5 WR-05 drain residual have since been fixed with permanent regressions and reviewer recheck — see their resolved entries below. The frontmatter pass is local source disposition only: it is not full Phase 05, ASVS-level, requirements, production or release clearance.
 
 This is the final independent continuation of the earlier adversarial review, with no agents or other writers used by the reviewer. Rechecked current implementations, cross-call consumers, current tracked financial diff and new regressions rather than accepting the fixer's disposition. The reviewed source/test list above includes the unchanged consumers/frontend and both new runtime files. `tests/runtime/test_financial_review.py` is now 1,016 lines; the new permanent cases at :621–1015 were read, including real intake/reconciliation, descriptor, cancellation/projection/deadline barriers, non-head proofs, public/resume/cache admission and later-candidate coverage. Earlier source/test review remains applicable to unchanged bytes, not a substitute for rechecking the newly changed paths.
 
@@ -130,18 +130,17 @@ The unchanged pinned host `e336fe14b841d6f0c940e75b3d343e3ab5cf8433` baseline ac
 
 **Action / acceptance evidence:** An approved host/browser qualification path must complete the actual admin scenarios with the required assertion, without filtering pageerrors, weakening TLS/security controls or declaring a vendor waiver here. Admin journey was not rerun or qualified by this reviewer or iteration 2 executor evidence.
 
-### WR-04: OPEN pre-existing token revocation/expiry boundary — separate security follow-up
+### WR-04 — RESOLVED (was OPEN, medium): presented-token revalidation under the order lock
 
-**Classification:** MEDIUM security concern, tracked as WARNING for this finite financial commit disposition; OPEN / NOT FIXED / NOT WAIVED. Not a new CR-05/06 financial source blocker or global security pass.
-**Files:** `infinitemarkets/views_public_api.py:321–345,359–378`; `infinitemarkets/services/orders.py:439–454,1444–1485`.
+**Classification:** RESOLVED after user-authorized fix; regression-covered.
 
-**Concrete source-derived interleave:** A request matches its still-valid presented token hash and passes expiry in `_order_for_token`. Before its later content transaction takes the order lock, token reissue commits a replacement hash (or the token deadline passes). Delivery/payable helpers refresh by order/merchant ID, not by the presented token digest/current token expiry. Thus an already token-admitted in-flight request can return otherwise financially authorized content after rotation/expiry. The documented reissue promise at `orders.py:1447–1448` says the old token is revoked immediately; the source does not implement the stronger interpretation that all previously admitted but unfinished requests lose content authority at rotation. This is an honest revocation-contract/privacy risk, not dismissed because it predates the tranche.
+**Previous defect:** `_order_for_token` admitted the bearer token outside the content transaction; rotation (`admin_reissue_token`) or expiry committed between admission and content reads could not stop an already-admitted request from disclosing the invoice/digital delivery or mutating opt-out state — contradicting the documented "old token revoked immediately" contract.
 
-**Lineage and linearization:** Independently read `git show bf99ec0b252f6ecff38eadb377d16d57def3576a:infinitemarkets/views_public_api.py`. Baseline :321–345 has the same token lookup/expiry check outside the later content reads; baseline :359–377 resolves once then retrieves goods/invoice by order ID without revalidating the presented credential. Current financial locks do not introduce that authentication-admission separation, though lock waits can lengthen its window. The shown interleave is an overlapping request admitted at the earlier valid-token lookup, not evidence that a fresh old-token lookup begun after committed rotation succeeds. With lookup as the authorization linearization point, rotation rejects subsequent lookups but does not retract admitted requests; with content acquisition as the intended boundary, the missing recheck is a defect requiring separate authorization hardening. Expiry has the same admission-versus-use distinction. No runtime reproduction, real-record incidence or after-rotation new admission was demonstrated in this disposition.
+**Current source property:** `views_public_api.py:321–369` adds `_token_digest` plus `_locked_order_for_token`, which takes the order `FOR UPDATE` and requires `crypto.tokens_equal(public_token_hash, presented_digest)` and `public_token_expires_at > tx.now()` inside the same `DomainTransaction` as the sensitive work. Applied at `order-status` (:384–392 before items/payment/delivery), `order-email-opt-out` (:414–420 before mutation) and `nostr/claim` (:1042–1049 via `presented_token_hash`). `services/nostr_auth.py:1419–1441` rechecks hash+expiry under its own order lock, refreshes the row and re-verifies bound-value equality before the `already_linked` early return — closing the stale-NULL→fresh-foreign-bound false-success gap the security reviewer found in the first WR-04 iteration. Every failure branch returns the identical 401 body (`_TOKEN_INVALID`/`CLAIM_INVALID` are byte-identical), preserving the no-oracle contract.
 
-**Follow-up property / regression criteria, not work authorized now:** Explicitly settle the immediate-revocation contract and, if strict content-boundary revocation is required, retain/revalidate the presented digest and current token expiry within the caller-owned locked transaction before private content use. Separately authorized barrier coverage should distinguish lookup-before-rotation/expiry from lookup-after-rotation/expiry, inspect actual private content, and preserve generic token failure behavior and valid positives. No auth code or tests are changed/run here; this paragraph records the open concern, not a new implementation task or waiver.
+**Regressions (executor-verified):** `tests/runtime/test_status_api.py::test_rotated_token_inflight_status_denied` and `::test_rotated_token_inflight_opt_out_denied` were genuine RED on the pre-fix tree (200 with bolt11 / 200 with mutation, now 401/no-op); `tests/runtime/test_nostr_signin.py::test_claim_rotated_token_inflight_denied` and `::test_claim_foreign_bound_during_inflight_window` cover the claim path including the foreign-bound-window residual. SQLite 26+40 and PG 75/59 focused selections pass.
 
-**Finite commit threshold:** This pre-existing MEDIUM issue does not reopen resolved CR-01–06 or require unauthorized broad auth changes before the user's scoped local financial commit. Local commit is appropriate after parent-owned final checks/scope review, with WR-04 explicitly retained OPEN, then pause. Production/security/release remain blocked; baseline lineage alone never clears the security concern.
+**Reviewer recheck disposition:** independent security reviewer confirmed all three endpoints close the race on both dialects (FOR UPDATE serialization on PG; BEGIN IMMEDIATE writer serialization on SQLite), found and dispositioned the claim early-return residual, and noted only cosmetic items since addressed (bytes annotations, `tokens_equal`).
 
 ## Human source/scope checks, not machine-flag assurance
 
@@ -266,7 +265,7 @@ Wave 4/5 source scope **PASSED** (wave-local warning WR-05 since resolved with p
 
 - **WR-01** retrospective browser RED chronology — OPEN.
 - **WR-03** F1 pinned-host admin no-pageerror qualification — OPEN.
-- **WR-04** MEDIUM token revocation/expiry admission-vs-content boundary — OPEN / NOT FIXED / NOT WAIVED.
+- ~~WR-04~~ MEDIUM token revocation/expiry admission-vs-content boundary — **RESOLVED** (locked presented-token recheck; regressions on both DBs).
 - **HISTORICAL-PAID-ORDER-AUDIT** — OPEN / NOT AUTHORIZED / NOT PERFORMED; real-record evidence NONE.
 - Live Plebeian UAT/checkout/funding/relay — PENDING.
 - Full platform matrix, browser/conformance qualification, ASVS-1 sign-off, production and release clearance — BLOCKED; local source pass is none of these.

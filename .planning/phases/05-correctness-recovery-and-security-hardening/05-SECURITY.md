@@ -2,7 +2,7 @@
 phase: "05"
 slug: correctness-recovery-and-security-hardening
 status: gaps_found
-threats_open: 7
+threats_open: 6
 asvs_level: 1
 created: 2026-10-11
 ---
@@ -82,20 +82,24 @@ The original F1–F3 rows remain open for qualification, not as claims that thei
 original source failure mechanisms still pass the current tests. ASVS level 1
 and high/critical blocking policy are unchanged.
 
-- **WR-04: MEDIUM / OPEN / NOT FIXED / NOT WAIVED.** Token lookup occurs before
-  the content transaction, as it did at baseline bf99ec0. An already-admitted
-  request may overlap token rotation/expiry and finish afterwards. Strict
-  content-boundary revocation needs a separately scoped credential/expiry
-  recheck. No fresh admission after committed rotation was demonstrated. This
-  is not a new CR-05/06 financial failure, but remains a security follow-up.
+- **WR-04: RESOLVED 2026-10-12.** Presented-token digest and expiry are now
+  revalidated under the order lock inside the content/mutation transaction
+  (`_locked_order_for_token`) for status, opt-out and claim; the claim path
+  also re-verifies bound-value equality on the fresh row. Permanent regressions
+  on both DBs; no-oracle identical 401 preserved.
 - F1 pinned-host admin no-pageerror qualification remains OPEN. No errors were
   filtered; no vendor, certificate, dependency or security-policy change.
 - F2 original browser RED chronology remains absent; actual baseline RED was
   captured retrospectively after GREEN and is not recast as test-first proof.
-- **HISTORICAL-PAID-ORDER-AUDIT: OPEN / NOT AUTHORIZED / NOT PERFORMED.**
-  Actual-record evidence NONE; production exposure, historical disposition and
-  release clearance BLOCKED. No actual-order access, automatic repair/refund
-  or live-funds/relay operation was performed.
+- **HISTORICAL-PAID-ORDER-AUDIT: authorized read-only scan performed
+  2026-10-12.** Every reachable local datastore was inspected read-only
+  (`.cache/qual-data*`, `phase2-closeout-sqlite-*`, `lnbits/data`, Downloads
+  backup, /tmp, phase-5 sandbox): **zero actual infinitemarkets order records
+  exist locally** — only host core DBs and an empty legacy `ext_gammamarkets`
+  file. Dispositions needed locally: NONE. If a deployed/remote instance
+  exists, its audit remains a separate operator gate; production exposure and
+  release clearance still require that evidence. No automatic repair/refund or
+  live-funds/relay operation was performed.
 - F4–F6, CI-01, full platform/matrix/qualification and live Plebeian remain
   pending. Local commit authorizes neither deployment nor further execution.
 
