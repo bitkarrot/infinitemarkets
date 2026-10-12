@@ -44,6 +44,11 @@ def _run_pair(label: str, argv_files: list[str]) -> str:
     env = dict(os.environ)
     # The child's run must never overwrite the durable evidence bundle.
     env.pop("GAMMA_QUAL_EVIDENCE", None)
+    # The CI-01 defect is SQLite-specific (orphaned aiosqlite worker
+    # thread). The child always runs the pair on its own SQLite store —
+    # inheriting a CI PostgreSQL URL would collide with the parent's
+    # schema in the shared database and corrupt the surrounding run.
+    env["LNBITS_DATABASE_URL"] = ""
     env["LNBITS_DATA_FOLDER"] = tempfile.mkdtemp(prefix=f"im-exit-{label}-")
     env.setdefault("UV_NO_ENV_FILE", "1")
     env.setdefault("UV_NO_SYNC", "1")
