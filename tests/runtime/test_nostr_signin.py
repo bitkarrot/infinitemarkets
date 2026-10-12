@@ -405,14 +405,13 @@ async def test_orders_scoped_to_buyer_and_delivery_gated(runtime_env):
     await _bind_buyer(env, order_b["id"], _buyer_hex("buyer-a"))
     await _bind_buyer(env, order_other["id"], _buyer_hex("buyer-b"))
 
-    # order_b simulates a paid digital order (delivery unlocked).
-    from infinitemarkets.db import DomainTransaction
+    from test_order_saga import _settle_core_payment
 
-    async with DomainTransaction() as tx:
-        await tx.execute(
-            "UPDATE orders SET state = 'confirmed' WHERE id = :o",
-            {"o": order_b["id"]},
-        )
+    from infinitemarkets.services import settlement
+
+    # order_b simulates a paid digital order (delivery unlocked).
+    payment = await _settle_core_payment(order_b["id"], order_b["total_sat"])
+    await settlement.invoice_listener(payment)
 
     transport = httpx.ASGITransport(app=env["app"])
     async with httpx.AsyncClient(
@@ -447,6 +446,76 @@ async def test_orders_scoped_to_buyer_and_delivery_gated(runtime_env):
         resp = await fresh2.get(f"{PUB}/nostr/orders")
         ids = {o["order_id"] for o in resp.json()["orders"]}
         assert ids == {order_other["id"]}
+
+
+@pytest.mark.parametrize("state", ["confirmed", "processing", "completed"])
+@pytest.mark.parametrize("damage", ["unpaid", "absent", "partial", "hash", "snapshot"])
+async def test_hard01_settled_without_accounting_history(runtime_env, state, damage):
+    import httpx
+    from test_order_admin import _hard01_snapshot
+    from test_order_saga import _settle_core_payment
+
+    from infinitemarkets.crypto import token_lookup_hash
+    from infinitemarkets.db import DomainTransaction
+    from infinitemarkets.services import checkout, settlement
+
+    product = await runtime_env["make_product"](
+        uuid.uuid4().hex, 10, delivery_content="history entitlement"
+    )
+    merchant = await _merchant(runtime_env)
+    result = await checkout.checkout(
+        payload={
+            "merchant_pubkey": merchant["pubkey"],
+            "items": [{"d_tag": product["d_tag"], "quantity": 2}],
+        },
+        idempotency_key=uuid.uuid4().hex,
+        client_scope=uuid.uuid4().hex,
+    )
+    async with DomainTransaction() as tx:
+        order = dict(
+            await tx.fetch_one(
+                "SELECT * FROM orders WHERE public_token_hash = :h",
+                {"h": token_lookup_hash(result["public_token"])},
+            )
+        )
+    if damage != "unpaid":
+        payment = await _settle_core_payment(order["id"], order["total_sat"])
+        await settlement.invoice_listener(payment)
+    label = "hard01-history"
+    await _bind_buyer(runtime_env, order["id"], _buyer_hex(label))
+    async with DomainTransaction() as tx:
+        await tx.execute(
+            "UPDATE orders SET state = :s WHERE id = :o", {"s": state, "o": order["id"]}
+        )
+        if damage == "absent":
+            await tx.execute(
+                "DELETE FROM inventory_reservations WHERE order_id = :o", {"o": order["id"]}
+            )
+        elif damage == "partial":
+            await tx.execute(
+                "UPDATE inventory_reservations SET quantity = 1 WHERE order_id = :o",
+                {"o": order["id"]},
+            )
+        if damage == "hash":
+            await tx.execute("UPDATE orders SET payment_hash = NULL WHERE id = :o",
+                             {"o": order["id"]})
+        elif damage == "snapshot":
+            await tx.execute("UPDATE payments SET bolt11_enc = NULL WHERE order_id = :o",
+                             {"o": order["id"]})
+    case = (['confirmed', 'processing', 'completed'].index(state) * 5
+            + ['unpaid', 'absent', 'partial', 'hash', 'snapshot'].index(damage))
+    client_ip = f"198.51.100.{case + 1}"
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=runtime_env["app"], client=(client_ip, 1234)),
+        base_url=ORIGIN,
+    ) as buyer:
+        await _signin(buyer, label)
+        before = await _hard01_snapshot(order["id"])
+        response = await buyer.get(f"{PUB}/nostr/orders")
+        assert response.status_code == 200, response.text
+        entry = next(item for item in response.json()["orders"] if item["order_id"] == order["id"])
+        assert entry["digital_delivery"] == []
+        assert await _hard01_snapshot(order["id"]) == before
 
 
 async def test_logout_revokes_session(runtime_env):

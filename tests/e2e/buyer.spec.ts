@@ -1,4 +1,5 @@
 import {expect, test} from '@playwright/test'
+import {createHash, randomBytes} from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -26,6 +27,84 @@ async function reachPayment(page: import('@playwright/test').Page) {
     await page.getByRole('button', {name: 'Continue to payment'}).click()
   }
 }
+
+test('hard02 recovered original invoice QR is payable; independent hold blocks delivery', async ({page, request, context}) => {
+  test.setTimeout(180_000)
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  for (const scenario of [{width: 1280, hold: false}, {width: 390, hold: false}, {width: 390, hold: true}]) {
+    await page.setViewportSize({width: scenario.width, height: 900})
+    const armed = await request.post(`${seed.base_url}/_e2e/recovery-arm`)
+    expect((await armed.json()).ok).toBe(true)
+    await page.goto(seed.digital_url)
+    let token = ''
+    let checkoutCalls = 0
+    const leaked: string[] = []
+    const observe = (req: import('@playwright/test').Request) => {
+      if (req.url().endsWith('/public/checkout')) checkoutCalls++
+      if (token && req.url().includes(token)) leaked.push(req.url())
+    }
+    page.on('request', observe)
+    await reachDelivery(page)
+    await reachPayment(page)
+    await page.locator('button[type=submit]').click()
+    const panel = page.locator('#gm-invoice-panel')
+    await expect(panel).toHaveAttribute('data-invoice-state', 'creation_unknown', {timeout: 20_000})
+    await expect(panel.locator('textarea.bolt11')).toHaveCount(0)
+    const link = await page.evaluate(() => (window as unknown as {GM: {statusUrl(): string}}).GM.statusUrl())
+    token = new URL(link).hash.slice(1)
+    expect(token).toHaveLength(43)
+    const headers = {'X-Order-Token': token}
+    const recovered = await request.post(`${seed.base_url}/_e2e/recovery`, {headers, data: {hold: scenario.hold}})
+    const recovery = await recovered.json()
+    expect(recovery.ok).toBe(true)
+    expect(recovery.invoice_count).toBe(1)
+    const statusPage = await context.newPage()
+    statusPage.on('pageerror', error => errors.push(error.message))
+    statusPage.on('request', req => { if (req.url().includes(token)) leaked.push(req.url()) })
+    await statusPage.setViewportSize({width: scenario.width, height: 900})
+    await statusPage.goto(link)
+    expect(new URL(statusPage.url()).hash).toBe('')
+    if (!scenario.hold) {
+      await expect(panel).toHaveAttribute('data-invoice-state', 'awaiting_payment', {timeout: 20_000})
+      await expect(panel.locator('.invoice-qr svg')).toBeVisible()
+      await expect(panel.locator('.invoice-countdown')).toContainText('Expires in')
+      const invoice = await panel.locator('textarea.bolt11').inputValue()
+      expect(createHash('sha256').update(invoice).digest('hex')).toBe(recovery.original_sha256)
+      await expect(statusPage.locator('#gm-order-state')).toContainText('Waiting for payment')
+      await expect(statusPage.locator('#gm-order-invoice .invoice-qr svg')).toBeVisible()
+      await expect(statusPage.locator('#gm-order-invoice textarea')).toHaveValue(invoice)
+      await statusPage.getByRole('button', {name: 'Copy invoice', exact: true}).focus()
+      await expect(statusPage.getByRole('button', {name: 'Copy invoice', exact: true})).toBeFocused()
+    } else {
+      await expect(panel).toHaveAttribute('data-invoice-state', 'creation_unknown')
+      await expect(panel.locator('textarea.bolt11')).toHaveCount(0)
+      await expect(statusPage.locator('#gm-order-state')).toContainText('On hold')
+      await expect(statusPage.locator('#gm-order-invoice')).toBeHidden()
+    }
+    const prior = await request.get(`${seed.base_url}/infinitemarkets/api/v1/public/order-status`, {headers})
+    expect((await prior.json()).digital_delivery).toEqual([])
+    const settled = await request.post(`${seed.base_url}/_e2e/settle`, {headers})
+    expect((await settled.json()).ok).toBe(true)
+    if (!scenario.hold) {
+      await expect(panel).toHaveAttribute('data-invoice-state', 'confirmed', {timeout: 20_000})
+      await expect(statusPage.locator('[data-gm="delivery-item"]')).toContainText('E2E-TOUR-2026', {timeout: 20_000})
+      await expect(statusPage.locator('#gm-order-invoice')).toBeHidden()
+    } else {
+      await expect(statusPage.locator('#gm-order-state')).toContainText('On hold')
+      await expect(statusPage.locator('[data-gm="delivery-item"]')).toHaveCount(0)
+      const held = await request.get(`${seed.base_url}/infinitemarkets/api/v1/public/order-status`, {headers})
+      expect((await held.json()).payment_exception).toBe(true)
+      expect((await held.json()).digital_delivery).toEqual([])
+    }
+    expect(checkoutCalls).toBe(1)
+    expect(leaked).toEqual([])
+    page.removeListener('request', observe)
+    await statusPage.close()
+  }
+  expect(errors).toEqual([])
+})
+
 
 test('product page embeds the adaptive checkout card', async ({page}) => {
   const resp = await page.goto(seed.digital_url)
@@ -101,6 +180,14 @@ test('order status page: fragment stripped, polls, settles', async ({
   page,
   request
 }) => {
+  if (!statusUrl) {
+    const created = await request.post(`${seed.base_url}/infinitemarkets/api/v1/public/checkout`, {
+      headers: {'Idempotency-Key': randomBytes(32).toString('hex')},
+      data: {merchant_pubkey: seed.pubkey, items: [{d_tag: seed.digital.d_tag, quantity: 1}]}
+    })
+    expect(created.status()).toBe(201)
+    statusUrl = `${seed.base_url}/infinitemarkets/order#${(await created.json()).public_token}`
+  }
   const token = new URL(statusUrl).hash.slice(1)
   expect(token.length).toBeGreaterThan(10)
 

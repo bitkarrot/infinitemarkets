@@ -2,14 +2,14 @@
 phase: "05"
 slug: correctness-recovery-and-security-hardening
 status: gaps_found
-threats_open: 6
+threats_open: 7
 asvs_level: 1
 created: 2026-10-11
 ---
 
 # Phase 5 — Open Security and Correctness Register
 
-This is a scoped register of **six open review findings**, not a complete new
+This is a scoped register of **six assessment findings plus the later open WR-04 authorization follow-up**, not a complete new
 ASVS certification. Three are high-priority financial findings in the assessment.
 Historical threat classifications are retained; in particular T-203-01 remains
 critical and T-302-01 remains high. Related rows across registers overlap and
@@ -67,5 +67,34 @@ proof of unauthorized history disclosure. Preserve those distinctions.
 [05-VALIDATION.md](05-VALIDATION.md) defines regression and evidence gates.
 [02-SECURITY.md](../02-release-a-safe-web-commerce/02-SECURITY.md) preserves
 historical threat history and reopens three original rows. Runtime filenames in
-this checklist are under `tests/runtime/`. No new tests or fixes have been
-implemented during this planning closeout; all unchecked requirements remain open.
+this checklist are under `tests/runtime/`. The original planning checklist remains unchecked where whole-phase or release
+evidence is still required. Local financial implementation evidence below does
+not waive those gates.
+
+## Authorized financial-tranche disposition
+
+F1–F3 source mitigation is implemented and independently reviewed locally.
+Final synthetic financial retention is SQLite 433 passed/6 PG-only skips and
+PostgreSQL 439 passed/no skips, natural exit 0; buyer hard02 passes one test
+covering three scenarios. CR-01–06 and WR-02 are resolved in source; see
+`05-REVIEW.md` and `05-FINANCIAL-REVIEW-FIXES.json` for exact evidence.
+The original F1–F3 rows remain open for qualification, not as claims that their
+original source failure mechanisms still pass the current tests. ASVS level 1
+and high/critical blocking policy are unchanged.
+
+- **WR-04: MEDIUM / OPEN / NOT FIXED / NOT WAIVED.** Token lookup occurs before
+  the content transaction, as it did at baseline bf99ec0. An already-admitted
+  request may overlap token rotation/expiry and finish afterwards. Strict
+  content-boundary revocation needs a separately scoped credential/expiry
+  recheck. No fresh admission after committed rotation was demonstrated. This
+  is not a new CR-05/06 financial failure, but remains a security follow-up.
+- F1 pinned-host admin no-pageerror qualification remains OPEN. No errors were
+  filtered; no vendor, certificate, dependency or security-policy change.
+- F2 original browser RED chronology remains absent; actual baseline RED was
+  captured retrospectively after GREEN and is not recast as test-first proof.
+- **HISTORICAL-PAID-ORDER-AUDIT: OPEN / NOT AUTHORIZED / NOT PERFORMED.**
+  Actual-record evidence NONE; production exposure, historical disposition and
+  release clearance BLOCKED. No actual-order access, automatic repair/refund
+  or live-funds/relay operation was performed.
+- F4–F6, CI-01, full platform/matrix/qualification and live Plebeian remain
+  pending. Local commit authorizes neither deployment nor further execution.

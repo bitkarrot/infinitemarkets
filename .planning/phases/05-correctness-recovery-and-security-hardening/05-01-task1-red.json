@@ -1,0 +1,13 @@
+{
+  "command": "LNBITS_DATA_FOLDER=$(mktemp -d /tmp/im-f1-red-core.XXXXXX) .venv/bin/pytest tests/runtime/test_order_admin.py tests/runtime/test_public_contract.py -k 'hard01 or transition_matrix or end_to_end_journey' -q --tb=short",
+  "exitCode": 1,
+  "targetTest": "test_hard01_unpaid_status_cannot_unlock_delivery",
+  "targetFile": "tests/runtime/test_order_admin.py",
+  "expected": "HTTP 422 invalid-transition; no durable effects",
+  "actual": "assert 200 == 422 at test_order_admin.py:462. 21 planned behavior failures, 2 positive passes, 14 deselected; natural exit 1.",
+  "outputFormat": "Explicit pytest-to-TAP summary adaptation for the installed TAP-only GSD checker; not native TAP runner output",
+  "output": "not ok 1 - test_hard01_unpaid_status_cannot_unlock_delivery\n# tests 23\n# pass 2\n# fail 21\n",
+  "rawLog": "/var/folders/_l/mkpnssh91x9fd3khg5ltnfjm0000gn/T/devin-overflows-501/shell-47bddc-a6c7780a289f5252/content.txt",
+  "rawAssertion": "assert response.status_code == 422, response.text\nE assert 200 == 422",
+  "topology": "macOS ARM64; SQLite single-process; fresh mktemp core and pytest runtime tmpdirs; FakeWallet; RELAY_IO off; no environment-file loading or dependency sync"
+}

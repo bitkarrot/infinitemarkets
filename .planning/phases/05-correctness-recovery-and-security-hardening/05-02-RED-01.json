@@ -1,0 +1,14 @@
+{
+  "command": "uv run pytest tests/runtime/test_order_saga.py -k 'hard03_missing_coverage' -q",
+  "exitCode": 1,
+  "targetFile": "tests/runtime/test_order_saga.py",
+  "targetTest": "test_hard03_missing_coverage_settles_into_inventory_review[missing]",
+  "expected": "cancelled with settled payment and inventory review before any consumption",
+  "actual": "confirmed; AssertionError at test_order_saga.py:1372",
+  "output": "FAILED tests/runtime/test_order_saga.py::test_hard03_missing_coverage_settles_into_inventory_review[missing]\nE AssertionError: incomplete/corrupt allocation must not confirm\nE assert 'confirmed' == 'cancelled'\n5 failed, 130 deselected in 4.04s",
+  "raw_log": "/var/folders/_l/mkpnssh91x9fd3khg5ltnfjm0000gn/T/devin-overflows-501/shell-fdd50e-cea4d9105a376c86/content.txt",
+  "profile": "fresh synthetic SQLite; FakeWallet; RELAY_IO off",
+  "natural_exit": true,
+  "classification": "intentional behavioral assertion RED; missing/partial/extra/expired confirmed, counter rolled back rather than persisting settled review",
+  "native_checker_limit": "pytest-only record rejected by TAP-only classifier; real Node TAP wrapper subsequently run, recorded separately"
+}

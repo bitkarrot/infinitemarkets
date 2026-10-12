@@ -1,0 +1,11 @@
+{
+ "command": "Node22 real node:test spawnSync uv run pytest tests/runtime/test_order_saga.py -k hard02_review_does -q --tb=short --show-capture=no; shell05abdf",
+ "exitCode": 1,
+ "targetFile": "tests/runtime/test_order_saga.py",
+ "targetTest": "test_hard02_review_does_not_replace_protected_authority",
+ "expected": "Mismatch/late/incomplete paths retain corruption/reasonless/manual flags and resolution",
+ "actual": "Permanent assertion line1577 fails five cases: mismatch overwrites active counter-corruption and reasonless holds; inactive refund_confirmed becomes active in all three paths. pytest5failed/4passed/166deselected3.73s exit1",
+ "output": "TAP version 13\n# Subtest: test_hard02_review_does_not_replace_protected_authority\nnot ok 1 - test_hard02_review_does_not_replace_protected_authority\n  ---\n  duration_ms: 5504.738625\n  failureType: 'testCodeFailure'\n  error: |-\n    E     At index 1 diff: 'settlement-amount-mismatch' != 'inventory-reservation-counters-incoherent'\n    5 failed, 4 passed, 166 deselected in 3.73s\n  code: 'ERR_ASSERTION'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 0\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 5510.54825",
+ "output_scope": "Actual TAP excerpt shell05abdf; stack and other failure blocks omitted",
+ "natural_exit": true
+}

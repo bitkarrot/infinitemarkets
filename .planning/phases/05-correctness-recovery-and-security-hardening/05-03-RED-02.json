@@ -1,0 +1,11 @@
+{
+ "command": "Node22 actual node:test spawnSync uv run pytest tests/runtime/test_order_saga.py -k 'hard02_timeout_preserves or hard02_callback_before or hard02_already_settled' -q --tb=short --show-capture=no; shell6390a9",
+ "exitCode": 1,
+ "targetFile": "tests/runtime/test_order_saga.py",
+ "targetTest": "test_hard02_timeout_preserves_protected_hold",
+ "expected": "Timeout retains stronger/reasonless holds and inactive manual refund decisions exactly",
+ "actual": "Eight permanent parameterized assertions line1489 fail: amount,wallet,multiple,correlation,reasonless,counter holds overwritten with creation-unknown; inactive refund decisions gained a hold. Seven retention examples including already-settled and callback-before-timeout pass. pytest8failed/7passed/151deselected3.74s exit1",
+ "output": "TAP version 13\n# Subtest: test_hard02_timeout_preserves_protected_hold\nnot ok 1 - test_hard02_timeout_preserves_protected_hold\n  ---\n  duration_ms: 5410.630708\n  failureType: 'testCodeFailure'\n  error: |-\n    E AssertionError: timeout must not weaken protected authority\n    E At index 1 diff: 'invoice-creation-unknown' != 'settlement-amount-mismatch'\n    8 failed, 7 passed, 151 deselected in 3.74s\n  code: 'ERR_ASSERTION'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 0\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 5417.812875",
+ "output_scope": "Actual TAP excerpt shell6390a9; other failures/stack omitted, no fabricated TAP",
+ "natural_exit": true
+}

@@ -391,14 +391,31 @@ async def enqueue_order_msg(
 
 
 async def enqueue_payment_request(
-    tx, order: dict, *, bolt11: str, expiration: int | None,
+    tx, order: dict, *, bolt11: str | None = None, expiration: int | None = None,
 ) -> str | None:
     """§6.9 type-2 payment request — only orders carrying a buyer key."""
-    if not order.get("buyer_pubkey_hash"):
+    from .orders import payable_invoice
+
+    snapshot = await payable_invoice(tx, order)
+    if snapshot is None or not order.get("buyer_pubkey_hash"):
+        return None
+    existing = await tx.fetch_one(
+        f"SELECT id FROM {tx.table('order_messages')} WHERE order_id = :o "
+        "AND direction = 'out' AND semantic_kind = 'payment-request' LIMIT 1",
+        {"o": order["id"]},
+    )
+    if existing:
         return None
     settings = ext_settings()
     ctx = _order_message_context(order, settings)
+    if (buyer_hash(settings, order["merchant_id"], ctx["buyer_pubkey"])
+            != order["buyer_pubkey_hash"]):
+        return None
     seq = await _next_msg_seq(tx, order["id"])
+    now = await tx.now()
+    if snapshot["expiry"] <= now or snapshot["allocation_deadline"] <= now:
+        return None
+    bolt11, expiration = snapshot["bolt11"], snapshot["expiry"]
     content = f"Payment request: {order['total_sat']} sats"
     if order.get("buyer_amount_sat") is not None and (
         order["buyer_amount_sat"] != order["total_sat"]
@@ -412,7 +429,7 @@ async def enqueue_payment_request(
         "subject": "order-payment",
         "order_external_id": ctx["external_id"],
         "amount": order["total_sat"],
-        "payment": bolt11, "expiration": expiration,
+        "payment": bolt11, "expiration": expiration, "rumor_created_at": now,
         "recipient_pubkey": ctx["buyer_pubkey"],
         "content": content, "semantic": "payment-request",
     }
@@ -884,11 +901,9 @@ async def reenqueue_payment_requests(now: int | None = None) -> int:
     invoice but no payment-request message row gets the type-2
     re-enqueued — idempotent by the ``semantic_kind`` check + live-intent
     dedupe."""
-    settings = ext_settings()
-    now = _now() if now is None else now
     async with db.connect() as conn:
         rows = await conn.fetchall(
-            f"SELECT o.*, p.bolt11_enc FROM {table('orders')} o"
+            f"SELECT o.id, o.merchant_id FROM {table('orders')} o"
             f" JOIN {table('payments')} p ON p.order_id = o.id"
             " WHERE o.state = 'awaiting_payment'"
             " AND o.buyer_pubkey_hash IS NOT NULL"
@@ -902,18 +917,9 @@ async def reenqueue_payment_requests(now: int | None = None) -> int:
     for row in rows:
         order = dict(row)
         try:
-            ver = crypto.envelope_version(order["bolt11_enc"])
-            bolt11 = crypto.decrypt(
-                order["bolt11_enc"], settings.master_keys[ver],
-                record_id=order["id"], table="payments",
-                column="bolt11_enc", key_version=ver,
-            ).decode()
             async with DomainTransaction() as tx:
-                await enqueue_payment_request(
-                    tx, order, bolt11=bolt11,
-                    expiration=order["invoice_expiry"],
-                )
-            enqueued += 1
+                intent_id = await enqueue_payment_request(tx, order)
+            enqueued += int(intent_id is not None)
         except Exception:  # noqa: BLE001 — report-only per row
             continue
     return enqueued

@@ -1,0 +1,12 @@
+{
+  "command": "LNBITS_DATA_FOLDER=$(mktemp -d /tmp/im-f1-red2-core.XXXXXX) .venv/bin/pytest tests/runtime/test_order_saga.py -k 'hard01' -q --tb=short",
+  "exitCode": 1,
+  "targetTest": "test_hard01_status_cancellation_releases_atomically",
+  "targetFile": "tests/runtime/test_order_saga.py",
+  "expected": "stock_reserved 0 after merchant status cancellation",
+  "actual": "assert 2 == 0 at test_order_saga.py:451; shipping unauthorized HTTP200 vs422 and reasonless paid processing cancellation HTTP200 vs422; 86 intentional failures, 22 deselected; natural exit 1",
+  "outputFormat": "Explicit pytest-to-TAP summary adaptation for installed TAP-only checker, not native runner output",
+  "output": "not ok 1 - test_hard01_status_cancellation_releases_atomically\n# tests 86\n# pass 0\n# fail 86\n",
+  "rawLog": "/var/folders/_l/mkpnssh91x9fd3khg5ltnfjm0000gn/T/devin-overflows-501/shell-22dfd7-9841db98880b8aff/content.txt",
+  "topology": "macOS ARM64 SQLite single-process fresh synthetic mktemp core and pytest runtime dirs; FakeWallet; RELAY_IO off; UV_NO_ENV_FILE/NO_SYNC/OFFLINE=1"
+}

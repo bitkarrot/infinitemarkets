@@ -135,9 +135,16 @@
         var d = this.gmOrders.detail;
         if (!d) return [];
         var out = [];
+        if (d.archived_at) return out;
         if (d.payment_exception) {
+          if (["expired", "cancelled"].indexOf(d.state) !== -1 &&
+              d.payment && d.payment.status === "settled") {
+            out.push({ key: "accept", label: "Accept paid order", kind: "exception" });
+          }
+          if (["confirmed", "processing"].indexOf(d.state) !== -1) {
+            out.push({ key: "cancel", label: "Cancel with reason", kind: "danger" });
+          }
           out.push(
-            { key: "accept", label: "Accept paid order", kind: "exception" },
             { key: "refund", label: "Request refund", kind: "exception" },
             {
               key: "confirm-refund",
@@ -147,7 +154,6 @@
           );
           return out;
         }
-        if (d.archived_at) return out;
         switch (d.state) {
           case "confirmed":
             out.push({
@@ -201,6 +207,12 @@
             out.push({ key: "cancel", label: "Cancel", kind: "danger" });
             break;
         }
+        if (d.fulfillment_authorized !== true || !d.payment ||
+            d.payment.status !== "settled") {
+          out = out.filter(function (action) {
+            return action.key.indexOf("status:") !== 0 && action.key.indexOf("ship:") !== 0;
+          });
+        }
         if (d.protocol === "web") {
           out.push({
             key: "reissue",
@@ -214,6 +226,11 @@
          disabled "no action" control. */
       gmOrderClosedNote: function () {
         var d = this.gmOrders.detail;
+        if (d && ["confirmed", "processing", "completed"].indexOf(d.state) !== -1 &&
+            (d.fulfillment_authorized !== true || !d.payment ||
+             d.payment.status !== "settled" || d.payment_exception)) {
+          return "Fulfillment requires review. Verify payment and complete inventory accounting before continuing.";
+        }
         if (!d || d.payment_exception || CLOSED_STATES.indexOf(d.state) < 0) {
           return "";
         }

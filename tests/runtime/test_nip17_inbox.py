@@ -782,6 +782,128 @@ async def _msg_rows(env: dict, order_id: str | None = None) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+async def _hard01_gamma_no_io(env, monkeypatch):
+    from harness.sdk import fixed_test_keys
+    from infinitemarkets.services import checkout, peer_relays, transport
+
+    assert not transport.relay_io_enabled()
+
+    async def synthetic_declared_routes(*args, **kwargs):
+        return ["wss://relay.invalid"]
+
+    monkeypatch.setattr(peer_relays, "resolve_buyer_inbox_relays", synthetic_declared_routes)
+    merchant = await _merchant(env)
+    product = await env["make_product"](uuid.uuid4().hex, 10)
+    buyer = fixed_test_keys(uuid.uuid4().hex).public_key().to_hex()
+    result = await checkout.gamma_order_intake(
+        merchant=merchant,
+        buyer_pubkey=buyer,
+        rumor_id=uuid.uuid4().hex * 2,
+        payload={
+            "external_id": uuid.uuid4().hex,
+            "items": [{"d_tag": product["d_tag"], "quantity": 2}],
+        },
+    )
+    order = await _fresh_order_row(env, result["order_id"])
+    return merchant, order, product
+
+
+async def test_hard01_gamma_cancel_releases_once_without_relay_io(runtime_env, monkeypatch):
+    from test_order_admin import _hard01_snapshot
+    from test_order_saga import _settle_core_payment
+
+    from infinitemarkets.services import order_messages, settlement
+
+    merchant, order, product = await _hard01_gamma_no_io(runtime_env, monkeypatch)
+    rumor = {"tags": [["order", _external_id(runtime_env, order)], ["status", "cancelled"]]}
+    result = await order_messages.handle_inbound_status(
+        merchant=merchant,
+        sender_hash=order["buyer_pubkey_hash"],
+        rumor=rumor,
+        now=int(time.time()),
+    )
+    assert result["outcome"] == "cancelled"
+    async with runtime_env["ext_module"].db.connect() as conn:
+        stock = await conn.fetchone(
+            "SELECT stock_reserved FROM infinitemarkets.products WHERE id = :p",
+            {"p": product["id"]},
+        )
+    assert stock["stock_reserved"] == 0
+    before = await _hard01_snapshot(order["id"])
+    repeated = await order_messages.handle_inbound_status(
+        merchant=merchant,
+        sender_hash=order["buyer_pubkey_hash"],
+        rumor=rumor,
+        now=int(time.time()),
+    )
+    assert repeated["outcome"] == "audit-only"
+    assert await _hard01_snapshot(order["id"]) == before
+    payment = await _settle_core_payment(order["id"], order["total_sat"])
+    await settlement.invoice_listener(payment)
+    fresh = await _fresh_order_row(runtime_env, order["id"])
+    assert fresh["state"] == "cancelled"
+    assert fresh["payment_exception"]
+
+
+@pytest.mark.parametrize(
+    "damage", ["unpaid", "absent", "partial", "healthy", "legacy_paid_awaiting", "hash", "snapshot"]
+)
+async def test_hard01_gamma_delivery_requires_payment_and_inventory(
+    runtime_env, monkeypatch, damage
+):
+    from test_order_admin import _hard01_snapshot
+    from test_order_saga import _settle_core_payment
+
+    from infinitemarkets.db import DomainTransaction
+    from infinitemarkets.services import order_messages, orders, settlement
+
+    merchant, order, product = await _hard01_gamma_no_io(runtime_env, monkeypatch)
+    response = await runtime_env["client"].patch(
+        f"{API}/products/{product['id']}",
+        json={"delivery_content": "Gamma entitlement"},
+        headers=await runtime_env["cookie"](),
+    )
+    assert response.status_code == 200, response.text
+    if damage != "unpaid":
+        payment = await _settle_core_payment(order["id"], order["total_sat"])
+        await settlement.invoice_listener(payment)
+    async with DomainTransaction() as tx:
+        await tx.execute(
+            "UPDATE orders SET state = :s WHERE id = :o",
+            {"s": "awaiting_payment" if damage == "legacy_paid_awaiting" else "confirmed",
+             "o": order["id"]},
+        )
+        if damage == "absent":
+            await tx.execute(
+                "DELETE FROM inventory_reservations WHERE order_id = :o", {"o": order["id"]}
+            )
+        elif damage == "partial":
+            await tx.execute(
+                "UPDATE inventory_reservations SET quantity = 1 WHERE order_id = :o",
+                {"o": order["id"]},
+            )
+        if damage == "hash":
+            await tx.execute("UPDATE orders SET payment_hash = NULL WHERE id = :o",
+                             {"o": order["id"]})
+        elif damage == "snapshot":
+            await tx.execute("UPDATE payments SET bolt11_enc = NULL WHERE order_id = :o",
+                             {"o": order["id"]})
+    fresh = await _fresh_order_row(runtime_env, order["id"])
+    before = await _hard01_snapshot(order["id"])
+    rumor = {"tags": [["order", _external_id(runtime_env, fresh)], ["status", "cancelled"]]}
+    result = await order_messages.handle_inbound_status(
+        merchant=merchant,
+        sender_hash=fresh["buyer_pubkey_hash"],
+        rumor=rumor,
+        now=int(time.time()),
+    )
+    assert result["outcome"] == "audit-only"
+    async with runtime_env["ext_module"].db.connect() as conn:
+        delivery = await orders.digital_delivery(conn, fresh)
+        assert bool(delivery) is (damage == "healthy")
+    assert await _hard01_snapshot(order["id"]) == before
+
+
 async def test_buyer_cancel_on_awaiting_payment(runtime_env, monkeypatch):
     """Buyer type-3 ``cancelled`` on an awaiting_payment order is
     actionable: §7.1 legality releases stock once + transitions cancelled,
@@ -835,7 +957,10 @@ async def test_buyer_cancel_on_confirmed_illegal(runtime_env, monkeypatch):
     order, _rumor = await _gamma_order(
         env, monkeypatch, merchant, "buyer-cancel-2"
     )
-    await settlement.confirm_settlement(order_id=order["id"])
+    from test_order_saga import _settle_core_payment
+
+    paid = await _settle_core_payment(order["id"], order["total_sat"])
+    await settlement.invoice_listener(paid)
     order = await _fresh_order_row(env, order["id"])
     assert order["state"] == "confirmed"
     ext_id = _external_id(env, order)
@@ -924,7 +1049,10 @@ async def test_kind17_receipt_verified(runtime_env, monkeypatch):
     funding = get_funding_source()
     preimage = funding.payment_secrets.get(payment["payment_hash"])
     assert preimage is not None, "FakeWallet did not record a preimage"
-    await settlement.confirm_settlement(order_id=order["id"])
+    from test_order_saga import _settle_core_payment
+
+    paid = await _settle_core_payment(order["id"], order["total_sat"])
+    await settlement.invoice_listener(paid)
     order = await _fresh_order_row(env, order["id"])
     assert order["state"] == "confirmed"
     ext_id = _external_id(env, order)

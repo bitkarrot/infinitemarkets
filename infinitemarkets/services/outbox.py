@@ -54,6 +54,7 @@ async def enqueue_intent(
     partially_published), so the dependency always tracks the current
     content rather than a superseded row.
     """
+    now = await tx.now()
     # Supersede older pending intents for this aggregate.
     await tx.execute(
         f"UPDATE {tx.table('outbox_events')} SET state = 'superseded',"
@@ -61,7 +62,7 @@ async def enqueue_intent(
         " AND aggregate_id = :ai AND aggregate_revision < :r"
         " AND state IN ('pending', 'claimed', 'partially_published')",
         {
-            "t": _now(),
+            "t": now,
             "at": aggregate_type,
             "ai": aggregate_id,
             "r": revision,
@@ -94,7 +95,7 @@ async def enqueue_intent(
             "r": revision,
             "k": event_kind,
             "ea": event_address,
-            "t": _now(),
+            "t": now,
         },
     )
 

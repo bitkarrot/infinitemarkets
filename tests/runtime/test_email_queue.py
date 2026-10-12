@@ -87,7 +87,7 @@ def _svc():
     }
 
 
-async def _order(runtime_env, *, email=None, opt_in=False) -> dict:
+async def _order(runtime_env, *, email=None, opt_in=False, qty=1, scope="email-test") -> dict:
     """A fresh awaiting_payment order; returns the row."""
     svcs = _svc()
     from infinitemarkets.db import db
@@ -100,14 +100,14 @@ async def _order(runtime_env, *, email=None, opt_in=False) -> dict:
     payload = {
         "merchant_pubkey": merchant["pubkey"],
         "items": [{"d_tag": runtime_env["product"]["d_tag"],
-                   "quantity": 1}],
+                   "quantity": qty}],
     }
     if email:
         payload["email"] = email
         payload["email_opt_in"] = opt_in
     resp = await svcs["checkout"].checkout(
         payload=payload, idempotency_key=uuid.uuid4().hex * 2,
-        client_scope="email-test",
+        client_scope=scope,
     )
     from infinitemarkets.crypto import token_lookup_hash
 
@@ -128,6 +128,81 @@ async def _queue_rows(order_id=None):
             sql += " WHERE order_id = :o"
             params["o"] = order_id
         return [dict(r) for r in await conn.fetchall(sql, params)]
+
+
+@pytest.mark.parametrize("state", ["confirmed", "processing", "completed"])
+@pytest.mark.parametrize("damage", ["unpaid", "absent", "partial", "healthy", "hash", "snapshot"])
+async def test_hard01_settled_without_accounting_email(runtime_env, monkeypatch, state, damage):
+    from test_order_admin import _hard01_snapshot
+    from test_order_saga import _settle_core_payment
+
+    from infinitemarkets.db import DomainTransaction
+
+    svcs = _svc()
+    secret = "synthetic email entitlement"
+    response = await runtime_env["client"].patch(
+        f"{API}/products/{runtime_env['product']['id']}",
+        json={"delivery_content": secret},
+        headers={"Origin": ORIGIN, "X-CSRF-Token": runtime_env["client"].cookies.get("gm_csrf")},
+    )
+    assert response.status_code == 200, response.text
+    address = f"{uuid.uuid4().hex}@example.com"
+    order = await _order(runtime_env, email=address, opt_in=True, qty=2, scope=uuid.uuid4().hex)
+    if damage != "unpaid":
+        payment = await _settle_core_payment(order["id"], order["total_sat"])
+        await svcs["settlement"].invoice_listener(payment)
+    async with DomainTransaction() as tx:
+        await tx.execute(
+            "UPDATE orders SET state = :s WHERE id = :o", {"s": state, "o": order["id"]}
+        )
+        if damage == "absent":
+            await tx.execute(
+                "DELETE FROM inventory_reservations WHERE order_id = :o", {"o": order["id"]}
+            )
+        elif damage == "partial":
+            await tx.execute(
+                "UPDATE inventory_reservations SET quantity = 1 WHERE order_id = :o",
+                {"o": order["id"]},
+            )
+        if damage == "hash":
+            await tx.execute("UPDATE orders SET payment_hash = NULL WHERE id = :o",
+                             {"o": order["id"]})
+        elif damage == "snapshot":
+            await tx.execute("UPDATE payments SET bolt11_enc = NULL WHERE order_id = :o",
+                             {"o": order["id"]})
+        await svcs["orders"].enqueue_email_intents(
+            tx,
+            order=order,
+            event_type="confirmed",
+            merchant_notify_emails=[],
+            merchant_notify_events={},
+            customer_email=address,
+        )
+    before = await _hard01_snapshot(order["id"])
+    async with DomainTransaction() as tx:
+        fresh = dict(await tx.fetch_one("SELECT * FROM orders WHERE id = :o", {"o": order["id"]}))
+        delivery = await svcs["orders"].digital_delivery(tx, fresh)
+        assert bool(delivery) is (damage == "healthy")
+    assert await _hard01_snapshot(order["id"]) == before
+    import lnbits.core.services.notifications as notifications
+    from lnbits.settings import settings
+
+    monkeypatch.setattr(type(settings), "is_email_notifications_configured", lambda self: True)
+    sent = []
+
+    async def fake_send(*args):
+        if address in args[5]:
+            sent.append(args[7])
+        return True
+
+    monkeypatch.setattr(notifications, "send_email", fake_send)
+    await svcs["email"].worker_tick("hard01-email")
+    assert sent
+    assert any(secret in body for body in sent) is (damage == "healthy")
+    after = await _hard01_snapshot(order["id"])
+    before.pop("email_queue")
+    after.pop("email_queue")
+    assert after == before
 
 
 async def test_enqueue_dedupes(runtime_env):

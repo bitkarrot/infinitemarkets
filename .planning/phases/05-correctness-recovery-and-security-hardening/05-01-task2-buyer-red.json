@@ -1,0 +1,12 @@
+{
+  "command": "LNBITS_DATA_FOLDER=$(mktemp -d /tmp/im-f1-buyer-red.XXXXXX) uv run pytest 'tests/runtime/test_nip17_inbox.py::test_hard01_gamma_delivery_requires_payment_and_inventory[legacy_paid_awaiting]' -q --tb=short",
+  "exitCode": 1,
+  "targetTest": "test_hard01_gamma_delivery_requires_payment_and_inventory[legacy_paid_awaiting]",
+  "targetFile": "tests/runtime/test_nip17_inbox.py",
+  "expected": "Verified paid Gamma order whose legacy state was corrupted to awaiting_payment is not buyer-cancellable; adapter audit-only and durable snapshot unchanged",
+  "actual": "At test_nip17_inbox.py:894, assert 'cancelled' == 'audit-only'. Actual FakeWallet/core/listener paid positive preceded the synthetic negative state corruption. 1 failed, 3.01s, natural exit1.",
+  "outputFormat": "Explicit pytest-to-TAP summary adaptation for installed TAP-only checker; not native runner output",
+  "output": "not ok 1 - test_hard01_gamma_delivery_requires_payment_and_inventory[legacy_paid_awaiting]\n# tests 1\n# pass 0\n# fail 1\n",
+  "rawAssertion": "assert result['outcome'] == 'audit-only'; E AssertionError: assert 'cancelled' == 'audit-only'",
+  "topology": "Fresh synthetic SQLite; FakeWallet; RELAY_IO off asserted by offline Gamma fixture; synthetic declared relay metadata only; no dials or proof fabrication; UV_NO_ENV_FILE/NO_SYNC/OFFLINE=1"
+}

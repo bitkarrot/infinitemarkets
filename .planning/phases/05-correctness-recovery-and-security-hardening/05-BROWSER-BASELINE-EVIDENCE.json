@@ -1,0 +1,175 @@
+{
+  "scope": "Bounded baseline browser observations only; not phase completion, financial review, release qualification or a gate closure.",
+  "chronology": {
+    "baseline_red_captured_after_reported_current_green": true,
+    "deviation": "The new hard02 browser test was first captured GREEN against current fixed code. This actual baseline RED was captured later by running the unchanged new test against archived bf99ec0 production code. It does not establish RED-before-fix chronology and does not replace missing historical pre-fix evidence.",
+    "existing_green_reference": ".planning/phases/05-correctness-recovery-and-security-hardening/05-03-PROGRESS.json:70-78",
+    "historical_timestamps_or_tap_fabricated": false,
+    "current_green_rerun_in_this_capture": false
+  },
+  "provenance": {
+    "baseline_commit": "bf99ec0b252f6ecff38eadb377d16d57def3576a",
+    "extraction": "Read-only git archive of bf99ec0: infinitemarkets, harness, tools, pyproject.toml, uv.lock and tests/e2e package manifests; each of the 97 archived production package files independently compared byte-for-byte to git show.",
+    "scratch_root": "/tmp/infinitemarkets-phase5-pg-1ae80f8/browser-baseline",
+    "baseline_package_path": "/private/tmp/infinitemarkets-phase5-pg-1ae80f8/browser-baseline/source/infinitemarkets",
+    "fresh_directory_guard": "browser-baseline did not exist before mkdir; staging refused an existing source directory.",
+    "package_file_count": 97,
+    "all_production_package_files_match_baseline": true,
+    "package_bytes_still_baseline_after_capture": true,
+    "runtime_import_verification": "At server ready, every loaded infinitemarkets module file was required to resolve within the scratch baseline package and match its archived SHA256; checkout and settlement were required to be loaded. No main-root extension package imports were accepted.",
+    "loaded_module_manifest": "/tmp/infinitemarkets-phase5-pg-1ae80f8/browser-baseline/loaded-modules.json",
+    "loaded_modules": {
+      "infinitemarkets.services.checkout": {
+        "file": "/private/tmp/infinitemarkets-phase5-pg-1ae80f8/browser-baseline/source/infinitemarkets/services/checkout.py",
+        "sha256": "c2a9b33e50033ac60b30c6a6b44c4ba0aa0e6192fe89fd3bfe0c00ba7a4308d7",
+        "matches_baseline_git_show": true
+      },
+      "infinitemarkets.services.settlement": {
+        "file": "/private/tmp/infinitemarkets-phase5-pg-1ae80f8/browser-baseline/source/infinitemarkets/services/settlement.py",
+        "sha256": "8924a71c1c86fc4a8c63b8b2a53772081d331ae22d04ab109a3b28de5a6c46f4",
+        "matches_baseline_git_show": true
+      },
+      "infinitemarkets.services.orders": {
+        "file": "/private/tmp/infinitemarkets-phase5-pg-1ae80f8/browser-baseline/source/infinitemarkets/services/orders.py",
+        "sha256": "78520d7220a021c7a9b167cc8d3e06bd8ec3edeace99582986f77dd6073d7156",
+        "matches_baseline_git_show": true
+      },
+      "infinitemarkets.views_public_api": {
+        "file": "/private/tmp/infinitemarkets-phase5-pg-1ae80f8/browser-baseline/source/infinitemarkets/views_public_api.py",
+        "sha256": "9d93a02f7e83e4e82724f8396a8d185508b36f390dff157cab4c442c412c2855",
+        "matches_baseline_git_show": true
+      }
+    },
+    "current_instrumentation_copied_without_modification": {
+      "tools/e2e_server.py": "75b74761259cdb2a9d2c74a1522a8dcf83589bbb82d2a91259e1de12b34cb88c",
+      "tests/e2e/buyer.spec.ts": "7ecbeff7122718dcfb0544806308ab6a194f53a5d025f4fa600a0ecb4ed3f3db",
+      "tests/e2e/admin.spec.ts": "e3afd76686ca8886d94a909613fd863a541c868974cfe6c8d7e3cd08475d08ac",
+      "tests/e2e/playwright.config.ts": "7e5255122ff825496f4600c284808c806c5d47d179ee1cf91629469ed4fed5ba"
+    },
+    "production_or_financial_helper_compatibility_patches": [],
+    "pinned_host": {
+      "commit": "e336fe14b841d6f0c940e75b3d343e3ab5cf8433",
+      "checkout": "/Users/bk/github/infinitemarkets/.cache/lnbits",
+      "installed_package": "/Users/bk/github/infinitemarkets/.venv/lib/python3.12/site-packages/lnbits",
+      "all_426_tracked_host_package_files_match_git_show": true,
+      "missing_files": 0,
+      "mismatched_files": 0,
+      "bundle_components_sha256": "cafa64ed8f829a86063881c3f702dc3c367f234d6994702f694f80041203414f",
+      "verification_manifest": "/tmp/infinitemarkets-phase5-pg-1ae80f8/browser-baseline/installed-host-verification.json",
+      "host_git_status_after_capture": "clean"
+    }
+  },
+  "execution_posture": {
+    "origin": "https://localhost:52173",
+    "database": "Fresh scratch SQLite only; LNBITS_DATABASE_URL explicitly empty; no PostgreSQL fixtures or existing database opened by the server.",
+    "fixture_root": "/tmp/infinitemarkets-phase5-pg-1ae80f8/browser-baseline/tmp/gm-e2e-y0aqbvoo",
+    "funding_source": "Real pinned-host FakeWallet",
+    "INFINITEMARKETS_RELAY_IO": "off",
+    "UV_NO_ENV_FILE": "1",
+    "UV_NO_SYNC": "1",
+    "UV_OFFLINE": "1",
+    "TZ": "UTC",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "TMPDIR": "/tmp/infinitemarkets-phase5-pg-1ae80f8/browser-baseline/tmp",
+    "node": "/Users/bk/.nvm/versions/node/v22.22.3/bin/node",
+    "dependency_reuse": "Read-only-use symlinks to existing .venv, .cache/lnbits and tests/e2e/node_modules; no installs or dependency updates.",
+    "https": "Unchanged e2e_server real HTTPS with its throwaway self-signed certificate and existing Playwright ignoreHTTPSErrors posture; no browser launch SSL flags, trust changes or service-worker blocking.",
+    "error_filtering_or_mocking": false,
+    "server_ready": "server-raw.log:102; module verification completed before readiness print",
+    "make_targets_run": [],
+    "make_note": "Makefile was read. No target exists for this isolated baseline browser capture; host/verification targets were avoided because they can mutate checkout or unrelated evidence."
+  },
+  "F2_actual_baseline_browser_red": {
+    "command": "Node22 tests/e2e/node_modules/@playwright/test/cli.js test buyer.spec.ts --grep 'hard02 recovered original invoice QR is payable; independent hold blocks delivery' --reporter=list --output=/tmp/infinitemarkets-phase5-pg-1ae80f8/browser-baseline/buyer-results",
+    "working_directory": "/tmp/infinitemarkets-phase5-pg-1ae80f8/browser-baseline/source/tests/e2e",
+    "process_record": "/tmp/infinitemarkets-phase5-pg-1ae80f8/browser-baseline/buyer-actual-process.json",
+    "playwright_exit_code": 1,
+    "capture_wrapper_exit_code": 0,
+    "natural_termination": true,
+    "wall_seconds": 27.690,
+    "test_seconds": 26.5,
+    "collected": 1,
+    "failed": 1,
+    "passed": 0,
+    "skipped": 0,
+    "failure_location": "tests/e2e/buyer.spec.ts:69:27",
+    "actual_assertion_excerpt": "Error: expect(locator).toHaveAttribute(expected) failed\nLocator: locator('#gm-invoice-panel')\nExpected: \"awaiting_payment\"\nReceived: \"creation_unknown\"\nTimeout: 20000ms\n44 locator resolutions retained data-invoice-state=creation_unknown",
+    "scenario_reached": {"width": 1280, "independent_hold": false},
+    "controls_verified_from_actual_trace_and_prior_assertions": {
+      "recovery_arm_http_status": 200,
+      "recovery_arm_ok": true,
+      "checkout_http_status": 201,
+      "checkout_request_count": 1,
+      "initial_creation_unknown_and_no_invoice_textarea_assertions_passed": true,
+      "recovery_http_status": 200,
+      "recovery_ok": true,
+      "invoice_count": 1,
+      "independent_hold_requested": false,
+      "status_page_fragment_stripped_assertion_passed": true,
+      "order_status_http_200_count": 10,
+      "post_recovery_projection": "awaiting_payment / pending / payment_exception=true; the original invoice exists but the frontend stays in creation_unknown",
+      "post_recovery_bolt11_present_in_status_response": true,
+      "digital_delivery_count": 0,
+      "readonly_post_capture_database": {"state": "awaiting_payment", "payment_exception": 1, "payment_exception_reason": "invoice-creation-unknown", "payment_exception_resolution": null, "projection_status": "pending", "original_invoice_attached": 1}
+    },
+    "failure_context": "error-context.md:15-32 records the intended state assertion and actual On hold/payment-being-verified browser snapshot, not a host setup/fixture/controls error.",
+    "not_reached": "The subsequent QR visibility/countdown/original-SHA256/copy, settlement, mobile and independent-hold assertions were not reached after the first state regression. They are not claimed as baseline passes or additional failures.",
+    "baseline_source_reference": "scratch source/infinitemarkets/services/checkout.py:1248-1345 attaches the original projection but does not clear the uncertainty payment_exception; :1377-1395 marks invoice-creation-unknown.",
+    "raw_log": "/tmp/infinitemarkets-phase5-pg-1ae80f8/browser-baseline/buyer-actual-raw.log",
+    "trace": "/tmp/infinitemarkets-phase5-pg-1ae80f8/browser-baseline/buyer-results/buyer-hard02-recovered-ori-d354d-endent-hold-blocks-delivery/trace.zip",
+    "initial_non_evidence_invocation": {"issue": "Anchored grep matched no full Playwright title; corrected to the exact unique title substring without changing the test.", "exit_code": 1, "collected": 0, "duration_seconds": 0.626, "counted_as_regression_red": false, "raw_log": "/tmp/infinitemarkets-phase5-pg-1ae80f8/browser-baseline/buyer-raw.log"}
+  },
+  "F1_pinned_host_pageerror_baseline": {
+    "approach": "Minimal actual Chromium script opening baseline admin, creating an actual unpaid checkout, settling it through the unchanged harness FakeWallet/listener route and collecting every pageerror. No synthetic error injection, filtering or masking.",
+    "script": "/tmp/infinitemarkets-phase5-pg-1ae80f8/browser-baseline/source/tests/e2e/baseline-errors.cjs",
+    "script_exit_code": 1,
+    "natural_termination": true,
+    "browser_closed": true,
+    "actual_completed_controls": {"desktop_admin_mounted": true, "checkout_http_status": 201, "settle_http_status": 200, "settle_ok": true, "merchant_detail_http_status": 200, "order_state": "confirmed", "payment_status": "settled", "websocket_frames_received": 1},
+    "all_pageerrors": [
+      {"stage": "desktop-admin-navigation", "message": "Failed to register a ServiceWorker for scope ('https://localhost:52173/') with script ('https://localhost:52173/service-worker.js'): An SSL certificate error occurred when fetching the script.", "stack": ""},
+      {"stage": "actual-FakeWallet-settlement", "message": "Cannot read properties of null (reading 'id')", "stack": "TypeError: Cannot read properties of null (reading 'id')\n    at Proxy.onWebsocketMessage (https://localhost:52173/static/bundle-components.min.js?v=1791831676:1:201894)"},
+      {"stage": "desktop-paid-order-selection", "message": "Failed to register a ServiceWorker for scope ('https://localhost:52173/') with script ('https://localhost:52173/service-worker.js'): An SSL certificate error occurred when fetching the script.", "stack": ""}
+    ],
+    "baseline_error_counts": {"total": 3, "serviceworker_ssl": 2, "null_wallet_id": 1},
+    "script_limitation": "After both target errors were already captured and actual paid/settled controls passed, an optional current-only Technical delivery details label was absent in the old admin UI. The script exited 1 on that locator after 5 seconds; mobile navigation was not reached. This is a capture with an explicit harness/UI compatibility limitation, not a GREEN admin journey.",
+    "host_source_references": [".cache/lnbits/lnbits/static/js/globals.js:89-92 registers the service worker without a rejection handler", ".cache/lnbits/lnbits/static/js/components/lnbits-manage-wallet-list.js:42-55 handles the real payment websocket message and dereferences this.g.wallet.id", ".cache/lnbits/lnbits/static/js/components/lnbits-manage-wallet-list.js:69-74 binds actual wallet websocket messages to that handler"],
+    "existing_main_comparison": {
+      "source": "/tmp/im-f1-e2e-final-results/admin-hard01-order-control-d8d9a-yment-at-desktop-and-mobile/error-context.md:15-38",
+      "sha256": "611be8545e5d6e013b4146c038ca8acb93497c40d42633b06698e6c55fbd1ece",
+      "source_is_existing_prior_current_run_not_rerun_here": true,
+      "main_counts": {"total": 13, "serviceworker_ssl": 10, "null_wallet_id": 3},
+      "match": "Both observed baseline error families match the existing main-run errors. Null-wallet stacks name Proxy.onWebsocketMessage at bundle-components.min.js:1:201894 in both runs; service-worker messages match apart from origin port. Cache-busting versions differ. Counts are not claimed identical across different journeys.",
+      "main_stack_example": "TypeError: Cannot read properties of null (reading 'id')\n    at Proxy.onWebsocketMessage (https://localhost:5099/static/bundle-components.min.js?v=1791790603:1:201894)"
+    },
+    "new_hard01_test_not_used_as_baseline_no_pageerror_proof": "The new financial-controls regression cannot establish an old-code no-pageerror baseline if it fails earlier on unsupported financial authority/unpaid controls. The minimal actual admin/payment capture avoids claiming that test reached its final errors assertion.",
+    "unpaid_confirmation_vulnerability": "Expected baseline behavior is not fixed or excused here; this capture does not independently re-run the unpaid-confirmation vulnerability or claim it absent.",
+    "no_pageerrors_gate_closed": false,
+    "raw_capture": "/tmp/infinitemarkets-phase5-pg-1ae80f8/browser-baseline/admin-baseline-raw.json"
+  },
+  "artifact_sha256": {
+    "buyer-actual-raw.log": "f96190a32f21576aec178caab89002323198a1367e3bd64096e0281c19365ba4",
+    "buyer-results/buyer-hard02-recovered-ori-d354d-endent-hold-blocks-delivery/trace.zip": "ea433f48ed2a24f711052260f16e463c3dd98443331711195c05a0186799be7c",
+    "server-raw.log": "24123d5f31638367e0dc7179f34f832c9d5c899f4d30f636996932a827367cdc",
+    "loaded-modules.json": "a83c767ca7cba7ffdd3dff0f7ac90010931c441824e77de326ac81db462bc848",
+    "admin-baseline-raw.json": "3fa27faf8da785c66c25a73f89aa7563977025216c0e21c51d0d3a396d2eec85"
+  },
+  "cleanup_and_boundaries": {
+    "owned_server_pid": 78431,
+    "owned_server_stopped": true,
+    "stop_method": "SIGINT after proof capture; server shutdown cancellation/KeyboardInterrupt log is cleanup only, not a test result.",
+    "server_tool_exit_code": -1,
+    "port_52173_listener_after_stop": false,
+    "owned_pid_exists_after_stop": false,
+    "server_watchdog_seconds": 360,
+    "buyer_capture_timeout_seconds": 210,
+    "admin_capture_watchdog_seconds": 60,
+    "main_source_tests_config_or_git_mutations": false,
+    "only_main_root_file_written": ".planning/phases/05-correctness-recovery-and-security-hardening/05-BROWSER-BASELINE-EVIDENCE.json",
+    "other_writes": "Scratch baseline source copies, scoped scripts, fresh SQLite fixture, throwaway certificate, seeds, browser artifacts and logs only. No existing database, root seed, metadata, generated asset or installed dependency changed.",
+    "sensitive_material": "Raw seeds, bearer/public tokens, invoice strings, test identity key material, logs and traces remain under approved disposable scratch. This durable file contains selected nonsecret observations and hashes only.",
+    "scratch_deletion": "Parent owns removal of the whole approved synthetic cluster root after review/testing; scratch raw artifacts will then be unavailable.",
+    "agents_spawned": false,
+    "missing_proofs": ["Historical RED-before-fix browser chronology", "Baseline hard02 later mobile/independent-hold assertions after the first intended failure", "A complete baseline admin journey or zero-pageerror result", "New execution of the current main code for comparison", "Full-suite, real-relay or release/financial-security qualification"]
+  }
+}

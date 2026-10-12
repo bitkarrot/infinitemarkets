@@ -223,6 +223,9 @@ async def test_bulk_archive_and_restore_closed_orders(runtime_env):
     closed = await _order(runtime_env)
     active = await _order(runtime_env)
     services = _svcs()
+    from test_order_saga import _settle_core_payment
+
+    await _settle_core_payment(closed["id"], closed["total_sat"])
     result = await services["settlement"].confirm_settlement(
         order_id=closed["id"], source="test"
     )
@@ -343,7 +346,9 @@ async def test_archived_late_payment_returns_to_active_attention(runtime_env):
     mid = runtime_env["merchant_id"]
     order = await _order(runtime_env)
     services = _svcs()
-    result = await services["settlement"].expire_order(order_id=order["id"])
+    result = await services["settlement"].expire_order(
+        order_id=order["id"], now=order["invoice_expiry"],
+    )
     assert result["action"] == "expired"
 
     bulk_url = f"{API}/merchants/{mid}/orders/bulk"
@@ -354,6 +359,9 @@ async def test_archived_late_payment_returns_to_active_attention(runtime_env):
     )
     assert response.status_code == 200, response.text
 
+    from test_order_saga import _settle_core_payment
+
+    await _settle_core_payment(order["id"], order["total_sat"])
     result = await services["settlement"].confirm_settlement(
         order_id=order["id"], source="test"
     )
@@ -392,8 +400,12 @@ async def test_transition_matrix(runtime_env):
     assert resp.status_code == 422
     assert resp.json()["type"] == "urn:infinitemarkets:invalid-transition"
 
+    from test_order_saga import _settle_core_payment
+
+    payment = await _settle_core_payment(order["id"], order["total_sat"])
+    await _svcs()["settlement"].invoice_listener(payment)
     # awaiting_payment -> confirmed -> processing -> completed is.
-    for to_state in ("confirmed", "processing", "completed"):
+    for to_state in ("processing", "completed"):
         resp = await client.post(
             f"{url}/status", json={"to_state": to_state},
             headers=await cookie(),
@@ -420,6 +432,107 @@ async def test_transition_matrix(runtime_env):
         )
     types = {r["event_type"] for r in rows}
     assert {"confirmed", "processing"} <= types
+
+
+async def _hard01_snapshot(order_id):
+    from infinitemarkets.db import DomainTransaction
+
+    async with DomainTransaction() as tx:
+        result = {}
+        for name in (
+            "orders",
+            "order_items",
+            "payments",
+            "inventory_reservations",
+            "order_events",
+            "email_queue",
+            "order_messages",
+            "order_fulfillment",
+        ):
+            column = "id" if name == "orders" else "order_id"
+            rows = await tx.fetch_all(
+                f"SELECT * FROM {tx.table(name)} WHERE {column} = :o",
+                {"o": order_id},
+            )
+            result[name] = sorted((dict(row) for row in rows), key=repr)
+        result["products"] = [
+            dict(row)
+            for row in await tx.fetch_all(
+                f"SELECT * FROM {tx.table('products')} WHERE id IN "
+                f"(SELECT product_id FROM {tx.table('order_items')} WHERE order_id = :o)"
+                " ORDER BY id",
+                {"o": order_id},
+            )
+        ]
+        result["outbox"] = [
+            dict(row)
+            for row in await tx.fetch_all(
+                f"SELECT id, state, aggregate_revision FROM {tx.table('outbox_events')}"
+                " ORDER BY id",
+            )
+        ]
+        return result
+
+
+async def test_hard01_unpaid_status_cannot_unlock_delivery(runtime_env):
+    order = await _order(runtime_env)
+    before = await _hard01_snapshot(order["id"])
+    response = await runtime_env["client"].post(
+        f"{_admin(runtime_env, order['id'])}/status",
+        json={"to_state": "confirmed"},
+        headers=await runtime_env["cookie"](),
+    )
+    assert response.status_code == 422, response.text
+    assert response.json()["type"] == "urn:infinitemarkets:invalid-transition"
+    status = await runtime_env["anon"].get(
+        f"{PUBLIC}/order-status",
+        headers={"X-Order-Token": order["_token"]},
+    )
+    assert status.json()["digital_delivery"] == []
+    assert await _hard01_snapshot(order["id"]) == before
+
+
+@pytest.mark.parametrize("damage", ["absent", "partial", "extra", "bad_item"])
+@pytest.mark.parametrize("state,target", [("confirmed", "processing"), ("processing", "completed")])
+async def test_hard01_settled_without_accounting_status(runtime_env, damage, state, target):
+    from test_order_saga import _settle_core_payment
+
+    from infinitemarkets.db import DomainTransaction
+
+    order = await _order(runtime_env)
+    payment = await _settle_core_payment(order["id"], order["total_sat"])
+    await _svcs()["settlement"].invoice_listener(payment)
+    async with DomainTransaction() as tx:
+        if state == "processing":
+            await _svcs()["orders"].transition_order(
+                tx,
+                order_id=order["id"],
+                to_state=state,
+                actor="system",
+            )
+        if damage == "absent":
+            await tx.execute(
+                "DELETE FROM inventory_reservations WHERE order_id = :o", {"o": order["id"]}
+            )
+        elif damage in ("partial", "extra"):
+            await tx.execute(
+                "UPDATE inventory_reservations SET quantity = :q WHERE order_id = :o",
+                {"q": 1 if damage == "partial" else 3, "o": order["id"]},
+            )
+        else:
+            await tx.execute(
+                "UPDATE order_items SET quantity = 0 WHERE order_id = :o", {"o": order["id"]}
+            )
+    before = await _hard01_snapshot(order["id"])
+    response = await runtime_env["client"].post(
+        f"{_admin(runtime_env, order['id'])}/status",
+        json={"to_state": target},
+        headers=await runtime_env["cookie"](),
+    )
+    assert response.status_code == 422, response.text
+    detail = (await runtime_env["client"].get(_admin(runtime_env, order["id"]))).json()
+    assert detail["fulfillment_authorized"] is False
+    assert await _hard01_snapshot(order["id"]) == before
 
 
 async def test_cancel_releases_stock_once(runtime_env):
@@ -619,14 +732,13 @@ async def test_decrypted_pii_owner_only(runtime_env):
 
 
 async def test_events_chronology(runtime_env):
+    from test_order_saga import _settle_core_payment
+
     client = runtime_env["client"]
-    cookie = runtime_env["cookie"]
     order = await _order(runtime_env)
     url = _admin(runtime_env, order["id"])
-    await client.post(
-        f"{url}/status", json={"to_state": "confirmed"},
-        headers=await cookie(),
-    )
+    payment = await _settle_core_payment(order["id"], order["total_sat"])
+    await _svcs()["settlement"].invoice_listener(payment)
     resp = await client.get(f"{url}/events")
     assert resp.status_code == 200
     events = resp.json()
@@ -646,17 +758,21 @@ async def test_admin_idempotency_key_accepted(runtime_env):
     order = await _order(runtime_env)
     url = _admin(runtime_env, order["id"])
 
+    from test_order_saga import _settle_core_payment
+
+    payment = await _settle_core_payment(order["id"], order["total_sat"])
+    await _svcs()["settlement"].invoice_listener(payment)
     hdrs = await cookie()
     hdrs["Idempotency-Key"] = uuid.uuid4().hex * 2
     resp = await client.post(
-        f"{url}/status", json={"to_state": "confirmed"}, headers=hdrs,
+        f"{url}/status", json={"to_state": "processing"}, headers=hdrs,
     )
     assert resp.status_code == 200
 
     hdrs = await cookie()
     hdrs["Idempotency-Key"] = "bad key!!"
     resp = await client.post(
-        f"{url}/status", json={"to_state": "processing"}, headers=hdrs,
+        f"{url}/status", json={"to_state": "completed"}, headers=hdrs,
     )
     assert resp.status_code == 422
     assert resp.json()["type"] == "urn:infinitemarkets:invalid-idempotency-key"

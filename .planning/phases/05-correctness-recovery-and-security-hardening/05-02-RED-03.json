@@ -1,0 +1,26 @@
+{
+ "command": "node --test-reporter=tap --input-type=module -e 'import {test} from \"node:test\"; import assert from \"node:assert/strict\"; import {spawnSync} from \"node:child_process\"; test(\"test_hard03_accept_cumulative_accounting_once[consumed]\", () => { const r = spawnSync(\"uv\", [\"run\", \"pytest\", \"tests/runtime/test_order_saga.py::test_hard03_accept_cumulative_accounting_once[consumed]\", \"-q\", \"--tb=short\", \"--show-capture=no\"], {encoding:\"utf8\"}); assert.equal(r.status, 0, r.stdout + r.stderr); });'",
+ "exitCode": 1,
+ "targetFile": "tests/runtime/test_order_saga.py",
+ "targetTest": "test_hard03_accept_cumulative_accounting_once[consumed]",
+ "expected": "normal paid consumption then cancel/accept stock7, not second charge",
+ "actual": "AssertionError at line1559: stock_on_hand4 !=7",
+ "output": "TAP version 13\n# Subtest: test_hard03_accept_cumulative_accounting_once[consumed]\nnot ok 1 - test_hard03_accept_cumulative_accounting_once[consumed]\n  ---\n  failureType: 'testCodeFailure'\n  error: |-\n    E AssertionError: accept must not charge accounted units twice\n    E {'stock_on_hand': 4} != {'stock_on_hand': 7}\n    1 failed in 2.93s\n  code: 'ERR_ASSERTION'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 0\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 4613.05175",
+ "output_scope": "actual TAP excerpt from shell7b54af; stack omitted",
+ "profile": "fresh synthetic SQLite; FakeWallet actual settlement and paid cancellation",
+ "natural_exit": true,
+ "additional_pytest_red": {
+   "command": "uv run pytest tests/runtime/test_order_saga.py -k 'hard03_accept_cumulative' -q --tb=short --show-capture=no",
+   "shell": "bd2fcf", "exit_code": 1, "failed": 4, "deselected": 138,
+   "seconds": 2.87,
+   "assertions": ["consumed: stock4 !=7", "partial: inventory_accounted False", "residual: stock_reserved3 !=0", "unlimited: inventory_accounted False"]
+ },
+ "postgres_contention_red": {
+   "command": "uv run pytest tests/runtime/test_catalog_variants.py -k 'hard03' -q --tb=short --show-capture=no",
+   "shell": "7bfd13", "exit_code": 1, "failed": 2, "warnings": 2, "seconds": 2.36,
+   "tests": ["test_hard03_variation_competing_capacity[accept]", "test_hard03_variation_competing_capacity[checkout]"],
+   "assertion": "line122: assert not isinstance(results[0], BaseException); IntegrityError from finite-stock CheckViolation rather than clean shortfall fallback",
+   "profile": "identity-verified socket-only synthetic PG17.9 UTC; two actual DomainTransaction connections with distinct pg_backend_pid assertions before capacity race",
+   "natural_exit": true
+ }
+}

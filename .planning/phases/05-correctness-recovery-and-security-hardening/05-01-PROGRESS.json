@@ -1,0 +1,148 @@
+{
+  "plan": "05-01",
+  "status": "partial-host-qualification-open",
+  "completion_summary_created": false,
+  "updated_at": "2026-10-12T21:07:09+00:00",
+  "source_implementation": "Implemented and independently reviewed in the authorized financial tranche; no later plans executed",
+  "current_checks": {
+    "full_financial": {
+      "sqlite_passed": 433,
+      "sqlite_pg_only_skips": 6,
+      "postgres_passed": 439,
+      "postgres_skips": 0,
+      "evidence": "05-FINANCIAL-REVIEW-FIXES.json"
+    },
+    "parent_focused": {
+      "sqlite_passed": 83,
+      "sqlite_pg_only_skips": 4,
+      "postgres_passed": 87,
+      "postgres_skips": 0,
+      "exit_code": 0
+    },
+    "buyer_browser": {
+      "tests_passed": 1,
+      "scenarios": 3,
+      "exit_code": 0
+    },
+    "source_review": "PASSED for finite F1/F3/F2 scope; CR-01 through CR-06 and WR-02 resolved",
+    "qualification": "BLOCKED; not phase completion or release clearance"
+  },
+  "remaining_gates": [
+    "F1 admin pinned-host pageerror qualification OPEN; no filtering, vendor or security change",
+    "WR-01 original browser RED chronology absent; retrospective baseline reproduction recorded honestly",
+    "WR-04 pre-existing in-flight token rotation/expiry race MEDIUM / OPEN / NOT FIXED / NOT WAIVED; separate bounded authorization follow-up",
+    "HISTORICAL-PAID-ORDER-AUDIT OPEN / NOT AUTHORIZED / NOT PERFORMED; actual-record evidence NONE; production exposure/disposition/release BLOCKED",
+    "F4-F6, CI-01, full matrix/qualification and separately authorized live Plebeian remain pending"
+  ],
+  "source_map_reference": "05-REVIEW.md and current 05-FINANCIAL-REVIEW-FIXES.json",
+  "historical_executor_snapshot": {
+    "plan": "05-01",
+    "status": "partial-blocked-not-complete",
+    "completionSummaryCreated": false,
+    "scope": "F1/HARD-01 only. No F2/F3/F4-F6/CI-01 implementation, global planning edits, Git operations, dependency/vendor/config-file changes, deployment, live funds or live relays.",
+    "tasks": {
+      "05-01-01": "Implemented; permanent assertion RED verified; final scoped SQLite GREEN 23 passed, 14 deselected, natural exit0. PostgreSQL qualification remains blocked.",
+      "05-01-02": "Implemented shared atomic cancellation and consumer/shipping gates; SQLite coverage passes except the explicitly retained fresh-accept positive requiring 05-02 provenance. Full original relay-enabled Gamma suite and PostgreSQL qualification remain unverified. Not complete.",
+      "05-01-03": "Permanent intended browser RED verified; UI and paid fixture implemented. Real desktop/390px negative controls, paid processing, keyboard action, reason dialog, paid cancellation and no-token-URL assertions pass before the final no-pageerror assertion fails on pinned-host errors. Accepted physical backorder browser integration remains unverified pending producer handoff. Not complete."
+    },
+    "filesEdited": [
+      "infinitemarkets/services/orders.py",
+      "infinitemarkets/static/infinitemarkets/js/admin_orders.js",
+      "tests/runtime/test_order_admin.py",
+      "tests/runtime/test_public_contract.py",
+      "tests/runtime/test_order_saga.py",
+      "tests/runtime/test_nostr_signin.py",
+      "tests/runtime/test_email_queue.py",
+      "tests/runtime/test_nip17_inbox.py",
+      "tests/runtime/test_release_a_journey.py",
+      "tests/e2e/admin.spec.ts",
+      "tools/e2e_server.py"
+    ],
+    "phaseArtifactsCreated": [
+      "05-01-task1-red.json",
+      "05-01-task2-red.json",
+      "05-01-task2-buyer-red.json",
+      "05-01-task3-red.json",
+      "05-01-PROGRESS.json"
+    ],
+    "implementation": {
+      "helpers": "orders.py _read_connection; payment_settled:157; inventory_accounted:178; fulfillment_authorized:296; _cancel_order_in_tx:627",
+      "authority": "One correlated settled local projection with exact external id/positive matching amount/payment hash/wallet hash/settled timestamp, plus readonly all-item merchant-owned consumed or explicit accepted allocation accounting. Malformed/partial/extra/foreign/boolean/negative/contradictory/ambiguous proof fails closed. Digital oversold/backordered items remain blocked. Physical declared backorders with credible proof may ship.",
+      "consumers": "digital_delivery:322 protects token/history/confirmed-email content and Gamma orders. order_detail field:914 adds owner-only fulfillment_authorized. admin_set_status:1005 and admin_set_shipping:1052 require common authority. No defensive repair of state, flags, stock, events, email or outbox.",
+      "cancellation": "Status cancellation invokes the open-transaction inner operation; external cancel_order and Gamma adapter share it. Reason required for paid/confirmed/processing merchant cancellation through existing /cancel; buyer remains early-only AND must lack verified settlement, including corrupt legacy awaiting_payment rows (orders.py:634-637). A separate permanent Gamma buyer RED proved the prior state-only cancellation bypass and its targeted GREEN passed. Held reservations release once, state/audit/intents commit or roll back together, repeated cancellation is a no-op, concurrent cancellation is fenced by order locking, late settlement remains cancelled/manual review. Existing status request {to_state} and response {id,state} preserved; no new reason field or refund automation.",
+      "literalStateTable": "ORDER_TRANSITIONS at orders.py:48-58 was not edited.",
+      "ui": "admin_orders.js:132 action computation requires owner boolean true and detail.payment.status settled; holds do not expose fulfillment; review copy at :227; cancellation remains reachable and existing reason-bearing /cancel dialog/warning retained. No confirmation action and no proof inference from stock/flags/state. Oversold is not a blanket veto for physical authorization.",
+      "fixtures": "Wrong unpaid-confirm positives in transition matrix, event chronology and idempotency tests now use actual FakeWallet/listener settlement. Buyer history and Release-A journey positives also use the real FakeWallet helper. Accepted proof is constructed only in explicitly synthetic readonly schema fixtures, never injected into the fresh production-accept positive.",
+      "offlineHarness": "tools/e2e_server.py honors RELAY_IO off, starts no local relay in that mode, seeds an explicitly synthetic active merchant without claiming publication/inbox ACK evidence, records publication_evidence=not-run-financial-offline-fixture, and provides bounded harness-only /_e2e/financial-negative controls. Existing shipped APIs/security policy/vendor code are untouched. Positive invoices settle through existing /_e2e/settle/FakeWallet."
+    },
+    "environment": {
+      "common": "UV_NO_ENV_FILE=1 UV_NO_SYNC=1 UV_OFFLINE=1; installed tools only; FakeWallet; INFINITEMARKETS_RELAY_IO=off. No credential files looked up or inspected.",
+      "sqlite": "LNBITS_DATABASE_URL=''; fresh mktemp core folder and pytest synthetic tmpdirs; single-process macOS ARM64.",
+      "postgres": "Approved socket-only PostgreSQL17.9, devin_phase5/infinitemarkets_phase5, socket /tmp/infinitemarkets-phase5-pg-1ae80f8/socket and data /tmp/infinitemarkets-phase5-pg-1ae80f8/data. psql verified database/data directory/version and empty listen_addresses. Parent owns shutdown/removal.",
+      "browser": "Installed Node22.22.3 at /Users/bk/.nvm/versions/node/v22.22.3/bin, Playwright1.63 Chromium, localhost HTTPS5099 disposable real host SQLite. Seed is synthetic /tmp/im-f1-e2e-05-01-seed.json. Both owned browser servers were terminated after tests; no preview or relay left running."
+    },
+    "redEvidence": {
+      "task1": "05-01-task1-red.json: HTTP200 versus422 at unpaid status assertion; 21 assertion failures, 2 passes, 14 deselected; exit1; installed checker RED_EVIDENCE_OK.",
+      "task2": "05-01-task2-red.json: status cancellation retained stock_reserved2 instead of0, unauthorized shipping HTTP200 versus422 and paid reasonless cancellation HTTP200 versus422; 86 assertion failures, 22 deselected; exit1; installed checker RED_EVIDENCE_OK.",
+      "task2BuyerFollowup": "05-01-task2-buyer-red.json: after real Gamma FakeWallet settlement, corrupt legacy awaiting_payment state allowed buyer cancellation; adapter returned cancelled instead of audit-only at then test_nip17_inbox.py:894. 1 failed, 3.01s, exit1; installed checker RED_EVIDENCE_OK. After the inner predicate required absence of verified settlement, the same exact selected test passed (1 passed, 2.65s, exit0).",
+      "task3": "05-01-task3-red.json: after fixing selector/debounce setup, owner detail authority false yet Start processing rendered; expected button count0, received1 at then admin.spec.ts:299; 1 failed, exit1; installed checker RED_EVIDENCE_OK. Earlier missing-selector attempts were NOT accepted as RED.",
+      "format": "Checker is TAP-only; JSON explicitly labels summaries as pytest/Playwright-to-TAP adaptations, not native runner output. Actual assertion and raw/artifact locations are retained.",
+      "ambiguousProofRetention": "The later permanent ambiguous_latest schema fixture was unexpectedly GREEN immediately (1 passed, exit0, 2.98s). Investigation confirmed the Task1 helper already rejects tied latest confirmation timestamps at orders.py:242. No fabricated RED or additional production change was made for this case."
+    },
+    "verificationCommands": {
+      "task1Final": "LNBITS_DATA_FOLDER=$(mktemp -d /tmp/im-f1-task1-final.XXXXXX) uv run pytest tests/runtime/test_order_admin.py tests/runtime/test_public_contract.py -k 'hard01 or transition_matrix or end_to_end_journey' -q --tb=short; 23 passed, 14 deselected, 6.50s, natural exit0.",
+      "task2EarlierGreen": "LNBITS_DATA_FOLDER=$(mktemp -d /tmp/im-f1-green2-core.XXXXXX) .venv/bin/pytest tests/runtime/test_order_saga.py tests/runtime/test_nostr_signin.py tests/runtime/test_email_queue.py -q --tb=short; 171 passed, 2 SQLite-only PostgreSQL concurrency skips, 20.81s, natural exit0. This predates the added fresh-accept dependency positive and is not full Task2 completion.",
+      "gammaBuyerRedCommand": "LNBITS_DATA_FOLDER=$(mktemp -d /tmp/im-f1-buyer-red.XXXXXX) uv run pytest 'tests/runtime/test_nip17_inbox.py::test_hard01_gamma_delivery_requires_payment_and_inventory[legacy_paid_awaiting]' -q --tb=short; 1 failed, 3.01s, natural exit1.",
+      "gammaBuyerGreenCommand": "LNBITS_DATA_FOLDER=$(mktemp -d /tmp/im-f1-buyer-green.XXXXXX) uv run pytest 'tests/runtime/test_nip17_inbox.py::test_hard01_gamma_delivery_requires_payment_and_inventory[legacy_paid_awaiting]' -q --tb=short; 1 passed, 2.65s, natural exit0.",
+      "fullSelection": "uv run pytest tests/runtime/test_order_admin.py tests/runtime/test_public_contract.py tests/runtime/test_order_saga.py tests/runtime/test_nostr_signin.py tests/runtime/test_email_queue.py tests/runtime/test_release_a_journey.py tests/runtime/test_nip17_inbox.py::test_hard01_gamma_cancel_releases_once_without_relay_io tests/runtime/test_nip17_inbox.py::test_hard01_gamma_delivery_requires_payment_and_inventory -q --tb=short",
+      "sqliteFinal": "Full selection with fresh /tmp/im-f1-final5-sqlite.* and LNBITS_DATABASE_URL='': 217 passed, 1 failed, 2 skipped, 31.35s, natural exit1. Sole failure is test_hard01_fresh_accept_retains_authoritative_fulfillment at test_order_saga.py:682. Skips are test_email_queue.py:570 PostgreSQL row-lock drill and :602 PostgreSQL rate-bucket drill. No failing test was skipped/excluded to claim GREEN.",
+      "sqliteEarlierAttempts": "Initial broader pass: 212 passed, 3 failed, 2 skipped (30.43s), exit1; two remaining wrong unpaid-confirm fixtures were corrected via real settlement. Subsequent passes: 214 passed/1 failed/2 skipped (30.46s), then 215 passed/1 failed/2 skipped (31.23s), all exit1. Then 216 passed/1 failed/2 skipped (31.34s), exit1. Digital-shortfall, ambiguous-proof retention and the additional paid-awaiting Gamma buyer case account for the final count increase.",
+      "postgresInitial": "Full selection using approved socket DSN, default local timezones: 217 setup errors, 8 warnings, 441.09s, natural exit1; zero behavior assertions executed. Readiness failed at tests/runtime/conftest.py:375 after each module's 60s wait.",
+      "postgresUtcAttempt": "Full selection with command-local TZ=UTC and PGOPTIONS='-c timezone=UTC', approved DSN unchanged: 218 setup errors, 8 warnings, 441.31s, natural exit1; zero behavior assertions executed. psql honors PGOPTIONS (verified UTC) but LNbits uses SQLAlchemy+asyncpg (.cache/lnbits/lnbits/db.py:298-318), which does not use libpq PGOPTIONS. Database default remains America/Los_Angeles; process-local timezone was corrected but driver sessions remained incompatible. No database/role/cluster configuration was changed and no third retry or readiness bypass was attempted.",
+      "browserRed": "workdir tests/e2e; PATH=/Users/bk/.nvm/versions/node/v22.22.3/bin:$PATH npx --no-install playwright test admin.spec.ts --grep hard01; 1 intended failed assertion, exit1, 17.8s.",
+      "browserBroad": "Same workdir/env; npx --no-install playwright test admin.spec.ts --grep 'orders|order states|hard01' --output=/tmp/im-f1-e2e-green-results; 1 passed, 1 failed at no-pageerror assertion, 2 serial tests did not run; 14.1s, natural exit1.",
+      "browserRetention": "npx --no-install playwright test admin.spec.ts --grep 'closed orders|order states' --output=/tmp/im-f1-e2e-retention-results; 2 passed, 6.6s, natural exit0.",
+      "browserFinal": "Fresh restarted offline server, npx --no-install playwright test admin.spec.ts --grep hard01 --output=/tmp/im-f1-e2e-final-results; 1 failed solely at final errors==[] assertion at admin.spec.ts:343, 11.8s, natural exit1. All preceding financial control/review/desktop/390px/keyboard/cancellation/no-refund/no-token-URL assertions passed.",
+      "lint": "make lint with common UV flags and LNBITS_DATABASE_URL='': final All checks passed, natural exit0. Earlier new-code E501/import findings were fixed with exact edits and range formatting confined to added/changed blocks.",
+      "syntax": "/Users/bk/.nvm/versions/node/v22.22.3/bin/node --check infinitemarkets/static/infinitemarkets/js/admin_orders.js; natural exit0.",
+      "backgroundObservation": "Earlier summary shell0d79d3 was queried at handoff: no more output, exited code0. Its original command is not mapped here and is not counted as financial evidence. All new verification commands reached reported natural exits; the two owned disposable browser servers were terminated.",
+      "notRun": "make host not run because its checkout script can perform parent-owned Git fetch/checkout and outgoing GitHub access. Installed pinned host was used unchanged. No make verify/full qualification, DB/install pair, full relay-enabled original Gamma suite, dependency install, Git, push or deployment command was run."
+    },
+    "blockers": [
+      {
+        "id": "05-02-03-PRODUCER-HANDOFF",
+        "test": "tests/runtime/test_order_saga.py:664-682 test_hard01_fresh_accept_retains_authoritative_fulfillment",
+        "actual": "Real checkout -> early cancellation -> actual core FakeWallet payment -> listener -> real resolve-exception accept endpoint returns200/confirmed/accepted; fulfillment_authorized remainsFalse because consumed rows are released and no cumulative allocation proof is written.",
+        "producer": "infinitemarkets/services/settlement.py:719-757 allocates stock and changes backorder rows, then transition_order stores only reason/exception-accept with no inventory_accounting detail. orders.py:178-293 must not turn that reason into proof.",
+        "parentAction": "Coordinate approved minimal 05-02 producer handoff: compute cumulative all-item accounting from durable consumed quantities/prior credible accepted allocations, allocate only remaining quantity, record exact shortfall, and pass detail.inventory_accounting={version:1,items:[item_id,product_id,quantity,consumed_qty,accepted_allocated_qty,backordered_qty]} in the same transaction. Keep proof all-item, integer, ownership/quantity consistent and latest-event provenance unambiguous. Do not blindly append proof to the current whole-quantity allocator, bless historical reason-only rows, or forge proof in this real-flow test. Rerun this positive after 05-02-03. No settlement.py edit was made here."
+      },
+      {
+        "id": "PINNED-HOST-BROWSER-ERRORS",
+        "test": "tests/e2e/admin.spec.ts:258-343 hard01",
+        "actual": "Self-signed localhost ServiceWorker fetch produces SSL registration error, and real payment WebSocket messages trigger null g.wallet.id in the pinned host's onWebsocketMessage.",
+        "source": ".cache/lnbits/lnbits/static/js/globals.js:89-90; .cache/lnbits/lnbits/static/js/components/lnbits-manage-wallet-list.js:42-55. Browser stack reports static/bundle-components.min.js:1:201894.",
+        "parentAction": "Resolve through approved host/browser qualification path. No filtering of errors, ServiceWorker/security-policy suppression, certificate trust changes, fake global wallet state, vendor edits or dependency installs were used. Browser task remains incomplete."
+      },
+      {
+        "id": "POSTGRES-UTC-SESSION-QUALIFICATION",
+        "source": "infinitemarkets/services/readiness.py:35-47; tests/runtime/conftest.py:375; .cache/lnbits/lnbits/db.py:298-318",
+        "parentAction": "Parent/config owner must provide UTC database sessions compatible with LNbits SQLAlchemy+asyncpg in this disposable socket-only database and process UTC, then rerun financial selection. Do not weaken readiness or treat the setup errors as RED financial evidence. Cluster remains running and unmodified by manual configuration operations."
+      },
+      {
+        "id": "FULL-GAMMA-AND-ACCEPTED-BROWSER-RETENTION",
+        "actual": "Six new offline Gamma domain cases passed in final SQLite selection using synthetic declared relay metadata and real gamma intake/FakeWallet, but existing full wrapped/relay-enabled Gamma suite was not run under the mandatory RELAY_IO-off restriction. Accepted physical backorder domain/schema fixture ships successfully; full actual-accept browser integration is not qualified.",
+        "parentAction": "Do not equate offline adapter coverage with full NIP-17 relay/crypto pipeline qualification or synthetic accepted-schema fixtures with a proven production accept writer. Coordinate remaining verification without live relays or fake allocation proof."
+      }
+    ],
+    "rawEvidenceLocations": [
+      "Phase-local RED JSONs contain original runner assertions and raw log pointers.",
+      "/var/folders/_l/mkpnssh91x9fd3khg5ltnfjm0000gn/T/devin-overflows-501/shell-70e834-47a17947cfb9b5eb/content.txt (first PostgreSQL setup errors)",
+      "/var/folders/_l/mkpnssh91x9fd3khg5ltnfjm0000gn/T/devin-overflows-501/shell-7aa3f8-7377465c17ad284f/content.txt (UTC-environment PostgreSQL setup errors)",
+      "tests/e2e/test-results/admin-hard01-order-control-d8d9a-yment-at-desktop-and-mobile/ (intended RED screenshot/context/trace)",
+      "/tmp/im-f1-e2e-final-results/admin-hard01-order-control-d8d9a-yment-at-desktop-and-mobile/ (final pinned-host error screenshot/context/trace)",
+      "Raw seed/trace/log artifacts are disposable and may contain synthetic authentication/invoice material; do not commit or relay raw bearer material. This progress artifact records only sanitized assertions/counts."
+    ],
+    "stop": "Stopped after scoped 05-01 work. No completion SUMMARY, phase advancement, threat/security/release clearance or executor commit. Parent owns Git/global planning updates and decisions on the blockers."
+  },
+  "pause": "User requested local commit if finite source review clear, then pause. No push/deploy/live/actual historical-record actions authorized."
+}

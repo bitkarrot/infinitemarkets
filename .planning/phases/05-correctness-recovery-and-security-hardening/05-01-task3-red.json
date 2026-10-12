@@ -1,0 +1,14 @@
+{
+  "command": "PATH=/Users/bk/.nvm/versions/node/v22.22.3/bin:$PATH npx --no-install playwright test admin.spec.ts --grep hard01 (workdir tests/e2e)",
+  "exitCode": 1,
+  "targetTest": "hard01 order controls require settled and fully accounted payment at desktop and mobile",
+  "targetFile": "tests/e2e/admin.spec.ts",
+  "expected": "No processing/completion/shipping button for a settled confirmed no-exception order with missing consumed coverage",
+  "actual": "At admin.spec.ts:299, expected button count0, received1 (Start processing). Owner-detail authority already false. 1 failed, natural exit1; 17.8s.",
+  "outputFormat": "Explicit Playwright-to-TAP summary adaptation for installed TAP-only GSD checker; not native runner output",
+  "output": "not ok 1 - hard01 order controls require settled and fully accounted payment at desktop and mobile\n# tests 1\n# pass 0\n# fail 1\n",
+  "rawAssertion": "expect(locator).toHaveCount(expected) failed; Expected: 0 Received: 1",
+  "artifacts": "tests/e2e/test-results/admin-hard01-order-control-d8d9a-yment-at-desktop-and-mobile/{test-failed-1.png,error-context.md,trace.zip}",
+  "invalidAttempts": "Two earlier selector/debounce failures did not authorize GREEN. Third run waited for filtered response and failed on the intended unsafe control assertion.",
+  "topology": "Node22.22.3 installed Playwright1.63 Chromium; localhost HTTPS5099 real LNbits/FakeWallet fresh tmp SQLite; RELAY_IO off with explicit offline financial harness seed; no relay/publication claims; no installs"
+}

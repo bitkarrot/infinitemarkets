@@ -228,6 +228,79 @@ async def test_checkout_rate_limits(runtime_env, monkeypatch, window_headroom):
     assert resp.json()["type"] == "urn:infinitemarkets:rate-limited"
 
 
+@pytest.mark.parametrize("state", ["confirmed", "processing", "completed"])
+@pytest.mark.parametrize("damage", ["unpaid", "missing_payment", "absent", "partial"])
+async def test_hard01_settled_without_accounting_token(runtime_env, state, damage):
+    from test_order_admin import _hard01_snapshot
+    from test_order_saga import _settle_core_payment
+
+    from infinitemarkets.crypto import token_lookup_hash
+    from infinitemarkets.db import DomainTransaction
+    from infinitemarkets.services import settlement
+
+    client = runtime_env["client"]
+    response = await client.post(
+        f"{API}/products",
+        json={
+            "category_id": runtime_env["category_id"],
+            "title": "guarded delivery",
+            "amount_minor": 1000,
+            "currency": "SAT",
+            "visibility": "on-sale",
+            "stock_on_hand": 10,
+            "format": "digital",
+            "delivery_content": "synthetic entitlement",
+        },
+        headers=await runtime_env["cookie"](),
+    )
+    assert response.status_code == 201, response.text
+    product = response.json()
+    from infinitemarkets.services import checkout
+
+    response = await checkout.checkout(
+        payload={
+            "merchant_pubkey": runtime_env["merchant_pubkey"],
+            "items": [{"d_tag": product["d_tag"], "quantity": 2}],
+        },
+        idempotency_key=_idem(),
+        client_scope=uuid.uuid4().hex,
+    )
+    token = response["public_token"]
+    async with DomainTransaction() as tx:
+        order = dict(
+            await tx.fetch_one(
+                "SELECT * FROM orders WHERE public_token_hash = :h",
+                {"h": token_lookup_hash(token)},
+            )
+        )
+    if damage not in ("unpaid", "missing_payment"):
+        payment = await _settle_core_payment(order["id"], order["total_sat"])
+        await settlement.invoice_listener(payment)
+    async with DomainTransaction() as tx:
+        await tx.execute(
+            "UPDATE orders SET state = :s WHERE id = :o", {"s": state, "o": order["id"]}
+        )
+        if damage == "missing_payment":
+            await tx.execute("DELETE FROM payments WHERE order_id = :o", {"o": order["id"]})
+        elif damage == "absent":
+            await tx.execute(
+                "DELETE FROM inventory_reservations WHERE order_id = :o", {"o": order["id"]}
+            )
+        elif damage == "partial":
+            await tx.execute(
+                "UPDATE inventory_reservations SET quantity = 1 WHERE order_id = :o",
+                {"o": order["id"]},
+            )
+    before = await _hard01_snapshot(order["id"])
+    response = await runtime_env["anon"].get(
+        f"{PUBLIC}/order-status",
+        headers={"X-Order-Token": token},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["digital_delivery"] == []
+    assert await _hard01_snapshot(order["id"]) == before
+
+
 async def test_end_to_end_journey(runtime_env):
     """The Release-A loop at API level: publish intents exist, the product
     is publicly readable, checkout issues one invoice, FakeWallet settles,

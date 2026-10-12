@@ -1,0 +1,876 @@
+{
+  "status": "finite-financial-source-review-passed-local-commit-authorized-release-blocked",
+  "review_iterations": {
+    "1": "review_iteration_1",
+    "2": "current_attempt",
+    "preservation": "Previous 401/407 verification and its 23 fingerprints retained verbatim under review_iteration_1; both interrupted histories remain below. Counts are not combined across iterations."
+  },
+  "current_attempt": {
+    "iteration": 2,
+    "scope": "Sole writer, approved F1/F3/F2 CR05/CR06/WR02 financial fixes only. No agents, Git mutations, configuration/vendor/dependency changes, new comments, F4-F6, CI01, live/real-data access or historical repairs. Only phase-local evidence JSON updated; canonical REVIEW unchanged.",
+    "source_review_status": "Candidate fixes locally verified; awaiting parent independent recheck. Canonical 05-REVIEW.md dated 2026-10-12T20:14:07Z remains the pre-iteration issues_found review. No claim of Source PASSED REVIEW, phase/security/requirements/release clearance.",
+    "revision": {
+      "head": "a4cb2128eecbbfda1ec3d3a7e0e221df0f5c9fa8",
+      "parent": "bf99ec0b252f6ecff38eadb377d16d57def3576a",
+      "git_posture": "Read-only diff/status/rev-parse/check; parent owns staging, commit and cleanup",
+      "status_shell": "bee5a9",
+      "user_edits_preserved": true
+    },
+    "environment": {
+      "common": "UV_NO_ENV_FILE=1 UV_NO_SYNC=1 UV_OFFLINE=1 TZ=UTC INFINITEMARKETS_RELAY_IO=off; FakeWallet; installed tools only. Runtime fixtures own fresh synthetic core/extension folders. Existing full Gamma tests may explicitly exercise controlled loopback LocalRelay; no real external relay writes.",
+      "sqlite": {
+        "LNBITS_DATABASE_URL": "",
+        "final_core_folder": "/tmp/im-financial-iteration2-final-sqlite-core",
+        "final_focused_core_folder": "/tmp/im-financial-iteration2-final-focused-sqlite-core"
+      },
+      "postgres": {
+        "identity_shell": "af29f0",
+        "identity_exit": 0,
+        "version": "PostgreSQL17.9 Homebrew aarch64",
+        "database": "infinitemarkets_phase5",
+        "data_directory": "/tmp/infinitemarkets-phase5-pg-1ae80f8/data",
+        "listen_addresses": "",
+        "timezone": "UTC",
+        "dsn": "postgres://devin_phase5@/infinitemarkets_phase5?host=/tmp/infinitemarkets-phase5-pg-1ae80f8/socket",
+        "PGPASSFILE": "/dev/null",
+        "PGSERVICEFILE": "/dev/null",
+        "final_core_folder": "/tmp/im-financial-iteration2-final-pg-core",
+        "final_focused_core_folder": "/tmp/im-financial-iteration2-final-focused-pg-core",
+        "authority": "Exact approved disposable synthetic cluster identity verified before fixtures. Kept running for parent teardown; no other database accessed."
+      }
+    },
+    "changes": [
+      {
+        "file": "infinitemarkets/services/orders.py",
+        "lines": "347-371,404-437,677-704",
+        "change": "Strict nonnegative exact integer quantity fields, item/product identity, uniqueness and equations for every merchant ancestor before cumulative comparison. Shared payable_invoice locks and refreshes current order/projection, requires awaiting_payment/pending/no hold/approved resolution, bounded coherent live reservations, mandatory authenticated original snapshot and future decoded expiry; read-only. Coverage refreshes tx.now after all inventory locks and counter reads and returns the validated epoch."
+      },
+      {
+        "file": "infinitemarkets/services/order_messages.py",
+        "lines": "393-439,899-925",
+        "change": "Initial/recovered type-2 admission uses shared locked invoice authority inside existing transaction; checks no existing request and actual buyer HMAC, takes authoritative persisted BOLT11/expiry instead of caller values, rechecks deadline before enqueue. Selection is only id/merchant hint; no pretransaction decryption. Denied admission has no message/outbox/sequence effect; existing queued requests are not deleted or cleared. No routing, publisher, transport or Nostr capability change."
+      },
+      {
+        "file": "infinitemarkets/services/checkout.py",
+        "lines": "717-728,1324,1337,1393-1395,1504-1541,1683-1691",
+        "change": "Attachment uses DB clock after canonical awaits and coverage's post-lock epoch before deadline/state decisions. Gamma initial admission locks order and reuses common guard. Resume and completed idempotency replay return only a currently authorized persisted invoice; cached response cannot bypass live identity/coverage. Original correlation retained, no new invoice minted."
+      },
+      {
+        "file": "infinitemarkets/services/settlement.py",
+        "lines": "427-439,462-509",
+        "change": "Canonical successful proof verification precedes coverage lockset; fresh coverage epoch governs settled CAS, invoice deadline and stock/state decision. Expired allocation/invoice follows existing cancelled review lane with coherent release only. Settled replay still returns before verification/mutation; paid expired-invoice goods remain valid."
+      },
+      {
+        "file": "infinitemarkets/views_public_api.py",
+        "lines": "359-378,734-739,768-787",
+        "change": "Token/history invoice exposure uses same locked payable_invoice guard. Digital delivery, current projection and invoice admission share the caller-owned DomainTransaction, without nested DomainTransaction or public mutations. Malformed envelope denies invoice instead of uncaught exception."
+      },
+      {
+        "file": "tests/runtime/test_financial_review.py",
+        "lines": "212-218,621-1015",
+        "change": "32 additional permanent cases: actual Gamma persist-timeout/reconcile/type-2 descriptors, healthy original recovery, strong/reasonless/manual/unknown holds, expired/lost/corrupt coverage and projection/identity denial; selection/cancel/projection/deadline barriers; order/product wait crossing actual decoded FakeWallet deadline; 8 non-head numeric-type regressions; public/resume/completed-cache negatives; later reconciliation candidate and authoritative caller-invoice positive. Expired old fixture now controls authoritative DomainTransaction clock, not stale caller hint."
+      },
+      {
+        "file": "tests/runtime/test_checkout.py",
+        "lines": "341",
+        "change": "Restored exact deleted baseline inline comment: fresh + replay + crash-resume only. No new comments added."
+      }
+    ],
+    "genuine_red_before_fixes": [
+      {
+        "shell": "b3fe7a",
+        "command": "uv run pytest tests/runtime/test_financial_review.py -k 'gamma_request or gamma_selection or deadline_after or ancestor_quantity or public_invoice' -q --tb=short --show-capture=no",
+        "database": "SQLite",
+        "core_folder": "/tmp/im-financial-iteration2-red-sqlite-core",
+        "exit_code": 1,
+        "natural_exit": true,
+        "failed": 27,
+        "passed": 1,
+        "deselected": 55,
+        "seconds": 5.41,
+        "behavior": "Protected type-2 requests incorrectly admitted; unsafe direct request helper returned intent; selected-before-cancel added request/outbox after cancellation; four post-lock expiry cases admitted awaiting/confirmed; 8 ancestor bool/float cases authorized; public stale/status/coverage cases exposed invoice and malformed envelope raised uncaught KeyError. Healthy actual Gamma recovery passed. No setup failures counted."
+      },
+      {
+        "shell": "406060",
+        "command": "uv run pytest tests/runtime/test_financial_review.py -k 'gamma_selection or deadline_after' -q --tb=short --show-capture=no",
+        "database": "approved PostgreSQL",
+        "core_folder": "/tmp/im-financial-iteration2-red-pg-core",
+        "exit_code": 1,
+        "natural_exit": true,
+        "failed": 5,
+        "deselected": 78,
+        "warnings": 2,
+        "seconds": 2.72,
+        "behavior": "Real independent-backend selection/cancel and order/product locks: stale request admitted; attachments exposed QR and settlement normally confirmed after controlled authoritative epoch crossed decoded invoice expiry."
+      },
+      {
+        "shell": "d73ece",
+        "command": "uv run pytest tests/runtime/test_financial_review.py -k public_invoice -q --tb=short --show-capture=no",
+        "database": "SQLite",
+        "core_folder": "/tmp/im-financial-iteration2-cached-red-core",
+        "exit_code": 1,
+        "natural_exit": true,
+        "failed": 5,
+        "deselected": 78,
+        "seconds": 2.95,
+        "behavior": "After public/resume guard fixes, completed idempotency cache still returned invalid/status-expired/deadline-expired/lost-coverage original BOLT11. Observed before completed-cache guard change."
+      }
+    ],
+    "clock_and_barrier_qualification": "Deadline-wait tests use actual decoded original FakeWallet expiry and real PostgreSQL order/product row locks with distinct pg_backend_pid values. DomainTransaction.now is explicitly controlled across event barriers (entry deadline-1, released deadline+1); no real-time sleep or claim that wall-clock PG time naturally passed expiry. SQLite serial-writer acquisition is paused before entry; Gamma selection/cancel is paused before owning SQLite transaction, versus existing PG transaction before order lock. Both DBs execute negatives without new skips. Additional projection/deadline selection variants and later-candidate/caller-invoice retention cases were added after principal REDs, not falsely labeled individual pre-fix REDs.",
+    "intermediate_results_not_final": [
+      {
+        "shell": "054f9b",
+        "command": "uv run pytest tests/runtime/test_financial_review.py -q --tb=short --show-capture=no",
+        "database": "SQLite",
+        "passed": 79,
+        "skipped": 4,
+        "seconds": 11.64,
+        "exit_code": 0
+      },
+      {
+        "shell": "8be96e",
+        "command": "uv run pytest tests/runtime/test_financial_review.py -q --tb=short --show-capture=no",
+        "database": "approved PostgreSQL",
+        "passed": 83,
+        "skipped": 0,
+        "warnings": 2,
+        "seconds": 8.54,
+        "exit_code": 0
+      },
+      {
+        "shell": "7de654",
+        "command_ref": "final_financial_command",
+        "database": "SQLite",
+        "passed": 431,
+        "skipped": 6,
+        "seconds": 62.8,
+        "exit_code": 0
+      },
+      {
+        "shell": "41cd29",
+        "command_ref": "final_financial_command",
+        "database": "approved PostgreSQL",
+        "passed": 437,
+        "skipped": 0,
+        "warnings": 12,
+        "seconds": 43.93,
+        "exit_code": 0
+      },
+      {
+        "shell": "f5bd15",
+        "command": "make lint",
+        "exit_code": 2,
+        "cause": "Own new E501 and import-order issues; corrected without adjacent cleanup"
+      },
+      {
+        "shell": "48b872",
+        "command": "make lint",
+        "exit_code": 2,
+        "cause": "New cache assertion E501; wrapped before final fingerprints/verification"
+      }
+    ],
+    "final_financial_command": "uv run pytest tests/runtime/test_order_admin.py tests/runtime/test_order_saga.py tests/runtime/test_checkout.py tests/runtime/test_catalog_variants.py tests/runtime/test_public_contract.py tests/runtime/test_nostr_signin.py tests/runtime/test_email_queue.py tests/runtime/test_nip17_inbox.py tests/runtime/test_release_a_journey.py tests/runtime/test_financial_review.py -q --tb=short --show-capture=no",
+    "selection": "Same exact ten financial files, including actual existing Gamma payment-request suite and new Gamma regressions in test_financial_review.py; no eleventh file created. All 439 cases collected on each final backend; existing 6 PG-only skips on SQLite only.",
+    "final_results": [
+      {
+        "shell": "839d1d",
+        "command_ref": "final_financial_command",
+        "database": "SQLite",
+        "passed": 433,
+        "failed": 0,
+        "skipped": 6,
+        "seconds": 66.69,
+        "exit_code": 0,
+        "natural_exit": true,
+        "skips": "Existing email row-lock/rate-bucket PG drills (2), checkout/email FK compatibility (1), public/history/email barriers (3); no new skip"
+      },
+      {
+        "shell": "b2906b",
+        "command_ref": "final_financial_command",
+        "database": "approved PostgreSQL17.9 UTC socket",
+        "passed": 439,
+        "failed": 0,
+        "skipped": 0,
+        "warnings": 12,
+        "seconds": 47.43,
+        "exit_code": 0,
+        "natural_exit": true
+      },
+      {
+        "shell": "3945ae",
+        "command": "uv run pytest tests/runtime/test_financial_review.py -q --tb=short --show-capture=no",
+        "database": "SQLite",
+        "passed": 83,
+        "failed": 0,
+        "skipped": 4,
+        "seconds": 11.76,
+        "exit_code": 0,
+        "natural_exit": true
+      },
+      {
+        "shell": "49d08f",
+        "command": "uv run pytest tests/runtime/test_financial_review.py -q --tb=short --show-capture=no",
+        "database": "approved PostgreSQL",
+        "passed": 87,
+        "failed": 0,
+        "skipped": 0,
+        "warnings": 2,
+        "seconds": 8.16,
+        "exit_code": 0,
+        "natural_exit": true
+      },
+      {
+        "shell": "773177",
+        "command": "make lint",
+        "exit_code": 0,
+        "result": "All checks passed"
+      },
+      {
+        "shell": "325ae6",
+        "command": "/Users/bk/.nvm/versions/node/v22.22.3/bin/node --check infinitemarkets/static/infinitemarkets/js/admin_orders.js && /Users/bk/.nvm/versions/node/v22.22.3/bin/node --check infinitemarkets/static/infinitemarkets/js/public_checkout.js && /Users/bk/.nvm/versions/node/v22.22.3/bin/node --check infinitemarkets/static/infinitemarkets/js/public_order.js && git diff --check",
+        "node": "/Users/bk/.nvm/versions/node/v22.22.3/bin/node",
+        "exit_code": 0
+      },
+      {
+        "shell": "b13684",
+        "command": "/Users/bk/.nvm/versions/node/v22.22.3/bin/node node_modules/@playwright/test/cli.js test buyer.spec.ts --grep hard02 --reporter=line --output=/tmp/im-financial-iteration2-playwright",
+        "workdir": "tests/e2e",
+        "passed": 1,
+        "scenarios": 3,
+        "seconds": 38.8,
+        "exit_code": 0,
+        "natural_exit": true,
+        "result": "Current desktop1280/mobile390 recovery and mobile independent hold. Strict original pageerror assertion unchanged; no errors filtered or assertions weakened. Existing local self-signed-certificate test posture unchanged."
+      }
+    ],
+    "postgres_warnings": "Benign explicitly required PGPASSFILE=/dev/null is not a plain file warning; no failure or skip masked.",
+    "evidence_checks": [
+      {
+        "shell": "908f95",
+        "command": "uv run python -m json.tool .planning/phases/05-correctness-recovery-and-security-hardening/05-FINANCIAL-REVIEW-FIXES.json > /dev/null && git diff --check",
+        "exit_code": 0
+      },
+      {
+        "shell": "299b41",
+        "command": "uv run python -c 'import json,sys; manifest=json.load(sys.stdin)[\"current_attempt\"][\"sha256_before_after\"]; print(\"\\n\".join(f\"{digest}  {path}\" for path,digest in manifest.items() if path != \"method\"))' < .planning/phases/05-correctness-recovery-and-security-hardening/05-FINANCIAL-REVIEW-FIXES.json | shasum -a 256 -c",
+        "exit_code": 0,
+        "result": "All 24 current manifest fingerprints validated OK"
+      }
+    ],
+    "browser": {
+      "server_shell": "8834df",
+      "server_command": "uv run python tools/e2e_server.py",
+      "base_url": "https://localhost:5099",
+      "GM_E2E_SEED_PATH": "/tmp/im-financial-iteration2-browser-seed.json",
+      "data_folder": "/var/folders/_l/mkpnssh91x9fd3khg5ltnfjm0000gn/T/gm-e2e-hkn6ohjw/data",
+      "backend": "Fresh synthetic SQLite/FakeWallet, relay IO off",
+      "seed_contents": "Not copied into evidence",
+      "cleanup": "Own server stopped after natural browser exit. Shell9e72c3 curl returned000/exit7 confirming port closed. PG cluster left running for parent."
+    },
+    "sha256_before_after": {
+      "method": "shasum -a256; before final full runtime/browser shellf0f7d7, after shell3f2c86. All24 values match, including original23 plus order_messages.py. Evidence JSON excluded. No source/test changes after these fingerprints.",
+      "infinitemarkets/db.py": "8db7ed34af4205b16125004ec248e547f685f239a8e33fbbda4dd16eeec88877",
+      "infinitemarkets/services/orders.py": "b496612bf3c484573057585724b316ff58aafb78e6f916d483905b94077b40fc",
+      "infinitemarkets/services/settlement.py": "1622ecd08d001d6d6604a733dd358062824c2d432ea5c9835ca00e6db15f227b",
+      "infinitemarkets/services/checkout.py": "59d2428898079eea2f72efda25df8a863957bf77b1f0013f7ef09cabc55bc74a",
+      "infinitemarkets/services/email.py": "973b9788bd0da952a9cfff06eefbe99fd32c7d2b801fb97d01c2b8accbcb63c9",
+      "infinitemarkets/services/outbox.py": "aad258c8c845b03dc2327bcd5b37138ff53f6b83edbf8b8e9b292689c290f120",
+      "infinitemarkets/services/order_messages.py": "604edaf0896376efe96c175555cbc1096ea282bcf730fcbd01058524320336ed",
+      "infinitemarkets/services/catalog.py": "b75d932d3993e9b7337a915b28d36721ca457b7bc8d1ecf45e2f2a700ef3e3bd",
+      "tests/runtime/test_financial_review.py": "b959629ce5ead797f90b083b935b74af04c71f12303834f817919cabbd6ec92b",
+      "tests/runtime/test_order_admin.py": "66a66d67ca04ff385ff67a1d9a0f524320489830f604c6299bc2a959ca7ebc2c",
+      "tests/runtime/test_order_saga.py": "d592919cb0363367b4637ae7d20893ee99cccde27156778b9d6f0c634f4affe5",
+      "tests/runtime/test_checkout.py": "0eca12def2697a93d85835b087fff70e493724ea1aa1fe5c497569b6d906d1be",
+      "tests/runtime/test_catalog_variants.py": "b1f499225906f2d1842256207b860071c8a10222f0c03c2c91df4b9401a2ef48",
+      "tests/runtime/test_public_contract.py": "80b4e9abf05b2d33101cb62ee1f0737e5df77ff09db933830cbd3f344b6ae4fe",
+      "tests/runtime/test_nostr_signin.py": "e4c277a2cbc08d9c76cddb8913986f0640176bd841a0ed6773a192ff17be3c89",
+      "tests/runtime/test_email_queue.py": "b1c3ed8a2b636c41dca83af7b238069cc64ff2c393306fe4759d58d598708fb1",
+      "tests/runtime/test_nip17_inbox.py": "23c68e802a4eceb589d35983a4885ffa9b18b1137bbff71ee69e842e6bdaa820",
+      "tests/runtime/test_release_a_journey.py": "7c9178d59e7646075625e504a951327d3d8a7154257632df4c8d4fef30175b13",
+      "infinitemarkets/views_public_api.py": "77d35e340d27a3da603bbd7a1748c8a468607beca592fc5ca5d698b3d45ff17e",
+      "infinitemarkets/static/infinitemarkets/js/admin_orders.js": "7b54517ab478692396d3d1ae1c27f261d181b559393742d24e1ceaaaf59ed333",
+      "infinitemarkets/static/infinitemarkets/js/public_checkout.js": "a0e05044dce06a30cd8c649c10112fd8e2dba098a335c98b1e252a282cbd0bb6",
+      "infinitemarkets/static/infinitemarkets/js/public_order.js": "ae8dae61acc645650f0d3af52678301f85524b9388d2e77492aaaee27dfcb118",
+      "tests/e2e/buyer.spec.ts": "7ecbeff7122718dcfb0544806308ab6a194f53a5d025f4fa600a0ecb4ed3f3db",
+      "tools/e2e_server.py": "75b74761259cdb2a9d2c74a1522a8dcf83589bbb82d2a91259e1de12b34cb88c"
+    },
+    "remaining_gates": [
+      "Parent independent CR05/CR06/WR02 source recheck and final scope review; no reviewer disposition fabricated from green tests",
+      "WR01 retrospective browser RED was after earlier GREEN, first desktop only; original RED-before-fix/mobile/hold chronology not proven; procedural disposition remains parent-owned",
+      "F1 pinned-host admin no-pageerror qualification remains OPEN; independent baseline ServiceWorker SSL/null-wallet WebSocket errors not filtered, fixed or waived; admin journey not rerun or claimed qualified here",
+      "HISTORICAL-PAID-ORDER-AUDIT OPEN / NOT AUTHORIZED / NOT PERFORMED; actual real-record evidence NONE; production exposure and real-record disposition unresolved; release blocked",
+      "No full phase/security/requirements clearance, live Plebeian/real relay/funding operations, F4-F6 or CI01",
+      "Parent owns final Git commit/cleanup and approved PostgreSQL cluster/scratch teardown; fixer stopped after scoped verification"
+    ]
+  },
+  "review_iteration_1": {
+    "scope": "F1/F3/F2 only. Stop before F4-F6 and CI01. No completion SUMMARY or canonical REVIEW rewrite.",
+    "writer_coordination": "Parent confirmed both 8d560d7e and a420 interrupted workers completed. This continuation was the sole code writer; no agents launched. Both interrupted histories retained below. All final source/test hashes were unchanged across final runtime/browser verification.",
+    "revision": {
+      "head": "a4cb2128eecbbfda1ec3d3a7e0e221df0f5c9fa8",
+      "parent": "bf99ec0b252f6ecff38eadb377d16d57def3576a",
+      "dirty_tree": true,
+      "user_future_roadmap_preserved": true,
+      "git": "Read-only show/status/diff/check only; no staging, commits, reset, checkout, config or push"
+    },
+    "provenance": "Read actual interrupted current source/tests and 8d's last evidence report before edits; preserved earlier source/test changes. Previously installed /Users/bk/.claude/agents/gsd-code-fixer.md defaults overridden by user single-main-tree/no-Git authority.",
+    "environment": {
+      "common": "UV_NO_ENV_FILE=1 UV_NO_SYNC=1 UV_OFFLINE=1 TZ=UTC; INFINITEMARKETS_RELAY_IO=off; FakeWallet; installed tools only",
+      "sqlite": "LNBITS_DATABASE_URL explicitly empty; fresh /tmp/im-financial-final-ten-sqlite-core and fixture-owned synthetic extension folders",
+      "postgres": {
+        "identity_shell": "c787c4",
+        "exit_code": 0,
+        "version": "PostgreSQL17.9 Homebrew aarch64",
+        "database": "infinitemarkets_phase5",
+        "data_directory": "/tmp/infinitemarkets-phase5-pg-1ae80f8/data",
+        "listen_addresses": "",
+        "timezone": "UTC",
+        "dsn": "postgres://devin_phase5@/infinitemarkets_phase5?host=/tmp/infinitemarkets-phase5-pg-1ae80f8/socket",
+        "PGPASSFILE": "/dev/null",
+        "PGSERVICEFILE": "/dev/null",
+        "data_folder": "/tmp/im-financial-final-ten-pg-core",
+        "authority": "Parent-approved disposable synthetic DB only; identity verified before fixture schema teardown, not any existing database; parent owns cluster stop/removal"
+      }
+    },
+    "changes_this_continuation": [
+      {
+        "file": "infinitemarkets/services/settlement.py",
+        "lines": "113-179,185-224,862-871",
+        "change": "Mandatory attached snapshot is now the default settlement verification precondition. Exact integer snapshot version/amount/expiry and nonempty string original user identity required. Acceptance reservation scan LIMIT65 rejects >64 before mutations."
+      },
+      {
+        "file": "infinitemarkets/services/checkout.py",
+        "lines": "1251-1254,1389-1391",
+        "change": "Only invoice attachment explicitly permits valid preattachment wallet snapshot verification; ordinary confirmation cannot. Legitimate crash recovery still attaches first. Wrapped inherited E501 line only."
+      },
+      {
+        "file": "infinitemarkets/services/orders.py",
+        "lines": "392-395,623-629,680-688",
+        "change": "Coverage/release per-order reservation scans bounded to LIMIT65 and fail closed for >64. Wrapped inherited E501 line only. Existing MAX_ITEMS64/unique order-product cardinality preserved. Global per-product cap remains100, matching checkout.MAX_HELD_PER_PRODUCT and locked claim guard; not capped at64."
+      },
+      {
+        "file": "infinitemarkets/services/outbox.py",
+        "lines": "57,65,98",
+        "change": "Transactional stock-publication enqueue creation/supersession uses one authoritative tx.now epoch instead of host wall clock. Three-line financial enqueue fix only; no publisher, lease, transport or F4 work."
+      },
+      {
+        "file": "tests/runtime/test_financial_review.py",
+        "lines": "23,146,160,183,241,337,452,505,518,566,596",
+        "change": "Finished five distinct released/partial/expired/corrupt/missing allocation fixtures, counter/replay/correlation assertions; actual API merchant status and real-owner wallet-switch positive; installed Pydantic.copy; real public/history/email PG consumers retained with unique synthetic history client IP; PG PID/audit/email/competitor/accounting assertions; malformed list/string lineage negatives; new direct-confirmation/cardinality/authenticated-type/stock-clock RED-GREEN regressions; E501 fixes."
+      }
+    ],
+    "new_red_evidence": [
+      {
+        "shell": "9aa8db",
+        "command": "uv run pytest tests/runtime/test_financial_review.py::test_review_direct_confirmation_requires_attached_identity -q --tb=short --show-capture=no",
+        "database": "SQLite",
+        "failed": 1,
+        "seconds": 3.1,
+        "exit_code": 1,
+        "assertion": "Unattached creation_unknown projection became settled instead of remaining creation_unknown. Observed before require_attached change."
+      },
+      {
+        "shell": "d18f98",
+        "command": "uv run pytest tests/runtime/test_financial_review.py -k 'cardinality or boolean_version' -q --tb=short --show-capture=no",
+        "database": "SQLite",
+        "failed": 4,
+        "deselected": 45,
+        "seconds": 3.51,
+        "exit_code": 1,
+        "assertions": "Real65-product/unique-reservation synthetic rows: coverage releasable=True; release did not raise; accept raised uncaught TransitionConflict rather than bounded ProblemError; authenticated boolean snapshot version authorized. Observed before bounds/version fixes."
+      },
+      {
+        "shell": "6c2911",
+        "command": "uv run pytest tests/runtime/test_financial_review.py -k boolean_version -q --tb=short --show-capture=no",
+        "database": "SQLite",
+        "failed": 3,
+        "passed": 1,
+        "deselected": 50,
+        "seconds": 2.69,
+        "exit_code": 1,
+        "assertions": "AEAD-authenticated float amount/expiry and list original user authorized delivery; version case already green. Observed before exact field-type fixes."
+      },
+      {
+        "shell": "8164d3",
+        "command": "uv run pytest tests/runtime/test_financial_review.py::test_review_accept_stock_intent_uses_database_clock -q --tb=short --show-capture=no",
+        "database": "SQLite",
+        "failed": 1,
+        "seconds": 3.02,
+        "exit_code": 1,
+        "assertion": "Real financial acceptance stock intents had future-dated creation/supersession/deadline timestamps under skewed host outbox clock. Observed before tx.now enqueue fix."
+      }
+    ],
+    "intermediate_checks": [
+      {
+        "shell": "1ddaa6",
+        "command": "uv run pytest tests/runtime/test_financial_review.py -q --tb=short --show-capture=no",
+        "database": "SQLite",
+        "passed": 45,
+        "skipped": 4,
+        "seconds": 7.42,
+        "exit_code": 0,
+        "scope": "Before final expanded lineage/type/clock assertions"
+      },
+      {
+        "shell": "ab316c",
+        "database": "SQLite",
+        "passed": 397,
+        "skipped": 6,
+        "seconds": 58.98,
+        "exit_code": 0,
+        "scope": "Ten financial files, before final type/clock fix; not final-tree evidence"
+      },
+      {
+        "shell": "520d54",
+        "database": "approvedPG",
+        "passed": 403,
+        "skipped": 0,
+        "warnings": 12,
+        "seconds": 41.47,
+        "exit_code": 0,
+        "scope": "Ten financial files, before final type/clock fix; not final-tree evidence"
+      },
+      {
+        "shell": "09c9c4",
+        "command": "make lint",
+        "exit_code": 2,
+        "result": "Nine inherited E501 findings"
+      },
+      {
+        "shell": "c4e065",
+        "command": "make lint",
+        "exit_code": 2,
+        "result": "One newly expanded E501 line; subsequently corrected"
+      }
+    ],
+    "final_financial_command": "uv run pytest tests/runtime/test_order_admin.py tests/runtime/test_order_saga.py tests/runtime/test_checkout.py tests/runtime/test_catalog_variants.py tests/runtime/test_public_contract.py tests/runtime/test_nostr_signin.py tests/runtime/test_email_queue.py tests/runtime/test_nip17_inbox.py tests/runtime/test_release_a_journey.py tests/runtime/test_financial_review.py -q --tb=short --show-capture=no",
+    "final_checks": [
+      {
+        "shell": "72c115",
+        "command_ref": "final_financial_command",
+        "database": "SQLite",
+        "passed": 401,
+        "failed": 0,
+        "skipped": 6,
+        "seconds": 62.08,
+        "exit_code": 0,
+        "natural_exit": true,
+        "skip_reasons": [
+          "Existing PG email row-lock drill (1)",
+          "Existing PG email rate-bucket drill (1)",
+          "PG checkout/email FK lock race (1)",
+          "PG public/history/email current-order snapshot barriers (3)"
+        ]
+      },
+      {
+        "shell": "17276a",
+        "command_ref": "final_financial_command",
+        "database": "approved PostgreSQL17.9 UTC socket",
+        "passed": 407,
+        "failed": 0,
+        "skipped": 0,
+        "warnings": 12,
+        "seconds": 43.22,
+        "exit_code": 0,
+        "natural_exit": true,
+        "warnings_reason": "PGPASSFILE=/dev/null is not a plain file; no test failures or skips"
+      },
+      {
+        "shell": "32ee02",
+        "command": "make lint",
+        "exit_code": 0,
+        "result": "All checks passed"
+      },
+      {
+        "shell": "b6f914",
+        "command": "Node22 --check infinitemarkets/static/infinitemarkets/js/admin_orders.js, public_checkout.js and public_order.js",
+        "exit_code": 0
+      },
+      {
+        "shell": "832dbe",
+        "command": "git diff --check",
+        "exit_code": 0
+      },
+      {
+        "shell": "44f5a2",
+        "command": "uv run python -m json.tool .planning/phases/05-correctness-recovery-and-security-hardening/05-FINANCIAL-REVIEW-FIXES.json > /dev/null",
+        "exit_code": 0,
+        "result": "Current and both nested historical attempt reports parse as JSON"
+      },
+      {
+        "shell": "b72585",
+        "command": "git diff --check",
+        "exit_code": 0,
+        "scope": "Final evidence included"
+      },
+      {
+        "shell": "c2a50d",
+        "command": "/Users/bk/.nvm/versions/node/v22.22.3/bin/node node_modules/@playwright/test/cli.js test buyer.spec.ts --grep hard02 --reporter=line --output=/tmp/im-financial-final-playwright",
+        "workdir": "tests/e2e",
+        "passed": 1,
+        "scenarios": 3,
+        "seconds": 38.8,
+        "exit_code": 0,
+        "natural_exit": true,
+        "result": "Current-code original QR recovery desktop1280/mobile390 and mobile independent hold. Unchanged strict empty pageerror assertion; no errors filtered. Existing configured local self-signed-cert browser posture unchanged, no TLS/security patch."
+      }
+    ],
+    "browser_topology": {
+      "server_command": "uv run python tools/e2e_server.py",
+      "final_server_shell": "31b7f7",
+      "base_url": "https://localhost:5099",
+      "seed": "Outside checkout /tmp/im-financial-final-browser-seed.json; never copied into evidence",
+      "data": "/var/folders/_l/mkpnssh91x9fd3khg5ltnfjm0000gn/T/gm-e2e-p7eirey3/data",
+      "backend": "Fresh synthetic SQLite + FakeWallet + relay IO off",
+      "cleanup": "Own preliminary server38a428 stopped before final source startup; final31b7f7 stopped after natural browser exit. Shellcac7c5 curl confirms port closed (000,exit7). PG left running for parent."
+    },
+    "sha256_before_after": {
+      "method": "shasum -a256; before shells d0f8db/c55fa5, after fdd42f; all23 hashes identical; evidence JSON excluded",
+      "infinitemarkets/db.py": "8db7ed34af4205b16125004ec248e547f685f239a8e33fbbda4dd16eeec88877",
+      "infinitemarkets/services/orders.py": "aa8554bbeccbebfd01979d46cb238caa86e513364ce045f8d4bc9e335b325f5d",
+      "infinitemarkets/services/settlement.py": "1de6f6477af4ded59e6d3063c56261a9b4ca0f7bd49164091b114d19303a2f42",
+      "infinitemarkets/services/checkout.py": "b0fbae846fbfa37db4ebc8e867a954848fb7a284260b19defbb43737e54c7f5b",
+      "infinitemarkets/services/email.py": "973b9788bd0da952a9cfff06eefbe99fd32c7d2b801fb97d01c2b8accbcb63c9",
+      "infinitemarkets/services/outbox.py": "aad258c8c845b03dc2327bcd5b37138ff53f6b83edbf8b8e9b292689c290f120",
+      "infinitemarkets/services/catalog.py": "b75d932d3993e9b7337a915b28d36721ca457b7bc8d1ecf45e2f2a700ef3e3bd",
+      "tests/runtime/test_financial_review.py": "8d65165357d441a3fa6aa46525a8fa89c92a49d8573c536ddc65e717199f1d87",
+      "tests/runtime/test_order_admin.py": "66a66d67ca04ff385ff67a1d9a0f524320489830f604c6299bc2a959ca7ebc2c",
+      "tests/runtime/test_order_saga.py": "d592919cb0363367b4637ae7d20893ee99cccde27156778b9d6f0c634f4affe5",
+      "tests/runtime/test_checkout.py": "be2bdef151b262f56c0cc95848fe2742a5b6c7669095380ac681e42aeaf666bf",
+      "tests/runtime/test_catalog_variants.py": "b1f499225906f2d1842256207b860071c8a10222f0c03c2c91df4b9401a2ef48",
+      "tests/runtime/test_public_contract.py": "80b4e9abf05b2d33101cb62ee1f0737e5df77ff09db933830cbd3f344b6ae4fe",
+      "tests/runtime/test_nostr_signin.py": "e4c277a2cbc08d9c76cddb8913986f0640176bd841a0ed6773a192ff17be3c89",
+      "tests/runtime/test_email_queue.py": "b1c3ed8a2b636c41dca83af7b238069cc64ff2c393306fe4759d58d598708fb1",
+      "tests/runtime/test_nip17_inbox.py": "23c68e802a4eceb589d35983a4885ffa9b18b1137bbff71ee69e842e6bdaa820",
+      "tests/runtime/test_release_a_journey.py": "7c9178d59e7646075625e504a951327d3d8a7154257632df4c8d4fef30175b13",
+      "infinitemarkets/views_public_api.py": "59d0ff70bf6ad7d1071ca986b14c34cb50e8b9b1c8d700a5932de748ecf6ec6f",
+      "infinitemarkets/static/infinitemarkets/js/admin_orders.js": "7b54517ab478692396d3d1ae1c27f261d181b559393742d24e1ceaaaf59ed333",
+      "infinitemarkets/static/infinitemarkets/js/public_checkout.js": "a0e05044dce06a30cd8c649c10112fd8e2dba098a335c98b1e252a282cbd0bb6",
+      "infinitemarkets/static/infinitemarkets/js/public_order.js": "ae8dae61acc645650f0d3af52678301f85524b9388d2e77492aaaee27dfcb118",
+      "tests/e2e/buyer.spec.ts": "7ecbeff7122718dcfb0544806308ab6a194f53a5d025f4fa600a0ecb4ed3f3db",
+      "tools/e2e_server.py": "75b74761259cdb2a9d2c74a1522a8dcf83589bbb82d2a91259e1de12b34cb88c"
+    },
+    "criteria_local_status": {
+      "CR01": "Scoped both-DB green: tx.now acceptance; <=clock order/product/reservation/audit/email and skewed stock-intent timestamps; bounded128 causal parent-event chain independent of same-second ties; normal consumed and partial backordered repeated cycles charge once; future/missing/forked/cyclic/quantity-changed/list-parent/string-items negatives deny without repair. Historical validation incidence not authorized/performed.",
+      "CR02": "Real approvedPG accept+received-checkout race completes on two distinct backendPIDs, stocks8/reserved1, one confirmed merchant email, one merchant acceptance event, competitor awaiting_payment, valid accounting/fulfillment. Merchant FOR NO KEY UPDATE preserves FK KEY SHARE compatibility and serialization.",
+      "CR03": "Default ordinary verification requires full attached immutable snapshot before settled CAS. Creating crash recovery uses explicit preattachment only within attachment and confirms after attachment. Real wallet-switch original identity and expired genuinely paid positives retain authority; canonical callback/crypto/hash/HMAC/BOLT11/missing-field negatives fail closed; settled replay pure no-op.",
+      "CR04": "Five distinct no-preexisting-hold creating damage cases attach original correlation but cancel into review, retain pending original hash/external, preserve corrupt counters without repair, safely release coherent residuals, suppress QR on attachment/replay/resume/token status. Earlier recovery/expiry-winning positives retained.",
+      "mediums": "Shared resolution allowlist remains None/unresolved/accepted. Per-order bounds cover item/reservation/proof scans. Real public/history/email PG snapshot barriers execute three actual consumers and block cancellation until authority/content snapshot finishes; later token status denied. No nested DomainTransaction for email/current transaction consumers."
+    },
+    "open_gates": [
+      "Parent independent canonical financial/security re-review and final exact-tree verification before any authorized local reviewed commit",
+      "F1 strict admin no-pageerror remains OPEN due unchanged pinned-host ServiceWorker TLS registration and null g.wallet.id WebSocket errors; no admin rerun or error filtering/vendor/security patch",
+      "WR01 original buyer browser RED chronology NOT CAPTURED: existing bf99 baseline capture was retrospective after GREEN. This rerun does not erase that deviation",
+      "HISTORICAL-PAID-ORDER-AUDIT OPEN / NOT AUTHORIZED / NOT PERFORMED; actual-record evidence NONE; real-record disposition NOT DONE; production exposure/release clearance BLOCKED",
+      "Live Plebeian, F4-F6, CI01, DB/install/full qualification and cross-platform matrix NOT RUN; no broader phase/security/requirements/release clearance",
+      "Parent owns approved PG cluster teardown/removal and retained synthetic browser/runtime scratch cleanup"
+    ],
+    "prohibitions_observed": "No agents, new runtime comments, Git mutation, FUTURE-ROADMAP/root STATE/ROADMAP/REQUIREMENTS/security changes, AGENTS/vendor/config/.env/dependency changes, installs, real data/wallet/funds/relay writes, push/deploy. Existing comments preserved; outbox helper financial enqueue only, publisher unchanged.",
+    "handoff": "Financial fixer stops here. All final tests naturally terminated with nonempty collection; only owned browser servers terminated after/before verification, never a killed test counted as success."
+  },
+  "prior_a420_attempt": {
+    "status": "paused-concurrent-writer-unverified",
+    "chronology": "Interrupted resume observed independently appearing wallet-switch and corruption cases, preserved them and stopped. Initial report later overwritten by 8d last report; reconstructed from preserved actual tool history/parent summary, not silently discarded.",
+    "edits": "Two installed Payment.copy callback fixtures at test_order_saga.py987/991 and fifteen distinct synthetic history IPs at test_nostr_signin.py505-510; unrun direct-confirmation and synthetic wallet/expiry tests; corrupt/missing allocation parameters initially unfinished. All retained and reconciled by current continuation.",
+    "checks": [
+      {
+        "shell": "4fc3bd",
+        "database": "SQLite",
+        "command": "uv run pytest tests/runtime/test_financial_review.py -q --tb=short --show-capture=no",
+        "passed": 17,
+        "skipped": 4,
+        "seconds": 4.97,
+        "exit_code": 0,
+        "scope": "Initial interrupted tree, not final verification"
+      },
+      {
+        "shell": "15552b",
+        "database": "SQLite",
+        "command": "Ten-file financial selection",
+        "passed": 363,
+        "failed": 4,
+        "skipped": 6,
+        "seconds": 54.23,
+        "exit_code": 1,
+        "failures": "Payment.model_copy compatibility; three later original signin cases429 after added cases shared client-IP bucket"
+      },
+      {
+        "shell": "97d3df",
+        "database": "approvedPG",
+        "command": "Same ten-file selection",
+        "passed": 369,
+        "failed": 4,
+        "skipped": 0,
+        "seconds": 38.44,
+        "exit_code": 1,
+        "failures": "Same four fixture failures; no stable final-tree claim"
+      }
+    ],
+    "historical_audit": "OPEN / NOT AUTHORIZED / NOT PERFORMED"
+  },
+  "prior_8d560d7e_report": {
+    "status": "partial-paused-unexpected-concurrent-edits-not-verified",
+    "completion_summary_created": false,
+    "scope": "F1/F3/F2 financial review fixes only; inherited main-tree diff preserved; no Git mutation, staging or commit",
+    "single_writer_blocker": {
+      "observed": "Files changed outside this session's recorded edit calls while targeted tests were running. Stopped source edits to preserve them.",
+      "examples": [
+        "tests/runtime/test_order_saga.py:987 changed paid_amount.model_copy to paid_amount.copy without a tool edit from this session",
+        "tests/runtime/test_financial_review.py:142 and :156 acquired new direct-confirmation and mutable-merchant-hash tests not authored by this session",
+        "tests/runtime/test_financial_review.py:175 gained corrupt/missing parameters without corresponding distinct corruption branches"
+      ],
+      "parent_action": "Establish a sole writer, reread the current tree and finish verification. Do not overwrite or attribute these additional edits to this session."
+    },
+    "environment": {
+      "common": "UV_NO_ENV_FILE=1 UV_NO_SYNC=1 UV_OFFLINE=1 TZ=UTC; FakeWallet; relay IO off; installed tools only",
+      "sqlite": "LNBITS_DATABASE_URL explicitly empty; fresh mktemp /tmp core folders and runtime fixture extension folders",
+      "postgres": {
+        "identity_shell": "0787d3",
+        "exit_code": 0,
+        "database": "infinitemarkets_phase5",
+        "data_directory": "/tmp/infinitemarkets-phase5-pg-1ae80f8/data",
+        "socket": "/tmp/infinitemarkets-phase5-pg-1ae80f8/socket",
+        "listen_addresses": "",
+        "timezone": "UTC",
+        "version": "PostgreSQL17.9 Homebrew aarch64",
+        "connection": "Exact user-approved socket DSN only; user devin_phase5; PGPASSFILE and PGSERVICEFILE /dev/null",
+        "teardown": "Only approved fixture schema teardown; cluster left running for parent"
+      }
+    },
+    "red_evidence": [
+      {
+        "shell": "c5a7b7",
+        "command": "uv run pytest tests/runtime/test_financial_review.py tests/runtime/test_order_saga.py -k 'review_ or accept_cumulative_accounting_once' -q --tb=short --show-capture=no",
+        "database": "SQLite",
+        "failed": 21,
+        "passed": 13,
+        "skipped": 1,
+        "deselected": 165,
+        "seconds": 7.29,
+        "exit_code": 1,
+        "valid_behavioral_failures": "Four authoritative-clock acceptance failures, five pending callback snapshot bypasses and three fresh creating/no-hold payable-invoice leaks",
+        "invalid_red": "Nine corrupted-paid identity cases stopped at a fixture HTTP405 caused by PUT instead of PATCH; these are not behavioral RED evidence",
+        "raw_log": "/var/folders/_l/mkpnssh91x9fd3khg5ltnfjm0000gn/T/devin-overflows-501/shell-c5a7b7-779af8354f31638b/content.txt"
+      },
+      {
+        "shell": "9574a4",
+        "command": "uv run pytest tests/runtime/test_financial_review.py -k corrupt_paid_identity -q --tb=short --show-capture=no",
+        "database": "SQLite",
+        "failed": 9,
+        "deselected": 9,
+        "seconds": 3.39,
+        "exit_code": 1,
+        "assertion": "Shared fulfillment_authorized remained True for contradictory or absent original immutable payment snapshots and unknown resolution",
+        "fixture_correction": "Use actual product PATCH; real FakeWallet settlement retained"
+      },
+      {
+        "shell": "613375",
+        "command": "uv run pytest tests/runtime/test_financial_review.py -k pg_checkout_email -q --tb=short --show-capture=no",
+        "database": "approved PostgreSQL17.9 UTC",
+        "failed": 1,
+        "deselected": 17,
+        "warnings": 2,
+        "seconds": 2.98,
+        "exit_code": 1,
+        "assertion": "Barrier-controlled accept and received-order begin_saga did not both complete; result types were dict and DBAPIError; configured real merchant confirmed email plus stock publication/FK path",
+        "earlier_invalid_attempts": "40e0aa and 8f1755 each naturally failed after a barrier TimeoutError; publication had already acquired an implicit merchant FK lock before the original notification barrier. Those attempts are not deadlock RED evidence. Final barrier moved before stock publication."
+      },
+      {
+        "shell": "c7c293",
+        "command": "uv run pytest tests/runtime/test_financial_review.py -k public_delivery_snapshot -q --tb=short --show-capture=no",
+        "database": "approved PostgreSQL17.9 UTC",
+        "failed": 1,
+        "deselected": 18,
+        "warnings": 2,
+        "seconds": 1.97,
+        "exit_code": 1,
+        "assertion": "Cancellation completed while authority had passed but delivery content selection remained paused, proving the shared order snapshot was not locked",
+        "earlier_invalid_attempts": "3fd12f and e95942 did not reach the authority barrier and are not intentional behavioral REDs"
+      }
+    ],
+    "green_and_failed_checks": [
+      {
+        "shell": "3b4c1e",
+        "command": "uv run pytest tests/runtime/test_financial_review.py tests/runtime/test_order_saga.py -k 'review_ or accept_cumulative_accounting_once' -q --tb=short --show-capture=no",
+        "database": "SQLite",
+        "passed": 34,
+        "skipped": 2,
+        "deselected": 165,
+        "seconds": 8.26,
+        "exit_code": 0,
+        "scope": "Earlier focused green before expanded retention fixtures and unexpected outside edits. Two PG-only skips. Not final-tree verification."
+      },
+      {
+        "shell": "63511d",
+        "command": "uv run pytest nine planned financial runtime files plus tests/runtime/test_financial_review.py -q --tb=short --show-capture=no",
+        "database": "SQLite",
+        "passed": 342,
+        "failed": 11,
+        "skipped": 4,
+        "seconds": 50.68,
+        "exit_code": 1,
+        "notes": "Exposed remaining fake direct-confirmation fixtures, recovery shape/canonical-uniqueness fixture problems and proof-contract fixture changes; not green"
+      },
+      {
+        "shell": "814e29",
+        "command": "uv run pytest tests/runtime/test_order_admin.py tests/runtime/test_order_saga.py tests/runtime/test_checkout.py tests/runtime/test_catalog_variants.py tests/runtime/test_public_contract.py tests/runtime/test_nostr_signin.py tests/runtime/test_email_queue.py tests/runtime/test_nip17_inbox.py tests/runtime/test_release_a_journey.py tests/runtime/test_financial_review.py -q --tb=short --show-capture=no",
+        "database": "SQLite",
+        "passed": 368,
+        "failed": 12,
+        "skipped": 6,
+        "seconds": 52.22,
+        "exit_code": 1,
+        "notes": "Not green: Pydantic v1 Payment has copy, not model_copy; wallet-switch fixture omitted required admin user; expanded authenticated-history fixtures exhausted the shared synthetic-client sign-in rate bucket. Some files changed during execution; line attribution/current-tree identity is not stable."
+      },
+      {
+        "shell": "60a579",
+        "command": "make lint",
+        "exit_code": 2,
+        "result": "Nine E501 line-length findings in checkout.py, orders.py, settlement.py and test_financial_review.py; source edits paused rather than overwrite another writer"
+      },
+      {
+        "shell": "839fc4",
+        "command": "Node22 --check admin_orders.js, public_checkout.js and public_order.js; git diff --check",
+        "exit_code": 0
+      },
+      {
+        "shell": "533c51",
+        "command": "Read-only git diff --stat and Python-filtered comment delta",
+        "exit_code": 0,
+        "result": "Existing stock/state comment relocated into actual consumption publication; existing nostr paid-order comment restored; transition-matrix comment restored; existing GAM harness comment move preserved. No unrelated new comment found in tracked diff."
+      }
+    ],
+    "finding_map": {
+      "CR-01": {
+        "status": "proposed-fix-earlier-SQLite-focused-green-current-tree-and-PG-unverified",
+        "source": "orders.py:219 confirmation_chain and :289 accepted_inventory_accounting; settlement.py _accept_inventory/_resolve_accept",
+        "change": "Bounded existing confirmation event-ID chain with parent_confirmation_id, unique root/head, fork/missing/cycle/future-date rejection and fixed cumulative item proof; tx.now authoritative epoch replaces future max(timestamp+1)"
+      },
+      "CR-02": {
+        "status": "proposed-fix-no-post-fix-PG-green",
+        "source": "db.py:208; checkout.py:926,1123,1749",
+        "change": "Sanctioned PostgreSQL FOR NO KEY UPDATE merchant serialization property, used by checkout scope locks; sorted leaf/parent locks unchanged"
+      },
+      "CR-03": {
+        "status": "partial-requires-further-source-review-and-fixes",
+        "source": "settlement.py:113 _payment_snapshot; :382 confirm_settlement; orders.py payment_settled",
+        "change": "Pure local AEAD/BOLT11/HMAC immutable read proof; newly attached encrypted wallet_refs JSON binds original wallet/user/order/merchant/external/tag/currency/hash/checking/amount/expiry; locked canonical successful core verification before new settlement CAS; exact callback identity; valid settled replay no-op",
+        "remaining_concrete_case": "confirm_settlement:417 still calls _verify_settlement whose attached classification at approximately217 permits creating/creation_unknown with no BOLT/hash/checking fields as preattachment verification. Direct ordinary confirmation must require the full attached snapshot unconditionally before the settled CAS at431. Parent-added direct-confirmation test142 should be executed; it was not part of reported runs.",
+        "other_review": "Validate snapshot version with exact integer type, not boolean-equivalent equality; canonical attach datetime/metadata normalization must preserve all mandatory immutable checks. No release clearance."
+      },
+      "CR-04": {
+        "status": "proposed-fix-earlier-three-SQLite-cases-green-expanded-cases-unverified",
+        "source": "checkout.py:1382+",
+        "change": "Failed complete allocation/deadline always cancels into inventory review with hold, preserves pending correlation, safely releases coherent own residual holds and enqueues on_hold/cancelled; no QR or ordinary expiry for valid invoice"
+      },
+      "medium_resolution_allowlist": "Implemented None/unresolved/accepted-only shared authority; earlier focused resolution-other RED/GREEN recorded",
+      "bounded_reads": "Added bounded items/reservations/confirmation-history and held-counter read limits; further cardinality and malformed-history coverage required",
+      "delivery_TOCTOU": "Proposed digital_delivery locked current-order authority/content snapshot on an existing DomainTransaction or independent transaction for a host read connection; email send preparation now takes order lock before email row lock. Actual public RED recorded. Expanded public/history/email PG barriers not yet green."
+    },
+    "files_authored_or_edited_by_this_session": [
+      "infinitemarkets/db.py",
+      "infinitemarkets/services/checkout.py",
+      "infinitemarkets/services/orders.py",
+      "infinitemarkets/services/settlement.py",
+      "infinitemarkets/services/email.py",
+      "tests/runtime/test_order_saga.py",
+      "tests/runtime/test_order_admin.py",
+      "tests/runtime/test_nostr_signin.py",
+      "tests/runtime/test_email_queue.py",
+      "tests/runtime/test_nip17_inbox.py",
+      "tests/runtime/test_financial_review.py"
+    ],
+    "not_performed": [
+      "Final exact-tree nine-file plus new-regression green on both databases",
+      "Post-fix PG concurrency green",
+      "Browser reruns, matrix, DB/install/full qualification, live calls or historical audit",
+      "Git mutations or commits, dependency/vendor/config/global-state edits, FUTURE-ROADMAP.md edit or staging",
+      "Canonical REVIEW or completion SUMMARY changes",
+      "Cluster shutdown/removal"
+    ],
+    "WR-01": "Existing 05-BROWSER-BASELINE-EVIDENCE read: retrospective bf99ec0 exact97-package-file assertion reproduction after reported current green; strict RED-before-fix chronology deviation remains honest. No browser error filtering or pageerror assertion change in this session.",
+    "remaining_gates": [
+      "Sole-writer coordination and parent independent financial/security recheck",
+      "Fix remaining mandatory ordinary settlement snapshot bypass and validate all surfaces",
+      "Correct fixture API/Pydantic usage and isolate synthetic-client rate buckets without weakening limits",
+      "Finish lint and fresh current-tree SQLite/approvedPG verification",
+      "F1 admin pinned-host pageerrors remain open; buyer browser previous3green not rerun",
+      "HISTORICAL-PAID-ORDER-AUDIT OPEN/NOT AUTHORIZED/NOT PERFORMED; actual-record evidence NONE; production exposure/real-record disposition/release clearance BLOCKED",
+      "Live Plebeian separately unauthorized/unperformed; F4-F6 and CI01 not attempted",
+      "Parent owns reviewed local commits and approved cluster cleanup"
+    ],
+    "evidence_integrity": "All reported processes exited naturally; no timeout or killed test counted as pass, no fabricated TAP or historical timestamps. Earlier failed/invalid attempts retained separately. Source status remains partial."
+  },
+  "parent_closeout": {
+    "updated_at": "2026-10-12T21:07:09+00:00",
+    "checks": {
+      "full_financial": {
+        "sqlite_passed": 433,
+        "sqlite_pg_only_skips": 6,
+        "postgres_passed": 439,
+        "postgres_skips": 0,
+        "evidence": "05-FINANCIAL-REVIEW-FIXES.json"
+      },
+      "parent_focused": {
+        "sqlite_passed": 83,
+        "sqlite_pg_only_skips": 4,
+        "postgres_passed": 87,
+        "postgres_skips": 0,
+        "exit_code": 0
+      },
+      "buyer_browser": {
+        "tests_passed": 1,
+        "scenarios": 3,
+        "exit_code": 0
+      },
+      "source_review": "PASSED for finite F1/F3/F2 scope; CR-01 through CR-06 and WR-02 resolved",
+      "qualification": "BLOCKED; not phase completion or release clearance"
+    },
+    "parent_lint_js_diff": "exit 0; pinned host e336fe1 verified unchanged",
+    "source_review": "05-REVIEW.md, finite scope PASSED; qualification BLOCKED",
+    "remaining_gates": [
+      "F1 admin pinned-host pageerror qualification OPEN; no filtering, vendor or security change",
+      "WR-01 original browser RED chronology absent; retrospective baseline reproduction recorded honestly",
+      "WR-04 pre-existing in-flight token rotation/expiry race MEDIUM / OPEN / NOT FIXED / NOT WAIVED; separate bounded authorization follow-up",
+      "HISTORICAL-PAID-ORDER-AUDIT OPEN / NOT AUTHORIZED / NOT PERFORMED; actual-record evidence NONE; production exposure/disposition/release BLOCKED",
+      "F4-F6, CI-01, full matrix/qualification and separately authorized live Plebeian remain pending"
+    ],
+    "git": "Local reviewed financial commit only; no push/deploy",
+    "pause": "Mandatory after local commit; no F4\u2013F6/CI01 or historical/live authorization",
+    "sandbox": {
+      "postgres": "STOPPED; pg_ctl fast stop naturally exited 0",
+      "stopped_at": "2026-10-12T21:13:57+00:00",
+      "retained": "Approved synthetic directory and baseline/raw evidence retained; no destructive directory deletion performed",
+      "browser": "All owned servers stopped; last worker confirmed port 5099 closed",
+      "scope": "No actual or production database, live funds, real relay, historical disposition, push or deployment"
+    },
+    "make_subsets": {
+      "command": "make -o host verify-db verify-protocol",
+      "host_prerequisite": "Already verified exact e336fe1; omitted to avoid vendor/Git/network writes",
+      "profile": "SQLite",
+      "db": {
+        "passed": 81,
+        "deselected": 896,
+        "exit_code": 0
+      },
+      "protocol": {
+        "passed": 69,
+        "skipped": 2,
+        "deselected": 906,
+        "exit_code": 0,
+        "skip_reasons": [
+          "Advisory external relay smoke disabled; no live relay authorization",
+          "Unfiltered full-profile evidence cannot be asserted in a subset run"
+        ]
+      }
+    },
+    "commit_hygiene": {
+      "file": "tests/runtime/test_financial_review.py",
+      "change": "Removed one final blank line caught only after adding the new file to the index; AST identical",
+      "verified_old_sha256": "b959629ce5ead797f90b083b935b74af04c71f12303834f817919cabbd6ec92b",
+      "commit_sha256": "62411ef30c6314a41a6c012b2ca685bec4ae3979d2e198fd27745bd8626690dd",
+      "earlier_test_fingerprints": "Retained unchanged above; no false claim that the new EOF fingerprint was used in those runs",
+      "validation": "AST equivalence, lint, cached diff check; no functional change"
+    }
+  }
+}

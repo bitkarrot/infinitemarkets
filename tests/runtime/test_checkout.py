@@ -299,7 +299,14 @@ async def test_idempotency_replay_and_conflict(runtime_env):
 async def test_idempotency_crash_resume(runtime_env):
     """A lease that dies after the order exists resumes the saga rather
     than duplicating the order/invoice (§4.15)."""
+    from infinitemarkets.db import db
+
     checkout = _svcs()["checkout"]
+    async with db.connect() as conn:
+        before = await conn.fetchone(
+            "SELECT COUNT(*) AS n FROM infinitemarkets.orders WHERE merchant_id = :m",
+            {"m": runtime_env["merchant_id"]},
+        )
     body = await _payload(runtime_env, [
         {"d_tag": runtime_env["widget"]["d_tag"], "quantity": 1},
     ])
@@ -312,7 +319,7 @@ async def test_idempotency_crash_resume(runtime_env):
     )
     # Force the record back to an expired in_progress lease — a kill
     # between intake and response.
-    from infinitemarkets.db import DomainTransaction, db
+    from infinitemarkets.db import DomainTransaction
 
     async with DomainTransaction() as tx:
         await tx.execute(
@@ -331,7 +338,7 @@ async def test_idempotency_crash_resume(runtime_env):
             " WHERE merchant_id = :m",
             {"m": runtime_env["merchant_id"]},
         )
-        assert n["n"] == 3  # fresh + replay + crash-resume only
+        assert n["n"] == before["n"] + 1  # fresh + replay + crash-resume only
 
 
 async def test_oversell_rejected(runtime_env):

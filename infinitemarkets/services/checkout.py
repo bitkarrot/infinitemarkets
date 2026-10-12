@@ -355,18 +355,22 @@ async def _claim_product_capacity(
                     and not parent["import_released"])):
             raise unprocessable("product-inactive", "Product unavailable")
     rc = await tx.execute(
-        f"UPDATE {tx.table('products')} SET stock_reserved = stock_reserved + :q "
+        f"UPDATE {tx.table('products')} SET stock_reserved = stock_reserved + :q, "
+        "revision = revision + 1, updated_at = :n "
         "WHERE id = :p AND merchant_id = :m AND deleted_at IS NULL "
         "AND draft = FALSE AND visibility = 'on-sale' AND nip99_status = 'active' "
         "AND recurring_frequency IS NULL AND product_type IN ('simple', 'variation') "
         f"AND {released_product_clause('products', tx.table)} "
         "AND (stock_on_hand IS NULL OR stock_on_hand - stock_reserved >= :q)",
-        {"q": quantity, "p": product_id, "m": merchant_id},
+        {"q": quantity, "p": product_id, "m": merchant_id, "n": await tx.now()},
     )
     if rc != 1:
         raise unprocessable(
             "insufficient-stock", "Insufficient stock", "requested quantity is not available",
         )
+    from .catalog import enqueue_stock_projection
+
+    await enqueue_stock_projection(tx, product_id)
 
 
 async def _resolve_shipping(
@@ -713,6 +717,14 @@ async def checkout(
     if record["state"] == "completed":
         body = await replay_response(record)
         if body is not None:
+            async with DomainTransaction() as tx:
+                current = await order_service._order_row(tx, record["order_id"])
+                snapshot = await order_service.payable_invoice(tx, current)
+                body["order"].update({
+                    "state": current["state"], "total_sat": current["total_sat"],
+                    "bolt11": snapshot["bolt11"] if snapshot else None,
+                    "expires_at": current["invoice_expiry"],
+                })
             return body
         raise not_found("checkout response expired")
     claim_token = record["claim_token"]
@@ -919,7 +931,7 @@ async def _insert_order_intake(
     )
     async with DomainTransaction() as tx:
         await tx.fetch_one(
-            f"SELECT id FROM {tx.table('merchants')} WHERE id = :m" + tx.for_update,
+            f"SELECT id FROM {tx.table('merchants')} WHERE id = :m" + tx.for_no_key_update,
             {"m": merchant["id"]},
         )
         count = await tx.fetch_one(
@@ -1116,13 +1128,16 @@ async def begin_saga(
         async with DomainTransaction() as tx:
             locked = await tx.fetch_one(
                 f"SELECT id FROM {tx.table('merchants')} "
-                f"WHERE id = :m{tx.for_update}", {"m": merchant["id"]},
+                f"WHERE id = :m{tx.for_no_key_update}", {"m": merchant["id"]},
             )
             if not locked:
                 raise unprocessable("product-inactive", "Product unavailable")
             await order_service.transition_order(
                 tx, order_id=order_id, from_state="received",
                 to_state="invoice_pending", actor="system", now=now,
+            )
+            await order_service.lock_inventory_products(
+                tx, merchant["id"], {item["product_id"] for item in items},
             )
             for item in sorted(items, key=lambda i: i["product_id"]):
                 await _claim_product_capacity(
@@ -1213,24 +1228,37 @@ async def begin_saga(
     return await attach_payment(order_id=order_id, payment=payment, now=_now())
 
 
-async def _invoice_delivery_mismatch(order_id: str, payment) -> bool:
+async def _invoice_delivery_mismatch(
+    order_id: str, payment, *, order=None, projection=None, verify_existing: bool = False,
+) -> bool:
     from bolt11 import decode as bolt11_decode
 
     from .settlement import _verify_settlement
 
     try:
-        async with db.connect() as conn:
-            order = await conn.fetchone(
-                f"SELECT * FROM {table('orders')} WHERE id = :o", {"o": order_id},
-            )
-            projection = await conn.fetchone(
-                f"SELECT * FROM {table('payments')} WHERE order_id = :o", {"o": order_id},
-            )
+        if order is None or projection is None:
+            async with db.connect() as conn:
+                order = await conn.fetchone(
+                    f"SELECT * FROM {table('orders')} WHERE id = :o", {"o": order_id},
+                )
+                projection = await conn.fetchone(
+                    f"SELECT * FROM {table('payments')} WHERE order_id = :o", {"o": order_id},
+                )
         if not order or not projection:
             return True
-        if projection["status"] not in ("creating", "creation_unknown"):
+        if projection["status"] not in ("creating", "creation_unknown") and not verify_existing:
             return False
-        if await _verify_settlement(dict(order), dict(projection), payment):
+        if (payment.extension != "infinitemarkets"
+                or payment.external_id != core_external_id(order_id)
+                or projection["core_external_id"] != payment.external_id
+                or (payment.extra or {}).get("tag") != "infinitemarkets"
+                or (payment.extra or {}).get("order_id") != order_id
+                or projection["amount_sat"] != order["total_sat"]
+                or not projection["wallet_id_hash"]):
+            return True
+        if await _verify_settlement(
+            dict(order), dict(projection), payment, require_attached=verify_existing,
+        ):
             return True
         invoice = bolt11_decode(payment.bolt11)
         if invoice.payment_hash != payment.payment_hash:
@@ -1250,20 +1278,17 @@ async def attach_payment(*, order_id: str, payment, now: int) -> dict:
     commerce state; enter awaiting_payment only for invoice_pending."""
     from bolt11 import decode as bolt11_decode
 
-    if await _invoice_delivery_mismatch(order_id, payment):
-        await _mark_unknown(order_id, now=now, reason="invoice-correlation-failed")
-        return {
-            "order_id": order_id, "state": "invoice_pending",
-            "bolt11": None, "expires_at": None,
-        }
-
     settings = ext_settings()
     key = settings.master_keys[settings.active_key_version]
     ver = settings.active_key_version
 
-    invoice = bolt11_decode(payment.bolt11)
-    expiry_dt = payment.expiry or getattr(invoice, "expiry_date", None)
-    expiry_epoch = int(expiry_dt.timestamp()) if expiry_dt else None
+    try:
+        invoice = bolt11_decode(payment.bolt11)
+        expiry_epoch = int(invoice.expiry_date.timestamp())
+    except Exception:
+        await _mark_unknown(order_id, now=now, reason="invoice-correlation-failed")
+        return {"order_id": order_id, "state": "invoice_pending",
+                "bolt11": None, "expires_at": None}
 
     def _enc(plaintext: bytes, column: str) -> bytes:
         return crypto.encrypt(
@@ -1281,6 +1306,43 @@ async def attach_payment(*, order_id: str, payment, now: int) -> dict:
             raise order_service.TransitionConflict(
                 f"order {order_id!r} does not exist"
             )
+        projection = await tx.fetch_one(
+            f"SELECT * FROM {tx.table('payments')} WHERE order_id = :o", {"o": order_id},
+        )
+        if projection and projection["status"] in ("creating", "creation_unknown"):
+            from .settlement import _core_payments_by_external_id, _inventory_review
+
+            originals = await _core_payments_by_external_id(core_external_id(order_id))
+            fields = ("payment_hash", "checking_id", "wallet_id", "bolt11", "amount",
+                      "extension", "external_id")
+            if (len(originals) != 1
+                    or any(getattr(originals[0], field) != getattr(payment, field, None)
+                           for field in fields)
+                    or await _invoice_delivery_mismatch(
+                        order_id, payment, order=order, projection=projection,
+                    )):
+                now = await tx.now()
+                await tx.execute(
+                    f"UPDATE {tx.table('payments')} SET status = 'creation_unknown' "
+                    "WHERE order_id = :o", {"o": order_id},
+                )
+                await _inventory_review(tx, dict(order), reason="invoice-correlation-failed",
+                                        source="attachment", now=now)
+                return {"order_id": order_id, "state": order["state"],
+                        "bolt11": None, "expires_at": None}
+        merchant = await tx.fetch_one(
+            f"SELECT user_id FROM {tx.table('merchants')} WHERE id = :m",
+            {"m": order["merchant_id"]},
+        )
+        now = await tx.now()
+        wallet_refs = json.dumps({
+            "version": 1, "order_id": order_id, "merchant_id": order["merchant_id"],
+            "user_id": merchant["user_id"], "external_id": core_external_id(order_id),
+            "tag": "infinitemarkets", "currency": "sat", "amount_sat": order["total_sat"],
+            "payment_hash": payment.payment_hash, "checking_id": payment.checking_id,
+            "expiry": expiry_epoch, "wallet_id": payment.wallet_id,
+            "source_wallet_id": payment.wallet_id,
+        })
         rc = await tx.execute(
             f"UPDATE {tx.table('payments')} "
             "SET payment_hash = :ph, checking_id_enc = :ci,"
@@ -1320,22 +1382,55 @@ async def attach_payment(*, order_id: str, payment, now: int) -> dict:
                 "i": order_id,
             },
         )
-        if order["state"] == "invoice_pending":
-            if expiry_epoch:
+        if order["state"] in ("invoice_pending", "awaiting_payment"):
+            if expiry_epoch and order["state"] == "invoice_pending":
                 await tx.execute(
                     f"UPDATE {tx.table('inventory_reservations')}"
                     " SET expires_at = :e, updated_at = :n"
                     " WHERE order_id = :o AND state = 'held'",
                     {"e": expiry_epoch, "n": now, "o": order_id},
                 )
+            coverage = await order_service.reservation_coverage(tx, dict(order), now)
+            now = coverage["now"]
+            if not coverage["complete"] or expiry_epoch is None or expiry_epoch <= now:
+                from .settlement import _inventory_review, _notify_context
+
+                reason = ("inventory-reservation-coverage-lost" if coverage["releasable"]
+                          else "inventory-reservation-counters-incoherent")
+                await _inventory_review(
+                    tx, dict(order), reason=reason, source="attachment", now=now,
+                )
+                await order_service.transition_order(
+                    tx, order_id=order_id, from_state=order["state"],
+                    to_state="cancelled", actor="system", reason=reason, now=now,
+                )
+                if coverage["releasable"]:
+                    await order_service.release_reservations(
+                        tx, order_id=order_id, to_state="released", now=now,
+                    )
+                current = await order_service._order_row(tx, order_id)
+                emails, events, customer = await _notify_context(tx, current)
+                for event in ("on_hold", "cancelled"):
+                    await order_service.enqueue_email_intents(
+                        tx, order=current, event_type=event,
+                        merchant_notify_emails=emails, merchant_notify_events=events,
+                        customer_email=customer, now=now,
+                    )
+                return {"order_id": order_id, "state": "cancelled",
+                        "bolt11": None, "expires_at": expiry_epoch}
+            await order_service.resolve_creation_uncertainty(tx, dict(order), now)
+        if order["state"] == "invoice_pending":
             await order_service.transition_order(
                 tx, order_id=order_id, from_state="invoice_pending",
                 to_state="awaiting_payment", actor="system",
                 detail={"payment_hash": payment.payment_hash}, now=now,
             )
+            attached_order = await order_service._order_row(tx, order_id)
+            usable = (not attached_order["payment_exception"]
+                      and attached_order["payment_exception_resolution"] in (None, "unresolved"))
             return {
                 "order_id": order_id, "state": "awaiting_payment",
-                "bolt11": payment.bolt11, "expires_at": expiry_epoch,
+                "bolt11": payment.bolt11 if usable else None, "expires_at": expiry_epoch,
             }
         # Cancelled or other state: keep the projection for late-settlement
         # detection; never deliver BOLT11.
@@ -1380,12 +1475,22 @@ async def _mark_unknown(
     """Timeout/unknown: status=creation_unknown + payment_exception — never
     a second invoice; reconciliation recovers by exact external id."""
     async with DomainTransaction() as tx:
+        order = await tx.fetch_one(
+            f"SELECT * FROM {tx.table('orders')} WHERE id = :i" + tx.for_update,
+            {"i": order_id},
+        )
+        if not order:
+            return
         changed = await tx.execute(
             f"UPDATE {tx.table('payments')} SET status = 'creation_unknown'"
             " WHERE order_id = :o AND status IN ('creating', 'creation_unknown')",
             {"o": order_id},
         )
         if changed != 1:
+            return
+        if (order["payment_exception_resolution"] not in (None, "unresolved")
+                or (order["payment_exception"]
+                    and order["payment_exception_reason"] != "invoice-creation-unknown")):
             return
         await tx.execute(
             f"UPDATE {tx.table('orders')} "
@@ -1411,31 +1516,25 @@ async def _resume_order(record: dict, *, now: int) -> dict:
         await begin_saga(order_id=order_id, now=now)
         order = await order_service.get_order(order_id)
 
-    ver = crypto.envelope_version(order["public_token_enc"])
-    token = crypto.decrypt(
-        order["public_token_enc"], settings.master_keys[ver],
-        record_id=order_id, table="orders", column="public_token_enc",
-        key_version=ver,
-    ).decode()
-    bolt11 = None
-    async with db.connect() as conn:
-        payment = await conn.fetchone(
-            f"SELECT bolt11_enc FROM {table('payments')} WHERE order_id = :o",
-            {"o": order_id},
-        )
-    if payment and payment["bolt11_enc"] is not None:
-        bver = crypto.envelope_version(payment["bolt11_enc"])
-        bolt11 = crypto.decrypt(
-            payment["bolt11_enc"], settings.master_keys[bver],
-            record_id=order_id, table="payments", column="bolt11_enc",
-            key_version=bver,
+    async with DomainTransaction() as tx:
+        order = await order_service._order_row(tx, order_id)
+        ver = crypto.envelope_version(order["public_token_enc"])
+        token = crypto.decrypt(
+            order["public_token_enc"], settings.master_keys[ver],
+            record_id=order_id, table="orders", column="public_token_enc",
+            key_version=ver,
         ).decode()
+        snapshot = await order_service.payable_invoice(tx, order)
+        bolt11 = snapshot["bolt11"] if snapshot else None
     return {
         "public_token": token,
         "order": {
             "state": order["state"],
             "total_sat": order["total_sat"],
-            "bolt11": bolt11 if order["state"] == "awaiting_payment" else None,
+            "bolt11": bolt11 if (
+                order["state"] == "awaiting_payment" and not order["payment_exception"]
+                and order["payment_exception_resolution"] in (None, "unresolved")
+            ) else None,
             "expires_at": order["invoice_expiry"],
         },
     }
@@ -1581,7 +1680,7 @@ async def gamma_order_intake(
 
         async with DomainTransaction() as tx:
             order = await tx.fetch_one(
-                f"SELECT * FROM {tx.table('orders')} WHERE id = :i",
+                f"SELECT * FROM {tx.table('orders')} WHERE id = :i" + tx.for_update,
                 {"i": order_id},
             )
             await order_messages.enqueue_payment_request(
@@ -1653,7 +1752,7 @@ async def _insert_gamma_order_intake(
     )
     async with DomainTransaction() as tx:
         await tx.fetch_one(
-            f"SELECT id FROM {tx.table('merchants')} WHERE id = :m" + tx.for_update,
+            f"SELECT id FROM {tx.table('merchants')} WHERE id = :m" + tx.for_no_key_update,
             {"m": merchant_id},
         )
         count = await tx.fetch_one(

@@ -1,0 +1,229 @@
+{
+  "plan": "05-03",
+  "status": "partial-browser-chronology-warning-financial-pause",
+  "completion_summary_created": false,
+  "updated_at": "2026-10-12T21:07:09+00:00",
+  "source_implementation": "Implemented and independently reviewed in the authorized financial tranche; no later plans executed",
+  "current_checks": {
+    "full_financial": {
+      "sqlite_passed": 433,
+      "sqlite_pg_only_skips": 6,
+      "postgres_passed": 439,
+      "postgres_skips": 0,
+      "evidence": "05-FINANCIAL-REVIEW-FIXES.json"
+    },
+    "parent_focused": {
+      "sqlite_passed": 83,
+      "sqlite_pg_only_skips": 4,
+      "postgres_passed": 87,
+      "postgres_skips": 0,
+      "exit_code": 0
+    },
+    "buyer_browser": {
+      "tests_passed": 1,
+      "scenarios": 3,
+      "exit_code": 0
+    },
+    "source_review": "PASSED for finite F1/F3/F2 scope; CR-01 through CR-06 and WR-02 resolved",
+    "qualification": "BLOCKED; not phase completion or release clearance"
+  },
+  "remaining_gates": [
+    "F1 admin pinned-host pageerror qualification OPEN; no filtering, vendor or security change",
+    "WR-01 original browser RED chronology absent; retrospective baseline reproduction recorded honestly",
+    "WR-04 pre-existing in-flight token rotation/expiry race MEDIUM / OPEN / NOT FIXED / NOT WAIVED; separate bounded authorization follow-up",
+    "HISTORICAL-PAID-ORDER-AUDIT OPEN / NOT AUTHORIZED / NOT PERFORMED; actual-record evidence NONE; production exposure/disposition/release BLOCKED",
+    "F4-F6, CI-01, full matrix/qualification and separately authorized live Plebeian remain pending"
+  ],
+  "source_map_reference": "05-REVIEW.md and current 05-FINANCIAL-REVIEW-FIXES.json",
+  "historical_executor_snapshot": {
+    "plan": "05-03",
+    "status": "partial-procedural-gates-open-financial-pause",
+    "completion_summary_created": false,
+    "scope": "Synthetic F2 after inherited F1/F3 only; STOP after this plan. Parent owns independent review, commits and global closure.",
+    "provenance": {
+      "base_revision": "bf99ec0b252f6ecff38eadb377d16d57def3576a (inherited05-02-SUMMARY, not reverified with Git)",
+      "host_revision": "e336fe14b841d6f0c940e75b3d343e3ab5cf8433 (inherited pin; no vendor edits)",
+      "working_tree": "Uncommitted inherited F1/F3 plus F2. Source and inherited summary/evidence inspected before edits; actual inherited Git diff was NOT inspected because this prompt prohibits Git. Parent must inspect whole first-three-plan diff independently.",
+      "isolation": "Inherited native base-check degraded; isolation none; sequential main-tree writer, no additional agents"
+    },
+    "tasks": {
+      "05-03-01": "Permanent intentional runtime RED accepted; original unpaid invoice now payable, then verified accounted delivery, exact one invoice, SAT/product/total identity and replay no-op. Both DB focused checks pass.",
+      "05-03-02": "Intentional hold/review/QR assertion REDs accepted. Order-first timeout CAS, stronger/reasonless/manual preservation, three independent transaction connections with actual distinct PG backend PIDs, callback-before-timeout, terminal/unallocated/duplicate and already-settled pure no-op regressions pass both DBs.",
+      "05-03-03": "Permanent actual browser regression and all planned automated selections pass. Browser pre-fix intentional RED was NOT captured before runtime repair, so locked browser TDD remains incomplete; no fabricated/reintroduced bug or fake RED used. Independent financial/security review still pending. No completion SUMMARY issued. Financial pause enforced."
+    },
+    "files_edited": [
+      "infinitemarkets/services/orders.py",
+      "infinitemarkets/services/checkout.py",
+      "infinitemarkets/services/settlement.py",
+      "infinitemarkets/views_public_api.py",
+      "tests/runtime/test_order_saga.py",
+      "tests/e2e/buyer.spec.ts",
+      "tools/e2e_server.py"
+    ],
+    "source_map": {
+      "orders.py:447": "resolve_creation_uncertainty: exactly active pure creation-unknown plus NULL/unresolved resolution only; clears flag/reason/resolution to false/NULL/NULL. Called only at new locked inventory-safe evidence boundaries; no sweep or settled no-op caller.",
+      "checkout.py:1223,1266,1357": "Revalidate exact core external-id/order/tag, recorded wallet ownership/hash, SAT amount, decoded BOLT11/hash/expiry under order lock before successful attachment. Complete live05-02 coverage, unexpired original canonical core row uniqueness plus exact invoice/wallet/checking identity required before pure clearing. Duplicate/terminal attachment does not clear. Request response uses re-read hold truth.",
+      "checkout.py:1421,1453": "Timeout locks/reads order FIRST then creating/creation_unknown payment CAS; never overwrites protected active/reasonless/manual authority. Correlation may strengthen pure uncertainty. Replay rebuild suppresses invoice under unresolved hold/manual decision.",
+      "settlement.py:200,261": "Mismatch/late/incomplete review uses locked order and preserves stronger/reasonless/manual flags and resolution, while new evidence can strengthen pure uncertainty. Separate high-severity audit evidence remains.",
+      "settlement.py:375-405": "After complete consumption and durable inventory proof, newly settled pure uncertainty clears only on unique successful exact canonical invoice correlation. Clears before transition/type3 snapshot; re-reads post-transition order for email snapshot. Already-settled CAS branch unchanged and mutation-free.",
+      "views_public_api.py:733": "Shared token/history invoice projection suppresses BOLT11 for holds/manual decisions. Direct F2 scope deviation justified by permanent genuine RED: unallocated/duplicate-held orders otherwise exposed a payable QR despite hold.",
+      "test_order_saga.py:1407-1762": "Eight permanent hard02 regression functions, 32 parameterized examples; real persist-then-timeout helper and actual FakeWallet host/listener retained. Includes successful original invoice QR and delivery currency identity, hold/manual matrix, corruption review preservation, timeout concurrency, no-op snapshots and pre-notification clearing.",
+      "buyer.spec.ts:31,179": "Desktop1280/390px recovered original QR/copy/countdown; held390px invoice and delivery blocked; real settlement, one checkout per scenario, original SHA256 identity, token-only headers/fragment stripping and no pageerrors. Existing order-status test now self-seeds an actual checkout when selected without earlier serial setup.",
+      "e2e_server.py:501-571,724-727,759-768": "Disposable harness-only one-call response-loss injection and explicit recovery. FakeWallet/offline/seeded-merchant/recovery-order guards, original create restored before awaited call; selected recovery lookups delayed until explicit release. No shipped debug route.",
+      "settlement.py:786": "Inherited F3 max(now, previous_confirmed.created_at+1) acceptance timestamp strategy UNCHANGED. Parent financial review must assess future-timestamp/clock semantics."
+    },
+    "environment": {
+      "common": "UV_NO_ENV_FILE=1 UV_NO_SYNC=1 UV_OFFLINE=1 TZ=UTC; FakeWallet; RELAY_IO off; installed dependencies only",
+      "sqlite": "LNBITS_DATABASE_URL explicitly empty; every pytest command fresh mktemp /tmp core folder, runtime extension tmpdirs; macOS single process/single-writer SQLite, not PG contention equivalence",
+      "postgres": "Exact parent-approved socket-only PG17.9 synthetic DB only. psql -X verified current_database=infinitemarkets_phase5, data_directory=/tmp/infinitemarkets-phase5-pg-1ae80f8/data, empty listen_addresses, UTC,17.9 Homebrew before destructive fixture schema teardown. Shellcdf22c exit0. PGPASSFILE/PGSERVICEFILE=/dev/null; benign disabled-credential-lookup warnings. Parent owns stop/removal; cluster left running.",
+      "browser": "Installed Node22.22.3/Playwright1.63 Chromium; real pinned-host disposable HTTPS localhost5099 SQLite seed /tmp/infinitemarkets-f2-e2e-seed.json; RELAY_IO off/no local relay. Existing throwaway certificate posture only, no trust/security/config changes. All three owned servers stopped; final port check shell4831f5 HTTP000 curl exit7 confirms no listener. No preview created."
+    },
+    "red_evidence": [
+      {
+        "record": "05-03-RED-01.json",
+        "shell": "f0c38f",
+        "result": "1 failed/150deselected; intentional stale payment_exception1 before QR at then1428; pytest2.41s; actual Node TAP exit1; native checker6e82a3 RED_EVIDENCE_OK exit0"
+      },
+      {
+        "record": "05-03-RED-02.json",
+        "shell": "6390a9",
+        "result": "8 failed/7passed/151deselected3.74s; timeout overwrites stronger/reasonless holds and inactive refund flags; actual Node TAP exit1; native checkerbe6521 RED_EVIDENCE_OK exit0"
+      },
+      {
+        "record": "05-03-RED-02-REVIEW.json",
+        "shell": "05abdf",
+        "result": "5 failed/4passed/166deselected3.73s; mismatch overwrites protected reasons; late/incomplete/mismatch reactivate inactive manual refund flags; actual Node TAP exit1; final exact-excerpt native checkerd84ec8 RED_EVIDENCE_OK exit0"
+      },
+      {
+        "record": "05-03-RED-02-QR.json",
+        "shell": "bb1c6c",
+        "result": "2 failed/2passed/178deselected3.21s; unallocated/duplicate-held status exposed BOLT11; terminal controls pass; actual Node TAP exit1; checkerdf25d4 RED_EVIDENCE_OK exit0"
+      }
+    ],
+    "red_format": "Real Node node:test wrapper runs actual pytest with spawnSync and naturally asserts child exit0. No invented TAP; artifacts retain actual TAP excerpts without full synthetic invoice values. Browser pre-fix RED absent and not counted.",
+    "final_checks": [
+      {
+        "command": "uv run pytest tests/runtime/test_order_saga.py tests/runtime/test_public_contract.py -k 'hard02 or creation_unknown or duplicate_attachment or end_to_end_journey' -q --tb=short --show-capture=no",
+        "sqlite": {
+          "shell": "078b2f",
+          "passed": 35,
+          "deselected": 165,
+          "skipped": 0,
+          "seconds": 7.9,
+          "exit_code": 0
+        },
+        "postgres": {
+          "shell": "d655fe",
+          "passed": 35,
+          "deselected": 165,
+          "skipped": 0,
+          "warnings": 3,
+          "seconds": 5.54,
+          "exit_code": 0
+        }
+      },
+      {
+        "command": "uv run pytest tests/runtime/test_order_saga.py -k 'hard02 or mismatch or late_settlement or creation_unknown or duplicate_attachment or hard03' -q --tb=short --show-capture=no",
+        "sqlite": {
+          "shell": "47732c",
+          "passed": 57,
+          "deselected": 125,
+          "skipped": 0,
+          "seconds": 9.16,
+          "exit_code": 0
+        },
+        "postgres": {
+          "shell": "cdb70f",
+          "passed": 57,
+          "deselected": 125,
+          "skipped": 0,
+          "warnings": 2,
+          "seconds": 4.96,
+          "exit_code": 0
+        }
+      },
+      {
+        "command": "uv run pytest tests/runtime/test_order_admin.py tests/runtime/test_order_saga.py tests/runtime/test_checkout.py tests/runtime/test_catalog_variants.py tests/runtime/test_public_contract.py tests/runtime/test_nostr_signin.py tests/runtime/test_email_queue.py tests/runtime/test_nip17_inbox.py tests/runtime/test_release_a_journey.py -q --tb=short --show-capture=no",
+        "sqlite": {
+          "shell": "f24b0b",
+          "passed": 336,
+          "skipped": 2,
+          "seconds": 48.32,
+          "exit_code": 0
+        },
+        "postgres": {
+          "shell": "4c8f27",
+          "passed": 338,
+          "skipped": 0,
+          "warnings": 11,
+          "seconds": 30.98,
+          "exit_code": 0
+        },
+        "sqlite_skip_reasons": [
+          "test_email_queue.py:570 existing PostgreSQL row-lock concurrency drill",
+          "test_email_queue.py:602 existing PostgreSQL rate-bucket concurrency drill"
+        ],
+        "retention": "All inherited F1 token/history/email/Gamma/merchant processing/completion/shipping proof consumers and F3 coverage/expiry/accept positives included. Actual fresh cancel/FakeWallet settlement/merchant accept fulfillment positive test_hard01_fresh_accept_retains_authoritative_fulfillment now passes without injected proof; accounted physical backorder and corruption guards retained. This is nine-file financial scope, not full phase/release qualification."
+      },
+      {
+        "command": "PATH=/Users/bk/.nvm/versions/node/v22.22.3/bin:$PATH npx --no-install playwright test buyer.spec.ts --grep 'hard02|order status page|checkout retries' --output=/tmp/infinitemarkets-f2-browser-qualified",
+        "workdir": "tests/e2e",
+        "shell": "bffef3",
+        "passed": 3,
+        "skipped": 0,
+        "seconds": 45.1,
+        "exit_code": 0,
+        "titles": [
+          "hard02 recovered original invoice QR is payable; independent hold blocks delivery (37.5s)",
+          "order status page: fragment stripped, polls, settles (5.6s)",
+          "checkout retries preserve uncertain requests but allow corrected rejections (1.3s)"
+        ],
+        "scope": "Fresh restarted disposable server with latest production code. Buyer pageerrors array empty. Does NOT close inherited F1 admin pinned-host ServiceWorker TLS/null-wallet websocket pageerror gate."
+      },
+      {
+        "command": "make lint",
+        "shell": "fd999b",
+        "exit_code": 0,
+        "result": "All checks passed; earlier new-code E501/import findings fixed surgically, no global formatting"
+      },
+      {
+        "command": "Node22 node --check public_checkout.js && node --check public_order.js && node --check admin_orders.js (full static paths)",
+        "shell": "34faee",
+        "exit_code": 0
+      }
+    ],
+    "earlier_checks": [
+      "Initial tracer green7943984passed/165deselected4.81s exit0 before expanded tests",
+      "Task2b691bd50passed/125deselected7.42s;40128e55passed8.39s;PG5e635555passed4.79s,all exit0",
+      "First broad da936e336passed/2skipped53.95s;PG466490338passed30.55s exit0, superseded by final canonical-revalidation reruns",
+      "Browser45cd161passed43.2s;fdb2de3passed46.5s exit0, superseded by latest fresh-server bffef3",
+      "Earlier lint42960e and82195f exit2 for new-code line length/import issues only; final lint passed"
+    ],
+    "all_green_processes": "Natural exits, nonempty test collection. No timeout/killed process counted as success. Server termination is owned harness cleanup only.",
+    "audit_gate": {
+      "id": "HISTORICAL-PAID-ORDER-AUDIT",
+      "status": "OPEN / NOT AUTHORIZED / NOT PERFORMED",
+      "actual_existing_record_evidence": "NONE",
+      "redacted_outcome_reference": null,
+      "historical_disposition": "NOT DONE",
+      "production_exposure": "BLOCKED",
+      "real_record_disposition": "BLOCKED",
+      "release_clearance": "BLOCKED",
+      "owner": "operator/parent",
+      "required_next_action": "Separately authorized actual read-only operator audit and independent review before any production exposure, real-record disposition or release. No existing database accessed now. Synthetic results/local review/parent-reviewed local commits cannot close this gate."
+    },
+    "remaining_gates": [
+      "05-03 Task3 locked pre-fix browser RED not captured; report partial, no SUMMARY or full-task completion claim",
+      "Actual inherited Git diff inspection unavailable under no-Git prompt; parent must inspect entire F1/F3/F2 diff independently",
+      "Independent parent code/financial/security review pending; verify exact canonical checks, order-first locking, all consumers and no widening/sweep",
+      "F1 admin browser no-pageerror gate OPEN: inherited unchanged pinned-host ServiceWorker TLS and null g.wallet.id websocket errors; not patched, filtered or claimed fixed by buyer-browser green",
+      "Inherited F3 acceptance timestamp max(now, prior_confirmed+1) can create future logical timestamps; unchanged, parent reviewer must assess clock/provenance implications",
+      "Historical operator audit OPEN/NOT AUTHORIZED/NOT PERFORMED; actual evidence NONE; production/disposition/release BLOCKED",
+      "Live Plebeian separately unauthorized/unperformed",
+      "No F4-F6/CI01/full-phase or Linux four-profile qualification performed; no requirement/security release closure"
+    ],
+    "prohibited_actions_not_performed": "No additional agents; no Git/stage/commit/push; no config/dependency/vendor/.env/security/global STATE/ROADMAP edits; no new runtime comments; no live funds/relay/real DB/audit access; no outgoing/refund/sweep operations. Manual refund concurrency uses synthetic existing-decision fields under independent locks, never funds or actual refund execution. ORDER_TRANSITIONS unchanged. Parent owns PG cleanup and reviewed local commits.",
+    "handoff": "STOP after F2. Parent independently reviews whole first-three financial scope and determines procedural follow-up before any completion summary. Local reviewed code/commits remain permitted; production exposure/disposition/release remain blocked."
+  },
+  "pause": "User requested local commit if finite source review clear, then pause. No push/deploy/live/actual historical-record actions authorized."
+}

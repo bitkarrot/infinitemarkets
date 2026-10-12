@@ -4,16 +4,16 @@ milestone: v1.0
 milestone_name: Core Commerce and Hardening
 current_phase: "05"
 current_phase_name: Correctness, Recovery, and Security Hardening
-status: ready_to_execute
-stopped_at: Six plans independently approved; only financial waves 1–3 authorized
-last_updated: "2026-10-12T07:06:41+00:00"
+status: paused
+stopped_at: Financial F1/F3/F2 source verified and reviewed; local commit then mandatory pause
+last_updated: "2026-10-12T21:07:09+00:00"
 last_activity: 2026-10-12
-last_activity_desc: Phase 5 plans independently approved; synthetic financial execution only; legacy audit and release gates open
+last_activity_desc: CR-01–06 source corrections verified locally; financial pause with qualification and audit gates open
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 24
-  completed_plans: 14
+  completed_plans: 15
 ---
 
 # Project State
@@ -28,14 +28,14 @@ See: .planning/PROJECT.md (updated 2026-10-11)
 ## Current Position
 
 Phase: 5 of 6 (Correctness, Recovery, and Security Hardening)
-Plan: 05-01 of 6 (F1); next 05-02 F3 then 05-03 F2; pause afterward
-Status: Ready for approved local synthetic financial execution; Phase 2/3 acceptance and milestone remain open
-Last activity: 2026-10-12 — six Phase 5 plans independently reviewed; native command/failure probes 29 checked with zero findings; only local F1→F3→F2 approved
+Plan: Financial 05-01 → 05-02 → 05-03 source implemented and reviewed; 05-02 scoped tasks complete, 05-01/03 qualification/procedural gates open
+Status: Paused after approved financial tranche; no auto-advance to 05-04, production or historical operations
+Last activity: 2026-10-12 — ten-file financial SQLite 433 passed/6 PG-only skips; PG 439 passed/no skips; finite independent source review passed; CR-01–06 resolved
 
-Progress: 3 phase acceptance scopes closed, 2 reopened, 1 not started. Phase 5 has six reviewed plans and zero completed plans. No overall
-acceptance percentage is implied by plan/artifact counters. There are 14 executed plan
+Progress: 3 phase acceptance scopes closed, 2 reopened, 1 in progress. Phase 5 has six reviewed plans; 05-02 scoped tasks complete, financial source implemented, and 05-01/03 still partial. No overall
+acceptance percentage is implied by plan/artifact counters. There are 15 executed plan
 summaries plus 4 explicitly superseded/re-scoped Phase 4 disposition records;
-18 summary files do not mean 18 original plans were executed. GSD may display
+19 summary files do not mean 19 original plans were executed. GSD may display
 100% for that artifact ratio; it is not milestone acceptance or Phase 5 progress.
 
 **Ad-hoc work since 03.1 (not phase-planned, committed + deployed, released as v0.1/v0.2/v0.3/v0.4/v0.5/v0.6/v0.6.1 and packaged for v0.6.2):** storefront filters + collection links; configurable index hero; dark/light shopper toggle; Messages list+thread redesign and counterparty kind-0 profiles; Publications timestamps/row detail, live relay catalog check, filters/sorting, and fresh kind-5 reissue; brand logo URL + footer copy; point-and-click Fine-tune + accent move; single-column merchant settings; primary-colored settings buttons; embeddable shop component (`gm-embed.js` + public products API + CORS), iframe embed with widened CSP, admin Embed snippets; About/More section + screenshots; outbox history prune control; Merchant Nostr Profile (avatar, bio, banner, NIP-05, Lightning address) and owner-only `nsec` reveal; redacted email previews + terminal-history cleanup; sortable Catalog columns and first-column quick actions; searchable country/EU shipping picker; LNbits-style Catalog tables and scrolling mobile section nav; Releases v0.1, v0.2, v0.3, v0.4, v0.5, v0.6, v0.6.1.
@@ -44,7 +44,7 @@ summaries plus 4 explicitly superseded/re-scoped Phase 4 disposition records;
 
 **Velocity:**
 
-- Executed plans with original summaries: 14
+- Executed plans with original summaries: 15
 - Phase 4 historical plans dispositioned: 4 (not 4 original plans executed)
 - Average duration: -
 - Total execution time: 0 hours
@@ -58,7 +58,7 @@ summaries plus 4 explicitly superseded/re-scoped Phase 4 disposition records;
 | 3 | 4 | - | - |
 | 03.1 | 3 | - | - |
 | 4 | 4 historical disposition records | - | - |
-| 5 | 6 reviewed, 0 executed | - | - |
+| 5 | 6 reviewed; financial source implemented, 1 scoped plan complete, 2 partial | - | - |
 
 **Recent Trend:**
 
@@ -117,7 +117,9 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 ### Blockers/Concerns
 
-- F1–F3 are high-priority payment/inventory correctness defects; F4–F6 are open publication/retry/admission defects. See `docs/spec-conformance-analysis.md`.
+- F1–F3 source corrections pass scoped local runtime and independent review; qualification remains open. F4–F6 remain unimplemented. See Phase 5 review/evidence and `docs/spec-conformance-analysis.md`.
+- WR-04: pre-existing in-flight token rotation/expiry race remains MEDIUM / OPEN / NOT FIXED / NOT WAIVED; no fresh revoked-token admission after committed rotation demonstrated. Separate authorization follow-up before broader security clearance.
+- F1 pinned-host admin pageerrors and F2 original browser RED chronology remain open; do not turn scoped source GREEN into plan/phase/release acceptance.
 - Security configuration remains unchanged: ASVS level 1, enforcement enabled, block on high. Old zero-open-threat claims are superseded, not treated as waivers.
 - CI-01 is test infrastructure debt, not evidence of a production teardown defect; do not call a timed-out test process successful.
 - Phase 2 visual-token/screenshot recommendations remain non-blocking UX follow-ups. No further demo reset, old-data migration or live-funds test is authorized by this closeout.
@@ -144,6 +146,6 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 ## Session Continuity
 
-Last session: 2026-10-11
-Stopped at: Closeout records reconciled; plan Phase 5 before implementing repairs
-Resume file: .planning/phases/05-correctness-recovery-and-security-hardening/05-CONTEXT.md
+Last session: 2026-10-12
+Stopped at: Financial source reviewed and verified; locally commit only, then pause before F4–F6
+Resume file: .planning/phases/05-correctness-recovery-and-security-hardening/05-REVIEW.md

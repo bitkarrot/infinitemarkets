@@ -255,6 +255,94 @@ test('orders workspace lists the seeded order + detail pane', async ({
   ).toBeVisible()
 })
 
+test('hard01 order controls require settled and fully accounted payment at desktop and mobile', async ({page, request}) => {
+  const errors: string[] = []
+  const tokens: string[] = []
+  let leakedToken = false
+  page.on('pageerror', error => errors.push(error.stack || error.message))
+  page.on('request', request => {
+    if (tokens.some(token => request.url().includes(token))) leakedToken = true
+  })
+  const ordersUrl = `/infinitemarkets/api/v1/merchants/${seed.merchant_id}/orders`
+  async function checkout() {
+    const response = await page.request.post('/infinitemarkets/api/v1/public/checkout', {
+      headers: {'Idempotency-Key': crypto.randomUUID(), Origin: seed.base_url},
+      data: {merchant_pubkey: seed.pubkey, items: [{d_tag: seed.digital.d_tag, quantity: 2}]}
+    })
+    expect(response.status()).toBe(201)
+    const body = await response.json()
+    tokens.push(body.public_token)
+    return body
+  }
+  async function selectOrder(id: string, width: number) {
+    await page.setViewportSize({width, height: 900})
+    await page.goto('/infinitemarkets/')
+    const search = page.getByPlaceholder('Search order or buyer')
+    await expect(search).toBeVisible({timeout: 20_000})
+    const filtered = page.waitForResponse(response => response.url().includes(`/orders?q=${id.slice(0, 8)}`))
+    await search.fill(id.slice(0, 8))
+    await filtered
+    const row = page.locator('.gm-order-row').filter({hasText: id.slice(0, 8)})
+    await expect(row).toBeVisible()
+    await row.locator('strong').first().click()
+    await expect(page.getByText('Technical delivery details')).toBeVisible()
+  }
+  for (const damage of ['absent', 'partial', 'unpaid', 'hold']) {
+    const created = await checkout()
+    const tokenHeaders = {'X-Order-Token': created.public_token}
+    if (damage !== 'unpaid') {
+      const settled = await request.post(`${seed.base_url}/_e2e/settle`, {headers: tokenHeaders})
+      expect((await settled.json()).ok).toBe(true)
+    }
+    const damaged = await request.post(`${seed.base_url}/_e2e/financial-negative`, {
+      headers: tokenHeaders, data: {damage, state: 'confirmed'}
+    })
+    const fixture = await damaged.json()
+    expect(fixture.ok).toBe(true)
+    const detail = await page.request.get(`${ordersUrl}/${fixture.order_id}`)
+    expect((await detail.json()).fulfillment_authorized).toBe(false)
+    for (const width of [1280, 390]) {
+      await selectOrder(fixture.order_id, width)
+      await expect(page.getByRole('button', {name: /Start processing|Mark complete|Start fulfillment|Mark shipped|Mark delivered/})).toHaveCount(0)
+      await expect(page.getByRole('button', {name: 'Cancel with reason', exact: true})).toBeVisible()
+      await expect(page.locator('[data-gm="closed-note"]')).toContainText('requires review')
+    }
+    const csrf = await csrfToken(page)
+    const cancelled = await page.request.post(`${ordersUrl}/${fixture.order_id}/cancel`, {
+      headers: {Origin: seed.base_url, 'X-CSRF-Token': csrf},
+      data: {reason: 'synthetic negative fixture cleanup; no refund implied'}
+    })
+    expect(cancelled.status()).toBe(200)
+  }
+  const created = await checkout()
+  const settled = await request.post(`${seed.base_url}/_e2e/settle`, {
+    headers: {'X-Order-Token': created.public_token}
+  })
+  const paid = await settled.json()
+  expect(paid.ok).toBe(true)
+  for (const width of [1280, 390]) {
+    await selectOrder(paid.order_id, width)
+    await expect(page.getByRole('button', {name: 'Start processing', exact: true})).toBeEnabled()
+  }
+  await page.getByRole('button', {name: 'Start processing', exact: true}).focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('button', {name: 'Mark complete', exact: true})).toBeEnabled()
+  await page.getByRole('button', {name: 'Cancel with reason', exact: true}).click()
+  await expect(page.getByText(/does not refund a settled/)).toBeVisible()
+  const cancel = page.getByRole('button', {name: 'Cancel order', exact: true})
+  await expect(cancel).toBeDisabled()
+  await page.getByLabel('Reason (required)').fill('synthetic paid cancellation; refund is separate')
+  const cancelled = page.waitForResponse(response => response.url().endsWith(`/orders/${paid.order_id}/cancel`))
+  await cancel.click()
+  expect((await cancelled).status()).toBe(200)
+  const detail = await page.request.get(`${ordersUrl}/${paid.order_id}`)
+  const result = await detail.json()
+  expect(result.state).toBe('cancelled')
+  expect(result.payment.status).toBe('settled')
+  expect(leakedToken).toBe(false)
+  expect(errors).toEqual([])
+})
+
 test('closed orders can be selected, archived, and restored', async ({page, request}) => {
   await page.goto('/infinitemarkets/')
   await expect(page.locator('[placeholder="Search order or buyer"]')).toBeVisible({

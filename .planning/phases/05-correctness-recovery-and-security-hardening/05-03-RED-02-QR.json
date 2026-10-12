@@ -1,0 +1,11 @@
+{
+ "command": "Node22 real node:test spawnSync uv run pytest tests/runtime/test_order_saga.py -k hard02_attachment_does -q --tb=short --show-capture=no; shellbb1c6c",
+ "exitCode": 1,
+ "targetFile": "tests/runtime/test_order_saga.py",
+ "targetTest": "test_hard02_attachment_does_not_clear_outside_new_active_coverage",
+ "expected": "Unallocated and duplicate-held recovery exposes no payable invoice",
+ "actual": "Two retained assertions at line1718 see BOLT11 instead of None; terminal retention passes. pytest2failed/2passed/178deselected3.21s exit1; synthetic full invoice values excluded from this evidence",
+ "output": "TAP version 13\n# Subtest: test_hard02_attachment_does_not_clear_outside_new_active_coverage\nnot ok 1 - test_hard02_attachment_does_not_clear_outside_new_active_coverage\n  ---\n  duration_ms: 4849.575625\n  failureType: 'testCodeFailure'\n  error: |-\n    E AssertionError: unresolved recovery must not expose a payable invoice\n    2 failed, 2 passed, 178 deselected in 3.21s\n  code: 'ERR_ASSERTION'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 0\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 4855.277833",
+ "output_scope": "Actual TAP excerpt shellbb1c6c; synthetic invoice values/stack omitted",
+ "natural_exit": true
+}

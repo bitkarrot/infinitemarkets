@@ -147,7 +147,10 @@ async def test_release_a_journey(runtime_env):
     import importlib
 
     settlement = importlib.import_module("infinitemarkets.services.settlement")
-    await settlement.confirm_settlement(order_id=order["id"], source="test")
+    from test_order_saga import _settle_core_payment
+
+    payment = await _settle_core_payment(order["id"], order["total_sat"])
+    await settlement.invoice_listener(payment)
     status = await anon.get(
         f"{PUBLIC}/order-status", headers={"X-Order-Token": token}
     )
@@ -170,6 +173,7 @@ async def test_release_a_journey(runtime_env):
     )
     assert detail.status_code == 200
     assert detail.json()["items"][0]["title"] == "tour"
+    assert detail.json()["fulfillment_authorized"] is True
 
     events = await client.get(
         f"{API}/merchants/{mid}/orders/{order['id']}/events",

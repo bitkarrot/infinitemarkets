@@ -281,6 +281,11 @@ async def worker_tick(
         async with DomainTransaction(database) as tx:
             deadline = time.monotonic()
             db_now = await tx.now()
+            if row["order_id"]:
+                await tx.fetch_one(
+                    f"SELECT id FROM {tx.table('orders')} WHERE id = :o" + tx.for_update,
+                    {"o": row["order_id"]},
+                )
             live = await tx.fetch_one(
                 f"SELECT * FROM {tx.table('email_queue')} WHERE id = :i"
                 " AND state = 'claimed' AND claimed_by = :w AND claim_token = :t"

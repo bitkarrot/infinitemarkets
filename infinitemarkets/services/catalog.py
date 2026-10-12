@@ -325,7 +325,8 @@ async def _enqueue_product(
 
 async def enqueue_stock_projection(tx: DomainTransaction, product_id: str) -> None:
     row = await tx.fetch_one(
-        f"SELECT p.merchant_id, p.revision, m.pubkey FROM {tx.table('products')} p "
+        f"SELECT p.merchant_id, p.revision, p.parent_product_id, m.pubkey "
+        f"FROM {tx.table('products')} p "
         f"JOIN {tx.table('merchants')} m ON m.id = p.merchant_id WHERE p.id = :p",
         {"p": product_id},
     )
@@ -333,6 +334,23 @@ async def enqueue_stock_projection(tx: DomainTransaction, product_id: str) -> No
         await _enqueue_product(
             tx, row["merchant_id"], product_id, row["revision"], row["pubkey"],
         )
+        if row["parent_product_id"]:
+            parent = await tx.fetch_one(
+                f"SELECT revision FROM {tx.table('products')} WHERE id = :p "
+                "AND merchant_id = :m" + tx.for_update,
+                {"p": row["parent_product_id"], "m": row["merchant_id"]},
+            )
+            if not parent:
+                raise unprocessable("invalid-transition", "Inventory parent requires review")
+            await tx.execute(
+                f"UPDATE {tx.table('products')} SET revision = revision + 1, updated_at = :n "
+                "WHERE id = :p",
+                {"n": await tx.now(), "p": row["parent_product_id"]},
+            )
+            await _enqueue_product(
+                tx, row["merchant_id"], row["parent_product_id"],
+                parent["revision"] + 1, row["pubkey"],
+            )
 
 
 async def _enqueue_collection(

@@ -1,0 +1,37 @@
+{
+  "plan": "05-02",
+  "scope": "F3 only; synthetic financial tranche; parent owns commits and global closure",
+  "base_revision": "bf99ec0b252f6ecff38eadb377d16d57def3576a",
+  "host_revision": "e336fe14b841d6f0c940e75b3d343e3ab5cf8433",
+  "working_tree": "Inherited uncommitted F1 preserved; F3 edits uncommitted in main tree; no Git mutations",
+  "topology": "local macOS; SQLite single process; disposable socket-only PostgreSQL17.9 Homebrew UTC",
+  "postgres_identity_command": "/opt/homebrew/opt/postgresql@17/bin/psql -X -h /tmp/infinitemarkets-phase5-pg-1ae80f8/socket -U devin_phase5 -d infinitemarkets_phase5 -Atc SELECT-current-database-and-settings",
+  "postgres_verified_identity": {"database": "infinitemarkets_phase5", "data_directory": "/tmp/infinitemarkets-phase5-pg-1ae80f8/data", "listen_addresses": "", "timezone": "UTC", "version": "17.9 (Homebrew)", "shell": "280be1", "exit_code": 0},
+  "environment": {"UV_NO_ENV_FILE": "1", "UV_NO_SYNC": "1", "UV_OFFLINE": "1", "TZ": "UTC", "sqlite_database_url": "explicitly empty", "postgres": "exact parent-provided approved synthetic socket DSN only", "PGPASSFILE": "/dev/null", "PGSERVICEFILE": "/dev/null", "funding": "FakeWallet", "relay_io": "off", "data": "fresh /tmp initial core folders and pytest runtime tmp folders"},
+  "red_records": ["05-02-RED-01.json", "05-02-RED-01-TAP.json", "05-02-RED-02.json", "05-02-RED-03.json"],
+  "native_red_gate": "RED_EVIDENCE_OK for01-TAP,02,03; real Node test wraps exact pytest assertion without fabricated TAP. Original pytest-only01 record rejected by installed TAP-only parser and retained honestly.",
+  "task_verification": [
+    {"task": "05-02-01", "command": "uv run pytest tests/runtime/test_order_saga.py -k 'hard03 or settlement_confirms_once or digital_delivery or duplicate_attachment' -q --tb=short --show-capture=no", "sqlite": {"shell": "efa24c", "passed": 24, "deselected": 126, "skipped": 0, "seconds": 5.62, "exit_code": 0}, "postgres": {"shell": "4728f5", "passed": 24, "deselected": 126, "skipped": 0, "warnings": 2, "seconds": 3.44, "exit_code": 0}},
+    {"task": "05-02-02", "command": "uv run pytest tests/runtime/test_order_saga.py tests/runtime/test_checkout.py -k 'hard03 or expiry or reconcile or crash or settlement' -q --tb=short --show-capture=no", "sqlite": {"shell": "0f40bb", "passed": 32, "deselected": 157, "skipped": 0, "seconds": 7.15, "exit_code": 0}, "postgres": {"shell": "b7ea64", "passed": 32, "deselected": 157, "skipped": 0, "warnings": 3, "seconds": 5.13, "exit_code": 0}},
+    {"task": "05-02-03", "command": "uv run pytest tests/runtime/test_order_saga.py tests/runtime/test_catalog_variants.py -k 'hard03 or late_settlement or settlement or variation' -q --tb=short --show-capture=no", "sqlite": {"shell": "edf98a", "passed": 29, "deselected": 125, "skipped": 0, "seconds": 7.69, "exit_code": 0}, "postgres": {"shell": "4c4415", "passed": 29, "deselected": 125, "skipped": 0, "warnings": 3, "seconds": 5.19, "exit_code": 0}}
+  ],
+  "financial_retention": {
+    "command": "uv run pytest tests/runtime/test_order_admin.py tests/runtime/test_order_saga.py tests/runtime/test_checkout.py tests/runtime/test_catalog_variants.py tests/runtime/test_public_contract.py tests/runtime/test_nostr_signin.py tests/runtime/test_email_queue.py tests/runtime/test_nip17_inbox.py tests/runtime/test_release_a_journey.py -q --tb=short --show-capture=no",
+    "sqlite": {"shell": "82bfe4", "passed": 304, "skipped": 2, "seconds": 43.97, "exit_code": 0, "skip_reasons": ["test_email_queue.py:570 existing PostgreSQL row-lock concurrency drill", "test_email_queue.py:602 existing PostgreSQL rate-bucket concurrency drill"]},
+    "postgres": {"shell": "fd28df", "passed": 306, "skipped": 0, "warnings": 11, "seconds": 30.05, "exit_code": 0},
+    "note": "Final broad retention preceded test-only enhancement asserting independent overlapping expiry/winner PostgreSQL backend PIDs; all exact final task reruns include the enhancement and pass. No subsequent production edits."
+  },
+  "earlier_green_and_failure_history": [
+    "Task1 SQLite shell2545da9passed/126deselected4.07s exit0; PG19fd849passed/126deselected2.74s exit0 before later tests added",
+    "Task2 SQLite15bfff19passed/1failed6.34s exit1: preexisting crash-resume test hardcoded3orders depended on excluded earlier tests. Own-order delta assertion retained duplicate protection. Rerun14b06d20passed5.92s exit0; PG004a6020passed4.44s exit0.",
+    "Task3 SQLitea020e119passed6.52s exit0; PGac7e7b18passed/1failed4.56s exit1: checkout winning unit lacked parent publication. Reserved capacity now bumps/publishes leaf and parent under prelocked union. Rerundaf61429passed7.79s; PGf8b81f29passed5.27s exit0.",
+    "First broadSQLite54a8a4303passed/1failed/2skipped45.54s exit1; PG365ea4305passed/1failed35.05s exit1: archived-late-payment fixture expired still-valid invoice. Fixture now uses its actual invoice_expiry; final reruns pass. No assertion relaxed."
+  ],
+  "other_checks": [
+    {"command": "make lint", "final_shell": "4098e7", "exit_code": 0, "result": "All checks passed; earlier line-length/import issues in newly added code corrected manually"},
+    {"command": "node --check infinitemarkets/static/infinitemarkets/js/admin_orders.js", "shells": ["59b015", "4098e7"], "exit_code": 0},
+    {"command": "git diff --check", "shells": ["02d07d", "4098e7"], "exit_code": 0}
+  ],
+  "process_exit": "All reported GREENs exited naturally; no timeout treated as success; no added skips",
+  "remaining_gates": ["F1 browser generic no-pageerror fails on unchanged pinned-host ServiceWorker TLS and null g.wallet.id websocket; not rerun or fixed here", "F2 not implemented; incidental invoice uncertainty not automatically cleared", "Independent parent financial/security review pending", "HISTORICAL-PAID-ORDER-AUDIT OPEN/NOT AUTHORIZED/NOT PERFORMED; actual-record evidence NONE; historical disposition NOT DONE; production exposure, real-record disposition and release clearance BLOCKED", "Live Plebeian gate separately unauthorized/unperformed", "CI01/full DB-install suite and four Linux matrix profiles not run", "Parent owns exact approved PostgreSQL stop/removal, STATE/ROADMAP/REQUIREMENTS/security and commits"]
+}

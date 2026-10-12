@@ -145,11 +145,313 @@ def delivery_unlocked(order: dict) -> bool:
     )
 
 
+def _read_connection(conn):
+    from ..db import table as default_table
+
+    return (
+        conn.table if isinstance(conn, DomainTransaction) else default_table,
+        getattr(conn, "fetchall", None) or conn.fetch_all,
+    )
+
+
+async def payment_settled(conn, order: dict) -> bool:
+    table, fetch = _read_connection(conn)
+    rows = await fetch(
+        f"SELECT * FROM {table('payments')} WHERE order_id = :o LIMIT 2",
+        {"o": order["id"]},
+    )
+    if len(rows) != 1:
+        return False
+    payment = dict(rows[0])
+    from .settlement import _payment_snapshot
+
+    return (
+        payment["status"] == "settled"
+        and payment["core_external_id"] == f"infinitemarkets:{order['id']}"
+        and type(payment["amount_sat"]) is int
+        and payment["amount_sat"] == order["total_sat"]
+        and payment["amount_sat"] > 0
+        and bool(payment["payment_hash"])
+        and bool(payment["wallet_id_hash"])
+        and type(payment["settled_at"]) is int
+        and _payment_snapshot(order, payment) is not None
+    )
+
+
+async def inventory_accounted(conn, order: dict) -> bool:
+    table, fetch = _read_connection(conn)
+    try:
+        items, expected = await inventory_items(conn, order)
+    except TransitionConflict:
+        return False
+    by_id = {item["id"]: item for item in items}
+    consumed = {}
+    rows = await fetch(
+        f"SELECT product_id, quantity, state FROM {table('inventory_reservations')} "
+        "WHERE order_id = :o LIMIT 65",
+        {"o": order["id"]},
+    )
+    if len(rows) > 64:
+        return False
+    for row in rows:
+        if row["state"] in ("held",) or row["state"] not in RESERVATION_STATES:
+            return False
+        if row["state"] != "consumed":
+            continue
+        product_id, quantity = row["product_id"], row["quantity"]
+        if (
+            product_id not in expected
+            or product_id in consumed
+            or type(quantity) is not int
+            or quantity <= 0
+            or quantity > expected[product_id]
+        ):
+            return False
+        consumed[product_id] = quantity
+    if (order.get("payment_exception_resolution") != "accepted" and consumed == expected
+            and all(item["backordered_qty"] == 0 for item in by_id.values())):
+        return True
+    if order.get("payment_exception_resolution") != "accepted":
+        return False
+    return await accepted_inventory_accounting(conn, order, by_id, consumed) is not None
+
+
+async def confirmation_chain(conn, order: dict) -> list[dict] | None:
+    from ..db import dialect
+
+    table, fetch = _read_connection(conn)
+    events = await fetch(
+        f"SELECT * FROM {table('order_events')} WHERE order_id = :o "
+        "AND to_state = 'confirmed' AND from_state != 'confirmed' LIMIT 129",
+        {"o": order["id"]},
+    )
+    if len(events) > 128:
+        return None
+    if isinstance(conn, DomainTransaction):
+        now = await conn.now()
+    else:
+        expression = ("CAST(strftime('%s', 'now') AS INTEGER)" if dialect() == "sqlite"
+                      else "FLOOR(EXTRACT(EPOCH FROM clock_timestamp()))")
+        now = int((await fetch(f"SELECT {expression} AS epoch", {}))[0]["epoch"])
+    nodes, parents = {}, {}
+    try:
+        for row in events:
+            event = dict(row)
+            if (not re.fullmatch(r"[0-9a-f]{32}", event["id"])
+                    or type(event["created_at"]) is not int
+                    or not 0 <= event["created_at"] <= now):
+                return None
+            raw = event["detail_json"]
+            if raw is not None and (not isinstance(raw, str) or len(raw) > 32_768):
+                return None
+            detail = json.loads(raw) if raw else {}
+            if not isinstance(detail, dict):
+                return None
+            if event["actor"] == "system" and event["from_state"] == "awaiting_payment":
+                parent = None
+            elif event["actor"] == "merchant" and event["from_state"] in ("expired", "cancelled"):
+                proof = detail.get("inventory_accounting")
+                if (not isinstance(proof, dict) or type(proof.get("version")) is not int
+                        or proof["version"] != 1 or "parent_confirmation_id" not in proof):
+                    return None
+                parent = proof["parent_confirmation_id"]
+                if parent is not None and (not isinstance(parent, str)
+                                          or not re.fullmatch(r"[0-9a-f]{32}", parent)):
+                    return None
+            else:
+                return None
+            event["detail"] = detail
+            nodes[event["id"]] = event
+            parents[event["id"]] = parent
+        roots = [key for key, parent in parents.items() if parent is None]
+        if not events:
+            return []
+        if len(roots) != 1:
+            return None
+        chain, visited = [], set()
+        key = roots[0]
+        while key is not None:
+            if key in visited:
+                return None
+            visited.add(key)
+            chain.append(nodes[key])
+            children = [child for child, parent in parents.items() if parent == key]
+            if len(children) > 1:
+                return None
+            key = children[0] if children else None
+        if len(visited) != len(nodes):
+            return None
+        return chain
+    except (ValueError, TypeError, KeyError):
+        return None
+
+
+async def accepted_inventory_accounting(conn, order: dict, by_id: dict, consumed: dict):
+    chain = await confirmation_chain(conn, order)
+    if not chain or chain[-1]["actor"] != "merchant":
+        return None
+    event = chain[-1]
+    try:
+        detail = json.loads(event["detail_json"])
+        proof = detail.get("inventory_accounting")
+        if (
+            not isinstance(proof, dict)
+            or type(proof.get("version")) is not int
+            or proof["version"] != 1
+        ):
+            return None
+        entries = proof.get("items")
+        if not isinstance(entries, list) or len(entries) != len(by_id):
+            return None
+        proof_consumed = {}
+        seen = set()
+        for entry in entries:
+            if not isinstance(entry, dict):
+                return None
+            item_id = entry.get("item_id")
+            if not isinstance(item_id, str) or item_id not in by_id or item_id in seen:
+                return None
+            seen.add(item_id)
+            item = by_id[item_id]
+            if entry.get("product_id") != item["product_id"]:
+                return None
+            values = [
+                entry.get(key)
+                for key in (
+                    "quantity",
+                    "consumed_qty",
+                    "accepted_allocated_qty",
+                    "backordered_qty",
+                )
+            ]
+            if any(type(value) is not int or value < 0 for value in values):
+                return None
+            quantity, used, allocated, shortfall = values
+            if (
+                quantity != item["quantity"]
+                or used + allocated + shortfall != quantity
+                or shortfall != item["backordered_qty"]
+            ):
+                return None
+            product_id = item["product_id"]
+            proof_consumed[product_id] = proof_consumed.get(product_id, 0) + used
+        if {key: value for key, value in proof_consumed.items() if value} != consumed:
+            return None
+        accounting = {entry["item_id"]: entry for entry in entries}
+        for predecessor in chain[:-1]:
+            if predecessor["actor"] != "merchant":
+                if any(entry["accepted_allocated_qty"] or entry["backordered_qty"]
+                       for entry in entries):
+                    return None
+                continue
+            previous = predecessor["detail"]["inventory_accounting"].get("items")
+            if not isinstance(previous, list) or len(previous) != len(entries):
+                return None
+            seen_previous = set()
+            for entry in previous:
+                if not isinstance(entry, dict):
+                    return None
+                item_id = entry.get("item_id")
+                if (not isinstance(item_id, str) or item_id not in by_id
+                        or item_id in seen_previous):
+                    return None
+                seen_previous.add(item_id)
+                values = [entry.get(key) for key in (
+                    "quantity", "consumed_qty", "accepted_allocated_qty", "backordered_qty",
+                )]
+                if any(type(value) is not int or value < 0 for value in values):
+                    return None
+                quantity, used, allocated, shortfall = values
+                if (entry.get("product_id") != by_id[item_id]["product_id"]
+                        or quantity != by_id[item_id]["quantity"]
+                        or used + allocated + shortfall != quantity
+                        or shortfall != by_id[item_id]["backordered_qty"]):
+                    return None
+            if {entry["item_id"]: entry for entry in previous} != accounting:
+                return None
+        return {"items": accounting, "event_id": event["id"],
+                "created_at": event["created_at"]}
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
+async def fulfillment_authorized(conn, order: dict) -> bool:
+    table, fetch = _read_connection(conn)
+    rows = await fetch(
+        f"SELECT * FROM {table('orders')} WHERE id = :o AND merchant_id = :m",
+        {"o": order["id"], "m": order["merchant_id"]},
+    )
+    if len(rows) != 1:
+        return False
+    current = dict(rows[0])
+    blocked_digital = await fetch(
+        f"SELECT oi.id FROM {table('order_items')} oi "
+        f"JOIN {table('products')} p ON p.id = oi.product_id "
+        "WHERE oi.order_id = :o AND p.format = 'digital' "
+        "AND (oi.backordered_qty != 0 OR :oversold)",
+        {"o": current["id"], "oversold": bool(current["oversold"])},
+    )
+    return (
+        not blocked_digital
+        and current["state"] in DELIVERY_STATES
+        and not current["payment_exception"]
+        and current["payment_exception_resolution"] in (None, "unresolved", "accepted")
+        and await payment_settled(conn, current)
+        and await inventory_accounted(conn, current)
+    )
+
+
+async def payable_invoice(conn, order: dict) -> dict | None:
+    from .settlement import _payment_snapshot
+
+    if not isinstance(conn, DomainTransaction):
+        async with DomainTransaction() as tx:
+            return await payable_invoice(tx, order)
+    current = await conn.fetch_one(
+        f"SELECT * FROM {conn.table('orders')} WHERE id = :o AND merchant_id = :m"
+        + conn.for_update, {"o": order["id"], "m": order["merchant_id"]},
+    )
+    if not current:
+        return None
+    order.update(dict(current))
+    if (order["state"] != "awaiting_payment" or order["payment_exception"]
+            or order["payment_exception_resolution"] not in (None, "unresolved")):
+        return None
+    payments = await conn.fetch_all(
+        f"SELECT * FROM {conn.table('payments')} WHERE order_id = :o LIMIT 2",
+        {"o": order["id"]},
+    )
+    if len(payments) != 1 or payments[0]["status"] != "pending":
+        return None
+    coverage = await reservation_coverage(conn, order, await conn.now())
+    if not coverage["complete"]:
+        return None
+    snapshot = _payment_snapshot(order, dict(payments[0]))
+    if snapshot is None:
+        return None
+    now = await conn.now()
+    if snapshot["expiry"] <= now or any(row["expires_at"] <= now for row in coverage["held"]):
+        return None
+    return {**snapshot, "now": now,
+            "allocation_deadline": min(row["expires_at"] for row in coverage["held"])}
+
+
 async def digital_delivery(conn, order: dict) -> list[dict]:
     """Buyer-facing delivery content for the order's digital items —
     ``[]`` until :func:`delivery_unlocked`. ``conn`` is any connection or
     transaction exposing ``fetchall``/``fetch_all``."""
-    if not delivery_unlocked(order):
+    if not isinstance(conn, DomainTransaction):
+        async with DomainTransaction() as tx:
+            return await digital_delivery(tx, order)
+    current = await conn.fetch_one(
+        f"SELECT * FROM {conn.table('orders')} WHERE id = :o AND merchant_id = :m"
+        + conn.for_update,
+        {"o": order["id"], "m": order["merchant_id"]},
+    )
+    if not current:
+        return []
+    order.update(dict(current))
+    if not delivery_unlocked(order) or not await fulfillment_authorized(conn, order):
         return []
     from ..db import table as default_table
     from .catalog import decrypt_delivery
@@ -283,6 +585,145 @@ async def get_order(order_id: str, merchant_id: str | None = None) -> dict:
     return dict(row)
 
 
+async def resolve_creation_uncertainty(tx: DomainTransaction, order: dict, now: int) -> bool:
+    if (order["state"] not in ("invoice_pending", "awaiting_payment")
+            or not order["payment_exception"]
+            or order["payment_exception_reason"] != "invoice-creation-unknown"
+            or order["payment_exception_resolution"] not in (None, "unresolved")):
+        return False
+    changed = await tx.execute(
+        f"UPDATE {tx.table('orders')} SET payment_exception = FALSE, "
+        "payment_exception_reason = NULL, payment_exception_resolution = NULL, updated_at = :n "
+        "WHERE id = :i AND state IN ('invoice_pending', 'awaiting_payment') "
+        "AND payment_exception = TRUE AND payment_exception_reason = 'invoice-creation-unknown' "
+        "AND (payment_exception_resolution IS NULL OR payment_exception_resolution = 'unresolved')",
+        {"i": order["id"], "n": now},
+    )
+    return changed == 1
+
+
+async def lock_inventory_products(
+    tx: DomainTransaction, merchant_id: str, product_ids,
+) -> dict[str, dict]:
+    leaves = {}
+    ids = set(product_ids)
+    for product_id in sorted(ids):
+        row = await tx.fetch_one(
+            f"SELECT * FROM {tx.table('products')} WHERE id = :p",
+            {"p": product_id},
+        )
+        if not row or row["merchant_id"] != merchant_id:
+            raise TransitionConflict("Inventory product provenance requires review")
+        leaves[product_id] = dict(row)
+    ids.update(row["parent_product_id"] for row in leaves.values() if row["parent_product_id"])
+    locked = {}
+    for product_id in sorted(ids):
+        row = await tx.fetch_one(
+            f"SELECT * FROM {tx.table('products')} WHERE id = :p" + tx.for_update,
+            {"p": product_id},
+        )
+        if not row or row["merchant_id"] != merchant_id:
+            raise TransitionConflict("Inventory parent provenance requires review")
+        locked[product_id] = dict(row)
+    if any(locked[key]["parent_product_id"] != row["parent_product_id"]
+           for key, row in leaves.items()):
+        raise TransitionConflict("Inventory parent changed during locking")
+    return locked
+
+
+async def inventory_items(conn, order: dict) -> tuple[list[dict], dict[str, int]]:
+    table, fetch = _read_connection(conn)
+    rows = await fetch(
+        f"SELECT oi.*, p.merchant_id AS product_merchant_id "
+        f"FROM {table('order_items')} oi LEFT JOIN {table('products')} p "
+        "ON p.id = oi.product_id WHERE oi.order_id = :o ORDER BY oi.id LIMIT 65",
+        {"o": order["id"]},
+    )
+    expected = {}
+    seen = set()
+    if not rows or len(rows) > 64:
+        raise TransitionConflict("Inventory item map requires review")
+    for row in rows:
+        if (not row["id"] or row["id"] in seen or not row["product_id"]
+                or row["product_merchant_id"] != order["merchant_id"]
+                or type(row["quantity"]) is not int or not 1 <= row["quantity"] <= 10_000
+                or type(row["backordered_qty"]) is not int
+                or not 0 <= row["backordered_qty"] <= row["quantity"]):
+            raise TransitionConflict("Inventory item map requires review")
+        seen.add(row["id"])
+        expected[row["product_id"]] = expected.get(row["product_id"], 0) + row["quantity"]
+    return [dict(row) for row in rows], expected
+
+
+async def inventory_counters_coherent(tx: DomainTransaction, products: dict) -> bool:
+    for product_id, product in products.items():
+        rows = await tx.fetch_all(
+            f"SELECT quantity FROM {tx.table('inventory_reservations')} "
+            "WHERE product_id = :p AND state = 'held' LIMIT 101",
+            {"p": product_id},
+        )
+        if len(rows) > 100:
+            return False
+        if any(type(row["quantity"]) is not int or row["quantity"] <= 0 for row in rows):
+            return False
+        reserved, stock = product["stock_reserved"], product["stock_on_hand"]
+        if (type(reserved) is not int or reserved != sum(row["quantity"] for row in rows)
+                or reserved < 0 or (stock is not None and
+                (type(stock) is not int or stock < reserved))):
+            return False
+    return True
+
+
+async def reservation_coverage(tx: DomainTransaction, order: dict, now: int) -> dict:
+    rows = await tx.fetch_all(
+        f"SELECT * FROM {tx.table('inventory_reservations')} WHERE order_id = :o LIMIT 65",
+        {"o": order["id"]},
+    )
+    if len(rows) > 64:
+        return {"complete": False, "releasable": False, "held": [], "now": await tx.now()}
+    held = [dict(row) for row in rows if row["state"] == "held"]
+    try:
+        items, expected = await inventory_items(tx, order)
+        products = await lock_inventory_products(
+            tx, order["merchant_id"], set(expected) | {row["product_id"] for row in held},
+        )
+    except TransitionConflict:
+        return {"complete": False, "releasable": False, "held": held, "now": await tx.now()}
+    coherent = await inventory_counters_coherent(tx, products)
+    now = await tx.now()
+    quantities = {}
+    valid = len(held) == len(rows) and all(item["backordered_qty"] == 0 for item in items)
+    for row in held:
+        product_id, quantity = row["product_id"], row["quantity"]
+        if (product_id in quantities or type(quantity) is not int or quantity <= 0
+                or type(row["expires_at"]) is not int or row["expires_at"] <= now):
+            valid = False
+        quantities[product_id] = quantity
+    return {"complete": valid and coherent and quantities == expected,
+            "releasable": coherent, "held": held, "products": products, "expected": expected,
+            "now": now}
+
+
+async def consume_reservations(tx: DomainTransaction, held: list[dict], now: int) -> int:
+    from .catalog import enqueue_stock_projection
+
+    for row in held:
+        rc = await tx.execute(
+            f"UPDATE {tx.table('inventory_reservations')} SET state = 'consumed', updated_at = :n "
+            "WHERE id = :i AND state = 'held'", {"n": now, "i": row["id"]},
+        )
+        if rc != 1:
+            raise TransitionConflict("Reservation consumption conflict")
+        await tx.execute(
+            f"UPDATE {tx.table('products')} SET stock_on_hand = stock_on_hand - :q, "
+            "stock_reserved = stock_reserved - :q, revision = revision + 1, updated_at = :n "
+            "WHERE id = :p", {"q": row["quantity"], "n": now, "p": row["product_id"]},
+        )
+        # Stock/state republication for each affected product (§8.3 step 5).
+        await enqueue_stock_projection(tx, row["product_id"])
+    return sum(row["quantity"] for row in held)
+
+
 async def release_reservations(
     tx: DomainTransaction, *, order_id: str, to_state: str, now: int
 ) -> int:
@@ -292,12 +733,21 @@ async def release_reservations(
     that flip in the same transaction, so a second pass is a no-op.
     """
     released = 0
+    order = await _order_row(tx, order_id)
     held = await tx.fetch_all(
         f"SELECT id, product_id, quantity FROM"
         f" {tx.table('inventory_reservations')}"
-        " WHERE order_id = :o AND state = 'held'",
+        " WHERE order_id = :o AND state = 'held' LIMIT 65",
         {"o": order_id},
     )
+    if len(held) > 64:
+        raise TransitionConflict("Reservation cardinality requires review before release")
+    if held:
+        products = await lock_inventory_products(
+            tx, order["merchant_id"], {row["product_id"] for row in held},
+        )
+        if not await inventory_counters_coherent(tx, products):
+            raise TransitionConflict("Inventory counters require review before release")
     for row in held:
         rc = await tx.execute(
             f"UPDATE {tx.table('inventory_reservations')}"
@@ -444,28 +894,47 @@ async def cancel_order(
     now = _now()
     async with DomainTransaction() as tx:
         order = await _order_row(tx, order_id)
-        if order["state"] == "cancelled":
-            return {"order_id": order_id, "action": "no-op-already-cancelled"}
-        await transition_order(
-            tx, order_id=order_id, from_state=order["state"],
-            to_state="cancelled", actor=actor, reason=reason, now=now,
+        return await _cancel_order_in_tx(
+            tx, order, actor=actor, reason=reason,
+            merchant_context=merchant_context, now=now,
         )
-        released = await release_reservations(
-            tx, order_id=order_id, to_state="released", now=now
+
+
+async def _cancel_order_in_tx(
+    tx: DomainTransaction, order: dict, *, actor: str, reason: str | None,
+    merchant_context: dict | None, now: int,
+) -> dict:
+    order_id = order["id"]
+    if order["state"] == "cancelled":
+        return {"order_id": order_id, "action": "no-op-already-cancelled"}
+    if actor == "buyer" and (
+        order["state"] not in BUYER_CANCELLABLE_STATES or await payment_settled(tx, order)
+    ):
+        raise IllegalTransition("Buyer cancellation is only permitted before verified payment")
+    reason = reason.strip() if reason is not None else None
+    if reason and len(reason) > 500:
+        raise IllegalTransition("Cancellation reason exceeds 500 characters")
+    if actor == "merchant" and (
+        order["state"] in DELIVERY_STATES or await payment_settled(tx, order)
+    ) and not reason:
+        raise IllegalTransition(
+            "Paid cancellation requires an explicit reason via /cancel; it does not refund money"
         )
-        if merchant_context is not None:
-            await enqueue_email_intents(
-                tx, order=order, event_type="cancelled",
-                merchant_notify_emails=merchant_context["notify_emails"],
-                merchant_notify_events=merchant_context["notify_events"],
-                customer_email=merchant_context.get("customer_email"),
-                now=now,
-            )
-        return {
-            "order_id": order_id,
-            "action": "cancelled",
-            "released": released,
-        }
+    await transition_order(
+        tx, order_id=order_id, from_state=order["state"],
+        to_state="cancelled", actor=actor, reason=reason, now=now,
+    )
+    released = await release_reservations(
+        tx, order_id=order_id, to_state="released", now=now,
+    )
+    if merchant_context is not None:
+        await enqueue_email_intents(
+            tx, order=order, event_type="cancelled",
+            merchant_notify_emails=merchant_context["notify_emails"],
+            merchant_notify_events=merchant_context["notify_events"],
+            customer_email=merchant_context.get("customer_email"), now=now,
+        )
+    return {"order_id": order_id, "action": "cancelled", "released": released}
 
 
 async def _order_row(tx: DomainTransaction, order_id: str) -> dict:
@@ -662,6 +1131,10 @@ async def order_detail(merchant_id: str, user, order_id: str) -> dict:
             return None
 
     async with DomainTransaction() as tx:
+        order = await _order_row(tx, order_id)
+        if order["merchant_id"] != merchant_id:
+            raise not_found("order not found")
+        authorized = await fulfillment_authorized(tx, order)
         items = await tx.fetch_all(
             f"SELECT product_id, product_d, title, quantity,"
             " unit_price_minor, currency, line_total_sat, backordered_qty"
@@ -714,6 +1187,7 @@ async def order_detail(merchant_id: str, user, order_id: str) -> dict:
         "address": json.loads(address) if address else None,
         "items": [dict(i) for i in items],
         "payment": dict(payment) if payment else None,
+        "fulfillment_authorized": authorized,
         "fulfillment": (
             {"tracking": tracking, "carrier": fulfil["carrier"],
              "eta": fulfil["eta"], "updated_at": fulfil["updated_at"]}
@@ -817,7 +1291,20 @@ async def admin_set_status(
         order = await _order_row(tx, order_id)
         if order["merchant_id"] != merchant_id:
             raise not_found("order not found")
+        if to_state != "cancelled" and (
+            (order["state"], to_state) not in (
+                ("confirmed", "processing"), ("processing", "completed")
+            )
+            or not await fulfillment_authorized(tx, order)
+        ):
+            raise unprocessable("invalid-transition", "Fulfillment is not authorized")
         try:
+            if to_state == "cancelled":
+                await _cancel_order_in_tx(
+                    tx, order, actor="merchant", reason=None,
+                    merchant_context=await _notify_ctx(order), now=now,
+                )
+                return {"id": order_id, "state": to_state}
             await transition_order(
                 tx, order_id=order_id, from_state=order["state"],
                 to_state=to_state, actor="merchant", now=now,
@@ -857,6 +1344,8 @@ async def admin_set_shipping(
         order = await _order_row(tx, order_id)
         if order["merchant_id"] != merchant_id:
             raise not_found("order not found")
+        if not await fulfillment_authorized(tx, order) or order["shipping_state"] == "not_required":
+            raise unprocessable("invalid-transition", "Fulfillment is not authorized")
         current = order["shipping_state"]
         if shipping_state not in SHIPPING_TRANSITIONS.get(
             current, frozenset()

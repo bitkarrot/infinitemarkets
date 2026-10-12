@@ -1,0 +1,11 @@
+{
+ "command": "node --test-reporter=tap --input-type=module -e 'import {test} from \"node:test\"; import assert from \"node:assert/strict\"; import {spawnSync} from \"node:child_process\"; test(\"test_hard03_missing_coverage_settles_into_inventory_review[missing]\", () => { const r = spawnSync(\"uv\", [\"run\", \"pytest\", \"tests/runtime/test_order_saga.py::test_hard03_missing_coverage_settles_into_inventory_review[missing]\", \"-q\", \"--tb=short\"], {encoding:\"utf8\"}); assert.equal(r.status, 0, r.stdout + r.stderr); });'",
+ "exitCode": 1,
+ "targetFile": "tests/runtime/test_order_saga.py",
+ "targetTest": "test_hard03_missing_coverage_settles_into_inventory_review[missing]",
+ "expected": "pytest passes cancelled inventory review assertion",
+ "actual": "pytest assertion at line1372 sees confirmed; child exits1; Node wrapper assert.equal(status,0) fails naturally",
+ "output": "TAP version 13\n# Subtest: test_hard03_missing_coverage_settles_into_inventory_review[missing]\nnot ok 1 - test_hard03_missing_coverage_settles_into_inventory_review[missing]\n  ---\n  failureType: 'testCodeFailure'\n  error: |-\n    E AssertionError: incomplete/corrupt allocation must not confirm\n    E assert 'confirmed' == 'cancelled'\n    1 failed in 2.74s\n  code: 'ERR_ASSERTION'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 0\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 4239.24225",
+ "output_scope": "actual TAP excerpt from shell0c148c; routine synthetic host startup and stack omitted",
+ "natural_exit": true
+}

@@ -196,14 +196,16 @@ Plans:
 5. Permanent negative-path runtime tests fail before each repair and pass afterward on the supported DB profiles; CI-01 terminates with exit 0 in both test-file orders.
 6. Fresh lint, qualification, relevant browser/conformance checks and ASVS review close the reopened gates. Live Plebeian checkout remains a required, separately authorized external gate; listing-only or FakeWallet evidence cannot satisfy it.
 
-**Plans:** Six independently reviewed plans; zero executed. Financial execution is
+**Plans:** Six independently reviewed plans; financial source implemented and
+independently reviewed. 05-02 scoped tasks complete; 05-01 host qualification
+and 05-03 browser chronology remain open. Financial execution is
 limited to **05-01 → 05-02 → 05-03 (F1 → F3 → F2)**, then mandatory pause.
 Later plans, production exposure, real-record audit/disposition and live funds need
 separate approval; local synthetic verification is not release clearance.
 
-- [ ] 05-01: Payment-backed merchant authority, atomic cancellation, read-only accounting/delivery guards and paid-action UI.
-- [ ] 05-02: Complete stock accounting, locked current expiry and repeat-safe explicit acceptance.
-- [ ] 05-03: Original-invoice timeout recovery, independent-hold preservation and buyer recovery; financial-tranche pause.
+- [ ] 05-01: Source/runtime implemented and reviewed; pinned-host admin no-pageerror qualification remains open.
+- [x] 05-02: Scoped stock accounting, current post-lock expiry and repeat-safe causal acceptance verified on SQLite/PostgreSQL; no release clearance.
+- [ ] 05-03: Source/runtime and buyer recovery verified; original browser RED chronology warning retained; financial-tranche pause.
 - [ ] 05-04: Revision-bound dependencies, dependency-safe pruning and 48-hour no-route eligibility.
 - [ ] 05-05: Atomic same-scope inbox bound and diagnosed CI-01 process-lifecycle repair.
 - [ ] 05-06: Fresh qualification, independent security review, operator historical-order audit and separately authorized live checkout.
@@ -228,4 +230,4 @@ re-execute superseded Phase 4 cutover plans.
 | 3. Release B — Gamma NIP-17 Orders | 4/4 historical; assurance and live UAT open | In Progress | Delivery 2026-09-29 |
 | 03.1. Buyer accounts (INSERTED) | 3/3 | Complete   | 2026-10-07 |
 | 4. Release C — Catalog Import and Export | 4 historical plans dispositioned; catalog-only delivery verified | Complete | 2026-10-09 |
-| 5. Correctness, Recovery, and Security Hardening | No plans authored | Pending | — |
+| 5. Correctness, Recovery, and Security Hardening | 1/6 scoped plan complete; financial source verified, 2 plans partial | In Progress / Paused | — |

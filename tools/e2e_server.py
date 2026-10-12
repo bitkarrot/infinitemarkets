@@ -75,7 +75,7 @@ os.environ.update(
         "INFINITEMARKETS_PUBLIC_BASE_URL": BASE_URL,
         # Real relay I/O against the local LocalRelay — deterministic
         # positive ACKs, no external relay dependency.
-        "INFINITEMARKETS_RELAY_IO": "on",
+        "INFINITEMARKETS_RELAY_IO": os.environ.get("INFINITEMARKETS_RELAY_IO", "on"),
         # TEST-ONLY escape hatch: permits ws:// loopback relay targets.
         "INFINITEMARKETS_ALLOW_INSECURE_RELAYS": "1",
         # Host settings via env so they are in place at settings/db
@@ -293,43 +293,51 @@ async def _seed(app, seed: dict, relay_url: str) -> None:
         # Real publish path: enqueues every aggregate intent; the outbox
         # worker signs + delivers to the local relay and flips the merchant
         # draft -> publication_pending -> active on profile ACK.
-        resp = await client.post(
-            f"{api}/merchants/{mid}/publish",
-            headers=await cookie(),
-        )
-        assert resp.status_code in (200, 202), resp.text
-        for _ in range(80):
+        if os.environ["INFINITEMARKETS_RELAY_IO"] == "off":
             async with DomainTransaction() as tx:
-                state = await tx.fetch_one(
-                    f"SELECT state FROM {tx.table('merchants')} WHERE id = :m", {"m": mid}
+                await tx.execute(
+                    f"UPDATE {tx.table('merchants')} SET state = 'active' WHERE id = :m",
+                    {"m": mid},
                 )
-            if state and state["state"] == "active":
-                break
-            await asyncio.sleep(0.5)
+            seed["publication_evidence"] = "not-run-financial-offline-fixture"
         else:
-            raise RuntimeError("merchant did not reach active via publish")
+            resp = await client.post(
+                f"{api}/merchants/{mid}/publish",
+                headers=await cookie(),
+            )
+            assert resp.status_code in (200, 202), resp.text
+            for _ in range(80):
+                async with DomainTransaction() as tx:
+                    state = await tx.fetch_one(
+                        f"SELECT state FROM {tx.table('merchants')} WHERE id = :m", {"m": mid}
+                    )
+                if state and state["state"] == "active":
+                    break
+                await asyncio.sleep(0.5)
+            else:
+                raise RuntimeError("merchant did not reach active via publish")
 
-        # GAM-01 inbox activation: kind-10050 publishes to the local
-        # relay through the real outbox worker; inbox_state reaches
-        # 'active' only on the durable ACK. Sign-in affordance +
-        # showcase/nostr_only mode gating depend on it.
-        resp = await client.post(
-            f"{api}/merchants/{mid}/inbox/enable",
-            json={},
-            headers=await cookie(),
-        )
-        assert resp.status_code == 200, resp.text
-        for _ in range(80):
-            async with DomainTransaction() as tx:
-                row = await tx.fetch_one(
-                    f"SELECT inbox_state FROM {tx.table('merchants')}"
-                    " WHERE id = :m", {"m": mid}
-                )
-            if row and row["inbox_state"] == "active":
-                break
-            await asyncio.sleep(0.5)
-        else:
-            raise RuntimeError("inbox did not reach active via publish")
+            # GAM-01 inbox activation: kind-10050 publishes to the local
+            # relay through the real outbox worker; inbox_state reaches
+            # 'active' only on the durable ACK. Sign-in affordance +
+            # showcase/nostr_only mode gating depend on it.
+            resp = await client.post(
+                f"{api}/merchants/{mid}/inbox/enable",
+                json={},
+                headers=await cookie(),
+            )
+            assert resp.status_code == 200, resp.text
+            for _ in range(80):
+                async with DomainTransaction() as tx:
+                    row = await tx.fetch_one(
+                        f"SELECT inbox_state FROM {tx.table('merchants')}"
+                        " WHERE id = :m", {"m": mid}
+                    )
+                if row and row["inbox_state"] == "active":
+                    break
+                await asyncio.sleep(0.5)
+            else:
+                raise RuntimeError("inbox did not reach active via publish")
 
         # One live order so the admin Orders tab has a row on load.
         resp = await client.post(
@@ -457,7 +465,11 @@ async def main() -> None:
     # publication; no external relay dependency in E2E.
     from harness.relay import LocalRelay, RelayMode
 
-    local_relay = await LocalRelay(mode=RelayMode.ACCEPTING).start()
+    local_relay = (
+        await LocalRelay(mode=RelayMode.ACCEPTING).start()
+        if os.environ["INFINITEMARKETS_RELAY_IO"] != "off" else None
+    )
+    relay_url = local_relay.url if local_relay else "ws://127.0.0.1:1"
 
     cert = TMP / "e2e.pem"
     key = TMP / "e2e-key.pem"
@@ -485,6 +497,113 @@ async def main() -> None:
 
     async def e2e_settle(x_order_token: str = Header(...)):
         return await _settle(x_order_token)
+
+    recovery_orders: set[str] = set()
+    recovery_armed = False
+
+    async def e2e_recovery_arm():
+        from lnbits.core.services import payments as host_payments
+        from lnbits.wallets import get_funding_source
+
+        nonlocal recovery_armed
+        if (recovery_armed or recovery_orders
+                or type(get_funding_source()).__name__ != "FakeWallet"
+                or os.environ["INFINITEMARKETS_RELAY_IO"] != "off"):
+            return {"ok": False}
+        original_create = host_payments.create_invoice
+        recovery_armed = True
+
+        async def persist_then_timeout(**kwargs):
+            nonlocal recovery_armed
+            host_payments.create_invoice = original_create
+            recovery_armed = False
+            payment = await original_create(**kwargs)
+            from infinitemarkets.db import db
+
+            order_id = (payment.external_id or "").removeprefix("infinitemarkets:")
+            async with db.connect() as conn:
+                order = await conn.fetchone(
+                    "SELECT merchant_id FROM infinitemarkets.orders WHERE id = :o", {"o": order_id},
+                )
+            if (order and order["merchant_id"] == seed.get("merchant_id")
+                    and payment.extension == "infinitemarkets"):
+                recovery_orders.add(order_id)
+                raise TimeoutError("synthetic one-call response loss")
+            return payment
+
+        host_payments.create_invoice = persist_then_timeout
+        return {"ok": True}
+
+    async def e2e_recovery(request: Request, x_order_token: str = Header(...)):
+        import hashlib
+
+        from lnbits.wallets import get_funding_source
+
+        from infinitemarkets.crypto import token_lookup_hash
+        from infinitemarkets.db import DomainTransaction
+        from infinitemarkets.services import checkout
+
+        if type(get_funding_source()).__name__ != "FakeWallet":
+            return {"ok": False}
+        body = await request.json()
+        async with DomainTransaction() as tx:
+            order = await tx.fetch_one(
+                f"SELECT * FROM {tx.table('orders')} WHERE public_token_hash = :h" + tx.for_update,
+                {"h": token_lookup_hash(x_order_token)},
+            )
+            if (not order or order["merchant_id"] != seed.get("merchant_id")
+                    or order["id"] not in recovery_orders):
+                return {"ok": False}
+            if body.get("hold"):
+                await tx.execute(
+                    f"UPDATE {tx.table('orders')} SET payment_exception = TRUE, "
+                    "payment_exception_reason = 'settlement-wallet-mismatch' WHERE id = :o",
+                    {"o": order["id"]},
+                )
+        matches = await recovery_lookup(f"infinitemarkets:{order['id']}")
+        if len(matches) != 1:
+            return {"ok": False}
+        recovery_orders.remove(order["id"])
+        await checkout.attach_payment(
+            order_id=order["id"], payment=matches[0], now=int(time.time()),
+        )
+        return {"ok": True, "invoice_count": len(matches),
+                "original_sha256": hashlib.sha256(matches[0].bolt11.encode()).hexdigest()}
+
+    async def e2e_financial_negative(request: Request, x_order_token: str = Header(...)):
+        from infinitemarkets.crypto import token_lookup_hash
+        from infinitemarkets.db import DomainTransaction
+
+        body = await request.json()
+        damage = body.get("damage")
+        state = body.get("state", "confirmed")
+        if damage not in ("unpaid", "hold", "absent", "partial") or state not in (
+            "confirmed", "processing", "completed",
+        ):
+            return {"ok": False}
+        async with DomainTransaction() as tx:
+            order = await tx.fetch_one(
+                f"SELECT id, merchant_id FROM {tx.table('orders')} WHERE public_token_hash = :h",
+                {"h": token_lookup_hash(x_order_token)},
+            )
+            if not order or order["merchant_id"] != seed.get("merchant_id"):
+                return {"ok": False}
+            await tx.execute(
+                f"UPDATE {tx.table('orders')} SET state = :s, payment_exception = :e WHERE id = :o",
+                {"s": state, "e": damage == "hold", "o": order["id"]},
+            )
+            if damage == "absent":
+                await tx.execute(
+                    f"DELETE FROM {tx.table('inventory_reservations')} WHERE order_id = :o",
+                    {"o": order["id"]},
+                )
+            elif damage == "partial":
+                await tx.execute(
+                    f"UPDATE {tx.table('inventory_reservations')} "
+                    "SET quantity = 1 WHERE order_id = :o",
+                    {"o": order["id"]},
+                )
+        return {"ok": True, "order_id": order["id"]}
 
     # Harness-only: sign a NIP-07-shaped event with the fixed E2E buyer
     # key so Playwright's window.nostr stub produces a REAL signed event
@@ -603,6 +722,9 @@ async def main() -> None:
 
     app.add_api_route("/_e2e/seed", e2e_seed, methods=["GET"])
     app.add_api_route("/_e2e/settle", e2e_settle, methods=["POST"])
+    app.add_api_route("/_e2e/financial-negative", e2e_financial_negative, methods=["POST"])
+    app.add_api_route("/_e2e/recovery-arm", e2e_recovery_arm, methods=["POST"])
+    app.add_api_route("/_e2e/recovery", e2e_recovery, methods=["POST"])
     app.add_api_route("/_e2e/sign", e2e_sign, methods=["POST"])
     app.add_api_route("/_e2e/mode", e2e_mode, methods=["POST"])
     app.add_api_route("/_e2e/mailbox", e2e_mailbox, methods=["GET"])
@@ -633,18 +755,29 @@ async def main() -> None:
     if ext_module.started_at is None:
         await check_and_register_extensions(app)
 
-    await _seed(app, seed, local_relay.url)
+    await _seed(app, seed, relay_url)
+    from infinitemarkets.services import settlement
+
+    recovery_lookup = settlement._core_payments_by_external_id
+
+    async def delayed_recovery_lookup(external_id):
+        if external_id.removeprefix("infinitemarkets:") in recovery_orders:
+            return []
+        return await recovery_lookup(external_id)
+
+    settlement._core_payments_by_external_id = delayed_recovery_lookup
     SEED_PATH.parent.mkdir(parents=True, exist_ok=True)
     SEED_PATH.write_text(json.dumps(seed, indent=2))
     print(
-        f"e2e server ready at {BASE_URL} — relay {local_relay.url}"
+        f"e2e server ready at {BASE_URL} — relay {relay_url if local_relay else 'IO off'}"
         f" — seed -> {SEED_PATH}"
     )
 
     try:
         await serve
     finally:
-        await local_relay.stop()
+        if local_relay:
+            await local_relay.stop()
 
 
 if __name__ == "__main__":

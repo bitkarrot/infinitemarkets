@@ -1,0 +1,11 @@
+{
+  "command": "Node22 node:test spawnSync of uv run pytest tests/runtime/test_order_saga.py::test_hard02_recovered_original_invoice_is_payable_and_fulfillable -q --tb=short --show-capture=no (actual shell f0c38f)",
+  "exitCode": 1,
+  "targetFile": "tests/runtime/test_order_saga.py",
+  "targetTest": "test_hard02_recovered_original_invoice_is_payable_and_fulfillable",
+  "expected": "Validated original unpaid invoice clears pure creation hold before payment",
+  "actual": "Permanent pytest line1428 sees payment_exception=1 after exact correlated attachment; intentional assertion failure; independent pytest shell7cb143 also exits1,1failed/150deselected2.98s",
+  "output": "TAP version 13\n# Subtest: test_hard02_recovered_original_invoice_is_payable_and_fulfillable\nnot ok 1 - test_hard02_recovered_original_invoice_is_payable_and_fulfillable\n  ---\n  duration_ms: 3880.284666\n  failureType: 'testCodeFailure'\n  error: |-\n    E AssertionError: verified original invoice must be payable before settlement\n    E assert not 1\n    1 failed in 2.41s\n  code: 'ERR_ASSERTION'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 0\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 3884.675958",
+  "output_scope": "Actual TAP excerpt from shell f0c38f; stack omitted; real wrapper executes actual pytest, no fabricated TAP",
+  "natural_exit": true
+}

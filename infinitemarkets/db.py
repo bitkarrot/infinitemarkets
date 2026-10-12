@@ -204,6 +204,10 @@ class DomainTransaction:
     def for_update(self) -> str:
         return " FOR UPDATE" if self._dialect == "postgres" else ""
 
+    @property
+    def for_no_key_update(self) -> str:
+        return " FOR NO KEY UPDATE" if self._dialect == "postgres" else ""
+
     async def now(self) -> int:
         expression = (
             "CAST(strftime('%s', 'now') AS INTEGER)" if self._dialect == "sqlite"

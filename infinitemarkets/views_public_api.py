@@ -358,22 +358,23 @@ async def public_order_status(request: Request, response: Response):
     """
     await _guard(request, response)
     order = await _order_for_token(request.headers.get("x-order-token"))
-    async with db.connect() as conn:
-        items = await conn.fetchall(
-            f"SELECT title, quantity, line_total_sat FROM"
-            f" {table('order_items')} WHERE order_id = :o",
-            {"o": order["id"]},
-        )
-        payment = await conn.fetchone(
-            f"SELECT status, bolt11_enc FROM {table('payments')} "
-            "WHERE order_id = :o",
-            {"o": order["id"]},
-        )
-        from .services.orders import digital_delivery
+    from .db import DomainTransaction
+    from .services.orders import digital_delivery
 
-        delivery = await digital_delivery(conn, order)
-    body = _order_status_projection(order, items, payment, delivery)
-    body["bolt11"] = await _order_payment_bolt11(order, payment)
+    async with DomainTransaction() as tx:
+        delivery = await digital_delivery(tx, order)
+        items = await tx.fetch_all(
+            f"SELECT title, quantity, line_total_sat FROM"
+            f" {tx.table('order_items')} WHERE order_id = :o",
+            {"o": order["id"]},
+        )
+        payment = await tx.fetch_one(
+            f"SELECT status, bolt11_enc FROM {tx.table('payments')} "
+            "WHERE order_id = :o", {"o": order["id"]},
+        )
+        bolt11 = await _order_payment_bolt11(order, payment, tx)
+        body = _order_status_projection(order, items, payment, delivery)
+        body["bolt11"] = bolt11
     return body
 
 
@@ -730,21 +731,12 @@ def _order_status_projection(
     }
 
 
-async def _order_payment_bolt11(order: dict, payment: dict | None):
+async def _order_payment_bolt11(order: dict, payment: dict | None, conn=None):
     """Decrypt the invoice only while the order awaits payment."""
-    if (
-        order["state"] != "awaiting_payment"
-        or not payment
-        or payment["bolt11_enc"] is None
-    ):
-        return None
-    settings = ext_settings()
-    ver = crypto.envelope_version(payment["bolt11_enc"])
-    return crypto.decrypt(
-        payment["bolt11_enc"], settings.master_keys[ver],
-        record_id=order["id"], table="payments", column="bolt11_enc",
-        key_version=ver,
-    ).decode()
+    from .services.orders import payable_invoice
+
+    snapshot = await payable_invoice(conn, order)
+    return snapshot["bolt11"] if snapshot else None
 
 
 @infinitemarkets_public_api_router.get("/nostr/orders")
@@ -773,23 +765,25 @@ async def nostr_orders(request: Request, response: Response):
                 "eh": session["email_hash"],
             },
         )
+        from .db import DomainTransaction
         from .services.orders import digital_delivery
 
         for row in rows:
             order = dict(row)
-            items = await conn.fetchall(
-                f"SELECT title, quantity, line_total_sat FROM"
-                f" {table('order_items')} WHERE order_id = :o",
-                {"o": order["id"]},
-            )
-            payment = await conn.fetchone(
-                f"SELECT status, bolt11_enc FROM {table('payments')}"
-                " WHERE order_id = :o",
-                {"o": order["id"]},
-            )
-            delivery = await digital_delivery(conn, order)
-            entry = _order_status_projection(order, items, payment, delivery)
-            entry["bolt11"] = await _order_payment_bolt11(order, payment)
+            async with DomainTransaction() as tx:
+                delivery = await digital_delivery(tx, order)
+                items = await tx.fetch_all(
+                    f"SELECT title, quantity, line_total_sat FROM"
+                    f" {tx.table('order_items')} WHERE order_id = :o",
+                    {"o": order["id"]},
+                )
+                payment = await tx.fetch_one(
+                    f"SELECT status, bolt11_enc FROM {tx.table('payments')}"
+                    " WHERE order_id = :o", {"o": order["id"]},
+                )
+                bolt11 = await _order_payment_bolt11(order, payment, tx)
+                entry = _order_status_projection(order, items, payment, delivery)
+                entry["bolt11"] = bolt11
             entry["order_id"] = order["id"]
             entry["created_at"] = order["created_at"]
             entry["receipt_verified"] = bool(order["receipt_verified"])
