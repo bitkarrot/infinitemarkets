@@ -87,6 +87,43 @@ blockers to solve if it does: `nostr-sdk` FFI bindings, direct SQL access,
 background task/invoice-listener lifecycle, and SMTP egress all need
 Wasm-safe host-call equivalents.
 
+### 5. Exploratory: Web of trust (WoT) via NIP-85 trusted assertions
+
+Brainstorm-stage idea, not committed work. Neither buyers nor merchants
+carry any in-protocol reputation signal in v1 — anyone can stand up a
+storefront or place an order, and the counterparty has no way to assess
+them. Baseline doc: [NIP-85 Trusted Assertions](https://github.com/nostr-protocol/nips/blob/master/85.md) —
+clients offload WoT computation to declared providers (kind-10040) that
+publish signed, addressable assertion events: 30382 (users), 30383
+(events), 30384 (addressables), 30385 (NIP-73 identifiers).
+
+Candidate slices, ordered by effort:
+
+- **Merchant reputation display (read-side only):** fetch a merchant
+  pubkey's kind-30382 assertions (`rank`, `followers`,
+  `reports_cnt_recd`) from the visitor's declared providers and surface
+  them on the storefront. No event-schema changes; works with existing
+  WoT providers (Brainstorm-style services) as-is.
+- **Buyer-side order gating:** optional merchant-configured policy —
+  route orders from unranked or low-`rank` buyer pubkeys to a review
+  queue rather than auto-accepting. Touches the order state machine;
+  needs a deliberate fail-open/fail-closed policy when the provider is
+  unreachable, and must not become a hard dependency on a third-party
+  service.
+- **Product-level assertions:** kind-30384 `rank`/reaction counts on
+  addressable 30402 listings as a discovery/ranking signal — adjacent to
+  the deferred reviews item (kind-31555) and could share a provider.
+- **Publishing assertions:** acting as a NIP-85 provider ourselves
+  (per-algorithm service keys, kind-0 service metadata) is a separate
+  hosted-service lane, not a storefront feature — only worth scoping if
+  the read-side integrations prove out.
+
+Open questions: which provider(s) to default to, how users choose or
+override providers (kind-10040), whether reputation should influence
+order acceptance at all (sybil-resistance value vs. exclusion of new
+buyers), and whether any of this belongs in the extension versus a
+separate consumer of the same relays.
+
 ## Spec alignment backlog
 
 Optional expansions and conditional questions, ordered by likely value.
@@ -165,8 +202,8 @@ yet.
   hardening, not replacements for F1–F6.
 
 Third-party stock/shipping integrations and shipping import/binding are **deferred**,
-not cancelled. Reviews, NIP-37, automatic payments, subscriptions/preorders and Wasm
-exploration remain optional/future work. Identity unlinking and email-as-notification
+not cancelled. Reviews, NIP-37, automatic payments, subscriptions/preorders, WoT
+assertions and Wasm exploration remain optional/future work. Identity unlinking and email-as-notification
 preference changes remain outside the delivered buyer-account scope. Live NIP-15/
 NIP-04 ordering and old-store cutover/freeze/liability reconciliation remain **dropped
 from v1**; do not resurrect them to satisfy obsolete plan files.
