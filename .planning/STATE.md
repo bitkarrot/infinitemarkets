@@ -4,15 +4,15 @@ milestone: v1.0
 milestone_name: Core Commerce and Hardening
 current_phase: "05"
 current_phase_name: Correctness, Recovery, and Security Hardening
-status: planning
-stopped_at: Hardening-first scope approved; Phase 5 implementation plans not yet authored
-last_updated: "2026-10-12T03:21:34+00:00"
-last_activity: 2026-10-11
-last_activity_desc: GSD closeout reconciled; F1–F6 and CI-01 remain open; live Plebeian checkout unverified
+status: ready_to_execute
+stopped_at: Six plans independently approved; only financial waves 1–3 authorized
+last_updated: "2026-10-12T07:06:41+00:00"
+last_activity: 2026-10-12
+last_activity_desc: Phase 5 plans independently approved; synthetic financial execution only; legacy audit and release gates open
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 18
+  total_plans: 24
   completed_plans: 14
 ---
 
@@ -28,12 +28,12 @@ See: .planning/PROJECT.md (updated 2026-10-11)
 ## Current Position
 
 Phase: 5 of 6 (Correctness, Recovery, and Security Hardening)
-Plan: Not yet authored
-Status: Ready to plan; Phase 2/3 acceptance reopened, not an archived milestone
-Last activity: 2026-10-11 — hardening-first scope approved; targeted closeout tests 70 passed/1 skipped; lint passed; CI-01 reproduced
+Plan: 05-01 of 6 (F1); next 05-02 F3 then 05-03 F2; pause afterward
+Status: Ready for approved local synthetic financial execution; Phase 2/3 acceptance and milestone remain open
+Last activity: 2026-10-12 — six Phase 5 plans independently reviewed; native command/failure probes 29 checked with zero findings; only local F1→F3→F2 approved
 
-Progress: 3 phase acceptance scopes closed, 2 reopened, 1 not started. No overall
-completion percentage until Phase 5 is planned. There are 14 executed plan
+Progress: 3 phase acceptance scopes closed, 2 reopened, 1 not started. Phase 5 has six reviewed plans and zero completed plans. No overall
+acceptance percentage is implied by plan/artifact counters. There are 14 executed plan
 summaries plus 4 explicitly superseded/re-scoped Phase 4 disposition records;
 18 summary files do not mean 18 original plans were executed. GSD may display
 100% for that artifact ratio; it is not milestone acceptance or Phase 5 progress.
@@ -58,7 +58,7 @@ summaries plus 4 explicitly superseded/re-scoped Phase 4 disposition records;
 | 3 | 4 | - | - |
 | 03.1 | 3 | - | - |
 | 4 | 4 historical disposition records | - | - |
-| 5 | Not yet planned | - | - |
+| 5 | 6 reviewed, 0 executed | - | - |
 
 **Recent Trend:**
 
@@ -112,6 +112,7 @@ Decisions are logged in PROJECT.md and the normative specification.
 - [ ] F1–F6 fixed and permanently regression-tested; reopened security threats verified closed.
 - [ ] CI-01 paired-test lifecycle fixed; 19 assertions passed but the process still hung at the 60-second diagnostic bound.
 - [ ] Fresh repaired-revision database/platform, browser and conformance evidence recorded.
+- [ ] Operator read-only historical paid-order audit authorized and performed before production exposure, record disposition or release; NONE performed during synthetic implementation.
 - [ ] Phase 3 live Plebeian checkout/payment UAT completed with operator authorization; only listing smoke is recorded so far.
 
 ### Blockers/Concerns

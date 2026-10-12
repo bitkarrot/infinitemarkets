@@ -1,0 +1,17 @@
+# Phase 5 surgical UI contract
+
+This is a behavior correction to approved Phase 2/03.1 surfaces, not a redesign. Read `02-UI-SPEC.md`, existing admin/buyer browser specs and corrected research. Preserve responsive layout, themes, semantic labels, accessible controls, token stripping, no-store headers and no third-party scripts.
+
+## Merchant order workspace (05-01)
+
+`infinitemarkets/static/infinitemarkets/js/admin_orders.js` action computation must mirror server authority: no merchant confirmation action; processing/completion and shipping require a paid-state order, correlated settled payment, no active payment exception and complete durable consumed/credible accepted-allocation proof. Consume the additive owner-only order_detail.fulfillment_authorized boolean computed by05-01's shared read-only helper; never infer accounting in JavaScript from payment/status/flags. Show review rather than active fulfillment controls for legacy unpaid OR settled+confirmed+no-exception rows with missing/partial/malformed accounting. Do not persist a new exception flag or alter damaged records merely to render this state. Cancellation remains reachable when legal; prepayment status cancellation preserves `{to_state}` API body, while exceptional paid cancellation uses the existing reason dialog and `/cancel`, with the existing warning that this does not refund money. Do not make oversold alone a universal physical shipping ban: accepted paid physical backorders remain fulfillable with visible backorder disclosure. Digital delivery remains blocked while oversold. Existing accept/refund/confirm-refund actions and restricted terminal accept states remain unchanged.
+
+## Buyer recovery (05-03)
+
+`public_checkout.js:619+` prioritizes payment_exception over QR rendering. `public_order.js:90+` displays a hold label, though its QR branch independently checks awaiting_payment/bolt11. Fix the resolved server truth, not only visual precedence: a newly validated attachment with complete live holds, pure invoice-creation-unknown and no manual resolution clears that incidental hold and yields the original usable invoice. Both checkout poll and token status must show QR/copy/countdown without a second-create/pay-again affordance; after verified accounted settlement they show paid state and delivery. Genuine active holds stay explicit and delivery locked. Cancelled/expired/unallocated orders receive no recovered invoice. Existing already-settled holds are not auto-cleared for visual convenience.
+
+Permanent runtime projection tests prove the server truth. A browser regression against only the disposable e2e server reproduces persist-then-timeout, recovery, visible original QR, FakeWallet settlement and delivery. Harness-only controls may be added in tools/e2e_server.py, never shipped routes. Existing history and confirmed-email regressions prove those consumers share the corrected delivery gate.
+
+## Verification
+
+Use installed Node22/24 and `cd tests/e2e && npx --no-install playwright test admin.spec.ts buyer.spec.ts` in a fresh verification shell from repo root against the disposable localhost HTTPS server. Run affected tests at desktop and a 390px viewport; verify hold/delivery labels and controls remain keyboard reachable, no token enters requests as path/query, and no runtime console error occurs. Record exact test titles/results and environment; screenshots alone do not establish payment authority. Browser blockers remain unverified, not waived.

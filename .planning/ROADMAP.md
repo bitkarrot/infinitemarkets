@@ -196,10 +196,17 @@ Plans:
 5. Permanent negative-path runtime tests fail before each repair and pass afterward on the supported DB profiles; CI-01 terminates with exit 0 in both test-file orders.
 6. Fresh lint, qualification, relevant browser/conformance checks and ASVS review close the reopened gates. Live Plebeian checkout remains a required, separately authorized external gate; listing-only or FakeWallet evidence cannot satisfy it.
 
-**Plans:** Not yet authored; no implementation work started. Proposed groups are
-financial authority/recovery (F1–F3), durable delivery (F4/F5), inbox admission
-(F6), and test lifecycle/release evidence (CI-01/HARD-08). These are not executed
-plans or a promise of a final plan count.
+**Plans:** Six independently reviewed plans; zero executed. Financial execution is
+limited to **05-01 → 05-02 → 05-03 (F1 → F3 → F2)**, then mandatory pause.
+Later plans, production exposure, real-record audit/disposition and live funds need
+separate approval; local synthetic verification is not release clearance.
+
+- [ ] 05-01: Payment-backed merchant authority, atomic cancellation, read-only accounting/delivery guards and paid-action UI.
+- [ ] 05-02: Complete stock accounting, locked current expiry and repeat-safe explicit acceptance.
+- [ ] 05-03: Original-invoice timeout recovery, independent-hold preservation and buyer recovery; financial-tranche pause.
+- [ ] 05-04: Revision-bound dependencies, dependency-safe pruning and 48-hour no-route eligibility.
+- [ ] 05-05: Atomic same-scope inbox bound and diagnosed CI-01 process-lifecycle repair.
+- [ ] 05-06: Fresh qualification, independent security review, operator historical-order audit and separately authorized live checkout.
 
 **Scope decision:** Hardening first, approved 2026-10-11. No external inventory/
 shipping integrations, shipping-import expansion, live legacy protocol work or

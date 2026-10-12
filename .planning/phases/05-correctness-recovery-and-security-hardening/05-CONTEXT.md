@@ -83,3 +83,36 @@ outside this phase. Revisit only by an explicit scope decision.
   process failed to exit at a 60-second diagnostic bound; remains open.
 - CI run 38194415581: all four Linux DB/platform jobs and lint passed before
   fixes; no local full suite, new browser run or live funding test in closeout.
+
+## Execution authorization and planning refinements
+
+Approved in the Phase 5 continuation on 2026-10-11:
+
+- Use independent Devin agents with GSD role instructions for research, planning,
+  execution and checking. Keep writes disjoint; do not claim independent checks
+  when only self-review occurred.
+- Plan all HARD-01–HARD-08, then execute F1–F3 only and pause before F4–F6/CI-01.
+  Within that tranche, repair stock accounting (F3) before clearing uncertainty
+  (F2), so a recovered invoice cannot unlock unaccounted fulfillment.
+- Leave existing paid-order records for an operator audit while fixing active
+  recovery flows, as selected in the user question. Do not add an automatic legacy
+  sweep, clear already-settled holds or repair historical stock without review.
+  Current authority covers isolated synthetic implementation/testing only, not
+  connecting to an existing database. The read-only operator audit is mandatory
+  **before production exposure, real-record disposition or release clearance**;
+  local code verification/commits do not satisfy or close it. Record this open gate
+  at the financial-tranche pause as well as the eventual release checkpoint.
+- For verified settlement with incomplete reservation coverage before expiry,
+  **cancel into the existing exception lane**: preserve settled payment, release
+  remaining held capacity atomically, retain a bounded inventory exception, and
+  require merchant accept/refund. Do not mislabel it as invoice expiry, broaden
+  accept states, auto-reopen or initiate an outgoing refund.
+- Approve only the disposable PostgreSQL cluster at
+  `/tmp/infinitemarkets-phase5-pg-1ae80f8`, its synthetic-database fixture schema
+  teardown, and stopping/removing that specific new cluster after checks.
+  No existing database, real wallet or live relay is covered by this approval.
+- Only `invoice-creation-unknown` is automatically recoverable. Correlation and
+  independent/reasonless holds and manual refund decisions must survive.
+  Preserve the documented resolution vocabulary and literal order state table.
+- No new dependency, security-policy relaxation, push, production application
+  deployment or real-funds operation is authorized by this local tranche.
