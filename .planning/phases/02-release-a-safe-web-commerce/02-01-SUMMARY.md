@@ -11,15 +11,15 @@ requires:
     provides: pinned host checkout, harness db/schema/tx adapters, qualification evidence pipeline
 provides:
   - Production `infinitemarkets` package discovered/migrated/route-mounted by the REAL host loader (LNBITS_EXTENSIONS_PATH + config.json + m001 through migrate_extension_database)
-  - m001 schema: all 21 §4 merchant/catalog/outbox tables + indexes, literal column names/constraints
-  - DomainTransaction: explicit BEGIN IMMEDIATE (raw aiosqlite) on SQLite / conn.begin() on PG; markdown-safe write path avoiding rewrite_values stripping
+  - "m001 schema: all 21 §4 merchant/catalog/outbox tables + indexes, literal column names/constraints"
+  - "DomainTransaction: explicit BEGIN IMMEDIATE (raw aiosqlite) on SQLite / conn.begin() on PG; markdown-safe write path avoiding rewrite_values stripping"
   - Strict §12 settings validation + topology refusal + OQ3 audit-capture startup warning in infinitemarkets_start
-  - crypto.py: AES-256-GCM envelopes (key_version + 96-bit nonce + tag) with length-prefixed AAD, purpose-separated HMAC-SHA256 privacy indexes, canonical public tokens
-  - keystore.py: generate/import/sign/public_key/delete/rewrap/stale_merchants + encrypted export/restore; no raw nsec persisted/logged/returned
-  - security.py: RFC 9457 problem+json boundary, cookie Origin+CSRF vs bearer mutation rules (cookie wins when both present), relay URL validator
+  - "crypto.py: AES-256-GCM envelopes (key_version + 96-bit nonce + tag) with length-prefixed AAD, purpose-separated HMAC-SHA256 privacy indexes, canonical public tokens"
+  - "keystore.py: generate/import/sign/public_key/delete/rewrap/stale_merchants + encrypted export/restore; no raw nsec persisted/logged/returned"
+  - "security.py: RFC 9457 problem+json boundary, cookie Origin+CSRF vs bearer mutation rules (cookie wins when both present), relay URL validator"
   - §5.1 merchant API (create/get/patch/import-key/publish/relay-health/notifications/test-send/deactivate) + §5.2 catalog API (catalogs/products/collections/shipping CRUD + images + events dry-run)
-  - services/events.py: deterministic unsigned builders — 30402/30405/30406/0/31989/31990/5 + NIP-15 30017/30018 projection with CompatibilityError on currency mismatch
-  - services/outbox.py: shared transactional enqueue with revision supersession + dependency edges (portable select-then-insert SQL)
+  - "services/events.py: deterministic unsigned builders — 30402/30405/30406/0/31989/31990/5 + NIP-15 30017/30018 projection with CompatibilityError on currency mismatch"
+  - "services/outbox.py: shared transactional enqueue with revision supersession + dependency edges (portable select-then-insert SQL)"
 affects: [02-02 publication worker consumes outbox intents + event builders; 02-03 orders reuse DomainTransaction + security boundary; 02-04 admin UI consumes §5.1/5.2 routes]
 
 actuals:
@@ -30,11 +30,11 @@ actuals:
 tech-stack:
   added: []
   patterns:
-    - Real-loader install fixture: symlink package into tmp LNBITS_EXTENSIONS_PATH, reset extension install rows in shared core DB, host's own enable endpoint per user
+    - "Real-loader install fixture: symlink package into tmp LNBITS_EXTENSIONS_PATH, reset extension install rows in shared core DB, host's own enable endpoint per user"
     - DomainTransaction for every multi-statement write; raw connection preserves markdown/JSON byte fidelity (Pitfall 3)
     - sys.modules purge + importlib re-import so module-level Database() binds the per-test data folder
-    - problem_boundary decorator: mutation enforcement + RFC 9457 conversion inside the route (dependency-raised errors bypass handlers); CSRF cookie issued on success AND error responses
-    - Publishable-mutation pattern: bump revision, enqueue outbox intent, wire dependency edges — all in one DomainTransaction
+    - "problem_boundary decorator: mutation enforcement + RFC 9457 conversion inside the route (dependency-raised errors bypass handlers); CSRF cookie issued on success AND error responses"
+    - "Publishable-mutation pattern: bump revision, enqueue outbox intent, wire dependency edges — all in one DomainTransaction"
 
 key-files:
   created:
@@ -112,3 +112,10 @@ coverage:
 #   02-02/02-03 workers land.
 # - GET /merchants/{id}/outbox + retry delta routes deferred to 02-02 with
 #   the worker (B2 consumes them).
+---
+
+# 02-01 — Historical execution record
+
+The original evidence and notes above are preserved. The missing closing
+frontmatter delimiter was restored during the 2026-10-11 closeout; this does not
+reapprove the reopened Phase 2 acceptance or security gaps.

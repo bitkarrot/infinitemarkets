@@ -11,22 +11,27 @@ requires:
       rejected-intake surface data, peer_relays resolution, relay_auth
       states on relay_configs
 provides:
-  - m007_nostr_signin: nostr_challenges (single-use, merchant+IP
+  - >-
+    m007_nostr_signin: nostr_challenges (single-use, merchant+IP
     scope-bound, 300s TTL) + buyer_sessions (hashed token, revocable,
     buyer_pubkey_enc/hash) + ix_buyer_sessions_pubkey
-  - nostr_auth buyer half: issue_challenge / verify_signin /
+  - >-
+    nostr_auth buyer half: issue_challenge / verify_signin /
     session_from_cookie / revoke_session / require_origin;
     NOSTR_SESSION_TTL_S=7d, SESSION_COOKIE=gm_nostr_session
     (HttpOnly; Secure; SameSite=Strict; Path=/infinitemarkets)
-  - public /nostr/* API: GET challenge, POST verify, GET orders
+  - >-
+    public /nostr/* API: GET challenge, POST verify, GET orders
     (buyer_pubkey_hash-scoped, §5.4 field set, delivery_unlocked-gated
     digital_delivery — D-03), POST claim (no-oracle token binding,
     buyer-claimed audit row, idempotent — D-05), POST logout
-  - session-attributed web checkout: buyer_pubkey written on
+  - >-
+    session-attributed web checkout: buyer_pubkey written on
     protocol='web' orders (D-04); status order_msg copies resolve
     through the buyer's peer_relays set (no 10050 -> pending/
     no_inbox_relays, private link stays authoritative)
-  - storefront_mode service: settings key storefront_mode,
+  - >-
+    storefront_mode service: settings key storefront_mode,
     full|showcase|browse_only|nostr_only (default full); checkout gate
     inside quote_preview/checkout; browse gate on product/collection/
     merchant pages; publish gate pauses catalog aggregates under
@@ -35,7 +40,8 @@ provides:
   - GET/PUT /merchants/{id}/storefront-mode with two-step impact
     confirm + D-10 409 inbox-required gate for showcase/nostr_only;
     D-11 in-flight orders untouched on mode change
-  - admin Messages surface (fifth nav): customer/Unknown folders,
+  - >-
+    admin Messages surface (fifth nav): customer/Unknown folders,
     unread badge + markers, mark-as-read, thread reply + compose-to-
     npub as dual-copy order_msg sends, per-copy delivery evidence,
     retry-now, connectivity health strip (D-12..D-15, D-18..D-20)
@@ -43,7 +49,8 @@ provides:
     relay-auth pills (authenticated/auth-required/auth-failed/
     payment-required) + paid_invoice display + external-pay retry
     (D-26/D-27, extension never spends)
-  - public_nostr.js (vanilla, no innerHTML): sign-in flow, order list,
+  - >-
+    public_nostr.js (vanilla, no innerHTML): sign-in flow, order list,
     claim UI, empty/error states, showcase guidance card;
     public_nostr_only.html notice page
   - test_release_b_journey.py capstone + buyer/admin Playwright specs

@@ -33,3 +33,6 @@ evidence/conformance/*.log
 dist/
 .vercel
 .env*
+
+# Obsidian vault config (local)
+.obsidian/

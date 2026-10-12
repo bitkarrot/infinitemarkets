@@ -1,16 +1,16 @@
 ---
 phase: 02-release-a-safe-web-commerce
 verified: 2026-09-27T22:49:26Z
-status: passed
-score: 5/5 acceptance areas passed; 4/4 required Linux profiles passed; human UAT 3/3; security verified
+status: gaps_found
+historical_score: 5/5 acceptance areas passed; 4/4 required Linux profiles passed; human UAT 3/3; security verified
 implementation_sha: 021c402d620396b671c3fd919ad2275b4c3072ff
 ci_run: 36352552899
-behavior_unverified: 0
+historical_behavior_unverified: 0
 ---
 
 # Phase 2 — Release A Verification
 
-**Verdict: passed. Phase 2 satisfies its implementation, automated qualification, threat-review, UI-review and human acceptance gates and is ready to be marked complete.**
+**Current verdict (2026-10-11): acceptance reopened for F1–F4.** The results below are the historical 2026-09-27 sign-off, not current clearance. See the closeout addendum and Phase 5.
 
 ## Exact verified profile
 
@@ -70,3 +70,17 @@ Optional external public-relay smoke and real-funding-provider payment tests wer
 ## Decision
 
 Phase 2 is verified and may be marked complete. Release A requirements MERC-01, CAT-01/02, PUB-01/02, WEB-01/02, PAY-01/02, INV-01, ORD-01, NOTF-01, SEC-01 and UI-01/02/03 can move from Pending to Complete. Phase 3 may start independently; its NIP-17/NIP-07 and Nostr order-history work was not pulled into Phase 2.
+
+## Closeout addendum — 2026-10-11
+
+The conformance follow-up at `a7082c7` reproduced unpaid merchant confirmation/
+delivery and cancellation stock leakage (F1), recovered-invoice hold persistence
+(F2), confirmation after reservation expiry without stock consumption (F3), and
+stale-revision dependency satisfaction (F4). These reopen current acceptance;
+the historical scores, profile and test counts above are not revised into a pass.
+
+Remediation is HARD-01–04/HARD-08 in Phase 5. The security register reopens the
+existing T-203-01, T-204-02 and T-205-01 mitigations; Phase 5 also records new
+recovery/publication threats. Temporary review probes are not permanent tests.
+No code was fixed by this addendum. See `docs/spec-conformance-analysis.md` and
+`.planning/v1.0-MILESTONE-AUDIT.md` from the repository root.

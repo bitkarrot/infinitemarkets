@@ -42,7 +42,7 @@
 | Public (unsigned/plaintext) kind-16/17 events on the wire | OPT-OUT | by protocol design the inbox admits only NIP-17 wraps; recorded known-delta `public-order-events-unread` |
 | `subject='order-info'` + `name` tag envelope | INTEGRATE | tolerated variant, recorded delta |
 | Opaque freeform `address` (physical orders) | OPT-OUT | physical shipping not supported on this surface — rejected pre-reservation with rejected reply (delta `opaque-address-physical-rejected`) |
-| NIP-15/NIP-04 literal legacy interop | OPT-OUT | Phase 4 scope by roadmap design |
+| NIP-15/NIP-04 literal legacy interop | OPT-OUT | Live legacy ordering dropped from v1; Phase 4 retains file-based catalog import only |
 
 ## Plebeian client surface (conformance target)
 

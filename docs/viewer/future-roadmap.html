@@ -3,32 +3,32 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Infinite Markets — Roadmap</title>
-<meta name="description" content="The Infinite Markets roadmap: next steps, spec-alignment backlog, and upstream NIP-99 specification changes under watch.">
-<meta property="og:title" content="Infinite Markets — Roadmap">
-<meta property="og:description" content="Next steps, spec-alignment backlog, and upstream NIP-99 specification changes under watch for the Infinite Markets LNbits extension.">
+<title>Infinite Markets — Future Roadmap</title>
+<meta name="description" content="Future features, deferred integrations, and specification watch items for Infinite Markets. Active delivery phases are tracked separately in GSD.">
+<meta property="og:title" content="Infinite Markets — Future Roadmap">
+<meta property="og:description" content="Future features, deferred integrations, and specification watch items for Infinite Markets. Active delivery phases are tracked separately in GSD.">
 <meta property="og:type" content="article">
-<meta property="og:url" content="https://infinitemarkets-docs.vercel.app/roadmap.html">
+<meta property="og:url" content="https://infinitemarkets-docs.vercel.app/future-roadmap.html">
 <meta property="og:site_name" content="Infinite Markets">
 <meta property="og:image" content="https://infinitemarkets-docs.vercel.app/media/demo-poster.jpg">
 <meta property="og:image:width" content="1600">
 <meta property="og:image:height" content="900">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Infinite Markets — Roadmap">
-<meta name="twitter:description" content="Next steps, spec-alignment backlog, and upstream NIP-99 specification changes under watch for the Infinite Markets LNbits extension.">
+<meta name="twitter:title" content="Infinite Markets — Future Roadmap">
+<meta name="twitter:description" content="Future features, deferred integrations, and specification watch items for Infinite Markets. Active delivery phases are tracked separately in GSD.">
 <meta name="twitter:image" content="https://infinitemarkets-docs.vercel.app/media/demo-poster.jpg">
 <meta property="og:locale" content="en_US">
 <meta name="robots" content="index,follow">
 <meta name="theme-color" content="#1e1d18">
-<link rel="canonical" href="https://infinitemarkets-docs.vercel.app/roadmap.html">
+<link rel="canonical" href="https://infinitemarkets-docs.vercel.app/future-roadmap.html">
 <link rel="apple-touch-icon" href="img/logo-512.png">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "TechArticle",
-  "headline": "Infinite Markets roadmap",
-  "url": "https://infinitemarkets-docs.vercel.app/roadmap.html",
-  "description": "Next steps, spec-alignment backlog, and upstream NIP-99 specification changes under watch for the Infinite Markets LNbits extension.",
+  "headline": "Infinite Markets future roadmap",
+  "url": "https://infinitemarkets-docs.vercel.app/future-roadmap.html",
+  "description": "Future features, deferred integrations, and specification watch items for Infinite Markets. Active delivery phases are tracked separately in GSD.",
   "author": { "@type": "Person", "name": "bitkarrot", "url": "https://github.com/bitkarrot" },
   "image": "https://infinitemarkets-docs.vercel.app/media/demo-poster.jpg"
 }
@@ -48,7 +48,7 @@
       <a href="index.html#start">Get started</a>
       <a href="overview.html">Overview</a>
       <a href="details.html">Details</a>
-      <a href="https://github.com/bitkarrot/infinitemarkets/blob/main/ROADMAP.md" target="_blank" rel="noopener">Markdown source</a>
+      <a href="https://github.com/bitkarrot/infinitemarkets/blob/main/FUTURE-ROADMAP.md" target="_blank" rel="noopener">Markdown source</a>
     </nav>
     <button class="theme" id="themeBtn">☀ Light</button>
     <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="siteMenu" aria-label="Menu">☰ <span class="lbl">Menu</span></button>
@@ -59,7 +59,7 @@
       <div><b>More</b>
         <a href="index.html">Home</a>
         <a href="index.html#start">Get started</a>
-        <a href="https://github.com/bitkarrot/infinitemarkets/blob/main/ROADMAP.md" target="_blank" rel="noopener">Markdown source</a>
+        <a href="https://github.com/bitkarrot/infinitemarkets/blob/main/FUTURE-ROADMAP.md" target="_blank" rel="noopener">Markdown source</a>
         <a href="overview.html">Illustrated overview</a>
         <a href="slides.html">Slide deck</a>
         <a href="architecture.html">Architecture diagrams</a>
@@ -80,7 +80,7 @@
     <b>On this page</b>
     <div id="toc"></div>
     <div class="alt">
-      <a class="pill-btn pink" href="https://github.com/bitkarrot/infinitemarkets/blob/main/ROADMAP.md" target="_blank" rel="noopener">Edit on GitHub ↗</a>
+      <a class="pill-btn pink" href="https://github.com/bitkarrot/infinitemarkets/blob/main/FUTURE-ROADMAP.md" target="_blank" rel="noopener">Edit on GitHub ↗</a>
       <a class="pill-btn" href="index.html">← Home</a>
     </div>
   </aside>
@@ -112,13 +112,14 @@ addEventListener('keydown', e => { if (e.key === 'Escape') setMenu(false); });
 document.addEventListener('click', e => { if (!menu.hidden && !e.target.closest('#siteMenu, #menuBtn')) setMenu(false); });
 
 (async function () {
-  // Single source of truth: the committed ROADMAP.md on main. A local
-  // roadmap.md next to this page is the fallback (e.g. offline previews).
+  // Single source of truth: the root FUTURE-ROADMAP.md. Local previews
+  // read the working tree; the hosted page reads the committed file on main.
   const REPO = 'https://github.com/bitkarrot/infinitemarkets';
   const SOURCES = [
-    'https://raw.githubusercontent.com/bitkarrot/infinitemarkets/main/ROADMAP.md',
-    'roadmap.md',
+    'https://raw.githubusercontent.com/bitkarrot/infinitemarkets/main/FUTURE-ROADMAP.md',
+    '../../FUTURE-ROADMAP.md',
   ];
+  if (['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) SOURCES.reverse();
   const PALETTE = ['#ffd23d', '#ff6a1f', '#ff5aa8', '#4fdc9a', '#2e6bff', '#c8f53c', '#ffd23d'];
   const article = document.getElementById('article');
   const toc = document.getElementById('toc');
@@ -152,7 +153,7 @@ document.addEventListener('click', e => { if (!menu.hidden && !e.target.closest(
     } catch (e) { /* try next source */ }
   }
   if (text === null) {
-    article.innerHTML = `<h1>Could not load the roadmap</h1><p>View it on <a href="${REPO}/blob/main/ROADMAP.md" target="_blank" rel="noopener">GitHub</a>.</p>`;
+    article.innerHTML = `<h1>Could not load the future roadmap</h1><p>View it on <a href="${REPO}/blob/main/FUTURE-ROADMAP.md" target="_blank" rel="noopener">GitHub</a>.</p>`;
     return;
   }
   article.innerHTML = render(text);

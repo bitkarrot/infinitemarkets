@@ -111,3 +111,12 @@ blocked: 0
 ## Gaps
 
 <!-- YAML format for plan-phase --gaps consumption -->
+
+## Closeout note — 2026-10-11
+
+Tests 1–16 above retain their historical outcomes; they were not rerun as human
+UAT during this closeout. In particular, test 14's drain evidence does not prove
+the same-scope backlog admission bound (F6), and ordinary dual-copy tests do not
+prove the full no-route recovery window (F5). Those assurance gaps, and shared
+commerce F1–F3, are reopened in Phase 5. Item 17 is still pending and must remain
+visible to `audit-uat`; it is neither passed nor waived.

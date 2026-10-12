@@ -1,15 +1,15 @@
 ---
 phase: "02"
 slug: "release-a-safe-web-commerce"
-status: verified
-threats_open: 0
+status: gaps_found
+threats_open: 3
 asvs_level: 1
 created: "2026-09-27"
 ---
 
 # Phase 2 — Security
 
-This is an ASVS-1 mitigation review of the 25 threats authored in plans 02-01 through 02-04, plus T-205-01 added when UAT introduced digital delivery. `threats_open: 0` means all 26 specified mitigations were found in the extension and exercised. [Current implementation CI run 36352552899](https://github.com/bitkarrot/infinitemarkets/actions/runs/36352552899) passed lint and all four blocking Linux profiles on `021c402`; human UAT passed 3/3, including payment/privacy wording, responsive accessibility, theme isolation and merchant operations. The pinned LNbits source was not changed. Optional public-relay and real-funding-provider interoperability remain outside this Phase 2 sign-off.
+This register retains the 26-threat historical Phase 2 review. **Current status (2026-10-11): three original threats are reopened** by F1/F3; the old 26/26 closure is not current clearance. The new recovery, publication, retry and admission findings are tracked in Phase 5 `05-SECURITY.md`; this register is not a complete current-system threat inventory. Historical CI/UAT entries below retain their original dates and scope.
 
 ## Trust Boundaries
 
@@ -41,7 +41,7 @@ All statuses below describe local implementation evidence, not deployed-platform
 | T-202-05 | Elevation | CSS/script theme injection | medium | mitigate | `services/themes.py` allowlist and contrast checks, scoped emitted CSS/CSP; `test_themes.py` | closed |
 | T-202-06 | Information disclosure | NIP-89 relay-hint fetch | medium | mitigate | `services/nip89.py` resolves local identifiers without fetching embedded hints; `test_nip89.py` and P0-11 | closed |
 | T-202-07 | Tampering | relay URL changed or redirected after validation | medium | mitigate | `services/transport.py` revalidates before sync, connect and send; `test_relay_config_api.py` | closed |
-| T-203-01 | Tampering | duplicate invoice/double allocation | critical | mitigate | `services/checkout.py` idempotency claim, conditional reservation, single Core external ID, invoice correlation and no blind reissue; `test_checkout.py`, `test_order_saga.py` on both databases | closed |
+| T-203-01 | Tampering | duplicate invoice/double allocation | critical | mitigate | `services/checkout.py` idempotency claim, conditional reservation, single Core external ID, invoice correlation and no blind reissue; `test_checkout.py`, `test_order_saga.py` on both databases | reopened — F3: reservation coverage can be absent at confirmation; Phase 5 |
 | T-203-02 | Information disclosure | bearer token in path/query/log | critical | mitigate | `views_public_api.py` accepts `X-Order-Token`; browser immediately removes inbound fragment with `replaceState`; redaction/dead-token and Playwright tests | closed |
 | T-203-03 | Tampering | buyer or relay evidence as payment | high | mitigate | `services/settlement.py` trusts only verified LNbits rows, not client or relay state; `test_order_saga.py` | closed |
 | T-203-04 | Denial of service | stock squatting/checkout flood | high | mitigate | Bounded open orders/held stock and transactional rate buckets, TTL expiry; `test_checkout.py`, `test_email_queue.py` | closed |
@@ -49,11 +49,11 @@ All statuses below describe local implementation evidence, not deployed-platform
 | T-203-06 | Repudiation | unproven refund claim | medium | mitigate | Merchant refund attestation is an audit event, not an automatic refund; `services/orders.py`, `test_order_admin.py` | closed |
 | T-203-07 | Tampering | expired worker lease | high | mitigate | `services/tasks.py`, `services/email.py` and `services/outbox.py` guard leased writes; stale-claim tests | closed |
 | T-204-01 | Information disclosure | fragment/history/referrer token leak | critical | mitigate | `public_order.js` strips fragment to memory; no token path/query in shipped API or E2E settle route; `test_buyer_ui.py`, `buyer.spec.ts` | closed |
-| T-204-02 | Tampering | illegal action from admin UI | high | mitigate | `services/orders.py` legal transitions and admin action map; `test_order_admin.py` | closed |
+| T-204-02 | Tampering | illegal action from admin UI | high | mitigate | `services/orders.py` legal transitions and admin action map; `test_order_admin.py` | reopened — F1: merchant status commands bypass payment/cancellation side effects; Phase 5 |
 | T-204-03 | Information disclosure | admin renders secrets | high | mitigate | Redacted admin projections and technical details; `test_admin_ui.py`, `test_order_admin.py` | closed |
 | T-204-04 | Elevation | merchant theme crosses into admin | medium | mitigate | `.gm-public`-scoped CSS and no admin theme token emission; `test_themes.py`, `test_admin_ui.py` | closed |
 | T-204-05 | Denial of service | buyer induced to pay twice | critical | mitigate | `public_checkout.js` preserves uncertain idempotency keys and offers no second invoice; invoice/expiry text avoids claiming unpaid without proof; `buyer.spec.ts`, `test_order_saga.py` | closed |
-| T-205-01 | Information disclosure | digital delivery content released before payment or published | high | mitigate | Added after UAT (2026-09-27). `products.delivery_enc` AEAD at rest (`services/catalog.py`); only the owner-scoped admin API decrypts it; `services/orders.py::digital_delivery` returns content only for `confirmed/processing/completed` without payment exception or oversell; never in public product JSON/HTML or NIP-99 events; buyer UI renders it as text with http(s) links only (no innerHTML). `test_order_saga.py::test_digital_delivery_revealed_only_after_confirmed_payment`, `test_public_contract.py`, `buyer.spec.ts` | closed |
+| T-205-01 | Information disclosure | digital delivery content released before payment or published | high | mitigate | Added after UAT (2026-09-27). `products.delivery_enc` AEAD at rest (`services/catalog.py`); only the owner-scoped admin API decrypts it; `services/orders.py::digital_delivery` returns content only for `confirmed/processing/completed` without payment exception or oversell; never in public product JSON/HTML or NIP-99 events; buyer UI renders it as text with http(s) links only (no innerHTML). `test_order_saga.py::test_digital_delivery_revealed_only_after_confirmed_payment`, `test_public_contract.py`, `buyer.spec.ts` | reopened — F1: unpaid confirmation unlocks digital delivery; Phase 5 |
 
 A shareable order link intentionally contains a token in its **URL fragment** until the receiving page strips it. The protection is that the fragment is not sent in HTTP paths, queries or referrers; the link itself must be kept private. No broader claim that the token never appears in a URL is made.
 
@@ -72,10 +72,19 @@ No accepted risks. A relay can retain already-public catalog events despite a ki
 
 ## Sign-Off
 
-- [x] Each planned threat has a mitigation and local source/test evidence.
+- [ ] Each planned threat has a mitigation verified against the current runtime, including the reopened cases.
 - [x] No risk was silently accepted as a substitute for a missing mitigation.
-- [x] `threats_open: 0` for local code-level verification.
+- [ ] Current local mitigations are closed; `threats_open: 3` until the reopened Phase 2 threats are repaired and retested.
 - [x] Current-revision Linux x86_64 and ARM64 CI evidence reviewed.
-- [x] Human security/UX and accessibility review completed through UAT 3/3.
+- [x] Historical human security/UX and accessibility review completed through UAT 3/3; not rerun in this closeout.
 
-**Approval:** verified for the Phase 2 Release-A scope on 2026-09-27. Optional external public-relay and real-funding-provider tests remain explicitly outside this approval.
+**Historical approval:** verified for Phase 2 on 2026-09-27. **Current approval: withheld** pending Phase 5 repairs. The old external-test scope limits remain unchanged; no required gate has been waived.
+
+## 2026-10-11 reopening
+
+Three original rows are reopened, retaining their original severities, including
+the critical T-203-01 classification. F2/F4/F5/F6 are additional findings in the
+[Phase 5 register](../05-correctness-recovery-and-security-hardening/05-SECURITY.md).
+Do not sum the two registers as distinct vulnerabilities: finding/threat mappings
+overlap. Existing security enforcement and the high-severity blocking threshold
+are unchanged. No risk acceptance substitutes for the missing fixes.

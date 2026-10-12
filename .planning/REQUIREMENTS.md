@@ -14,6 +14,11 @@
 
 ## v1 Requirements
 
+**2026-10-11 closeout:** 11 original acceptance requirements are reopened by the
+conformance review, alongside 8 new hardening requirements. Historical delivery
+remains recorded; an unchecked item below is not a claim that its entire feature
+is absent. Phase 5 owns remediation. No live UAT or security gate is waived.
+
 ### Phase 0 Qualification
 
 - [x] **QUAL-01**: Operator can reproduce the approved host/SDK dependency set on every supported platform from recorded lockfile paths, wheel hashes, release-source revisions, and native dependency provenance without a silent host downgrade.
@@ -35,17 +40,17 @@
 
 - [x] **MERC-01**: Merchant can create/import a protected Nostr identity, bind an owned incoming LNbits wallet, configure relays/notifications, and activate/deactivate without exposing raw keys or credentials.
 - [x] **CAT-01**: Merchant can create and update categories (one per product), simple/variable/variation products, cross-category collections, images/specifications, shipping options, stock, visibility, and local drafts under the normative validation rules.
-- [x] **CAT-02**: Merchant can soft-delete category entities only when empty and another active category remains; product and collection deletion retain ordered reference removal, durable tombstones, stable protocol addresses, and historical order integrity.
-- [x] **PUB-01**: Merchant can publish deterministic Gamma/NIP-99 `0`, `30402`, `30405`, `30406`, `31989`, and `31990` events through a durable, ordered outbox with positive per-relay ACK evidence.
+- [ ] **CAT-02**: Merchant can soft-delete category entities only when empty and another active category remains; product and collection deletion retain ordered reference removal, durable tombstones, stable protocol addresses, and historical order integrity.
+- [ ] **PUB-01**: Merchant can publish deterministic Gamma/NIP-99 `0`, `30402`, `30405`, `30406`, `31989`, and `31990` events through a durable, ordered outbox with positive per-relay ACK evidence.
 - [x] **PUB-02**: Merchant can inspect relay health, pending/partial/failed publication state, and retry/supersession outcomes without reading secret-bearing logs.
 - [x] **WEB-01**: Buyer can open a local NIP-89 naddr product page and browse active public products, collections, shipping, price, and availability without seeing merchant internals.
 - [x] **WEB-02**: Buyer can submit idempotent web checkout with server-recalculated items/shipping/FX and receive a high-entropy fragment/header status capability that never appears in a request path/query.
-- [x] **PAY-01**: Buyer can receive exactly one correlated LNbits invoice after stock reservation; unknown creation is reconciled without blind reissue.
-- [x] **PAY-02**: Settled, expired, cancelled, late, mismatched, and manually accepted/refund-attested payments follow the normative state/exception machine without treating buyer claims or receipts as settlement.
-- [x] **INV-01**: Concurrent buyers cannot allocate more finite stock than exists; held reservations expire/release once and settlement consumes stock once.
-- [x] **ORD-01**: Merchant can inspect orders/audit history and apply legal processing, cancellation, shipping, exception, fulfillment, and public-token rotation actions with owner-scoped authorization.
+- [ ] **PAY-01**: Buyer can receive exactly one correlated LNbits invoice after stock reservation; unknown creation is reconciled without blind reissue.
+- [ ] **PAY-02**: Settled, expired, cancelled, late, mismatched, and manually accepted/refund-attested payments follow the normative state/exception machine without treating buyer claims or receipts as settlement.
+- [ ] **INV-01**: Concurrent buyers cannot allocate more finite stock than exists; held reservations expire/release once and settlement consumes stock once.
+- [ ] **ORD-01**: Merchant can inspect orders/audit history and apply legal processing, cancellation, shipping, exception, fulfillment, and public-token rotation actions with owner-scoped authorization.
 - [x] **NOTF-01**: Merchant and opted-in web buyer can receive per-recipient transactional emails through host SMTP with explicit suppressed/failed state, bounded retry, protected token rendering, and opt-out.
-- [x] **SEC-01**: Release A enforces key/PII encryption, retention, HMAC lookup scopes, CSRF/origin/auth boundaries, rate/input limits, log redaction, unsupported-topology refusal, and cancellation-safe lifecycle behavior.
+- [ ] **SEC-01**: Release A enforces key/PII encryption, retention, HMAC lookup scopes, CSRF/origin/auth boundaries, rate/input limits, log redaction, unsupported-topology refusal, and cancellation-safe lifecycle behavior.
 - [x] **UI-01**: Merchant can choose Editorial, Guided, or Compact public layout presets while responsive safety applies a compact mobile fallback and checkout fields, totals, validation, payment states, and security copy remain invariant.
 - [x] **UI-02**: Merchant can triage and process orders through a responsive split list/detail workspace with search, state filters, exception prominence, legal contextual actions, and embedded payment/inventory/fulfillment chronology.
 - [x] **UI-03**: Merchant can customize public appearance through Warm Market, Clean Minimal, or High Contrast presets, optional Brand Basics, and opt-in guarded Advanced Tokens while WCAG save gates and public/admin separation remain enforced.
@@ -53,10 +58,10 @@
 ### Release B — Gamma NIP-17 Orders
 
 - [x] **GAM-01**: Merchant can publish and validate a 1–3 relay kind-10050 inbox profile before claiming Gamma order reachability.
-- [x] **GAM-02**: Buyer can submit a valid NIP-17 kind-16 type-1 order that enters the same canonical pricing, shipping, inventory, invoice, and settlement services as web checkout.
-- [x] **GAM-03**: Buyer and merchant can exchange kind-16 payment/status/shipping and kind-17 receipt messages with stable rumor identity, independent sender/recipient copies, and settlement-independent receipt semantics.
-- [x] **GAM-04**: Durable inbox processing verifies and deduplicates outer/seal/rumor identity, preserves encrypted history, resumes completed-session cursors, and routes each copy only to that party's declared relays.
-- [x] **GAM-05**: Release B passes deployed relay SSRF/egress, recipient-gated relay, NIP-42, overload, and independent external Gamma-client conformance gates.
+- [ ] **GAM-02**: Buyer can submit a valid NIP-17 kind-16 type-1 order that enters the same canonical pricing, shipping, inventory, invoice, and settlement services as web checkout.
+- [ ] **GAM-03**: Buyer and merchant can exchange kind-16 payment/status/shipping and kind-17 receipt messages with stable rumor identity, independent sender/recipient copies, and settlement-independent receipt semantics.
+- [ ] **GAM-04**: Durable inbox processing verifies and deduplicates outer/seal/rumor identity, preserves encrypted history, resumes completed-session cursors, and routes each copy only to that party's declared relays.
+- [ ] **GAM-05**: Release B passes deployed relay SSRF/egress, recipient-gated relay, NIP-42, overload, and independent external Gamma-client conformance gates.
 
 ### Buyer Accounts
 
@@ -74,6 +79,17 @@
 - [x] ~~**LEG-04**: Old-intake freeze, payable-invoice reconciliation and activation gate~~ — **Dropped**. No cutover, attestation, physical stock-count or old-order audit is part of catalog import; old-store inventory coordination is operator-managed.
 - [x] ~~**LEG-05**: Scarce-stock old/new cutover rehearsal~~ — **Dropped**. Normal checkout contention and stock-reservation tests remain required for published products.
 - [x] **LEG-06**: Merchant can export products as safe, round-trippable CSV and review/import classic/modern Shopify CSV (including options and image-only rows). Optional merchant-supplied media can be validated and relinked without server-side URL fetches; >20 images require explicit selection. Products import as hidden drafts and only become available after explicit Catalog publication. Variable parents and their imported options publish together.
+
+### Correctness, Recovery, and Security Hardening
+
+- [ ] **HARD-01**: Merchant status/fulfillment commands require the appropriate payment authority and side effects: unpaid confirmation/delivery is refused and cancellation releases reservations exactly once (F1).
+- [ ] **HARD-02**: A recovered invoice-creation timeout becomes fulfillable after verified settlement when no independent exception remains; unrelated exceptions and single-invoice correlation are preserved (F2).
+- [ ] **HARD-03**: Settlement verifies complete reservation/stock coverage or takes an explicit safe exception/reallocation path; expired holds cannot lead to unaccounted confirmed purchases (F3).
+- [ ] **HARD-04**: An outbox dependency requires its intended revision or a proved valid replacement, never merely any historical publication (F4).
+- [ ] **HARD-05**: No-route waiting remains eligible for the entire documented 48-hour recovery window without exhausting the ordinary failed-send budget (F5).
+- [ ] **HARD-06**: Inbox admission atomically enforces the 1,000-pending-wrap bound per merchant/relay, with concurrent/rate-window regression tests and overload visibility (F6).
+- [ ] **HARD-07**: The DB/install pytest pair terminates with exit 0 in both file orders and the normal suite; passing assertions followed by a hang or forced process exit are not success (CI-01).
+- [ ] **HARD-08**: Permanent runtime regressions, fresh four-profile qualification, relevant browser/conformance evidence and security review close the reopened acceptance gaps; required live external checkout evidence is recorded without treating listings or FakeWallet as a live payment pass.
 
 ## v2 Requirements
 
@@ -99,7 +115,7 @@
 
 ## Acceptance Criteria
 
-- Every v1 requirement maps to exactly one roadmap phase and to normative contract evidence.
+- Every v1 requirement has one primary roadmap phase and normative contract evidence. Later remediation explicitly references that original owner rather than treating historical delivery as current acceptance.
 - Phase 1 passes P0-01 through P0-14 before any production extension runtime implementation begins.
 - Each later phase reruns its applicable Phase 0 domain, host, security, and failure assertions through the real implementation.
 - Release labels are claimed only when their release-specific interoperability/deployment gates pass.
@@ -129,25 +145,25 @@ A requirement is complete only when implementation (or Phase 0 probe/model), aut
 | QUAL-14 | Phase 1 | Complete |
 | MERC-01 | Phase 2 | Complete |
 | CAT-01 | Phase 2 | Complete |
-| CAT-02 | Phase 2 | Complete |
-| PUB-01 | Phase 2 | Complete |
+| CAT-02 | Phase 2 | Reopened — F4 / HARD-04; Phase 5 remediation |
+| PUB-01 | Phase 2 | Reopened — F4 / HARD-04; Phase 5 remediation |
 | PUB-02 | Phase 2 | Complete |
 | WEB-01 | Phase 2 | Complete |
 | WEB-02 | Phase 2 | Complete |
-| PAY-01 | Phase 2 | Complete |
-| PAY-02 | Phase 2 | Complete |
-| INV-01 | Phase 2 | Complete |
-| ORD-01 | Phase 2 | Complete |
+| PAY-01 | Phase 2 | Reopened — F2 / HARD-02; Phase 5 remediation |
+| PAY-02 | Phase 2 | Reopened — F1–F3 / HARD-01–03; Phase 5 remediation |
+| INV-01 | Phase 2 | Reopened — F1/F3 / HARD-01, HARD-03; Phase 5 remediation |
+| ORD-01 | Phase 2 | Reopened — F1 / HARD-01; Phase 5 remediation |
 | NOTF-01 | Phase 2 | Complete |
-| SEC-01 | Phase 2 | Complete |
+| SEC-01 | Phase 2 | Reopened — F1 / HARD-01, HARD-08; Phase 5 remediation |
 | UI-01 | Phase 2 | Complete |
 | UI-02 | Phase 2 | Complete |
 | UI-03 | Phase 2 | Complete |
 | GAM-01 | Phase 3 | Complete |
-| GAM-02 | Phase 3 | Complete |
-| GAM-03 | Phase 3 | Complete |
-| GAM-04 | Phase 3 | Complete |
-| GAM-05 | Phase 3 | Complete |
+| GAM-02 | Phase 3 | Reopened — F1–F3 / HARD-01–03; Phase 5 remediation |
+| GAM-03 | Phase 3 | Reopened — F5 / HARD-05; Phase 5 remediation |
+| GAM-04 | Phase 3 | Reopened — F5/F6 / HARD-05–06; Phase 5 remediation |
+| GAM-05 | Phase 3 | Reopened — F6 and live UAT / HARD-06, HARD-08; Phase 5 remediation |
 | ACC-01 | Phase 03.1 | Complete |
 | ACC-02 | Phase 03.1 | Complete |
 | ACC-03 | Phase 03.1 | Complete |
@@ -159,13 +175,22 @@ A requirement is complete only when implementation (or Phase 0 probe/model), aut
 | LEG-04 | Phase 4 | Dropped — catalog-only scope |
 | LEG-05 | Phase 4 | Dropped — catalog-only scope |
 | LEG-06 | Phase 4 | Complete |
+| HARD-01 | Phase 5 | Pending |
+| HARD-02 | Phase 5 | Pending |
+| HARD-03 | Phase 5 | Pending |
+| HARD-04 | Phase 5 | Pending |
+| HARD-05 | Phase 5 | Pending |
+| HARD-06 | Phase 5 | Pending |
+| HARD-07 | Phase 5 | Pending |
+| HARD-08 | Phase 5 | Pending |
 
 **Coverage:**
 
-- v1 requirements: 46 total
-- Mapped to phases: 46
-- Unmapped: 0
+- v1 requirements: 54 total; 50 active and 4 explicitly dropped legacy/cutover requirements.
+- Active status: 31 recorded complete, 11 reopened, 8 pending hardening.
+- Mapped to primary phases: 54; unmapped: 0.
+- No requirement has been closed merely because its test file exists or CI is green.
 
 ---
 *Requirements defined: 2026-09-20*
-*Last updated: 2026-10-09 — Release C catalog-only draft import/export verified and deployed; LEG-04/05 dropped*
+*Last updated: 2026-10-11 — hardening-first closeout; affected acceptance reopened and HARD-01–08 added.*

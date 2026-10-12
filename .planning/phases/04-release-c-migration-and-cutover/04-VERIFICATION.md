@@ -1,3 +1,11 @@
+---
+phase: 04-release-c-migration-and-cutover
+verified: "2026-10-12T03:01:39+00:00"
+status: passed
+requirements-completed: [LEG-03, LEG-06]
+scope: catalog-only
+---
+
 # Phase 04 — Catalog Import and Export Verification
 
 **Date:** 2026-10-09
@@ -63,3 +71,18 @@ historical only, not current acceptance criteria.
 - Public marketplace filters vary. In particular, a regular product without a
   `stock` tag can be treated as out of stock even when it appears in the
   marketplace dashboard.
+
+## Retrospective closeout — 2026-10-11
+
+LEG-03/LEG-06 remain delivered in the catalog-only scope. Current focused
+account/catalog checks passed 70 tests with one optional private-Shopify-sample
+skip and process exit 0; this selection included `test_migration_import.py` and
+`test_migration_export_media.py`. `make lint` passed, and all four Linux
+qualification profiles are green on `a7082c7` (run 38194415581).
+
+The original four PLAN files now each have an explicit disposition SUMMARY.
+Those records do not claim execution of removed freeze, liability, attestation,
+or cutover-rehearsal work. No fresh browser run or live deployment was performed
+in this closeout; the deployment/browser observations above remain historical.
+Shared checkout safety is separately reopened in Phase 5 and is not certified
+by this catalog-scope verification.

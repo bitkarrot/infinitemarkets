@@ -1,8 +1,15 @@
 # Roadmap: infinitemarkets
 
+## v1.0 — Core Commerce and Hardening
+
 ## Overview
 
 The project advances through four gated vertical stages. GSD Phase 1 executes the normative contract's Phase 0 conformance profile without production runtime code. Phase 2 delivers safe Gamma/NIP-99 catalog publication and LNbits-backed web commerce. Phase 3 adds private Gamma NIP-17 orders after the commerce core is stable. Phase 4 adds file-based catalog import/export into hidden drafts for merchant review and ordinary publication; no old-order reconciliation or cutover is provided.
+
+**Closeout review (2026-10-11):** historical feature delivery is not current
+acceptance. Phase 2 and Phase 3 assurance is reopened by F1–F6; the live
+Plebeian checkout gate remains pending. Phase 5 owns the repairs. The milestone
+is not archived or production-qualified. See [the audit](v1.0-MILESTONE-AUDIT.md).
 
 ## Phases
 
@@ -13,9 +20,11 @@ The project advances through four gated vertical stages. GSD Phase 1 executes th
 - Decimal phases are reserved for urgent inserted work.
 
 - [x] **Phase 1: Conformance Profile (Contract Phase 0)** - Prove host, SDK, schema, state, security, and protocol assumptions before runtime implementation. (completed 2026-09-20)
-- [x] **Phase 2: Release A — Safe Web Commerce** - Ship catalog publication and LNbits-backed public checkout as the first production vertical slice. (completed 2026-09-27)
-- [x] **Phase 3: Release B — Gamma NIP-17 Orders** - Add encrypted recipient-specific Gamma order messaging and external-client conformance. (completed 2026-09-29)
-- [x] **Phase 4: Release C — Catalog Import and Export** - Import file-based catalogs as hidden drafts for merchant review and publication; no extension-managed cutover. (completed 2026-10-09)
+- [ ] **Phase 2: Release A — Safe Web Commerce** - Delivered 2026-09-27; acceptance reopened for F1–F4, repaired through Phase 5.
+- [ ] **Phase 3: Release B — Gamma NIP-17 Orders** - Delivered 2026-09-29; shared-commerce/retry/backlog assurance and live checkout remain open, tracked through Phase 5.
+- [x] **Phase 03.1: Buyer Accounts** - Delivery documented through 2026-10-07; missing verification record reconstructed 2026-10-11 from summaries, source, current targeted checks and historical browser evidence.
+- [x] **Phase 4: Release C — Catalog Import and Export** - Catalog-only delivery verified; old cutover plans dispositioned, not executed as current requirements. (completed 2026-10-09)
+- [ ] **Phase 5: Correctness, Recovery, and Security Hardening** - Repair F1–F6, fix CI-01 and re-establish runtime/security/release evidence before optional feature expansion.
 
 ## Phase Details
 
@@ -73,7 +82,7 @@ Plans:
 - [x] 02-03: Checkout, reservation + invoice saga, settlement/reconciliation, order admin API, email
 - [x] 02-04: Buyer checkout/status UI and merchant admin surfaces (orders, catalog, publications, settings, appearance)
 
-**Release gate:** Complete. [Current implementation CI run 36352552899](https://github.com/bitkarrot/infinitemarkets/actions/runs/36352552899) passed lint and all four required Linux x86_64/ARM64 × SQLite/PostgreSQL profiles on `021c402`; current local Chromium passed 19/19, human UAT passed 3/3, Nyquist coverage is 16/16 requirements, and the ASVS-1 register is verified with 26/26 threats closed. Port 5099 serves the fresh quote-capable demo; the old disposable database files were preserved but are not mounted. See `02-VERIFICATION.md`, `02-VALIDATION.md`, `02-SECURITY.md`, `02-UI-REVIEW.md` and `02-UAT.md`.
+**Release gate: reopened.** The 2026-09-27 CI/UAT/security results remain historical evidence, not current clearance. F1–F4 invalidate parts of the payment, inventory, merchant-action and ordered-publication claims. The affected security threats and requirements remain open until Phase 5 permanent regressions and fresh verification pass. See `02-VERIFICATION.md`, `02-VALIDATION.md`, `02-SECURITY.md` and the milestone audit.
 
 *Plan count revised 3→4 during plan-checker revision: order-backend and UI layers split to keep each executor under the context budget.*
 
@@ -93,7 +102,7 @@ Plans:
 
 **Plans:** 4/4 plans complete
 
-**Carried from Phase 2 UAT (2026-09-27):** Nostr buyers retrieve order status and history from their NIP-17 message history (order keyed by buyer pubkey + order id); an optional NIP-07 "Sign in with Nostr" for the web storefront; and a merchant `web_checkout_enabled` setting so a shop can run Nostr-only once Gamma ordering exists. Web buyers keep per-order private links — no buyer accounts.
+**Historical scope carried from Phase 2 UAT (2026-09-27; the later account phase supersedes the no-account limitation):** Nostr buyers retrieve order status and history from their NIP-17 message history (order keyed by buyer pubkey + order id); an optional NIP-07 "Sign in with Nostr" for the web storefront; and a merchant `web_checkout_enabled` setting so a shop can run Nostr-only once Gamma ordering exists. Web buyers keep per-order private links — no buyer accounts.
 
 *Plan count revised 3→4 during plan-checker revision: buyer/merchant surfaces (sign-in, storefront modes, Messages) split from the conformance gate to keep each executor under the context budget — matching the research's recommended 4-part structure.*
 
@@ -171,14 +180,45 @@ Plans:
 - [x] 04-04: Superseded rehearsal plan; no longer a current release criterion.
 - [x] Closeout: catalog-only workflow, tests, live deployment, merchant operations surfaces, and relay reconciliation verified for release packaging.
 
+### Phase 5: Correctness, Recovery, and Security Hardening
+
+**Goal:** Restore payment, inventory, publication and private-message invariants, with permanent regression coverage and honest release evidence.
+**Mode:** mvp
+**Depends on:** Delivered Phases 2, 3, 03.1 and 4; this phase repairs their shared boundaries rather than requiring their reopened gates to pass first.
+**Requirements:** HARD-01, HARD-02, HARD-03, HARD-04, HARD-05, HARD-06, HARD-07, HARD-08
+**Repairs original acceptance:** CAT-02, PUB-01, PAY-01, PAY-02, INV-01, ORD-01, SEC-01, GAM-02, GAM-03, GAM-04, GAM-05.
+**Success Criteria** (what must be TRUE):
+
+1. Merchant status commands cannot substitute for verified payment, expose unpaid delivery, or bypass cancellation inventory effects (F1).
+2. Timeout recovery preserves invoice correlation and resolves only verified uncertainty; late settlement never confirms without complete inventory accounting (F2/F3).
+3. Publication dependencies bind to the required revision, and no-route intents remain claimable until the documented deadline (F4/F5).
+4. Same-scope inbox admission is atomically bounded across concurrency and rate-window resets (F6).
+5. Permanent negative-path runtime tests fail before each repair and pass afterward on the supported DB profiles; CI-01 terminates with exit 0 in both test-file orders.
+6. Fresh lint, qualification, relevant browser/conformance checks and ASVS review close the reopened gates. Live Plebeian checkout remains a required, separately authorized external gate; listing-only or FakeWallet evidence cannot satisfy it.
+
+**Plans:** Not yet authored; no implementation work started. Proposed groups are
+financial authority/recovery (F1–F3), durable delivery (F4/F5), inbox admission
+(F6), and test lifecycle/release evidence (CI-01/HARD-08). These are not executed
+plans or a promise of a final plan count.
+
+**Scope decision:** Hardening first, approved 2026-10-11. No external inventory/
+shipping integrations, shipping-import expansion, live legacy protocol work or
+old-store cutover. S1–S4 remain explicit follow-ups in the root roadmap.
+See `05-CONTEXT.md`, `05-SECURITY.md` and `05-VALIDATION.md` in the phase directory.
+
 ## Progress
 
-**Execution Order:** Phase 1 → Phase 2 → Phase 3 → Phase 03.1 → Phase 4
+**Execution Order:** Phase 1 → Phase 2 → Phase 3 → Phase 03.1 → Phase 4 → Phase 5
+
+Completion below means acceptance in the stated scope, not absence of later
+defects. The reopened Phase 2/3 requirements are repaired in Phase 5; do not
+re-execute superseded Phase 4 cutover plans.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Conformance Profile | 3/3 | Complete    | 2026-09-20 |
-| 2. Release A — Safe Web Commerce | 4/4 | Complete    | 2026-09-27 |
-| 3. Release B — Gamma NIP-17 Orders | 4/4 | Complete    | 2026-09-29 |
-| 03.1. Buyer accounts (INSERTED) | 3/3 | Complete   | 2026-10-05 |
-| 4. Release C — Catalog Import and Export | Catalog workflow implemented and verified | Complete | 2026-10-09 |
+| 2. Release A — Safe Web Commerce | 4/4 historical; acceptance reopened for Phase 5 repairs | In Progress | Delivery 2026-09-27 |
+| 3. Release B — Gamma NIP-17 Orders | 4/4 historical; assurance and live UAT open | In Progress | Delivery 2026-09-29 |
+| 03.1. Buyer accounts (INSERTED) | 3/3 | Complete   | 2026-10-07 |
+| 4. Release C — Catalog Import and Export | 4 historical plans dispositioned; catalog-only delivery verified | Complete | 2026-10-09 |
+| 5. Correctness, Recovery, and Security Hardening | No plans authored | Pending | — |

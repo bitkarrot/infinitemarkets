@@ -13,7 +13,8 @@ requires:
       relay-health/outbox routes
 
 provides:
-  - Admin shell (one nav: Orders/Catalog/Publications/Settings) mounted
+  - >-
+    Admin shell (one nav: Orders/Catalog/Publications/Settings) mounted
     on the host Vue 3 app via mixins inside `{% block page %}`
   - B1 Linear Split order workspace (390px list + detail, legal-action
     map, exception banner, order_events timeline, collapsed technical
@@ -63,7 +64,7 @@ key-files:
   modified:
     - infinitemarkets/views.py (index → admin.html; index.html removed)
     - infinitemarkets/views_public_api.py (payment_exception on status)
-    - infinitemarkets/services/orders.py (list rows: buyer/item summary + q)
+    - "infinitemarkets/services/orders.py (list rows: buyer/item summary + q)"
     - infinitemarkets/services/merchant.py (spec_revision on projection)
     - infinitemarkets/services/relay.py (blossom_servers on relay-health)
     - infinitemarkets/templates/infinitemarkets/public_product.html (A2 card)

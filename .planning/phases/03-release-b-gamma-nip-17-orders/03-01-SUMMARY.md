@@ -5,7 +5,7 @@ subsystem: nostr-inbox-transport
 tags: [nip-17, nip-42, gift-wrap, relay-transport, sqlite, postgresql]
 
 requires:
-  - phase: 02-release-b-alpha-catalog
+  - phase: 02-release-a-safe-web-commerce
     provides: durable outbox, relay_configs direction vocabulary, shared
       no-signer transport client, worker task supervisor, keystore custody
 provides:
@@ -75,7 +75,7 @@ patterns-established:
   - "nostr-sdk pooled-relay quirk: reconnecting a disconnected-but-pooled
     relay silently swallows REQs — sessions remove and re-add the relay."
 
-requirements-completed: []
+requirements-completed: [GAM-01]
 
 coverage:
   - id: D1
@@ -217,3 +217,11 @@ plan began:
   `ipaddress.is_loopback`).
 - Pending: `inbox_blocklist`/`peer_relays` currently lack admin
   management endpoints beyond retry (mutes arrive via 03-02 domain flow).
+
+## Metadata closeout — 2026-10-11
+
+The empty requirement list omitted GAM-01 despite the kind-10050 activation
+implementation and seven activation tests recorded above and the phase-level
+verification. That link and the old Phase 2 dependency name are corrected here.
+This does not close shared-commerce, retry/backlog or live-checkout findings;
+current Phase 3 acceptance remains reopened in 03-VERIFICATION.md and Phase 5.

@@ -1,12 +1,18 @@
-# Roadmap
+# Future Roadmap
 
-Forward-looking plan for infinitemarkets. The upstream protocol —
-[OpenMarketsFoundation/specification](https://github.com/OpenMarketsFoundation/specification)
-(draft, forked from GammaMarkets/market-spec) — is still in flux, so this
-roadmap tracks two things: committed next work, and alignment items for the
-parts of the spec we don't yet implement. Completed history lives in
-[`.planning/ROADMAP.md`](.planning/ROADMAP.md); deliberate divergences already
-on record are numbered in `docs/technical-specification.md` §21 ("D-n" below).
+Future features, deferred integrations, product-contract decisions, and upstream
+specification watch items for Infinite Markets. These are not an execution plan
+or a promise that every item will be built. Active phases, acceptance criteria,
+and progress belong to the [GSD execution roadmap](.planning/ROADMAP.md).
+
+**Hardening first:** repair and verify the existing conformance findings before
+optional feature expansion. The [Phase 5 execution scope](.planning/ROADMAP.md#phase-5-correctness-recovery-and-security-hardening)
+owns that work and its release gates; the [implementation assessment](docs/spec-conformance-analysis.md)
+records the findings. This document does not duplicate the Phase 5 checklist.
+
+The [OpenMarkets specification](https://github.com/OpenMarketsFoundation/specification)
+(draft, forked from GammaMarkets/market-spec) remains in flux. Deliberate
+divergences are recorded in `docs/technical-specification.md` §21 ("D-n" below).
 
 ## Current spec coverage
 
@@ -18,7 +24,7 @@ shipping options, kind-0 profile with `payment_preference`, NIP-89
 31989/31990, kind-10050 inbox relays, NIP-17 order messaging (kind-16
 type 1–4, kind-17 receipts, kind-14 DMs), and kind-5 tombstones.
 
-## Next
+## Other workstreams and deferred features
 
 ### 1. Optional integrations with other Nostr extensions — inventory and shipping
 
@@ -63,6 +69,8 @@ release rather than shipped as a phase.
 - Storefront and admin usability: checkout flow friction, Catalog/Orders/
   Messages workspace ergonomics, mobile/responsive polish, accessibility
   and contrast, empty/loading/error states.
+- Documentation viewer: contain wide Markdown tables on narrow screens; the
+  roadmap's pre-existing mobile overflow remains future UI polish, not Phase 5 scope.
 - Security maintenance: dependency and host-pin updates, relay/egress
   hardening, abuse/rate-limit tuning, periodic review of the ASVS-1 threat
   register, and conformance re-runs when the host or SDK pins move.
@@ -81,10 +89,10 @@ Wasm-safe host-call equivalents.
 
 ## Spec alignment backlog
 
-Gaps between the implementation and the OpenMarkets spec, ordered by likely
-value. None are mandatory as whole features — the spec's required set
-(30402 products, 30405 collections, merchant preferences, NIP-17 ordering)
-is fully implemented. The **Spec status** column shows where each row sits:
+Optional expansions and conditional questions, ordered by likely value.
+The required protocol components are present, but their presence does not
+establish safe end-to-end conformance: the F1–F6 repairs tracked in GSD remain open.
+The **Spec status** column shows where each expansion or question sits:
 `optional` (a MAY component or MAY tag), `conditional` (a REQUIRED tag only
 inside an optional kind we already publish), or `recommended` (a SHOULD).
 
@@ -142,3 +150,23 @@ yet.
 | [#1](https://github.com/OpenMarketsFoundation/specification/pull/1) Spec repo reorganization | `SPEC.md` compatibility snapshot + pillar/lane file structure; no semantic changes. | Doc anchors only — update links/references when it merges; everything else stacks on it. |
 
 (PRs #2–#6 are closed earlier drafts of #7–#11.)
+
+## Deferred assurance and product-contract work
+
+- **S1:** decide whether digital entitlements are immutable/versioned or intentionally
+  live before choosing a snapshot migration; current catalog edits affect past sales.
+- **S2:** settle rumor-versus-wrapper `source_event_id` semantics and document
+  authenticated buyer history separately from anonymous token access.
+- **S3:** preserve precise evidence scope; resolve 30406 tag-shape ambiguity with
+  fixtures/upstream clarification; add durable backlog, stuck-order, reservation,
+  payment-exception and retry-exhaustion visibility where needed.
+- **S4:** parameterized order-list SQL, stale docstrings/no-op helpers, deterministic
+  AUTH synchronization, and trusted-proxy/rate-window documentation remain follow-up
+  hardening, not replacements for F1–F6.
+
+Third-party stock/shipping integrations and shipping import/binding are **deferred**,
+not cancelled. Reviews, NIP-37, automatic payments, subscriptions/preorders and Wasm
+exploration remain optional/future work. Identity unlinking and email-as-notification
+preference changes remain outside the delivered buyer-account scope. Live NIP-15/
+NIP-04 ordering and old-store cutover/freeze/liability reconciliation remain **dropped
+from v1**; do not resurrect them to satisfy obsolete plan files.

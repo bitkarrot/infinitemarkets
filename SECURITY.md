@@ -73,8 +73,10 @@ The normative contract is `docs/technical-specification.md` §§9.5, 11, 15
 and 19, and the threat model is in `docs/architecture-proposal.md` §21.
 In brief:
 
-- **Payments.** LNbits is the settlement authority. Orders are confirmed only
-  by settled LNbits payments bound to that order. Amounts are always computed
+- **Payments (required policy, currently under repair).** LNbits must be the
+  settlement authority. F1–F3 below show that current command/recovery paths do
+  not fully enforce confirmation by a settled, correlated LNbits payment with
+  complete inventory accounting. Amounts are always computed
   on the server, and Nostr receipts are only hints. The extension never calls
   outgoing-payment APIs. Refunds are recorded as out-of-band merchant
   attestations.
@@ -87,11 +89,12 @@ In brief:
 - **Auth.** Admin routes are scoped to the LNbits user and merchant. Cookie
   mutations require an exact `Origin` match plus a double-submit CSRF token.
   User-id-only auth is rejected. Buyer sessions use HttpOnly, Secure,
-  SameSite=Strict cookies. Session, magic-link and order tokens are stored
-  only as hashes, and magic links are single-use with a ~15-minute TTL.
+  SameSite=Strict cookies. Credential lookup uses hashes. Order tokens also have
+  encrypted recovery copies; queued magic-link delivery uses encrypted payloads
+  until send-time cleanup. Magic links are single-use with a ~15-minute TTL.
 - **Inbound Nostr.** Everything is untrusted. The order is verify → decrypt →
-  dispatch, with size limits applied before decoding and per-author and
-  per-relay admission caps.
+  dispatch, with size limits applied before decoding and per-author/per-relay
+  rate limits. The durable per-scope backlog bound remains open as F6 below.
 - **Network.** Relay URLs are an SSRF boundary. They must be `wss://`, raw IPs
   are refused, and DNS-resolved non-global ranges are rejected at validate,
   connect and reconnect.
@@ -131,7 +134,39 @@ Deployers own these controls. The extension can't enforce them alone.
 
 ## Verification
 
-The security behaviours above are covered by `make verify` (qualification,
-runtime and e2e suites, including relay SSRF, CSRF, token, log-scrubbing and
-NIP-59 tests) and by the conformance matrix in `tests/conformance/`. Evidence
-is recorded in `evidence/`.
+Existing Python qualification/runtime checks run through `make verify`, including
+relay SSRF, CSRF, token, log-scrubbing and NIP-59 tests. Playwright is separate:
+`cd tests/e2e && npx playwright test` against the disposable E2E server, using the
+Node versions declared in `tests/e2e/package.json`. The scripted client matrix is
+in `tests/conformance/`. Full-profile evidence is recorded in `evidence/`.
+
+Passing existing tests is not sufficient: the open findings below require new
+permanent negative-path regressions and repaired-revision verification.
+
+## Current assurance gaps and required security checks
+
+**Reviewed 2026-10-11 at `a7082c7`; fixes not yet implemented.** The historical
+Phase 2 ASVS-1 sign-off is not current zero-open-threat clearance. See the
+[assessment](docs/spec-conformance-analysis.md),
+[open finding register](.planning/phases/05-correctness-recovery-and-security-hardening/05-SECURITY.md)
+and [validation contract](.planning/phases/05-correctness-recovery-and-security-hardening/05-VALIDATION.md).
+
+| Finding | Check required before closure |
+|---|---|
+| F1 | Reject unpaid merchant confirmation; keep digital delivery locked across token/history surfaces; cancellation releases reserved stock exactly once |
+| F2 | Recover a creation-timeout invoice and verified settlement without a stale uncertainty hold, while preserving unrelated exceptions |
+| F3 | Late settlement after reservation expiry never confirms without complete stock consumption/reallocation or explicit exception handling |
+| F4 | A published old revision cannot satisfy an unpublished newer dependency |
+| F5 | No-route waits remain eligible for the promised 48 hours rather than exhausting send attempts early |
+| F6 | Concurrent same-merchant/relay admission cannot exceed 1,000 pending wraps, including across rate-window resets |
+
+F1 is a merchant-authenticated authority defect, not a demonstrated anonymous
+buyer exploit. The paired-test exit hang (CI-01) is separately tracked as test
+infrastructure debt; an assertion-pass summary followed by timeout is not a pass.
+
+Recheck owner/buyer isolation, CSRF, magic-link replay/merge, encrypted recovery
+copies and redaction; include newer key-export, embed, import/media and relay
+management surfaces in the ASVS review. Preserve the current security enforcement,
+pins and CI profiles; do not weaken controls to clear the checklist. Live Plebeian
+checkout/payment is still unverified, and public listing/local FakeWallet evidence
+must not be presented as full external payment interoperability.

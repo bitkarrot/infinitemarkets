@@ -1,38 +1,42 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.0
-milestone_name: milestone
-current_phase: 04
-current_phase_name: Release C — Catalog Import and Export
-status: complete
-stopped_at: Release C and post-release merchant operations verified; preparing v0.6.2 release
-last_updated: "2026-10-10"
-last_activity: 2026-10-09
-last_activity_desc: Catalog-only import/export, merchant profile controls, email history tooling, message profiles, live relay reconciliation, and fresh kind-5 tombstone reissue verified
+milestone_name: Core Commerce and Hardening
+current_phase: "05"
+current_phase_name: Correctness, Recovery, and Security Hardening
+status: planning
+stopped_at: Hardening-first scope approved; Phase 5 implementation plans not yet authored
+last_updated: "2026-10-12T03:21:34+00:00"
+last_activity: 2026-10-11
+last_activity_desc: GSD closeout reconciled; F1–F6 and CI-01 remain open; live Plebeian checkout unverified
 progress:
-  total_phases: 5
-  completed_phases: 5
+  total_phases: 6
+  completed_phases: 3
   total_plans: 18
-  completed_plans: 18
-  percent: 100
+  completed_plans: 14
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-10-09)
+See: .planning/PROJECT.md (updated 2026-10-11)
 
 **Core value:** A merchant can sell one authoritative inventory safely through LNbits-backed web and Nostr flows without duplicate invoices, double allocation, or relay delivery being mistaken for payment truth.
-**Current focus:** v1 roadmap complete; operational hardening, marketplace interoperability, and merchant UX maintenance.
+**Current focus:** Phase 5 correctness/recovery/security hardening; milestone acceptance remains open.
 
 ## Current Position
 
-Phase: 4 (Release C — Catalog Import and Export) — COMPLETE
-Status: Phases 1, 2, 3, 03.1, and 4 complete; legacy freeze/reconciliation plans remain superseded historical records
-Last activity: 2026-10-09 — catalog-only workflow verified, live relay reconciliation/tombstone reissue deployed, Publications UX hardened, v0.5 released, Catalog tables restyled, v0.6 and v0.6.1 released, and v0.6.2 packaged
+Phase: 5 of 6 (Correctness, Recovery, and Security Hardening)
+Plan: Not yet authored
+Status: Ready to plan; Phase 2/3 acceptance reopened, not an archived milestone
+Last activity: 2026-10-11 — hardening-first scope approved; targeted closeout tests 70 passed/1 skipped; lint passed; CI-01 reproduced
 
-Progress: [██████████] 100% of roadmap phases (5/5)
+Progress: 3 phase acceptance scopes closed, 2 reopened, 1 not started. No overall
+completion percentage until Phase 5 is planned. There are 14 executed plan
+summaries plus 4 explicitly superseded/re-scoped Phase 4 disposition records;
+18 summary files do not mean 18 original plans were executed. GSD may display
+100% for that artifact ratio; it is not milestone acceptance or Phase 5 progress.
 
 **Ad-hoc work since 03.1 (not phase-planned, committed + deployed, released as v0.1/v0.2/v0.3/v0.4/v0.5/v0.6/v0.6.1 and packaged for v0.6.2):** storefront filters + collection links; configurable index hero; dark/light shopper toggle; Messages list+thread redesign and counterparty kind-0 profiles; Publications timestamps/row detail, live relay catalog check, filters/sorting, and fresh kind-5 reissue; brand logo URL + footer copy; point-and-click Fine-tune + accent move; single-column merchant settings; primary-colored settings buttons; embeddable shop component (`gm-embed.js` + public products API + CORS), iframe embed with widened CSP, admin Embed snippets; About/More section + screenshots; outbox history prune control; Merchant Nostr Profile (avatar, bio, banner, NIP-05, Lightning address) and owner-only `nsec` reveal; redacted email previews + terminal-history cleanup; sortable Catalog columns and first-column quick actions; searchable country/EU shipping picker; LNbits-style Catalog tables and scrolling mobile section nav; Releases v0.1, v0.2, v0.3, v0.4, v0.5, v0.6, v0.6.1.
 
@@ -40,7 +44,8 @@ Progress: [██████████] 100% of roadmap phases (5/5)
 
 **Velocity:**
 
-- Total plans completed: 18
+- Executed plans with original summaries: 14
+- Phase 4 historical plans dispositioned: 4 (not 4 original plans executed)
 - Average duration: -
 - Total execution time: 0 hours
 
@@ -52,7 +57,8 @@ Progress: [██████████] 100% of roadmap phases (5/5)
 | 2 | 4 | - | - |
 | 3 | 4 | - | - |
 | 03.1 | 3 | - | - |
-| 4 | 4 historical records | - | - |
+| 4 | 4 historical disposition records | - | - |
+| 5 | Not yet planned | - | - |
 
 **Recent Trend:**
 
@@ -77,7 +83,7 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 - Runtime identity is `infinitemarkets`.
 - Direct qualified `nostr-sdk` is the baseline; other relay extensions are unqualified adapter candidates.
-- GSD Phase 1 is the contract's Phase 0 evidence gate; it contains no production runtime implementation.
+- GSD Phase 1 is the contract's P0 qualification gate; it contains no production runtime implementation.
 - Release order is A web commerce, B Gamma NIP-17, C catalog import/export with drafts; no old-system migration gate.
 - Checkout preserves Editorial/Guided/Compact merchant presets with responsive mobile fallback and invariant payment semantics.
 - Merchant order operations use a split list/detail workspace with embedded chronology.
@@ -95,24 +101,31 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 ### Pending Todos
 
-- None. Country-name and EU-zone shipping picker completed (`.planning/todos/completed/2026-10-08-select-shipping-countries-and-zones-by-name.md`).
+- No loose files in `.planning/todos/pending/`; the shipping picker is already completed.
+- This is not zero remaining work: HARD-01–08 are open in REQUIREMENTS.md and Phase 5; Phase 3 UAT item 17 remains pending.
 
 ### Release Closeout Gates
 
-- [x] Current implementation CI passed lint and Linux x86_64/ARM64 SQLite/PostgreSQL qualification: run 36352552899 on `021c402`.
-- [x] Human buyer/merchant UAT passed 3/3; security/accessibility review is verified with 26/26 threats closed.
-- [x] Nyquist validation covers all 16 Phase 2 requirements; UI review found no blocker.
-- [x] At the user's request, the 5099 demo was replaced with a fresh seed; quote and buyer/admin browser checks passed. Old disposable database files were not deleted, but are not mounted in the new demo.
+- [x] Current pre-fix CI observed: run 38194415581 on `a7082c7`, all four Linux SQLite/PostgreSQL profiles plus lint passed. This does not test all F1–F6 regressions.
+- [x] Existing account/catalog delivery checked: 70 passed, 1 optional private-Shopify-sample skip, process exit 0; lint passed.
+- [x] Historical Phase 4 cutover plans explicitly dispositioned; no removed feature is reinstated.
+- [ ] F1–F6 fixed and permanently regression-tested; reopened security threats verified closed.
+- [ ] CI-01 paired-test lifecycle fixed; 19 assertions passed but the process still hung at the 60-second diagnostic bound.
+- [ ] Fresh repaired-revision database/platform, browser and conformance evidence recorded.
+- [ ] Phase 3 live Plebeian checkout/payment UAT completed with operator authorization; only listing smoke is recorded so far.
 
 ### Blockers/Concerns
 
-- Phase 2 has no remaining blocker. Typography/spacing token consolidation and durable visual snapshot baselines are non-blocking UI recommendations in `02-UI-REVIEW.md`.
-- The new demo uses a fresh disposable database rather than migrating old demo orders and the previously hand-added images. If those records must remain visible, the old database requires a separate recovery plan.
-- Release B cannot claim full production interoperability without deployed egress controls and external-client evidence.
-- Release C provides catalog-only import/export; it does not reconcile old invoices or freeze another store. Operators must avoid selling the same physical units elsewhere independently.
-- Kind-5 deletion is a relay request. The live relay check detects stale deleted copies, and reissue sends fresh tombstones, but relays/clients can still ignore NIP-09.
+- F1–F3 are high-priority payment/inventory correctness defects; F4–F6 are open publication/retry/admission defects. See `docs/spec-conformance-analysis.md`.
+- Security configuration remains unchanged: ASVS level 1, enforcement enabled, block on high. Old zero-open-threat claims are superseded, not treated as waivers.
+- CI-01 is test infrastructure debt, not evidence of a production teardown defect; do not call a timed-out test process successful.
+- Phase 2 visual-token/screenshot recommendations remain non-blocking UX follow-ups. No further demo reset, old-data migration or live-funds test is authorized by this closeout.
+- Release B still needs its live external checkout evidence and operator egress controls for broader deployment claims.
+- Release C is catalog-only; old-store stock coordination remains operator-managed. Kind-5 deletion cannot compel a relay/client to remove public data.
 
 ### Roadmap Evolution
+
+- 2026-10-11: user chose hardening first. Phase 5 added for F1–F6, CI-01 and release/security evidence; optional integrations and shipping-import expansion deferred.
 
 - Phase 03.1 inserted after Phase 3: Buyer accounts — email magic-link sign-in and Nostr identity linking
 - Phase 4 revised: LEG-01/02 and old-system cutover LEG-04/05 dropped; active LEG-03/06 cover catalog-only file import/export, hidden draft review and normal publication.
@@ -121,12 +134,15 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 | Category | Item | Status | Deferred At | Milestone |
 |----------|------|--------|-------------|-----------|
+| Integrations | External inventory/shipping authority and shipping import/binding | Deferred until hardening | 2026-10-11 | Future |
+| Contracts | S1 entitlement policy; S2 identifiers/history; S3/S4 observability and cleanup | Retained follow-ups in root FUTURE-ROADMAP.md | 2026-10-11 | After blocking repairs |
+| Accounts | Identity unlink and notification-preference expansion | Out of delivered scope | Buyer-account delivery | Future |
 | Protocol | NIP-37 draft synchronization | Deferred | Initialization | v2 |
 | Commerce | Subscriptions, preorder purchasing, automated refunds | Deferred | Initialization | v2 |
 | Transport | `nostrclient`/`nostrrelay` runtime adapters | Qualification required | Initialization | Future |
 
 ## Session Continuity
 
-Last session: 2026-10-09
-Stopped at: v1 roadmap and Phase 4 verified; preparing the v0.6.1 release artifacts and manifest
-Resume file: .planning/phases/04-release-c-migration-and-cutover/04-VERIFICATION.md
+Last session: 2026-10-11
+Stopped at: Closeout records reconciled; plan Phase 5 before implementing repairs
+Resume file: .planning/phases/05-correctness-recovery-and-security-hardening/05-CONTEXT.md

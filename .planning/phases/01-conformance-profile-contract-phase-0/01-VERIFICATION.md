@@ -1,24 +1,30 @@
 ---
 phase: 01-conformance-profile-contract-phase-0
-verified: 2026-09-20T19:30:00Z
+verified: "2026-10-12T03:01:39+00:00"
 status: passed
 score: 14/14 must-haves verified
 covered_files:
+  - .github/workflows/qualification.yml
   - .planning/phases/01-conformance-profile-contract-phase-0/01-01-PLAN.md
   - .planning/phases/01-conformance-profile-contract-phase-0/01-01-SUMMARY.md
   - .planning/phases/01-conformance-profile-contract-phase-0/01-02-PLAN.md
   - .planning/phases/01-conformance-profile-contract-phase-0/01-02-SUMMARY.md
   - .planning/phases/01-conformance-profile-contract-phase-0/01-03-PLAN.md
   - .planning/phases/01-conformance-profile-contract-phase-0/01-03-SUMMARY.md
+  - .planning/phases/01-conformance-profile-contract-phase-0/01-CONTEXT.md
+  - .planning/phases/01-conformance-profile-contract-phase-0/01-DISCUSSION-LOG.md
+  - .planning/phases/01-conformance-profile-contract-phase-0/01-VALIDATION.md
+  - .planning/phases/01-conformance-profile-contract-phase-0/SKELETON.md
   - PINS.md
-  - evidence/manifest.json
   - evidence/REPORT.md
-  - .github/workflows/qualification.yml
-covered_digest: "v1:sha256:02f19b309ebb050eb4e1becc0ddc4794aa9ac98a9d9f8171d66409a97105bb0c"
+  - evidence/manifest.json
+covered_digest: "v1:sha256:efb7624bfac121c7d6c0825b120db44d3949fc1d1bbe3b34d84cf506cf902267"
 behavior_unverified: 0
 ---
 
 # Phase 1: Conformance Profile (Contract Phase 0) Verification Report
+
+**2026-10-11 evidence refresh:** current CI run 38194415581 passed the four Linux DB/platform profiles on `a7082c7`; the original counts and owner approval below are historical. This refresh retains only the P0 harness/model claim, not runtime-wide safety or closure of F1–F6. The missing retrospective coverage map is now `01-VALIDATION.md`.
 
 **Phase Goal:** Prove host, SDK, schema, state, security, and protocol assumptions before runtime implementation.
 **Verified:** 2026-09-20
@@ -99,3 +105,13 @@ None — all items verified programmatically. D-11 owner approval was the human 
 ---
 *Verified: 2026-09-20*
 *Verifier: gsd-verifier subagent (verdict persisted post-run)*
+
+## Closeout evidence boundary
+
+The current CI workflow runs canonical `make verify` with evidence enabled on
+SQLite/PostgreSQL × Linux x86_64/ARM64. Its successful status was rechecked from
+GitHub during this closeout. The coverage fingerprint is refreshed for the
+reviewed current artifacts, including the retrospective validation map; the old
+checked-in report is historical and was not regenerated. No new local full-suite
+run is claimed. Runtime financial/delivery defects remain open in Phase 5 and
+are not disproved by the P0 harness/model proofs.

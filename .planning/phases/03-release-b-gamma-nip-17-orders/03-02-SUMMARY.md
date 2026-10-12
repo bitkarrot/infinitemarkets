@@ -10,19 +10,22 @@ requires:
       sessions/admission/cursors, peer kind-10050 discovery, durable outbox
       with relay_publications.delivery_copy
 provides:
-  - rumor<->domain adapter (order_messages.py): build_checkout_payload,
+  - >-
+    rumor<->domain adapter (order_messages.py): build_checkout_payload,
     canonical rumor descriptors frozen at enqueue, enqueue_order_msg at
     revision 0 with per-order msg_seq aggregate ids
   - gamma_order_intake reusing the canonical _resolve_cart/_price_cart/
     begin_saga pipeline — protocol='gamma', buyer_pubkey_enc/hash,
     ix_orders_nostr_external_id request-hash dedupe, no public token,
     buyer amount stored as buyer_amount_sat and never trusted
-  - full validated-row dispatch: type-1 intake, type-3 buyer status
+  - >-
+    full validated-row dispatch: type-1 intake, type-3 buyer status
     (cancelled-only, constant-time sender-hash match, §7.1 legality),
     kind-17 receipt (cosmetic receipt_verified only), kind-14 DM
     threading (order vs Unknown), merchant-authored sender-copy recovery,
     D-22 status=rejected replies
-  - order_msg outbox branch: two independent nip17_wraps per attempt,
+  - >-
+    order_msg outbox branch: two independent nip17_wraps per attempt,
     recipient copy to buyer peer_relays, sender copy to merchant inbox,
     delivery_copy-scoped accepted evidence, published iff >=1 accepted in
     EACH class, class-scoped partial retry, §9.3 no-route pending/15-min
@@ -30,13 +33,15 @@ provides:
   - type-2/3/4 outbound enqueues in-transaction on every legal gamma
     transition; merchant compose/reply kind-14 admin routes
   - rejected-intake admin surface + idempotent mute -> inbox_blocklist
-  - admission-abuse ordering: blocklist + per-author cap before
+  - >-
+    admission-abuse ordering: blocklist + per-author cap before
     validation, muted-author bounded growth, per-inner-buyer DM cap
   - §8.7 reconcile resume of received|validated inbox rows + type-2
     re-enqueue; refresh_stale_peer_relays no-route sweep (fresh 10050
     re-resolution + 48h fail) on a 15-min cadence under the
     reconciliation lease
-  - retention: processed inbox ciphertext 7d, rejected/quarantined 30d,
+  - >-
+    retention: processed inbox ciphertext 7d, rejected/quarantined 30d,
     expired peer_relays purged
 affects: [03-03, 03-04]
 

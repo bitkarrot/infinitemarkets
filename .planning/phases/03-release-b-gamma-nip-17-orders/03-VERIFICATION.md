@@ -1,7 +1,7 @@
 ---
 phase: 03-release-b-gamma-nip-17-orders
 verified: 2026-09-29
-status: passed-with-manual-items
+status: gaps_found
 verified_by: gsd-executor (plan 03-04)
 ---
 
@@ -84,3 +84,17 @@ conformance env cannot ship an OS-level egress policy).
 - `cd tests/conformance && ./run_matrix.sh matrix` — exit 0; three
   evidence entries under `conformance.release_b` in
   `evidence/manifest.json`; zero unrecorded divergences.
+
+## Current closeout override — 2026-10-11
+
+The preceding observations are historical. Current acceptance is **gaps_found**:
+shared commerce has F1–F3 boundary defects, no-route retries stop early (F5), and
+the 1,000-row same-merchant/relay admission bound is not implemented (F6). A
+bounded drain of a larger multi-scope queue is not proof of bounded admission.
+The temporary same-scope probe admitted row 1,001; earlier overload claims must
+not be read as closing that invariant.
+
+Phase 5 owns permanent regressions and repairs. Live UAT item 17 remains pending:
+listing-only evidence and the scripted FakeWallet/LNURLp-shim run do not prove
+live checkout/payment. No live test, real-funds operation or security waiver was
+performed by this documentation closeout.

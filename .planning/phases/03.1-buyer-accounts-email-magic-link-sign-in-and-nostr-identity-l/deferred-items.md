@@ -3,7 +3,7 @@
 Out-of-scope discoveries logged during 03.1-01 execution. Pre-existing at
 HEAD (verified on the unmodified tree); not caused by this plan's changes.
 
-## Pre-existing lint debt — `make lint` red
+## Closed — historical lint debt
 
 `uv run ruff check .` reports 14 errors in `tools/demo/` (`demo.py`,
 `demo_tail.py`, `reshoot.py`, `verify_gen.py` — committed in `dd3feb3
@@ -14,7 +14,7 @@ on all files modified by 03.1-01 is clean. Fixing the demo tooling is a
 separate cleanup — recommend `chore:` commit or `tools/` exclusion
 discussion with maintainers.
 
-## Pre-existing pytest exit hang — `test_db.py` + `test_install.py` pairing
+## Open — pytest exit hang (CI-01): `test_db.py` + `test_install.py` pairing
 
 `uv run pytest -q tests/runtime/test_db.py tests/runtime/test_install.py`
 runs all 17 tests green (`17 passed in ~3.4s`), then the pytest process
@@ -26,3 +26,15 @@ Each file passes cleanly alone, and the full `pytest -m runtime -q` suite
 un-disposed module-scoped `Database` engine and the host boot's async
 runtime teardown; worth a `runtime teardown: dispose module-scoped
 Database engines` investigation if it recurs on other pairs.
+
+## CI-01 — unresolved follow-up, 2026-10-11
+
+- **Lint: closed.** `make lint` now exits 0 with “All checks passed”; current CI
+  lint is also green on `a7082c7`. The descriptions above preserve the old finding.
+- **CI-01: reproduced and transferred, not closed.** Fresh temporary SQLite /
+  FakeWallet run of the paired files printed `19 passed in 3.39s`, then failed to
+  exit within a 60-second diagnostic bound (supervisor exit 124). The process was
+  terminated; no application/fixture fix was made. HARD-07 in Phase 5 requires
+  a real clean exit in both orders, plus the normal-suite check.
+- The closeout's separate account/catalog subset exited normally: 70 passed,
+  1 optional private-Shopify-sample skip. That does not resolve CI-01.

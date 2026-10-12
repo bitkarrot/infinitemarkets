@@ -1,3 +1,15 @@
+---
+phase: 02-release-a-safe-web-commerce
+plan: "02"
+requirements-completed: [PUB-01, WEB-01, UI-03]
+metadata_reconstructed: 2026-10-11
+acceptance_scope: historical-delivery
+---
+
+**Historical execution record:** metadata reconstructed from the original plan,
+summary and phase verification on 2026-10-11. Current Phase 2 acceptance is
+reopened; this header does not close F1–F4 or create a new test pass.
+
 # 02-02 Summary — relay transport, outbox publisher, public storefront, themes
 
 ## Tasks completed

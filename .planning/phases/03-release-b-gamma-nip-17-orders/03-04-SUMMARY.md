@@ -19,7 +19,8 @@ provides:
     provisioning (requireAuthFilter + merchant allowlist + paid tier +
     createdAtDaysPast) + 8-probe battery incl. the real extension inbox
     session on the gated relay
-  - tests/conformance/plebeian_matrix.py — scripted external-client
+  - >-
+    tests/conformance/plebeian_matrix.py — scripted external-client
     matrix on a PINNED PlebeianApp/market clone: real-checkout
     (publishOrderWithDependencies), strict-rumor
     (nip17OrderTransport.ts), physical-rejection, buyer read-back
@@ -30,7 +31,8 @@ provides:
     driver; merges manifest.json + REPORT.md conformance entries
   - tests/conformance/README.md — env docs, delta register, live
     plebeian.market smoke checklist (manual-only), D-33 note
-  - tests/runtime/test_release_b_drills.py — 28-test drill suite:
+  - >-
+    tests/runtime/test_release_b_drills.py — 28-test drill suite:
     gated-relay env subprocess, NIP-42 roundtrip/oversize/foreign,
     paid-write surface+retry, wrap admission cap, bounded drain, egress
     DNS matrix at the dial boundary, reconnect revalidation

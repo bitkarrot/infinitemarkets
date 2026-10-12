@@ -2,7 +2,7 @@
 phase: "02"
 slug: "release-a-safe-web-commerce"
 status: validated
-nyquist_compliant: true
+nyquist_compliant: false
 wave_0_complete: true
 created: "2026-09-27"
 validated: "2026-09-27"
@@ -10,7 +10,7 @@ validated: "2026-09-27"
 
 # Phase 2 — Validation Strategy
 
-> Requirement-to-test audit reconstructed from the four executed plans and the current implementation evidence.
+> Historical 2026-09-27 coverage map. Current validation is partial: F1–F4 require permanent runtime regressions in Phase 5; test-file presence and earlier green runs do not close those gaps.
 
 ## Test Infrastructure
 
@@ -32,7 +32,7 @@ validated: "2026-09-27"
 - **Before UAT or phase completion:** run canonical SQLite/PostgreSQL qualification, current browser tests and lint.
 - **No watch-mode command** is accepted as release evidence.
 
-## Per-Task Verification Map
+## Per-Task Verification Map (historical)
 
 | Task ID | Plan | Wave | Requirements | Threat refs | Automated evidence | Status |
 |---------|------|------|--------------|-------------|--------------------|--------|
@@ -54,7 +54,7 @@ Every Phase 2 requirement—MERC-01, CAT-01/02, PUB-01/02, WEB-01/02, PAY-01/02,
 
 ## Wave 0 Requirements
 
-Existing infrastructure covers all Phase 2 requirements. No missing test fixture, runner or dependency remains.
+Original test infrastructure exists. Phase 5 must add the missing negative-path cases; existing fixture/runner availability does not establish complete regression coverage.
 
 ## Manual-Only Verifications
 
@@ -76,6 +76,17 @@ No Phase 2 requirement is manual-only. Human UAT supplements automated verificat
 - [x] No Wave 0 dependency remains.
 - [x] No watch-mode flags are used for release evidence.
 - [x] Current SQLite/PostgreSQL Linux x86_64/ARM64 qualification is green.
-- [x] `nyquist_compliant: true` is set.
+- [ ] Current regression coverage is complete; F1–F4 remain open and `nyquist_compliant` is false.
 
-**Approval:** validated 2026-09-27; no Nyquist coverage gaps found.
+**Historical approval:** validated 2026-09-27. **Current status (2026-10-11): partial**; the historical green rows do not cover the newly reproduced F1–F4 boundaries.
+
+## Reopened coverage
+
+| Finding | Missing permanent regression | Remediation owner |
+|---|---|---|
+| F1 | Unpaid merchant confirmation must fail; every cancellation path releases held stock once; token and authenticated-history delivery remain locked | HARD-01 |
+| F2 | Creation timeout, invoice recovery and verified settlement resolve only the originating uncertainty | HARD-02 |
+| F3 | Settlement after expiry/release checks all item quantities before confirmation | HARD-03 |
+| F4 | Published revision 1 cannot satisfy a dependency on pending revision 2 | HARD-04 |
+
+See Phase 5's validation contract for DB/profile and security closure requirements.

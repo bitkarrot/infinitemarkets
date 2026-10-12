@@ -1,3 +1,15 @@
+---
+phase: 02-release-a-safe-web-commerce
+plan: "03"
+requirements-completed: [WEB-02, PAY-01, PAY-02, INV-01, ORD-01, NOTF-01, SEC-01]
+metadata_reconstructed: 2026-10-11
+acceptance_scope: historical-delivery
+---
+
+**Historical execution record:** metadata reconstructed from the original plan,
+summary and phase verification on 2026-10-11. Current Phase 2 acceptance is
+reopened; this header does not close F1–F4 or create a new test pass.
+
 # 02-03 Summary — orders, checkout saga, settlement, email queue
 
 ## Tasks completed

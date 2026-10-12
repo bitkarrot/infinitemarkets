@@ -10,7 +10,11 @@ A merchant can sell one authoritative inventory safely through LNbits-backed web
 
 ## Requirements
 
-### Validated
+### Delivered and Historically Validated
+
+The records below describe delivered scope, not current production clearance.
+The 2026-10-11 conformance review reopens financial and delivery assurance; see
+[the milestone audit](v1.0-MILESTONE-AUDIT.md) and Phase 5.
 
 - Phase 0 qualification (P0-01 through P0-14) has reproducible artifacts.
 - Release A catalog publication and safe public web checkout are implemented and deployed.
@@ -22,7 +26,12 @@ A merchant can sell one authoritative inventory safely through LNbits-backed web
 
 ### Active
 
-- v1 roadmap complete; ongoing work is operational hardening, marketplace interoperability, and merchant UX maintenance.
+- Repair F1–F6 before optional feature expansion; add permanent runtime/security regressions.
+- Resolve CI-01, the DB/install paired-test teardown hang, without forced-exit workarounds.
+- Re-verify reopened requirements and complete the operator-approved live Plebeian checkout gate before full Release-B claims.
+- Preserve S1–S4 policy, contract, observability and cleanup follow-ups without expanding Phase 5 into optional integrations.
+
+- The v1 milestone remains open for Phase 5 hardening and required external validation; delivered feature scope is not cancelled or restarted.
 
 ### Out of Scope
 
@@ -89,4 +98,4 @@ This document evolves at phase transitions and milestone boundaries.
 3. Update context, constraints, and decision outcomes.
 
 ---
-*Last updated: 2026-10-11 after v0.6.1 release; preparing v0.6.2*
+*Last updated: 2026-10-11 — user approved hardening-first closeout; Phase 5 is next, with no implementation changes or new release certification.*
