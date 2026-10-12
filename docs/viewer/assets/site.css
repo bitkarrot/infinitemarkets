@@ -19,6 +19,8 @@ body.site { overflow-x: hidden; height: auto; min-height: 100%;
 .site-nav nav a { color: var(--ink); text-decoration: none; font-weight: 600; font-size: 14.5px;
   padding: 7px 12px; border-radius: 999px; }
 .site-nav nav a:hover { background: var(--bg); }
+.site-nav nav a.gh { display: inline-flex; align-items: center; padding: 7px 10px; }
+.site-nav nav a.gh svg { width: 19px; height: 19px; display: block; fill: currentColor; }
 .pill-btn, .site-nav .theme { display: inline-flex; align-items: center; gap: 8px;
   background: var(--paper); color: var(--ink) !important; border: 2px solid var(--ink);
   border-radius: 999px; box-shadow: 3px 3px 0 var(--ink); font: 700 14px var(--sans);
