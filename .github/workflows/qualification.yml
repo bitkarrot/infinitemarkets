@@ -20,11 +20,11 @@ jobs:
   lint:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version-file: ".nvmrc"
           package-manager-cache: false
@@ -53,8 +53,8 @@ jobs:
     env:
       LNBITS_BACKEND_WALLET_CLASS: FakeWallet
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - uses: astral-sh/setup-uv@v7
@@ -65,7 +65,7 @@ jobs:
         run: make verify 2>&1 | tee pytest-output.txt
       - name: Upload evidence bundle
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: qualification-evidence-sqlite-${{ matrix.runner }}
           path: |
@@ -98,8 +98,8 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - uses: astral-sh/setup-uv@v7
@@ -110,7 +110,7 @@ jobs:
         run: make verify 2>&1 | tee pytest-output.txt
       - name: Upload evidence bundle
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: qualification-evidence-postgresql-${{ matrix.runner }}
           path: |
