@@ -413,3 +413,50 @@ The right next step is targeted invariant repair, not an architectural rewrite.
 Preserve the strong transactional, cryptographic, and protocol foundations while
 closing the demonstrated gaps between components. Reassess readiness only after
 the fixes and permanent regression coverage are in place.
+
+## Remediation status
+
+**2026-10-12 — all six findings repaired and verified; release clearance still
+pending.** The Phase 5 hardening tranche in `.planning/` implemented and
+independently reviewed the repairs. Fixes below are local verification on the
+approved SQLite + disposable PostgreSQL profiles; full detail lives in
+`.planning/phases/05-correctness-recovery-and-security-hardening/05-REVIEW.md`.
+
+| Finding | Disposition | Key repair |
+|---|---|---|
+| F1 — merchant status bypass | **Fixed** — `3c0c237` | Status/fulfillment/delivery share locked payment + inventory authority; cancellation atomically releases reservations; unpaid confirmation refused |
+| F2 — recovered timeout stuck on hold | **Fixed** — `3c0c237` | Order-first CAS timeout handling, strict invoice identity correlation, pure-creation-uncertainty resolution, protected-hold preservation, hold-aware public invoice suppression |
+| F3 — expired-reservation confirmation | **Fixed** — `3c0c237` | Complete live-coverage requirement before consumption; expired/incomplete settlement routes to the cancelled inventory-review lane; repeat-safe cumulative acceptance proof |
+| F4 — stale-revision dependencies | **Fixed** — `5f48bd9` | Dependencies bind to the joined intended row: same merchant/aggregate/kind, published, revision ≥ recorded intent; superseded rows need a real qualifying replacement; pruning preserves retained prerequisites |
+| F5 — early no-route exhaustion | **Fixed** — `5f48bd9` | No-route waits no longer consume the 20-attempt send budget; +15 min cadence and exact 48-hour terminal deadline preserved |
+| F6 — missing inbox backlog bound | **Fixed** — `5f48bd9` | Atomic per-merchant/relay 1,000 pending cap enforced pre-decrypt inside one transaction (merchant row lock on PostgreSQL, serialized writers on SQLite); additive `m016` index |
+| WR-04 — token revocation race (follow-up) | **Fixed** — `eaf7d64` | Presented-token digest/expiry revalidated under the order lock for status, opt-out and claim paths |
+
+Plus **CI-01** (HARD-07): the paired test hang root cause was demonstrated — a
+worker cancel landing inside an engine checkout orphaned a non-daemon aiosqlite
+worker thread — and fixed by shielding the worker drain; a bounded
+process-exit regression covers both file orders.
+
+### Verification evidence
+
+- `make verify-runtime` SQLite: **751 passed, 6 expected PG-only skips**, exit 0.
+- `make verify` SQLite: **982 passed, 8 skipped**; PostgreSQL 17.9: **987 passed,
+  3 skipped** — both natural exit 0.
+- Independent source review of every changed path: **PASSED** for the finite
+  scope; review findings CR-01–06, WR-04 and WR-05 all resolved.
+
+### Still open (not release clearance)
+
+- **F1 browser gate:** pinned-host ServiceWorker TLS + null `g.wallet.id`
+  websocket errors on the admin order surface — a host-qualification issue,
+  reproduced on the baseline; no vendor/security workaround applied.
+- **F2 chronology caveat:** the original browser RED was reproduced
+  retrospectively after the fix, so test-first chronology evidence is absent
+  (recorded, not hidden).
+- **Live Plebeian checkout/payment UAT:** remains an operator-authorized
+  external gate — listing smoke and FakeWallet evidence are not equivalent.
+- **Historical paid-order audit:** a read-only scan of every reachable local
+  datastore found **zero actual order records** locally; any deployed/remote
+  instance still requires its own operator-authorized audit before release.
+- Four-profile Linux CI matrix for the repaired revision was triggered on push
+  and is running at the time of this update.

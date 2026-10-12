@@ -127,8 +127,10 @@ separate consumer of the same relays.
 ## Spec alignment backlog
 
 Optional expansions and conditional questions, ordered by likely value.
-The required protocol components are present, but their presence does not
-establish safe end-to-end conformance: the F1–F6 repairs tracked in GSD remain open.
+The required protocol components are present; the F1–F6 defects the
+conformance review found were repaired and regression-verified in GSD Phase 5
+(2026-10-12). Release clearance still awaits the remaining qualification gates
+(live external checkout, fresh CI matrix, browser host issues).
 The **Spec status** column shows where each expansion or question sits:
 `optional` (a MAY component or MAY tag), `conditional` (a REQUIRED tag only
 inside an optional kind we already publish), or `recommended` (a SHOULD).

@@ -6,7 +6,7 @@ current_phase: "05"
 current_phase_name: Correctness, Recovery, and Security Hardening
 status: paused
 stopped_at: F1–F6 source corrections verified and reviewed; 05-06 qualification/audit/live gates remain
-last_updated: "2026-10-12T23:03:53+00:00"
+last_updated: "2026-10-12T23:45:00+00:00"
 last_activity: 2026-10-12
 last_activity_desc: F4/F5/F6 fixed+reviewed, CI-01 root cause fixed; full make verify green both profiles; 05-06 gates open
 progress:
@@ -117,7 +117,9 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 ### Blockers/Concerns
 
-- F1–F6 source corrections pass local runtime + independent review (05-REVIEW.md); CI-01 root cause fixed with process-exit regression; full make verify green both profiles. 05-06 gates remain: pinned-host browser errors, WR-01 chronology, WR-04 token follow-up, historical audit, live Plebeian, release clearance.
+- F1–F6 source corrections pass local runtime + independent review (05-REVIEW.md); CI-01 root cause fixed with process-exit regression; full make verify green both profiles; pushed to origin/main (eaf7d64) for the four-profile CI matrix. 05-06 gates remain: pinned-host browser errors, WR-01 chronology, live Plebeian, release clearance.
+- WR-04 token revocation boundary RESOLVED (locked presented-token recheck on status/opt-out/claim; regressions both DBs).
+- Historical paid-order audit: authorized read-only scan complete — zero actual order records in any reachable local datastore; remote/deployed instance audit remains an operator gate if one exists.
 - WR-04: pre-existing in-flight token rotation/expiry race remains MEDIUM / OPEN / NOT FIXED / NOT WAIVED; no fresh revoked-token admission after committed rotation demonstrated. Separate authorization follow-up before broader security clearance.
 - F1 pinned-host admin pageerrors and F2 original browser RED chronology remain open; do not turn scoped source GREEN into plan/phase/release acceptance.
 - Security configuration remains unchanged: ASVS level 1, enforcement enabled, block on high. Old zero-open-threat claims are superseded, not treated as waivers.
