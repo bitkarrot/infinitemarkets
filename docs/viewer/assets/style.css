@@ -86,6 +86,9 @@ body.viewer { overflow: hidden;
 #zoomPct { font-family: var(--mono); font-size: 12px; font-weight: 500;
   min-width: 48px; text-align: center; background: var(--ink); color: var(--paper);
   border-radius: 999px; padding: 5px 8px; }
+/* enlarge the menu button's tap target beyond the visible pill */
+#controls #menuBtn { position: relative; }
+#controls #menuBtn::after { content: ""; position: absolute; inset: -6px; }
 
 .theme-fab { position: fixed; top: 16px; right: 18px; z-index: 10; }
 

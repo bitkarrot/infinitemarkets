@@ -299,8 +299,11 @@ html { scroll-behavior: smooth; }
 .site-nav .container { position: relative; }
 .site-nav nav a.on { background: var(--ink); color: var(--paper); }
 .nav-sep { width: 2px; height: 22px; background: var(--dot); margin: 0 6px; }
-.menu-btn { display: none; background: var(--lime); color: #111; border: 2px solid var(--ink); border-radius: 999px;
+.menu-btn { display: none; position: relative; background: var(--lime); color: #111; border: 2px solid var(--ink); border-radius: 999px;
   box-shadow: 3px 3px 0 var(--ink); font: 700 14px var(--sans); padding: 8px 14px; cursor: pointer; }
+/* enlarge the tap target beyond the pill: browsers clip hit-testing to the
+   border-radius curve, so the rounded caps are dead zones without this */
+.menu-btn::after { content: ""; position: absolute; inset: -8px; }
 .site-menu { position: absolute; top: 74px; right: 24px; z-index: 30; display: grid; grid-template-columns: 1fr 1fr;
   gap: 8px 28px; background: var(--paper); border: 2.5px solid var(--ink); border-radius: 18px;
   box-shadow: 7px 7px 0 var(--ink); padding: 18px 22px; min-width: 420px; }
@@ -338,7 +341,8 @@ html { scroll-behavior: smooth; }
   .brand { font-size: 17px; gap: 8px; }
   .brand img { width: 34px; height: 34px; }
   .site-nav .theme { padding: 7px 11px; font-size: 13px; }
-  .menu-btn { padding: 7px 12px; font-size: 13px; }
+  .menu-btn { padding: 7px 12px; font-size: 13px; min-height: 44px; min-width: 44px;
+    justify-content: center; }
   .menu-btn .lbl { display: none; }
   .site-menu { left: 12px; right: 12px; min-width: 0; grid-template-columns: 1fr; }
   .menu-dock .site-menu, .site-menu.float { position: fixed; top: 64px; left: 12px; right: 12px; margin-top: 0; }
