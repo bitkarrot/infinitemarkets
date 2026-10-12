@@ -63,7 +63,7 @@ conformance env cannot ship an OS-level egress policy).
 
 ## Manual-only items (per 03-VALIDATION.md — never a scripted pass)
 
-- **Live `plebeian.market` public-relay smoke** — checklist authored at
+- **Live `plebeian.market` public-relay smoke** — **deferred 2026-10-12 by operator decision for the v0.6.3 hardening release; recorded as a documented open limitation, never a pass.** Checklist authored at
   `tests/conformance/README.md` §"Live `plebeian.market` smoke
   checklist". **Status: PARTIAL — listing verified, checkout/order
   pending.** Record results here when run (date, host, merchant npub,

@@ -9,7 +9,7 @@ updated: 2026-09-29T07:07:26.745868+00:00
 ## Current Test
 <!-- OVERWRITE each test - shows where we are -->
 
-[testing paused — 1 item outstanding: live plebeian.market smoke,
+[testing paused — 1 item outstanding: live plebeian.market smoke — DEFERRED 2026-10-12 by operator decision for v0.6.3; not passed or waived,
 deferred to operator per user decision 2026-09-29]
 
 ## Tests
@@ -94,8 +94,8 @@ expected: §21 decision 30 records the three-part disposition + operator-respons
 result: pass
 source: automated — grep-verified spec/PINS edits (a4bc536)
 
-### 17. Live plebeian.market public-relay smoke
-expected: Manual checklist (tests/conformance/README.md) executed against live plebeian.market over public relays — wrap/ACK evidence collected and recorded into 03-VERIFICATION.md
+### 17. Live plebeian.market public-relay smoke — **DEFERRED (operator decision 2026-10-12)**
+expected (still required to close): Manual checklist (tests/conformance/README.md) executed against live plebeian.market over public relays — wrap/ACK evidence collected and recorded into 03-VERIFICATION.md
 result: [pending]
 reason: Deferred to operator — user will run the live smoke later; Release-B claim remains gated on this evidence
 

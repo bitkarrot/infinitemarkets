@@ -208,7 +208,7 @@ separate approval; local synthetic verification is not release clearance.
 - [ ] 05-03: Source/runtime and buyer recovery verified; original browser RED chronology warning retained; financial-tranche pause.
 - [x] 05-04: Revision-bound dependencies, dependency-safe pruning and 48-hour no-route eligibility; reviewed, both DBs.
 - [x] 05-05: Atomic same-scope inbox bound verified under contention; CI-01 diagnosed (orphaned aiosqlite worker from cancelled checkout) and fixed with bounded process-exit regression.
-- [ ] 05-06: Fresh qualification, independent security review, operator historical-order audit and separately authorized live checkout.
+- [ ] 05-06: Qualification evidence, independent security review and local audit scan done; live Plebeian checkout deferred by operator decision (v0.6.3 released with documented limitations); historical remote audit pending if a deployed instance exists.
 
 **Scope decision:** Hardening first, approved 2026-10-11. No external inventory/
 shipping integrations, shipping-import expansion, live legacy protocol work or
@@ -230,4 +230,4 @@ re-execute superseded Phase 4 cutover plans.
 | 3. Release B — Gamma NIP-17 Orders | 4/4 historical; assurance and live UAT open | In Progress | Delivery 2026-09-29 |
 | 03.1. Buyer accounts (INSERTED) | 3/3 | Complete   | 2026-10-07 |
 | 4. Release C — Catalog Import and Export | 4 historical plans dispositioned; catalog-only delivery verified | Complete | 2026-10-09 |
-| 5. Correctness, Recovery, and Security Hardening | 3/6 plans complete; 2 partial (host-browser + chronology gates) | In Progress | — |
+| 5. Correctness, Recovery, and Security Hardening | 3/6 plans complete; 2 partial; 05-06 evidence reconciled, live UAT deferred | In Progress | v0.6.3 hardening release |

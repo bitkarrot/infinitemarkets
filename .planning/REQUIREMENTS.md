@@ -184,7 +184,7 @@ A requirement is complete only when implementation (or Phase 0 probe/model), aut
 | HARD-05 | Phase 5 | Verified 2026-10-12 — both DB profiles, independent review |
 | HARD-06 | Phase 5 | Verified 2026-10-12 — both DB profiles, independent review |
 | HARD-07 | Phase 5 | Verified 2026-10-12 — both DB profiles, independent review |
-| HARD-08 | Phase 5 | In progress — regressions + local full-profile evidence recorded; four-profile Linux CI running; live external checkout pending |
+| HARD-08 | Phase 5 | Partially verified — regressions, local full-profile evidence, independent review and four-profile Linux CI all recorded; live external checkout UAT deferred by operator 2026-10-12 |
 
 **Coverage:**
 

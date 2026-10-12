@@ -5,8 +5,8 @@ milestone_name: Core Commerce and Hardening
 current_phase: "05"
 current_phase_name: Correctness, Recovery, and Security Hardening
 status: paused
-stopped_at: Preparing v0.6.3 hardening release; 05-06 live-UAT deferred, release notes document open gates
-last_updated: "2026-10-12T23:45:00+00:00"
+stopped_at: v0.6.3 hardening release cut and pushed; 05-06 reconciled with live UAT deferred
+last_updated: "2026-10-13T00:05:00+00:00"
 last_activity: 2026-10-12
 last_activity_desc: F4/F5/F6 fixed+reviewed, CI-01 root cause fixed; full make verify green both profiles; 05-06 gates open
 progress:
@@ -29,8 +29,8 @@ See: .planning/PROJECT.md (updated 2026-10-11)
 
 Phase: 5 of 6 (Correctness, Recovery, and Security Hardening)
 Plan: 05-06 qualification remains; 05-01/03 partial gates (host browser, RED chronology); WR-04 token follow-up open
-Status: v0.6.3 hardening release in progress — F1–F6 + CI-01 repaired/reviewed; live Plebeian UAT deferred by operator decision
-Last activity: 2026-10-12 — F1–F6+CI-01+WR-04 repaired/reviewed; four-profile CI green on eaf7d64; local historical scan found zero real order records; preparing v0.6.3
+Status: v0.6.3 released — all source defects repaired/reviewed, four-profile CI green; Phase 5 closes pending deferred live Plebeian UAT or written risk acceptance
+Last activity: 2026-10-12 — v0.6.3 cut with documented open gates (live UAT deferred, pinned-host browser errors, RED chronology caveat); 05-06 evidence reconciled
 
 Progress: 3 phase acceptance scopes closed, 2 reopened, 1 in progress. Phase 5 has six reviewed plans; 05-02 scoped tasks complete, financial source implemented, and 05-01/03 still partial. No overall
 acceptance percentage is implied by plan/artifact counters. There are 17 executed plan
