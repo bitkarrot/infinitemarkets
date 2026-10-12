@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Infinite Markets — Roadmap</title>
+<meta name="description" content="The Infinite Markets roadmap: next steps, spec-alignment backlog, and upstream NIP-99 specification changes under watch.">
+<meta property="og:title" content="Infinite Markets — Roadmap">
+<meta property="og:description" content="Next steps, spec-alignment backlog, and upstream NIP-99 specification changes under watch for the Infinite Markets LNbits extension.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://infinitemarkets-docs.vercel.app/roadmap.html">
+<meta property="og:site_name" content="Infinite Markets">
+<meta property="og:image" content="https://infinitemarkets-docs.vercel.app/media/demo-poster.jpg">
+<meta property="og:image:width" content="1600">
+<meta property="og:image:height" content="900">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Infinite Markets — Roadmap">
+<meta name="twitter:description" content="Next steps, spec-alignment backlog, and upstream NIP-99 specification changes under watch for the Infinite Markets LNbits extension.">
+<meta name="twitter:image" content="https://infinitemarkets-docs.vercel.app/media/demo-poster.jpg">
+<meta property="og:locale" content="en_US">
+<meta name="robots" content="index,follow">
+<meta name="theme-color" content="#1e1d18">
+<link rel="canonical" href="https://infinitemarkets-docs.vercel.app/roadmap.html">
+<link rel="apple-touch-icon" href="img/logo-512.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "Infinite Markets roadmap",
+  "url": "https://infinitemarkets-docs.vercel.app/roadmap.html",
+  "description": "Next steps, spec-alignment backlog, and upstream NIP-99 specification changes under watch for the Infinite Markets LNbits extension.",
+  "author": { "@type": "Person", "name": "bitkarrot", "url": "https://github.com/bitkarrot" },
+  "image": "https://infinitemarkets-docs.vercel.app/media/demo-poster.jpg"
+}
+</script>
+<link rel="icon" href="img/logo-128.png">
+<script>document.documentElement.dataset.theme = localStorage.getItem('imv-theme') || 'dark';</script>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body class="site">
+
+<header class="site-nav">
+  <div class="container">
+    <a class="brand" href="index.html"><img src="img/logo-128.png" alt="">Infinite Markets</a>
+    <nav class="primary" aria-label="Main">
+      <a href="index.html">Home</a>
+      <a href="index.html#start">Get started</a>
+      <a href="overview.html">Overview</a>
+      <a href="details.html">Details</a>
+      <a href="https://github.com/bitkarrot/infinitemarkets/blob/main/ROADMAP.md" target="_blank" rel="noopener">Markdown source</a>
+    </nav>
+    <button class="theme" id="themeBtn">☀ Light</button>
+    <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="siteMenu" aria-label="Menu">☰ <span class="lbl">Menu</span></button>
+    <div class="site-menu" id="siteMenu" hidden>
+      <div><b>On this page</b>
+        <div id="menuToc"><a href="index.html">Home</a><a href="index.html#start">Get started</a></div>
+      </div>
+      <div><b>More</b>
+        <a href="index.html">Home</a>
+        <a href="index.html#start">Get started</a>
+        <a href="https://github.com/bitkarrot/infinitemarkets/blob/main/ROADMAP.md" target="_blank" rel="noopener">Markdown source</a>
+        <a href="overview.html">Illustrated overview</a>
+        <a href="slides.html">Slide deck</a>
+        <a href="architecture.html">Architecture diagrams</a>
+        <a href="https://github.com/bitkarrot/infinitemarkets" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/bitkarrot/infinitemarkets/issues" target="_blank" rel="noopener">Issues &amp; feedback</a>
+        <hr class="menu-sep">
+        <a href="details.html">Project details</a>
+        <a href="details.html#lnbits">Built on LNbits</a>
+        <a href="details.html#status">Status &amp; risks</a>
+        <a href="details.html#explore">Go deeper</a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="article-wrap">
+  <aside class="toc">
+    <b>On this page</b>
+    <div id="toc"></div>
+    <div class="alt">
+      <a class="pill-btn pink" href="https://github.com/bitkarrot/infinitemarkets/blob/main/ROADMAP.md" target="_blank" rel="noopener">Edit on GitHub ↗</a>
+      <a class="pill-btn" href="index.html">← Home</a>
+    </div>
+  </aside>
+  <article class="md" id="article"><p>Loading…</p></article>
+</div>
+
+<footer class="site-foot">
+  <div class="container">
+    <a class="brand" href="index.html"><img src="img/logo-128.png" alt="">Infinite Markets</a>
+    <p>Built on LNbits · MIT licensed · by <a href="https://github.com/bitkarrot" target="_blank" rel="noopener">bitkarrot</a></p>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="slides.html">Slides</a>
+      <a href="architecture.html">Architecture</a>
+      <a href="https://github.com/bitkarrot/infinitemarkets" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="assets/mermaid.min.js"></script>
+<script src="assets/md.js"></script>
+<script>
+/* narrow-screen menu */
+const menuBtn = document.getElementById('menuBtn'), menu = document.getElementById('siteMenu');
+const setMenu = open => { menu.hidden = !open; menuBtn.setAttribute('aria-expanded', open); menuBtn.innerHTML = open ? '✕ <span class="lbl">Close</span>' : '☰ <span class="lbl">Menu</span>'; };
+menuBtn.addEventListener('click', () => setMenu(menu.hidden));
+menu.addEventListener('click', e => { if (e.target.closest('a')) setMenu(false); });
+addEventListener('keydown', e => { if (e.key === 'Escape') setMenu(false); });
+document.addEventListener('click', e => { if (!menu.hidden && !e.target.closest('#siteMenu, #menuBtn')) setMenu(false); });
+
+(async function () {
+  // Single source of truth: the committed ROADMAP.md on main. A local
+  // roadmap.md next to this page is the fallback (e.g. offline previews).
+  const REPO = 'https://github.com/bitkarrot/infinitemarkets';
+  const SOURCES = [
+    'https://raw.githubusercontent.com/bitkarrot/infinitemarkets/main/ROADMAP.md',
+    'roadmap.md',
+  ];
+  const PALETTE = ['#ffd23d', '#ff6a1f', '#ff5aa8', '#4fdc9a', '#2e6bff', '#c8f53c', '#ffd23d'];
+  const article = document.getElementById('article');
+  const toc = document.getElementById('toc');
+
+  // Repo-relative markdown links (.planning/…, docs/…) have no meaning on
+  // this site — point them at the GitHub blob view instead.
+  const fixLinks = md => md.replace(
+    /\]\(((?!https?:|#|mailto:)[^)]+)\)/g,
+    (_, p) => `](${REPO}/blob/main/${p.replace(/^\.\//, '')})`,
+  );
+
+  const render = md => {
+    md = fixLinks(md.replace(/^\s*<!--[\s\S]*?-->\s*/, ''));
+    let html = '', open = false, n = 0;
+    for (const b of MD.blocks(md)) {
+      if (b.t === 'h' && b.n === 2) {
+        if (open) html += '</section>';
+        html += `<section style="--accent:${PALETTE[n++ % PALETTE.length]}">`;
+        open = true;
+      }
+      html += MD.html(b);
+    }
+    return html + (open ? '</section>' : '');
+  };
+
+  let text = null;
+  for (const src of SOURCES) {
+    try {
+      const res = await fetch(src);
+      if (res.ok) { text = await res.text(); break; }
+    } catch (e) { /* try next source */ }
+  }
+  if (text === null) {
+    article.innerHTML = `<h1>Could not load the roadmap</h1><p>View it on <a href="${REPO}/blob/main/ROADMAP.md" target="_blank" rel="noopener">GitHub</a>.</p>`;
+    return;
+  }
+  article.innerHTML = render(text);
+
+  const h1 = article.querySelector('h1');
+  if (h1) document.title = h1.textContent + ' — Infinite Markets';
+  article.style.setProperty('--accent', '#c8f53c');
+
+  const heads = [...article.querySelectorAll('h2')];
+  toc.innerHTML = heads.map(h => `<a href="#${h.id}">${h.textContent}</a>`).join('');
+  document.getElementById('menuToc').innerHTML = toc.innerHTML;
+  const links = [...toc.querySelectorAll('a')];
+  const spy = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      links.forEach(a => a.classList.toggle('on', a.getAttribute('href') === `#${e.target.id}`));
+    });
+  }, { rootMargin: '-90px 0px -70% 0px' });
+  heads.forEach(h => spy.observe(h));
+
+  const draw = () => MD.renderMermaid(article, box => getComputedStyle(box.closest('section') || article).getPropertyValue('--accent').trim());
+  MD.themeToggle(document.getElementById('themeBtn'), draw);
+  await document.fonts.ready;
+  await draw();
+  if (location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView();
+})();
+</script>
+</body>
+</html>
