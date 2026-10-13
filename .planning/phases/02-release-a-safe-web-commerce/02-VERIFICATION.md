@@ -1,7 +1,8 @@
 ---
 phase: 02-release-a-safe-web-commerce
 verified: 2026-09-27T22:49:26Z
-status: gaps_found
+status: passed
+reconciled: 2026-10-13 — reopened F1–F4 findings repaired and verified via Phase 5 (HARD-01..04); see 05-VERIFICATION.md
 historical_score: 5/5 acceptance areas passed; 4/4 required Linux profiles passed; human UAT 3/3; security verified
 implementation_sha: 021c402d620396b671c3fd919ad2275b4c3072ff
 ci_run: 36352552899
@@ -10,7 +11,7 @@ historical_behavior_unverified: 0
 
 # Phase 2 — Release A Verification
 
-**Current verdict (2026-10-11): acceptance reopened for F1–F4.** The results below are the historical 2026-09-27 sign-off, not current clearance. See the closeout addendum and Phase 5.
+**Current verdict (2026-10-13): reopened F1–F4 findings were repaired and verified in Phase 5 (HARD-01..04, both DB profiles, independent review, four-profile CI on eaf7d64).** The results below remain the historical 2026-09-27 sign-off plus the Phase 5 remediation evidence.
 
 ## Exact verified profile
 

@@ -1,16 +1,15 @@
 ---
-status: partial
+status: complete
 phase: 03-release-b-gamma-nip-17-orders
 source: [03-01-SUMMARY.md, 03-02-SUMMARY.md, 03-03-SUMMARY.md, 03-04-SUMMARY.md]
 started: 2026-09-29T00:00:00Z
-updated: 2026-09-29T07:07:26.745868+00:00
+updated: 2026-10-13T04:35:00+00:00
 ---
 
 ## Current Test
 <!-- OVERWRITE each test - shows where we are -->
 
-[testing paused — 1 item outstanding: live plebeian.market smoke — DEFERRED 2026-10-12 by operator decision for v0.6.3; not passed or waived,
-deferred to operator per user decision 2026-09-29]
+[testing complete — item 17 (live plebeian.market smoke) executed and passed 2026-10-13; see 03-VERIFICATION.md manual-items section]
 
 ## Tests
 
@@ -94,17 +93,17 @@ expected: §21 decision 30 records the three-part disposition + operator-respons
 result: pass
 source: automated — grep-verified spec/PINS edits (a4bc536)
 
-### 17. Live plebeian.market public-relay smoke — **DEFERRED (operator decision 2026-10-12)**
-expected (still required to close): Manual checklist (tests/conformance/README.md) executed against live plebeian.market over public relays — wrap/ACK evidence collected and recorded into 03-VERIFICATION.md
-result: [pending]
-reason: Deferred to operator — user will run the live smoke later; Release-B claim remains gated on this evidence
+### 17. Live plebeian.market public-relay smoke
+expected: Manual checklist (tests/conformance/README.md) executed against live plebeian.market over public relays — wrap/ACK evidence collected and recorded into 03-VERIFICATION.md
+result: pass
+source: manual — 2026-10-13 live run on `schedulerlnbits.exe.xyz` (v0.6.3): wrap `f2f378dd273d0142` via `wss://nos.lol` → `processed`; gamma order `afa3499b59fe…` confirmed after internal invoice settlement; type-2 (`9a59aa732253…` recipient-copy) and type-3 `confirmed` (`450ce39d3074…` recipient-copy) wraps accepted on the buyer's declared relays; full evidence in 03-VERIFICATION.md. Known-delta register applied verbatim.
 
 ## Summary
 
 total: 17
-passed: 16
+passed: 17
 issues: 0
-pending: 1
+pending: 0
 skipped: 0
 blocked: 0
 
@@ -118,5 +117,6 @@ Tests 1–16 above retain their historical outcomes; they were not rerun as huma
 UAT during this closeout. In particular, test 14's drain evidence does not prove
 the same-scope backlog admission bound (F6), and ordinary dual-copy tests do not
 prove the full no-route recovery window (F5). Those assurance gaps, and shared
-commerce F1–F3, are reopened in Phase 5. Item 17 is still pending and must remain
-visible to `audit-uat`; it is neither passed nor waived.
+commerce F1–F3, are reopened in Phase 5. Item 17 was executed live on
+2026-10-13 and passed (see 03-VERIFICATION.md); Phase 5 items remain the open
+assurance gaps.

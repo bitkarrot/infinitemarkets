@@ -1,6 +1,7 @@
 ---
 phase: 05-correctness-recovery-and-security-hardening
-status: gates_partially_closed
+status: passed
+reconciled: 2026-10-13 — all open gates closed or operator-disposed (live UAT, paid-order audit, F1 limitation, WR-01 caveat)
 created: 2026-10-12
 ---
 
@@ -20,27 +21,56 @@ local synthetic verification never substitutes for an operator or live gate.
 | HARD-05 | No-route waits stay claimable for the documented 48h without consuming send budget | ✅ VERIFIED | `outbox.py` `_cas_state(bump_attempts=False)` on no-route requeue; `test_nip17_outbox.py::test_hard05_*` controlled-time coverage (21 waits → deliver; exact deadline terminal; real failures still exhaust) |
 | HARD-06 | Atomic 1,000 pending-wrap bound per merchant/relay before decrypt | ✅ VERIFIED | `inbox.py` locked count+insert in one DomainTransaction (PG `FOR NO KEY UPDATE`; SQLite writer serialization); `m016_inbox_scope_backlog` index; `test_intake_abuse.py` hard06 cap + contested-999 proofs; `test_release_b_drills.py` rollover |
 | HARD-07 | DB/install pair exits cleanly in both orders and within the normal suite | ✅ VERIFIED | Root cause demonstrated (cancelled engine checkout orphaned non-daemon aiosqlite worker thread); `tasks.py:_guarded` shield+drain; `tests/test_runtime_process_exit.py` bounded child regression; `make verify-runtime`/`make verify` natural exit 0 |
-| HARD-08 | Permanent regressions + fresh qualification + security review + required live evidence | ⚠️ PARTIAL | Regressions permanent; local `make verify` green (982/8 SQLite, 987/3 PG); **four-profile Linux CI green on `eaf7d64`** (run 38322792120); independent review PASSED. Live external checkout evidence deferred by operator decision — see open gates |
+| HARD-08 | Permanent regressions + fresh qualification + security review + required live evidence | ✅ VERIFIED | Regressions permanent; local `make verify` green (982/8 SQLite, 987/3 PG); **four-profile Linux CI green on `eaf7d64`** (run 38322792120); independent review PASSED; live external checkout evidence recorded 2026-10-13 (wrap→order→invoice→settlement→status over public relays) — see open gates for residual host/procedural items |
 
 ## Open gates (not closed by this record)
 
-- **Live Plebeian checkout/payment UAT — DEFERRED 2026-10-12 by operator
-  decision.** UAT item 17 remains outstanding; release v0.6.3 was cut with this
-  explicitly documented limitation. Scripted/shim/FakeWallet evidence is not a
-  substitute; the item is deferred, not passed or waived.
-- **F1 pinned-host browser errors** — ServiceWorker TLS + null `g.wallet.id`
-  websocket errors on the admin surface, reproduced on the unmodified baseline
-  host; unresolved host-qualification issue. No filtering or vendor workaround.
-- **WR-01 chronology caveat** — original browser RED for the F2 path was
-  reproduced retrospectively; test-first chronology evidence is absent.
-- **Historical paid-order audit** — authorized read-only scan of every
-  reachable local datastore found **zero actual order records**; a
-  deployed/remote instance (if any) still requires its own operator audit.
+- **Live Plebeian checkout/payment UAT — CLOSED 2026-10-13.** Full public-relay
+  run executed on `schedulerlnbits.exe.xyz` (v0.6.3): Playwright-driven live
+  plebeian.market checkout, wrap `f2f378dd273d0142` processed via `nos.lol`,
+  gamma order `afa3499b59fe…` confirmed after internal bolt11 settlement, type-2
+  and type-3 wraps verified dual-copy on buyer-declared relays. Complete
+  evidence in `03-VERIFICATION.md` + `03-UAT.md` item 17 + conformance run log.
+- **F1 pinned-host browser errors — DISPOSED 2026-10-13, operator-accepted
+  documented host limitation.** Reproduced live on the pinned host `e336fe14`
+  (v1.6.2-rc1) via `tests/e2e` admin spec: every functional assertion passed
+  (settlement, controls, no token leak); the only failure is
+  `expect(errors).toEqual([])` collecting two upstream host defects — (a)
+  `SecurityError` ServiceWorker registration fails because the e2e harness
+  serves a throwaway self-signed cert (`tools/e2e_server.py` `ssl_certfile`)
+  and the deployed exe.dev proxy also presents a self-signed cert; (b)
+  `TypeError: null.id` in `lnbits-manage-wallet-list.js:55` —
+  `this.g.wallet.id` is unguarded on non-wallet pages when a payment websocket
+  message arrives. **Both are unfixed upstream on LNbits `main` (`b717d51d`
+  HEAD checked 2026-10-13)** — a host-version bump does not resolve them, and
+  extension admin functionality is verified unaffected. **Operator accepted
+  in writing 2026-10-13** as a documented host limitation; no pageerror
+  filtering, security weakening, or vendor workaround was applied.
+- **WR-01 chronology caveat — DISPOSED 2026-10-13, operator-accepted
+  permanent caveat.** Original browser RED for the F2 path was reproduced
+  retrospectively; test-first chronology evidence is absent and cannot be
+  fabricated. **Operator accepted in writing 2026-10-13**: the honesty note
+  remains permanently recorded in `05-REVIEW.md` and
+  `05-BROWSER-BASELINE-EVIDENCE.json`; actual regression coverage and
+  independent review stand on their own.
+- **Historical paid-order audit — PERFORMED 2026-10-13 on the deployed
+  instance.** Read-only scan of `ext_infinitemarkets.sqlite3` +
+  `database.sqlite3` on `schedulerlnbits.exe.xyz`: 14 orders total, all on the
+  demo Node Report at 210 sats; all contacts are `example.com` placeholders or
+  empty; buyer PII columns are envelope-encrypted at rest; 9 successful
+  "Infinitemarkets order" inbound wallet payments (1,890 sats) are internal
+  test settlements including today's live UAT order; all other wallet inflows
+  are funding/test memos ("Admin credit", ZapGoals E2E, "LNbits"). 5 settled
+  payment rows attached to cancelled/expired orders are the designed
+  late-settlement projection retention. **Zero real-customer paid orders; no
+  exposure concern.**
 - **WR-04/WR-05** — resolved (`eaf7d64` locked token recheck; `tasks.py`
   drain preserves cancellation). See `05-REVIEW.md`.
 
 ## Release posture
 
 v0.6.3 cut 2026-10-12 with the open gates above documented in the release
-notes. Milestone closeout stays open until the deferred live UAT is performed
-or the operator formally accepts the residual risk in writing here.
+notes. As of 2026-10-13 every open gate is closed or dispositioned: live UAT
+executed and passed, paid-order audit performed on the deployed instance,
+F1 host-browser errors and WR-01 chronology caveat accepted in writing by
+the operator as documented residual limitations.

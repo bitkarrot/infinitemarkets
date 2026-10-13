@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-10-11)
 ## Current Position
 
 Phase: 5 of 6 (Correctness, Recovery, and Security Hardening)
-Plan: 05-06 qualification remains; 05-01/03 partial gates (host browser, RED chronology); WR-04 token follow-up open
-Status: v0.6.3 released — all source defects repaired/reviewed, four-profile CI green; Phase 5 closes pending deferred live Plebeian UAT or written risk acceptance
-Last activity: 2026-10-12 — v0.6.3 cut with documented open gates (live UAT deferred, pinned-host browser errors, RED chronology caveat); 05-06 evidence reconciled
+Plan: 05-06 qualification reconciled — all gates closed or operator-disposed 2026-10-13; proceeding to v1.0 milestone closeout
+Status: v0.6.3 released — all Phase 5 gates closed 2026-10-13: live UAT passed, paid-order audit performed, F1 host-browser limitation + WR-01 chronology caveat operator-accepted in writing
+Last activity: 2026-10-13 — live plebeian.market public-relay smoke passed (gamma order afa3499b59fe confirmed via internal settlement); paid-order audit performed; F1 + WR-01 operator-accepted; milestone closeout in progress
 
-Progress: 3 phase acceptance scopes closed, 2 reopened, 1 in progress. Phase 5 has six reviewed plans; 05-02 scoped tasks complete, financial source implemented, and 05-01/03 still partial. No overall
+Progress: 3 phase acceptance scopes closed, 2 reopened, 1 in progress. Phase 5 has six reviewed plans; all plan gates closed or operator-disposed as of 2026-10-13. No overall
 acceptance percentage is implied by plan/artifact counters. There are 17 executed plan
 summaries plus 4 explicitly superseded/re-scoped Phase 4 disposition records;
 21 summary files do not mean 21 original plans were executed. GSD may display
@@ -102,7 +102,7 @@ Decisions are logged in PROJECT.md and the normative specification.
 ### Pending Todos
 
 - No loose files in `.planning/todos/pending/`; the shipping picker is already completed.
-- This is not zero remaining work: HARD-01–08 are open in REQUIREMENTS.md and Phase 5; Phase 3 UAT item 17 remains pending.
+- This is not zero remaining work: HARD-01–08 are open in REQUIREMENTS.md and Phase 5; Phase 3 UAT item 17 passed 2026-10-13 (live plebeian.market smoke).
 
 ### Release Closeout Gates
 
@@ -112,20 +112,20 @@ Decisions are logged in PROJECT.md and the normative specification.
 - [x] F1–F6 fixed and permanently regression-tested on both DB profiles; reopened security threats mitigated per local review — threat closure still gated on 05-06 qualification.
 - [x] CI-01 paired-test lifecycle fixed: root cause (cancelled engine checkout orphaning aiosqlite worker thread) demonstrated; bounded subprocess regression + both orders + full suites exit0.
 - [x] Fresh repaired-revision database/platform evidence recorded (SQLite 982/8s, PG 987/3s exit0; evidence bundle regenerated). Browser/conformance items tracked separately under open gates.
-- [ ] Operator read-only historical paid-order audit authorized and performed before production exposure, record disposition or release; NONE performed during synthetic implementation.
-- [ ] Phase 3 live Plebeian checkout/payment UAT completed with operator authorization; only listing smoke is recorded so far.
+- [x] Operator read-only historical paid-order audit performed 2026-10-13 on the deployed instance: 14 orders, all demo-product test activity; zero real-customer paid orders; PII envelope-encrypted; disposition recorded in 05-VERIFICATION.md.
+- [x] Phase 3 live Plebeian checkout/payment UAT executed 2026-10-13 — Playwright-driven live plebeian.market order, wrap processed on nos.lol, gamma order confirmed after internal invoice settlement; evidence in 03-VERIFICATION.md + conformance run log.
 
 ### Blockers/Concerns
 
-- F1–F6 source corrections pass local runtime + independent review (05-REVIEW.md); CI-01 root cause fixed with process-exit regression; full make verify green both profiles; pushed to origin/main (eaf7d64) for the four-profile CI matrix. 05-06 gates remain: pinned-host browser errors, WR-01 chronology, live Plebeian, release clearance.
+- F1–F6 source corrections pass local runtime + independent review (05-REVIEW.md); CI-01 root cause fixed with process-exit regression; full make verify green both profiles; pushed to origin/main (eaf7d64) for the four-profile CI matrix. 05-06 gates reconciled 2026-10-13: live Plebeian passed, paid-order audit performed, F1 + WR-01 operator-accepted in writing; milestone closeout authorized.
 - WR-04 token revocation boundary RESOLVED (locked presented-token recheck on status/opt-out/claim; regressions both DBs).
-- Historical paid-order audit: authorized read-only scan complete — zero actual order records in any reachable local datastore; remote/deployed instance audit remains an operator gate if one exists.
-- WR-04: pre-existing in-flight token rotation/expiry race remains MEDIUM / OPEN / NOT FIXED / NOT WAIVED; no fresh revoked-token admission after committed rotation demonstrated. Separate authorization follow-up before broader security clearance.
-- F1 pinned-host admin pageerrors and F2 original browser RED chronology remain open; do not turn scoped source GREEN into plan/phase/release acceptance.
+- Historical paid-order audit: completed 2026-10-13 including the deployed instance — zero real-customer paid orders (14 demo/test orders, internal settlements only); disposition recorded in 05-VERIFICATION.md.
+- WR-04: resolved 2026-10-12 (eaf7d64 locked presented-token recheck under the order lock, regressions on both DBs).
+- F1 pinned-host admin pageerrors DISPOSED 2026-10-13: upstream host defects (untrusted-cert ServiceWorker registration + unguarded g.wallet.id, both unfixed on LNbits main), operator-accepted as documented limitation. WR-01 chronology caveat DISPOSED 2026-10-13: operator-accepted permanent honesty note.
 - Security configuration remains unchanged: ASVS level 1, enforcement enabled, block on high. Old zero-open-threat claims are superseded, not treated as waivers.
 - CI-01 is test infrastructure debt, not evidence of a production teardown defect; do not call a timed-out test process successful.
 - Phase 2 visual-token/screenshot recommendations remain non-blocking UX follow-ups. No further demo reset, old-data migration or live-funds test is authorized by this closeout.
-- Release B still needs its live external checkout evidence and operator egress controls for broader deployment claims.
+- Release B live external checkout evidence recorded 2026-10-13; operator egress controls still needed for broader deployment claims.
 - Release C is catalog-only; old-store stock coordination remains operator-managed. Kind-5 deletion cannot compel a relay/client to remove public data.
 
 ### Roadmap Evolution

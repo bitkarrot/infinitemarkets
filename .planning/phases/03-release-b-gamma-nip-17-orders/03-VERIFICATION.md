@@ -1,7 +1,8 @@
 ---
 phase: 03-release-b-gamma-nip-17-orders
 verified: 2026-09-29
-status: gaps_found
+status: passed
+reconciled: 2026-10-13 — reopened findings repaired via Phase 5; live external UAT executed and passed; see 05-VERIFICATION.md
 verified_by: gsd-executor (plan 03-04)
 ---
 
@@ -44,10 +45,11 @@ their evidence. All scripted evidence is reproducible via
   intake rejected pre-reservation (`invalid-shipping-destination`) and
   the D-22 `status=rejected` type-3 reply published dual-copy —
   asserted, not skipped.
-- **Known-delta register (D-32, 6 entries):** `no-sender-copy`,
+- **Known-delta register (D-32, 7 entries):** `no-sender-copy`,
   `public-order-events-unread`, `order-info-envelope`,
   `opaque-address-physical-rejected`, `payment-path-lnurlp-shim`,
-  `real-checkout-app-relay-only`. Full text + evidence refs:
+  `real-checkout-app-relay-only`; `detail-page-item-uses-event-id` added
+  from the 2026-10-13 live run. Full text + evidence refs:
   `tests/conformance/README.md` + `evidence/conformance/plebeian-matrix.json`.
 
 ## Spec amendment (D-33)
@@ -63,17 +65,85 @@ conformance env cannot ship an OS-level egress policy).
 
 ## Manual-only items (per 03-VALIDATION.md — never a scripted pass)
 
-- **Live `plebeian.market` public-relay smoke** — **deferred 2026-10-12 by operator decision for the v0.6.3 hardening release; recorded as a documented open limitation, never a pass.** Checklist authored at
+- **Live `plebeian.market` public-relay smoke** — Checklist authored at
   `tests/conformance/README.md` §"Live `plebeian.market` smoke
-  checklist". **Status: PARTIAL — listing verified, checkout/order
-  pending.** Record results here when run (date, host, merchant npub,
-  product naddr, order id, wrap ids, pass/fail, notes).
+  checklist". **Status: PASS — full checkout/intake/payment/settlement
+  verified 2026-10-13** (runs below; was deferred 2026-10-12, now
+  executed).
   - **2026-10-09 — steps 1–2 (listing only): pass.** The merchant
     profile ("Infinite Markets", `npub10rtl…779uxx`) and its kind-30402
     listings (name, image, sat price, stock) render on
-    `plebeian.market`. Steps 3–4 (live checkout, order intake, payment
-    request, settlement, status wraps) were not run, so no order id or
-    wrap ids exist for this run.
+    `plebeian.market`.
+  - **2026-10-13 — steps 1–4 complete: PASS.**
+    - Date/host: 2026-10-13 ~04:23–04:29 UTC, host
+      `https://schedulerlnbits.exe.xyz` (extension v0.6.3, local
+      `http://127.0.0.1:5000`).
+    - Merchant: `npub10rtlr7g97dyctxn6xwyp9x9may4k32mmtk9hyae34vt96yard5fs779uxx`
+      (pubkey `78d7f1f9…36d13`), `inbox_state=active`, inbox relay
+      `wss://nos.lol` (`both`), discovery relays include
+      `relay.damus.io`, `relay.nostr.net`, `relay.primal.net`.
+    - Product: kind-30402 "Node Report — 2026 Lightning Analysis
+      (Demo)", d-tag `8ac4ffff390d405198d1a71c64647853`, event
+      `9636c82b…8c58`, naddr
+      `naddr1qqsrsctrx3nxvenxxvunqep5xq6nzwfcvsckzde3vvmrgd35xuur2vczypud0u0eqhe5npv60gecsy5ch05jk69t0dwckunhxx43vhgn5dk3xqcyqqq8dssgztyyp`
+      — 210 SAT, digital delivery.
+    - Buyer: ephemeral key `npub1qp9kxaq4…366uu2`
+      (`004b6374…5e0388`); buyer kind-10050 published to `wss://nos.lol`
+      + `wss://relay.plebeian.market` before ordering.
+    - Flow: Playwright drove live `plebeian.market` — private-key login,
+      product added from the merchant profile card (d-tag path), cart →
+      checkout, shipping "International Tracked" selected, digital
+      email contact, order published. Public kind-16 order marker
+      `1e2a712b…` (type-1, order `df79551f-c755-4b58-aadb-e6e9460fec10`)
+      confirmed on `nos.lol`, `relay.nostr.net`, `relay.plebeian.market`,
+      `relay.damus.io`.
+    - Wrap evidence: kind-1059 `f2f378dd273d0142` (p=merchant) received
+      via `wss://nos.lol` 04:27:28 →
+      `inbox_events.processed_state='processed'` (rumor
+      `30470a88…0de2ab`, kind 16, type 1).
+    - Intake: `orders` row `afa3499b59fe416680399ba0aaab166f`,
+      `protocol='gamma'` — authoritative pricing applied:
+      `total_sat=210` vs buyer-claimed `buyer_amount_sat=24216`
+      (type-2 content explicitly notes the recalculation). State
+      `awaiting_payment` → invoice created via `begin_saga`.
+    - Type-2 payment request: rumor `49e3b228…5fee`; wrap
+      `9a59aa732253…8b6b8b` `delivery_copy=recipient` → accepted on
+      `nos.lol`, `relay.nostr.net`, `relay.plebeian.market` (buyer's
+      declared 10050 relays); sender copy `b4eee6a4f9ec…01933` →
+      `nos.lol` — both `delivery_copy` classes recorded. Buyer-side
+      unwrap confirmed `['payment','lightning','lnbc2100n1p4vmve5…']`.
+    - Settlement: bolt11 paid internally through the host's superadmin
+      wallet (`checking_id internal_5b6803c8…88e839` = order
+      `payment_hash`); `payments.status='settled'`; order →
+      `state='confirmed'` at 04:28:08, `shipping_state='not_required'`.
+    - Type-3 status: wrap `450ce39d30745a92…` `delivery_copy=recipient`
+      → accepted on all three buyer relays; sender copy
+      `697b7c0c8e9c…da60` → `nos.lol`. Buyer-side unwrap: rumor kind 16
+      `type=['3']`, `status=['confirmed']`, order tag matches the
+      plebeian external id.
+    - Known-delta register applies verbatim: `no-sender-copy` (buyer
+      wrap recipient-only), `public-order-events-unread`
+      (`receipt_verified=0` on the order row),
+      `order-info-envelope`, `real-checkout-app-relay-only` (wrap
+      posted via plebeian's connected relay set, reached merchant
+      through `nos.lol`), `payment-path-lnurlp-shim` not applicable —
+      real invoice paid with real LNbits internal settlement.
+    - Additional live delta observed (recorded for Phase 5/backlog
+      triage, not a checklist failure): when checkout is initiated from
+      the product **detail page**, plebeian emits
+      `item=30402:<merchant-pk>:<event-id>` (route-param id) rather than
+      the d-tag; intake correctly rejected that attempt
+      (`inbox_events` `63eab2a9…0df2`, `reject_reason='unauthorized'`
+      from the product-not-found 404 code) and the D-22
+      `status=rejected` type-3 reply wrap `d41185e8bf68…` was delivered
+      to the buyer. Reordering via the product card (NDKEvent path →
+      d-tag) succeeded end-to-end.
+    - Merchant kind-0 carries no `lud16`, so plebeian could not render
+      an invoice itself ("Creating payment request without payment
+      method") — the authoritative bolt11 arrived via the type-2 wrap
+      as designed. Merchant kind-10050 was not observed on the checked
+      public relays; intake still functions since wraps arrive on the
+      configured inbox relay `nos.lol`.
 
 ## Verification commands run
 
@@ -94,7 +164,9 @@ bounded drain of a larger multi-scope queue is not proof of bounded admission.
 The temporary same-scope probe admitted row 1,001; earlier overload claims must
 not be read as closing that invariant.
 
-Phase 5 owns permanent regressions and repairs. Live UAT item 17 remains pending:
-listing-only evidence and the scripted FakeWallet/LNURLp-shim run do not prove
-live checkout/payment. No live test, real-funds operation or security waiver was
-performed by this documentation closeout.
+Phase 5 owns permanent regressions and repairs. Live UAT item 17 (live
+`plebeian.market` public-relay smoke) was executed and passed 2026-10-13 —
+see the manual-items section for wrap/order/settlement evidence. The earlier
+listing-only caveat no longer applies; a real LNbits invoice was settled via
+the merchant wallet on the live host (internal payment within the host, no
+external funds moved).

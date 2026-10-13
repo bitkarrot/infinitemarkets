@@ -8,13 +8,24 @@ infinitemarkets is a standard Python LNbits extension for merchants who want to 
 
 A merchant can sell one authoritative inventory safely through LNbits-backed web and Nostr flows without duplicate invoices, double allocation, or relay delivery being mistaken for payment truth.
 
+## Current State
+
+**v1.0 shipped 2026-10-13** — Core Commerce and Hardening. All 50 active
+requirements closed; the reopened F1–F6 acceptance findings were repaired
+with permanent regressions on both database profiles, independently
+reviewed, and verified on a four-profile Linux CI matrix. The live
+`plebeian.market` public-relay checkout was executed end-to-end on the
+deployed v0.6.3 host (wrap → order → invoice → settlement → status wraps).
+Residual items are documented limitations: upstream LNbits pageerrors on
+the admin surface (operator-accepted) and the WR-01 retrospective-RED
+chronology caveat. Archives: `milestones/v1.0-ROADMAP.md`,
+`milestones/v1.0-REQUIREMENTS.md`, `v1.0-MILESTONE-AUDIT.md`.
+
 ## Requirements
 
-### Delivered and Historically Validated
+### Delivered and Validated
 
-The records below describe delivered scope, not current production clearance.
-The 2026-10-11 conformance review reopens financial and delivery assurance; see
-[the milestone audit](v1.0-MILESTONE-AUDIT.md) and Phase 5.
+The records below describe delivered scope verified at v1.0 ship.
 
 - Phase 0 qualification (P0-01 through P0-14) has reproducible artifacts.
 - Release A catalog publication and safe public web checkout are implemented and deployed.
@@ -24,14 +35,19 @@ The 2026-10-11 conformance review reopens financial and delivery assurance; see
 - One canonical domain model and inventory/payment authority remain shared across web and Nostr adapters.
 - Key custody, privacy, authentication, transaction, recovery, and deployment gates are enforced by the implementation contract.
 
-### Active
+### Next Milestone Goals
 
-- Repair F1–F6 before optional feature expansion; add permanent runtime/security regressions.
-- Resolve CI-01, the DB/install paired-test teardown hang, without forced-exit workarounds.
-- Re-verify reopened requirements and complete the operator-approved live Plebeian checkout gate before full Release-B claims.
-- Preserve S1–S4 policy, contract, observability and cleanup follow-ups without expanding Phase 5 into optional integrations.
-
-- The v1 milestone remains open for Phase 5 hardening and required external validation; delivered feature scope is not cancelled or restarted.
+- Preserve S1–S4 policy, contract, observability and cleanup follow-ups.
+- Optional feature expansion now unblocked: external inventory/shipping
+  integrations, reviews, subscriptions/preorders, NIP-37, buyer
+  unlink/notification-preference expansion — each gated on its own plan.
+- Track the conformance known-delta register (7 entries) — the
+  detail-page event-id item-ref divergence is a Plebeian-side candidate
+  for upstream reporting/fix.
+- Merchant `lud16` on the public profile so Plebeian's native invoice UI
+  can render alongside the type-2 wrap path.
+- Upstream LNbits: the `g.wallet.id` null-deref and untrusted-cert
+  ServiceWorker registration remain open upstream defects.
 
 ### Out of Scope
 
@@ -98,4 +114,4 @@ This document evolves at phase transitions and milestone boundaries.
 3. Update context, constraints, and decision outcomes.
 
 ---
-*Last updated: 2026-10-12 after Phase-5 hardening tranche; preparing v0.6.3*
+*Last updated: 2026-10-13 — v1.0 milestone shipped and archived*

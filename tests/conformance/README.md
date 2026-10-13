@@ -116,6 +116,13 @@ named divergence is missing. Current register (evidence refs live in
    wrap to the connected app relay, not the merchant's resolved
    kind-10050 set (the strict transport does resolve it; both coincide
    on `nak` in this env).
+7. **detail-page-item-uses-event-id** — observed live 2026-10-13: when the
+   order is initiated from the product *detail page*, the `item` tag is
+   `30402:<pubkey>:<event-id>` (route-param id) instead of the d-tag; the
+   extension rejects `product not found` (404 → `unauthorized`) and the
+   D-22 `rejected` reply is delivered. Cart adds from product cards use
+   the NDKEvent→d-tag path and succeed. Recorded, not fixed (client-side
+   divergence in plebeian's detail-page `handleAddToCartClick`).
 
 ## Live `plebeian.market` smoke checklist (manual-only, D-30)
 
@@ -145,6 +152,7 @@ scripted pass. Record results into
 | Date | Steps covered | Result | Notes |
 |---|---|---|---|
 | 2026-10-09 | 1–2 (listing only) | pass | Merchant profile ("Infinite Markets", `npub10rtl…779uxx`) and its kind-30402 listings (name, image, sat price, stock) render on `plebeian.market`. Checkout and order steps 3–4 not run; no order id or wrap ids to record. |
+| 2026-10-13 | 1–4 (full live smoke) | pass | Host `https://schedulerlnbits.exe.xyz` (v0.6.3). Product: Node Report, naddr `naddr1qqsrs…tyyp`. Buyer `npub1qp9kxaq4…366uu2` (ephemeral). Plebeian external order id `df79551f-c755-4b58-aadb-e6e9460fec10`; wrap `f2f378dd273d0142` on `wss://nos.lol` → `inbox_events` `processed`; order `afa3499b59fe…` `protocol=gamma` → `confirmed` after internal settlement of the type-2 bolt11 (210 sats). Type-2 recipient copy `9a59aa732253…` + type-3 `confirmed` recipient copy `450ce39d3074…` accepted on nos.lol/relay.nostr.net/relay.plebeian.market; sender copies on nos.lol. One prior attempt rejected `unauthorized` (product-not-found): detail-page Add-to-Cart emits `item=30402:<pk>:<event-id>` instead of the d-tag — card path works; D-22 `rejected` reply delivered to buyer. `receipt_verified=0` per delta `public-order-events-unread`. |
 
 ## D-33 note
 
