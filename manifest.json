@@ -3,16 +3,16 @@
     {
       "id": "infinitemarkets",
       "name": "Infinite Markets",
-      "version": "0.6.3",
-      "archive": "https://github.com/bitkarrot/infinitemarkets/releases/download/v0.6.3/infinitemarkets-0.6.3.zip",
-      "hash": "1216905b9007f32888d16f79763d5fe6f7feff0c7a275730d89d33ca9b7d7565",
+      "version": "1.0.0",
+      "archive": "https://github.com/bitkarrot/infinitemarkets/releases/download/v1.0.0/infinitemarkets-1.0.0.zip",
+      "hash": "cbe991074666506ae1f90741b760a2690561a5320e77ebb57291d58a247df478",
       "repo": "https://github.com/bitkarrot/infinitemarkets",
-      "icon": "https://github.com/bitkarrot/infinitemarkets/raw/v0.6.3/infinitemarkets/static/infinitemarkets/img/infinite-markets-blue.png",
+      "icon": "https://github.com/bitkarrot/infinitemarkets/raw/v1.0.0/infinitemarkets/static/infinitemarkets/img/infinite-markets-blue.png",
       "short_description": "NIP-99 catalog and Lightning checkout with one authoritative inventory.",
       "min_lnbits_version": "1.6.0",
       "max_lnbits_version": null,
-      "html_url": "https://github.com/bitkarrot/infinitemarkets/releases/tag/v0.6.3",
-      "details_link": "https://raw.githubusercontent.com/bitkarrot/infinitemarkets/v0.6.3/infinitemarkets/config.json",
+      "html_url": "https://github.com/bitkarrot/infinitemarkets/releases/tag/v1.0.0",
+      "details_link": "https://raw.githubusercontent.com/bitkarrot/infinitemarkets/v1.0.0/infinitemarkets/config.json",
       "dependencies": []
     }
   ],
