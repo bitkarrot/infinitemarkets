@@ -221,7 +221,7 @@ Copy-ready snippets for all three options (link grid, modal grid, iframe) are in
 
 Release-B evidence is reproducible: the scripted conformance matrix (`tests/conformance/run_matrix.sh matrix`) runs a real recipient-gated `nostrrelay` environment, egress/NIP-42/paid-write/overload drills, and an independent external-client matrix against a pinned `PlebeianApp/market` clone — 14/14 probes with a recorded 6-entry known-delta register (`evidence/conformance/`).
 
-**Live `plebeian.market` smoke (manual, partial)**: on 2026-10-09 the merchant profile and kind-30402 listings published by the extension were confirmed rendering on `plebeian.market` (checklist steps 1–2). The live checkout and order steps (3–4) have not been run yet; see `tests/conformance/README.md` and `.planning/phases/03-release-b-gamma-nip-17-orders/03-VERIFICATION.md`.
+**Live `plebeian.market` smoke (manual, complete)**: on 2026-10-13 the full checklist was executed on the deployed v0.6.3 host — a Playwright-driven live `plebeian.market` checkout produced a wrapped order that was processed via `nos.lol`, created a `protocol='gamma'` order, settled its type-2 bolt11 invoice to `confirmed`, and delivered type-3 status wraps to the buyer's declared relays. Earlier listing-only evidence from 2026-10-09 is retained; see `tests/conformance/README.md` and `.planning/phases/03-release-b-gamma-nip-17-orders/03-VERIFICATION.md`.
 
 ## Development
 

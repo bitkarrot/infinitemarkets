@@ -5,10 +5,12 @@ specification watch items for Infinite Markets. These are not an execution plan
 or a promise that every item will be built. Active phases, acceptance criteria,
 and progress belong to the [GSD execution roadmap](.planning/ROADMAP.md).
 
-**Hardening first:** repair and verify the existing conformance findings before
-optional feature expansion. The [Phase 5 execution scope](.planning/ROADMAP.md#phase-5-correctness-recovery-and-security-hardening)
-owns that work and its release gates; the [implementation assessment](docs/spec-conformance-analysis.md)
-records the findings. This document does not duplicate the Phase 5 checklist.
+**Status as of 2026-10-13:** v1.0 shipped. The Phase 5 hardening pass repaired
+and regression-verified every reopened conformance finding (F1–F6, CI-01), and
+the live `plebeian.market` public-relay checkout passed end-to-end. Optional
+feature expansion is now unblocked; the items below are candidates for the next
+milestone. The [implementation assessment](docs/spec-conformance-analysis.md)
+records the original findings; current status lives in `.planning/STATE.md`.
 
 The [OpenMarkets specification](https://github.com/OpenMarketsFoundation/specification)
 (draft, forked from GammaMarkets/market-spec) remains in flux. Deliberate
@@ -129,8 +131,9 @@ separate consumer of the same relays.
 Optional expansions and conditional questions, ordered by likely value.
 The required protocol components are present; the F1–F6 defects the
 conformance review found were repaired and regression-verified in GSD Phase 5
-(2026-10-12). Release clearance still awaits the remaining qualification gates
-(live external checkout, fresh CI matrix, browser host issues).
+(2026-10-12), and release clearance was granted at the v1.0 closeout
+(2026-10-13) after the live external checkout passed and the remaining
+host/procedural items were operator-disposed.
 The **Spec status** column shows where each expansion or question sits:
 `optional` (a MAY component or MAY tag), `conditional` (a REQUIRED tag only
 inside an optional kind we already publish), or `recommended` (a SHOULD).

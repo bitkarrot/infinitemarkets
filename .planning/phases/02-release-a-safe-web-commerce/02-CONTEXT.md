@@ -62,7 +62,7 @@ Ship the production `infinitemarkets` LNbits extension as the first vertical sli
 ### Project Scope
 
 - `.planning/ROADMAP.md` Phase 2 — goal, 16 requirements (MERC-01, CAT-01/02, PUB-01/02, WEB-01/02, PAY-01/02, INV-01, ORD-01, NOTF-01, SEC-01, UI-01/02/03), success criteria, plan skeleton.
-- `.planning/REQUIREMENTS.md` — requirement definitions and Definition of Done.
+- `.planning/milestones/v1.0-REQUIREMENTS.md` — requirement definitions and Definition of Done.
 - `.planning/research/` — STACK/ARCHITECTURE/PITFALLS (silent-failure modes the runtime must not reintroduce).
 
 ### Host Reference

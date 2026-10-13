@@ -63,7 +63,7 @@ Produce permanent, reproducible probes, fixtures, executable models, and evidenc
 ### Project Scope and Requirements
 
 - `.planning/PROJECT.md` — project constraints, authoritative-document precedence, host/protocol pins, and release sequence.
-- `.planning/REQUIREMENTS.md` QUAL-01 through QUAL-14 — Phase 1 requirements and Definition of Done.
+- `.planning/milestones/v1.0-REQUIREMENTS.md` QUAL-01 through QUAL-14 — Phase 1 requirements and Definition of Done.
 - `.planning/ROADMAP.md` Phase 1 — phase goal, success criteria, and three planned workstreams.
 
 ### Preserved Research

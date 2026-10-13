@@ -61,8 +61,8 @@ Requirements: LEG-03, LEG-04, LEG-05 (all Pending).
 **Downstream agents MUST read these before planning or implementing.**
 
 - `.planning/ROADMAP.md` — Phase 4 scope, plans 04-01/04-02/04-03, execution order
-- `.planning/REQUIREMENTS.md` — LEG-03 (lines ~73), LEG-04, LEG-05 + scope-amendment note
-- `.planning/REQUIREMENTS.md` scope amendment — LEG-01/02 dropped (no NIP-15 live interop, no NIP-04)
+- `.planning/milestones/v1.0-REQUIREMENTS.md` — LEG-03 (lines ~73), LEG-04, LEG-05 + scope-amendment note
+- `.planning/milestones/v1.0-REQUIREMENTS.md` scope amendment — LEG-01/02 dropped (no NIP-15 live interop, no NIP-04)
 - `infinitemarkets/models.py`, `infinitemarkets/migrations.py` — product category is required; `legacy_liability_qty` is not a column yet
 - `infinitemarkets/services/catalog.py` — validation, draft creation and category/pub gates; importer needs a transaction-aware draft primitive rather than nested `create_product` transactions
 - `infinitemarkets/services/outbox.py`, `infinitemarkets/services/relay.py` — publication machinery (draft landing = no outbox entries)

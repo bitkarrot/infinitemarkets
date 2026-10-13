@@ -4,11 +4,11 @@ milestone: v1.0
 milestone_name: Core Commerce and Hardening
 current_phase: "05"
 current_phase_name: Correctness, Recovery, and Security Hardening
-status: paused
-stopped_at: v0.6.3 hardening release cut and pushed; 05-06 reconciled with live UAT deferred
-last_updated: "2026-10-13T00:05:00+00:00"
-last_activity: 2026-10-12
-last_activity_desc: F4/F5/F6 fixed+reviewed, CI-01 root cause fixed; full make verify green both profiles; 05-06 gates open
+status: milestone-closed
+stopped_at: v1.0 milestone archived and tagged 2026-10-13 (commit ceea609)
+last_updated: "2026-10-13T05:30:00+00:00"
+last_activity: 2026-10-13
+last_activity_desc: live UAT passed, paid-order audit performed, F1+WR-01 operator-accepted, v1.0 archived
 progress:
   total_phases: 6
   completed_phases: 3
@@ -102,7 +102,7 @@ Decisions are logged in PROJECT.md and the normative specification.
 ### Pending Todos
 
 - No loose files in `.planning/todos/pending/`; the shipping picker is already completed.
-- This is not zero remaining work: HARD-01–08 are open in REQUIREMENTS.md and Phase 5; Phase 3 UAT item 17 passed 2026-10-13 (live plebeian.market smoke).
+- HARD-01–08 all verified (archived requirements at `.planning/milestones/v1.0-REQUIREMENTS.md`); Phase 3 UAT item 17 passed 2026-10-13 (live plebeian.market smoke).
 
 ### Release Closeout Gates
 

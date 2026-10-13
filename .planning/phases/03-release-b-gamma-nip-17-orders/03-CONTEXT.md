@@ -106,7 +106,7 @@ A Nostr buyer can place and follow a Gamma order through declared inbox relays a
 ### Project Scope
 
 - `.planning/ROADMAP.md` Phase 3 — goal, requirements GAM-01..GAM-05, success criteria, 3-plan skeleton, carried UAT items.
-- `.planning/REQUIREMENTS.md` — requirement definitions and Definition of Done.
+- `.planning/milestones/v1.0-REQUIREMENTS.md` — requirement definitions and Definition of Done.
 - `.planning/phases/02-release-a-safe-web-commerce/02-CONTEXT.md` — carried decisions (frozen identifiers, spec register 1–29, transport/UI constraints).
 - `.planning/research/` — STACK/ARCHITECTURE/PITFALLS.
 

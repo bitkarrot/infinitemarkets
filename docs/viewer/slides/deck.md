@@ -17,7 +17,7 @@ Authoring conventions
 - Status tags in bullets render as chips: [shipped] [tested] [spec-aligned] [todo] [roadmap].
 -->
 
-<!-- slide: layout=title accent=yellow bg=night logo=../img/logo-512.png kicker="infinitemarkets · v0.5 · LNbits extension" -->
+<!-- slide: layout=title accent=yellow bg=night logo=../img/logo-512.png kicker="infinitemarkets · v0.6.3 · LNbits extension" -->
 # Infinite Markets
 
 ## One inventory. Every storefront. Your rails.
@@ -171,7 +171,7 @@ paid/shipped booleans.
 <!-- slide: layout=split accent=mint kicker="part 3 · infinite markets" -->
 # Infinite Markets - What it is
 
-- A **standard Python LNbits extension**, MIT, v0.5, LNbits ≥ 1.6.0
+- A **standard Python LNbits extension**, MIT, v0.6.3, LNbits ≥ 1.6.0
 - **Commerce authority**: catalog, inventory, shipping, orders, messages, publication
 - **LNbits core stays settlement authority**: invoices, payment records, funding source
 - Two rails, **one pipeline**: a web storefront and a native Nostr/Gamma channel share pricing, reservation, invoicing & settlement
@@ -435,7 +435,7 @@ the merchant's LNbits does, bound to the order.
 
 - **Scripted matrix** against a pinned `PlebeianApp/market` clone: **14/14 probes pass**, covering checkout → NIP-17 intake → invoice → settlement [tested]
 - **Live on `plebeian.market`** (Oct 9): merchant profile and listings render with images, sat prices and stock [tested]
-- Live checkout & order run on `plebeian.market`: **not yet run** [todo]
+- **Live checkout & order on `plebeian.market`: verified end-to-end** (Oct 13) — wrap → order → invoice → settlement → `confirmed` status wrap, all over public relays [tested]
 - Physical-item orders from Plebeian are declined for now (its address format has no machine-readable country); digital items work end to end
 
 ![Infinite Markets listings on plebeian.market](../img/plebeian-listing.png "Listings published by Infinite Markets, rendered on plebeian.market")
@@ -450,8 +450,10 @@ send separate country/region fields work for physical items.
 
 Other recorded deltas: Plebeian's live checkout sends a single recipient-only
 wrap to its app relay (the strict transport resolves both kind-10050 lists);
-public receipt events are invisible to the NIP-17 inbox. All six are kept in
-the known-delta register in tests/conformance/README.md.
+public receipt events are invisible to the NIP-17 inbox; Plebeian's detail-page
+cart path references products by event id instead of d-tag (rejected + `rejected`
+status reply delivered). All seven are kept in the known-delta register in
+tests/conformance/README.md.
 
 ---
 
@@ -514,8 +516,8 @@ rule when deciding which extension owns stock.
 # Where it stands
 
 - **Releases A, B, 03.1 and C implemented**: web commerce, Gamma NIP-17 orders, buyer accounts, catalog import/export
-- Published **v0.5** via LNbits extension manifest (sha256-verified)
-- Conformance: gated `nostrrelay` env, egress / NIP-42 / paid-relay drills, **Plebeian matrix**, plus a live `plebeian.market` listing check
+- Published **v0.6.3** via LNbits extension manifest (sha256-verified)
+- Conformance: gated `nostrrelay` env, egress / NIP-42 / paid-relay drills, **Plebeian matrix**, plus a live `plebeian.market` checkout verified end-to-end (2026-10-13)
 - Pinned host (LNbits `v1.6.2-rc1`), pinned Gamma spec & NIPs, recorded decisions
 - Out of scope for v1: escrow, fiat custody, automated refunds, subscriptions, reviews
 
@@ -524,7 +526,7 @@ rule when deciding which extension owns stock.
 <!-- slide: layout=bullets accent=pink kicker="risks" -->
 # Risks
 
-1. **This is experimental software**: v0.5, built on a draft marketplace spec; start with small amounts
+1. **This is experimental software**: v0.6.3, built on a draft marketplace spec; start with small amounts
 2. **Contingent on community support and feedback**: interop depends on marketplace clients, the spec working group, and real merchants using it
 3. **Maintenance has a cost**: tracking LNbits releases, spec revisions, marketplace client changes, and security updates takes ongoing time and resources
 
@@ -534,7 +536,7 @@ rule when deciding which extension owns stock.
 # What's next
 
 - **Seeking testers and active users**: run the extension, validate it, send feedback, and file issues
-- Run a **live checkout & order** on `plebeian.market`
+- Merchant `lud16` on the public profile so marketplaces can render their own invoice UI
 - Add **Conduit Market** (and Shopstr) to the external-client matrix
 - Structured-address interop so marketplace **physical orders** flow end to end
 - LNbits **Inventory** and **Shipping** extension integration

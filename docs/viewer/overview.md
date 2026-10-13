@@ -19,7 +19,7 @@ Video: media/infinite-markets-demo.mp4 | media/demo-poster.jpg | The 2-minute pr
 
 | | |
 |---|---|
-| **What** | A standard Python LNbits extension (`infinitemarkets`), v0.5 |
+| **What** | A standard Python LNbits extension (`infinitemarkets`), v0.6.3 |
 | **Requires** | LNbits ≥ 1.6.0 and a bound merchant wallet |
 | **Sells through** | Its own web storefront, embeds, and Gamma / NIP-99 Nostr marketplaces |
 | **Payments** | Lightning invoices from the merchant's LNbits wallet |
@@ -314,7 +314,7 @@ creates the invoice; the merchant's LNbits does, bound to the order.
 
 - A scripted test suite drives a pinned copy of the Plebeian Market code through checkout, encrypted order intake, invoicing and settlement: **14 of 14 checks pass** [tested]
 - On **plebeian.market** itself (October 9), the merchant profile and listings render with images, sat prices and stock [tested]
-- A live checkout and order on plebeian.market hasn't been run yet [todo]
+- A **live checkout and order on plebeian.market completed end-to-end on October 13**: the wrapped order was processed through the public relays, the merchant's type-2 payment request carried the real bolt11, the invoice settled, and the buyer received the `confirmed` status wrap [tested]
 - Physical-item orders from Plebeian are declined for now (its address format has no machine-readable country); digital items work end to end.
 
 ### Conduit Market: same open spec
@@ -333,26 +333,29 @@ Conduit [spec-aligned], but this hasn't been tested yet [todo].
 
 ## 7. Status, risks and what's next
 
-**Where it stands.** Releases A, B, 03.1 and C are implemented: web commerce,
-Gamma NIP-17 orders, buyer accounts, and catalog import/export. Version 0.5 is
-published through an LNbits extension manifest with a sha256-verified archive.
-Conformance testing covers a gated relay environment, egress / relay-auth /
-paid-relay drills, the Plebeian test suite, and a live plebeian.market listing
-check. Escrow, fiat custody, automated refunds, subscriptions and reviews are
-out of scope for v1.
+**Where it stands.** v1.0 shipped 2026-10-13: web commerce, Gamma NIP-17
+orders, buyer accounts, and catalog import/export are implemented, and the
+Phase 5 hardening pass repaired and regression-verified every reopened
+correctness/recovery finding. Version 0.6.3 is published through an LNbits
+extension manifest with a sha256-verified archive. Conformance testing covers
+a gated relay environment, egress / relay-auth / paid-relay drills, the
+Plebeian test suite, and a **live plebeian.market checkout verified
+end-to-end** (wrapped order → invoice → settlement → status over public
+relays, 2026-10-13). Escrow, fiat custody, automated refunds, subscriptions
+and reviews are out of scope for v1.
 
 **Risks.**
 
-1. **This is experimental software:** v0.5, built on a draft marketplace spec. Start with small amounts.
+1. **This is experimental software:** v0.6.3, built on a draft marketplace spec. Start with small amounts.
 2. **It depends on community support and feedback:** interop relies on marketplace clients, the spec working group, and real merchants using it.
 3. **Maintenance has a cost:** keeping up with LNbits releases, spec revisions, marketplace changes, and security updates takes ongoing time and resources.
 
 **What's next.**
 
 - **Seeking testers and active users:** run the extension, validate it, send feedback, and [file issues](https://github.com/bitkarrot/infinitemarkets/issues).
-- Run a live checkout and order on plebeian.market.
 - Add Conduit Market (and Shopstr) to the external-client test suite.
 - Structured addresses so marketplace physical orders work end to end.
+- Merchant `lud16` on the public Nostr profile so marketplace clients can render their own invoice UI alongside the order-message payment request.
 - Integrate the LNbits Inventory and Shipping extensions.
 - Follow the Open Markets Protocol as the Gamma draft evolves.
 
