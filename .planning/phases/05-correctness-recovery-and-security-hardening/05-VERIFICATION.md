@@ -70,7 +70,7 @@ local synthetic verification never substitutes for an operator or live gate.
 ## Release posture
 
 v0.6.3 cut 2026-10-12 with the open gates above documented in the release
-notes. As of 2026-10-13 every open gate is closed or dispositioned: live UAT
+notes; the milestone-closing product release is **v1.0.0** (2026-10-13). As of 2026-10-13 every open gate is closed or dispositioned: live UAT
 executed and passed, paid-order audit performed on the deployed instance,
 F1 host-browser errors and WR-01 chronology caveat accepted in writing by
 the operator as documented residual limitations.

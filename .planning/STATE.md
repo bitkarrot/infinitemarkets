@@ -5,10 +5,10 @@ milestone_name: Core Commerce and Hardening
 current_phase: "05"
 current_phase_name: Correctness, Recovery, and Security Hardening
 status: milestone-closed
-stopped_at: v1.0 milestone archived and tagged 2026-10-13 (commit ceea609)
+stopped_at: product release v1.0.0 tagged and published 2026-10-13; v1.0 milestone archived
 last_updated: "2026-10-13T05:30:00+00:00"
 last_activity: 2026-10-13
-last_activity_desc: live UAT passed, paid-order audit performed, F1+WR-01 operator-accepted, v1.0 archived
+last_activity_desc: product release v1.0.0 published; v1.0 milestone archived and tagged
 progress:
   total_phases: 6
   completed_phases: 3
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-11)
 
 Phase: 5 of 6 (Correctness, Recovery, and Security Hardening)
 Plan: milestone v1.0 archived and tagged 2026-10-13 (commit 3c0ad9a); next milestone unplanned — deferred scope candidates noted in ROADMAP
-Status: v1.0 SHIPPED 2026-10-13 — v0.6.3 hardening release + live external verification; all Phase 5 gates closed or operator-disposed
+Status: product release v1.0.0 cut 2026-10-13 — milestone v1.0 shipped, all Phase 5 gates closed or operator-disposed
 Last activity: 2026-10-13 — v1.0 milestone archived and tagged: live UAT passed, paid-order audit performed, F1 + WR-01 operator-accepted, audit reconciled to passed
 
 Progress: 3 phase acceptance scopes closed, 2 reopened, 1 in progress. Phase 5 has six reviewed plans; all plan gates closed or operator-disposed as of 2026-10-13. No overall

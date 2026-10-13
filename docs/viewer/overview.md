@@ -19,7 +19,7 @@ Video: media/infinite-markets-demo.mp4 | media/demo-poster.jpg | The 2-minute pr
 
 | | |
 |---|---|
-| **What** | A standard Python LNbits extension (`infinitemarkets`), v0.6.3 |
+| **What** | A standard Python LNbits extension (`infinitemarkets`), v1.0.0 |
 | **Requires** | LNbits ≥ 1.6.0 and a bound merchant wallet |
 | **Sells through** | Its own web storefront, embeds, and Gamma / NIP-99 Nostr marketplaces |
 | **Payments** | Lightning invoices from the merchant's LNbits wallet |
@@ -346,7 +346,7 @@ and reviews are out of scope for v1.
 
 **Risks.**
 
-1. **This is experimental software:** v0.6.3, built on a draft marketplace spec. Start with small amounts.
+1. **This is experimental software:** v1.0.0, built on a draft marketplace spec. Start with small amounts.
 2. **It depends on community support and feedback:** interop relies on marketplace clients, the spec working group, and real merchants using it.
 3. **Maintenance has a cost:** keeping up with LNbits releases, spec revisions, marketplace changes, and security updates takes ongoing time and resources.
 
