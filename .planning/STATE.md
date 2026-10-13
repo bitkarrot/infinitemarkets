@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-10-11)
 ## Current Position
 
 Phase: 5 of 6 (Correctness, Recovery, and Security Hardening)
-Plan: 05-06 qualification reconciled — all gates closed or operator-disposed 2026-10-13; proceeding to v1.0 milestone closeout
-Status: v0.6.3 released — all Phase 5 gates closed 2026-10-13: live UAT passed, paid-order audit performed, F1 host-browser limitation + WR-01 chronology caveat operator-accepted in writing
-Last activity: 2026-10-13 — live plebeian.market public-relay smoke passed (gamma order afa3499b59fe confirmed via internal settlement); paid-order audit performed; F1 + WR-01 operator-accepted; milestone closeout in progress
+Plan: milestone v1.0 archived and tagged 2026-10-13 (commit 3c0ad9a); next milestone unplanned — deferred scope candidates noted in ROADMAP
+Status: v1.0 SHIPPED 2026-10-13 — v0.6.3 hardening release + live external verification; all Phase 5 gates closed or operator-disposed
+Last activity: 2026-10-13 — v1.0 milestone archived and tagged: live UAT passed, paid-order audit performed, F1 + WR-01 operator-accepted, audit reconciled to passed
 
 Progress: 3 phase acceptance scopes closed, 2 reopened, 1 in progress. Phase 5 has six reviewed plans; all plan gates closed or operator-disposed as of 2026-10-13. No overall
 acceptance percentage is implied by plan/artifact counters. There are 17 executed plan
