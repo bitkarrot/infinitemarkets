@@ -66,6 +66,24 @@ def problem_for(exc: ProblemError) -> JSONResponse:
     return problem(exc.status, exc.code, exc.title, exc.detail)
 
 
+def config_problem(exc: Exception) -> JSONResponse:
+    """Render a host-configuration failure (SettingsError) as problem+json.
+
+    ``SettingsError`` messages name the missing/malformed
+    ``INFINITEMARKETS_*`` variable but never echo values, so the detail is
+    safe to surface — and surfacing it is the point: without this the
+    admin UI only shows a bare 500 and operators cannot tell the
+    extension needs host-level env configuration plus a restart.
+    """
+    return problem(
+        500,
+        "extension-config",
+        "Extension not configured",
+        f"{exc} Set the variable in the LNbits host environment "
+        "(its .env, systemd unit, or container env) and restart LNbits.",
+    )
+
+
 def unauthorized(detail: str = "authentication required") -> ProblemError:
     return ProblemError(401, "unauthorized", "Unauthorized", detail)
 

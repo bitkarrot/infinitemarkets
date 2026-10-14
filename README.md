@@ -112,7 +112,7 @@ Symlink or copy `infinitemarkets/` into the host's extensions directory, or run 
 
 All extension settings use the `INFINITEMARKETS_` prefix and are read from the **host** environment — i.e. the environment of the LNbits process itself (its `.env`, systemd unit, Docker env, or shell — wherever `LNBITS_*` settings already live), not a file inside the extension.
 
-The extension **refuses to start** until the four required values below are present and valid.
+The extension **refuses to start** until the four required values below are present and valid. Missing or malformed values surface directly in the extension's admin page as an `Extension not configured` banner naming the offending variable — not a bare 500.
 
 ### Generating the required secrets
 
