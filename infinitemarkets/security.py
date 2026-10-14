@@ -118,6 +118,27 @@ def _bearer_present(request: Request) -> bool:
     return auth.lower().startswith("bearer ") and len(auth) > 7
 
 
+def _allowed_cookie_origins() -> set[str]:
+    """Operator-declared origins allowed to submit cookie-authed
+    mutations — never derived from the request's Host header:
+
+    - ``INFINITEMARKETS_PUBLIC_BASE_URL`` (canonical storefront)
+    - the host's ``nostr_absolute_request_urls`` — LNbits already treats
+      this as the operator's trusted origin set for absolute requests;
+      admins working on any of those hostnames are legitimate
+    - ``INFINITEMARKETS_ADMIN_ORIGINS`` (explicit extra origins, e.g. an
+      internal admin hostname)
+    """
+    allowed = {ext_settings().public_base_url}
+    urls = getattr(host_settings, "nostr_absolute_request_urls", None) or []
+    for u in urls:
+        p = urlparse(str(u).strip().rstrip("/"))
+        if p.scheme in {"http", "https"} and p.netloc:
+            allowed.add(f"{p.scheme}://{p.netloc}")
+    allowed.update(ext_settings().admin_origins)
+    return allowed
+
+
 def _user_id_only_auth(request: Request) -> bool:
     """True when the request carries no credential but relies on the host's
     optional ``usr``-only auth path (which we refuse for mutations)."""
@@ -152,21 +173,10 @@ def enforce_mutation_security(request: Request) -> None:
     # could otherwise smuggle a forged bearer to skip the Origin check).
     if request.cookies.get("cookie_access_token"):
         origin = request.headers.get("origin")
-        # Accept the configured canonical storefront origin OR the
-        # request's own effective origin. The second case covers admins
-        # reaching the host on a different hostname than
-        # PUBLIC_BASE_URL (e.g. shop.example.com fronts the shop while
-        # admin work happens on host.internal). It cannot weaken the
-        # CSRF contract: a cross-origin page's Origin never equals the
-        # target's own origin, so those requests still fail here.
-        effective = (
-            f"{request.base_url.scheme}://{request.base_url.netloc}"
-        )
-        canonical = ext_settings().public_base_url
         if (
             not origin
             or origin.lower() == "null"
-            or origin not in (canonical, effective)
+            or origin not in _allowed_cookie_origins()
         ):
             raise forbidden("cross-origin cookie mutation rejected")
 

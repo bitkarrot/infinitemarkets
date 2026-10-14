@@ -13,6 +13,8 @@ import re
 import time
 from decimal import Decimal
 
+from loguru import logger
+
 from ..db import (
     db,
     effective_stock,
@@ -256,14 +258,25 @@ async def check_public_rate_limit(request, *, bucket: str = "public-get",
     now = int(time.time())
     window = now - (now % window_s)
     async with db.connect() as conn:
-        await conn.execute(
-            f"INSERT INTO {table('rate_limit_buckets')} "
-            "(scope_hash, bucket, window_start, count, expires_at) "
-            "VALUES (:s, :b, :w, 1, :e) "
-            "ON CONFLICT (scope_hash, bucket, window_start) "
-            "DO UPDATE SET count = rate_limit_buckets.count + 1",
-            {"s": scope, "b": bucket, "w": window, "e": window + window_s * 2},
-        )
+        try:
+            await conn.execute(
+                f"INSERT INTO {table('rate_limit_buckets')} "
+                "(scope_hash, bucket, window_start, count, expires_at) "
+                "VALUES (:s, :b, :w, 1, :e) "
+                "ON CONFLICT (scope_hash, bucket, window_start) "
+                "DO UPDATE SET count = rate_limit_buckets.count + 1",
+                {"s": scope, "b": bucket, "w": window,
+                 "e": window + window_s * 2},
+            )
+        except Exception as exc:
+            if "locked" in str(exc):
+                from ..db import active_transactions
+
+                logger.warning(
+                    f"rate-limit write locked; active domain txs: "
+                    f"{active_transactions()}"
+                )
+            raise
         row = await conn.fetchone(
             f"SELECT count FROM {table('rate_limit_buckets')} "
             "WHERE scope_hash = :s AND bucket = :b AND window_start = :w",

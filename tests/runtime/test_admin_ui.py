@@ -811,9 +811,9 @@ def _mutation_scope(origin: str, host: str) -> dict:
 
 
 def test_mutation_same_origin_alias_accepted(monkeypatch):
-    """Origin equal to the request's own origin — but different from the
-    canonical PUBLIC_BASE_URL — must pass: multi-hostname deployments
-    (shop on one domain, admin on another) are legitimate."""
+    """An operator-declared admin origin (INFINITEMARKETS_ADMIN_ORIGINS)
+    different from canonical PUBLIC_BASE_URL must pass: multi-hostname
+    deployments (shop on one domain, admin on another) are legitimate."""
     import base64 as _b64
     import json as _json
 
@@ -831,11 +831,43 @@ def test_mutation_same_origin_alias_accepted(monkeypatch):
         _b64.b64encode(bytes([9]) * 32).decode(),
     )
     monkeypatch.setenv("INFINITEMARKETS_PUBLIC_BASE_URL", ORIGIN)
-    # Origin == request origin (admin-alias.example), != canonical.
+    monkeypatch.setenv(
+        "INFINITEMARKETS_ADMIN_ORIGINS", "https://admin-alias.example"
+    )
     _sec.enforce_mutation_security(
         Request(_mutation_scope("https://admin-alias.example",
                                 "admin-alias.example"))
     )
+
+
+def test_mutation_host_derived_origin_rejected(monkeypatch):
+    """Origin matching the request's own host but NOT on the operator
+    allowlist must be rejected — the authorized set is never derived
+    from the request's Host header (CWE-346)."""
+    import base64 as _b64
+    import json as _json
+
+    import pytest as _pytest
+    from starlette.requests import Request
+
+    from infinitemarkets import security as _sec
+
+    monkeypatch.setenv(
+        "INFINITEMARKETS_MASTER_KEYS",
+        _json.dumps({"v1": _b64.b64encode(bytes(32)).decode()}),
+    )
+    monkeypatch.setenv("INFINITEMARKETS_ACTIVE_KEY_VERSION", "v1")
+    monkeypatch.setenv(
+        "INFINITEMARKETS_PRIVACY_KEY",
+        _b64.b64encode(bytes([9]) * 32).decode(),
+    )
+    monkeypatch.setenv("INFINITEMARKETS_PUBLIC_BASE_URL", ORIGIN)
+    monkeypatch.delenv("INFINITEMARKETS_ADMIN_ORIGINS", raising=False)
+    with _pytest.raises(_sec.ProblemError):
+        _sec.enforce_mutation_security(
+            Request(_mutation_scope("https://admin-alias.example",
+                                    "admin-alias.example"))
+        )
 
 
 def test_mutation_foreign_origin_still_rejected(monkeypatch):
