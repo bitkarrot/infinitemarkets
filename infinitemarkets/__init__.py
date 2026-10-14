@@ -18,7 +18,13 @@ import time
 
 from fastapi import APIRouter
 
+from ._vendored import ensure_vendored
 from .db import db  # noqa: F401  (host migration runner imports this attr)
+
+# Release archives carry vendored wheels under _vendor/ because the host
+# never pip-installs extension dependencies; a no-op when the host env
+# already provides them. Must run before the nostr_sdk importers below.
+ensure_vendored()
 
 infinitemarkets_ext: APIRouter = APIRouter(
     prefix="/infinitemarkets", tags=["infinitemarkets"]
