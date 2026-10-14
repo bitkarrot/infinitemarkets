@@ -22,6 +22,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from lnbits.core.models import User
 from lnbits.decorators import check_user_exists
 from lnbits.helpers import template_renderer
+from loguru import logger
 
 from .db import (
     effective_stock_select,
@@ -241,8 +242,14 @@ def _public_response(request: Request, template: str, ctx: dict,
 
 
 async def _public_guard(request: Request) -> HTMLResponse | None:
-    """Rate-limit public pages; a 429 renders honestly, never a 500."""
+    """Rate-limit public pages; a 429 renders honestly, never a 500.
+
+    The limiter is the first settings read on every public page, so an
+    invalid extension configuration surfaces here as a 503 page (details
+    go to the log, not to buyers) instead of a bare 500 from deeper in
+    the route."""
     from .security import ProblemError
+    from .settings import SettingsError
 
     try:
         await nip89.check_public_rate_limit(request, bucket="public-page")
@@ -250,6 +257,13 @@ async def _public_guard(request: Request) -> HTMLResponse | None:
         return _public_response(
             request, "public_invalid.html",
             {"message": exc.title}, status=exc.status,
+        )
+    except SettingsError as exc:
+        logger.error(f"infinitemarkets: public page unavailable — {exc}")
+        return _public_response(
+            request, "public_invalid.html",
+            {"message": "This store is temporarily unavailable."},
+            status=503,
         )
     return None
 

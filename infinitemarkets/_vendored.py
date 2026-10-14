@@ -11,9 +11,10 @@ Remote installs instead get the pinned wheels unpacked under
 ``infinitemarkets/_vendor/<wheel platform tag>/`` by
 ``tools/package_release.py``. This shim runs at the top of
 ``infinitemarkets/__init__.py``, before any module that imports
-``nostr_sdk``: when the host environment already provides the module the
-shim does nothing, so a provisioned host always wins over the bundled
-fallback.
+``nostr_sdk``. A host copy is used only when it is exactly the pinned
+version; any other host version (or one without distribution metadata) is
+shadowed by the vendored wheel, so the extension never runs SDK code
+outside its pin when the pinned wheel is available.
 
 Frozen hosts additionally lack lazily-loaded **stdlib** modules that
 the bundler never saw (observed: ``html.parser``/``_markupbase`` on the
@@ -26,6 +27,7 @@ pinned by sha256 in ``tools/package_release.py``), applied with the same
 from __future__ import annotations
 
 import importlib
+import importlib.metadata
 import importlib.util
 import platform
 import sys
@@ -39,6 +41,9 @@ PURE_DIR = VENDOR_DIR / "py"
 
 #: Top-level modules the archive vendors under ``_vendor/<platform tag>/``.
 VENDORED_MODULES = ("nostr_sdk",)
+
+#: Pinned ``(distribution, version)`` per vendored module (PINS.md §3).
+PINNED_VERSIONS = {"nostr_sdk": ("nostr-sdk", "0.44.8")}
 
 #: Stdlib modules the archive vendors under ``_vendor/py/`` — frozen
 # hosts can ship a bundled-but-incomplete stdlib.
@@ -73,9 +78,37 @@ def _module_missing(module: str) -> bool:
         return True
 
 
+def _host_matches_pin(module: str) -> bool:
+    dist, pinned = PINNED_VERSIONS[module]
+    try:
+        return importlib.metadata.version(dist) == pinned
+    except importlib.metadata.PackageNotFoundError:
+        return False
+
+
+def _loaded_from(module: str, wheel_dir: Path) -> bool:
+    origin = getattr(sys.modules.get(module), "__file__", None) or ""
+    return Path(origin).resolve().is_relative_to(wheel_dir.resolve())
+
+
+def _warn(message: str) -> None:
+    from loguru import logger
+
+    logger.warning(f"infinitemarkets: {message}")
+
+
 def _enable_vendored_wheels() -> None:
-    missing = [m for m in VENDORED_MODULES if _module_missing(m)]
-    if not missing:
+    needed = [
+        m for m in VENDORED_MODULES
+        if _module_missing(m) or not _host_matches_pin(m)
+    ]
+    for module in [m for m in needed if m in sys.modules]:
+        # Already imported by the host or another extension — it cannot
+        # be swapped out from under them.
+        _warn(f"{module} was imported before the pinned vendored wheel "
+              "could load; running the host copy outside the pin")
+        needed.remove(module)
+    if not needed:
         return
     for tag in _platform_tags():
         wheel_dir = VENDOR_DIR / tag
@@ -83,13 +116,19 @@ def _enable_vendored_wheels() -> None:
             continue
         sys.path.insert(0, str(wheel_dir))
         try:
-            for module in missing:
+            for module in needed:
                 importlib.import_module(module)
+                if not _loaded_from(module, wheel_dir):
+                    raise ImportError(f"{module} did not load from {wheel_dir}")
             return
         except ImportError:
-            for module in missing:
+            for module in needed:
                 _drop_partial_imports(module)
             sys.path.remove(str(wheel_dir))
+    for module in needed:
+        if not _module_missing(module):
+            _warn(f"no vendored {module} wheel loads on this platform; "
+                  "running the host copy outside the pin")
 
 
 def _enable_vendored_stdlib() -> None:
@@ -118,11 +157,12 @@ def _enable_vendored_stdlib() -> None:
 def ensure_vendored() -> None:
     """Append vendored fallbacks to ``sys.path``.
 
-    No-op unless the host cannot already resolve a vendored module, and a
-    no-op entirely on git checkouts (``_vendor/`` only exists in release
-    archives). If nothing vendored matches this platform the later
-    imports raise the same ``ModuleNotFoundError`` a stock host would
-    have produced without this shim.
+    No-op unless the host lacks a vendored module (or carries an
+    unpinned version of it), and a no-op entirely on git checkouts
+    (``_vendor/`` only exists in release archives). If nothing vendored
+    matches this platform the later imports raise the same
+    ``ModuleNotFoundError`` a stock host would have produced without
+    this shim.
     """
     if not VENDOR_DIR.is_dir():
         return
