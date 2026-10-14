@@ -112,7 +112,11 @@ Symlink or copy `infinitemarkets/` into the host's extensions directory, or run 
 
 All extension settings use the `INFINITEMARKETS_` prefix and are read from the **host** environment — i.e. the environment of the LNbits process itself (its `.env`, systemd unit, Docker env, or shell — wherever `LNBITS_*` settings already live), not a file inside the extension.
 
-The extension **refuses to start** until the four required values below are present and valid.
+The extension **refuses to start** until the required values below are present and valid.
+
+**Zero-config bootstrap:** if neither `INFINITEMARKETS_MASTER_KEYS` nor `INFINITEMARKETS_PRIVACY_KEY` is set, the extension generates a `v1` master key and a privacy key once and persists them to `infinitemarkets-keys.json` in the LNbits data folder (mode `0600`, next to `database.sqlite3` — a DB-only leak cannot decrypt stored fields). The admin page shows a warning while generated keys are in use; set the variables explicitly to take over key management — env vars always win over the file. Setting only *one* of the two keeps the strict contract for both.
+
+`INFINITEMARKETS_PUBLIC_BASE_URL` still needs an explicit `https://` origin — it defaults to the host's own `LNBITS_BASEURL` when that value is already a canonical https origin.
 
 ### Generating the required secrets
 
@@ -153,10 +157,10 @@ INFINITEMARKETS_PUBLIC_BASE_URL=https://shop.example.com
 
 | Variable | Rules |
 |---|---|
-| `INFINITEMARKETS_MASTER_KEYS` | Valid JSON object, non-empty; every version label a non-empty string; every value strict base64 decoding to **exactly 32 bytes**; duplicate key material under two versions is rejected (it breaks rotation semantics) |
-| `INFINITEMARKETS_ACTIVE_KEY_VERSION` | Must be a label present in `MASTER_KEYS` |
-| `INFINITEMARKETS_PRIVACY_KEY` | base64 (32 bytes) **or** 64-char hex; must not match any master key's material |
-| `INFINITEMARKETS_PUBLIC_BASE_URL` | `https://` origin only — `https://shop.example.com` and `https://shop.example.com:8443` valid; `http://…`, `…/shop`, `…?x=1`, `user:pass@host` all rejected |
+| `INFINITEMARKETS_MASTER_KEYS` | Valid JSON object, non-empty; every version label a non-empty string; every value strict base64 decoding to **exactly 32 bytes**; duplicate key material under two versions is rejected (it breaks rotation semantics). Auto-generated + persisted when both secrets are unset |
+| `INFINITEMARKETS_ACTIVE_KEY_VERSION` | Must be a label present in `MASTER_KEYS`; optional when the keyring holds exactly one version |
+| `INFINITEMARKETS_PRIVACY_KEY` | base64 (32 bytes) **or** 64-char hex; must not match any master key's material. Auto-generated + persisted when both secrets are unset |
+| `INFINITEMARKETS_PUBLIC_BASE_URL` | `https://` origin only — `https://shop.example.com` and `https://shop.example.com:8443` valid; `http://…`, `…/shop`, `…?x=1`, `user:pass@host` all rejected. Defaults to the host's `LNBITS_BASEURL` when it qualifies |
 
 **Common mistakes**
 
