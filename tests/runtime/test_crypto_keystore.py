@@ -225,17 +225,23 @@ def test_base_url_defaults_to_host_lnbits_baseurl(monkeypatch, tmp_path):
         gsettings.ext_settings()
 
 
-def test_start_hook_fails_before_activation(monkeypatch):
-    """Missing/malformed config must abort infinitemarkets_start — merchant
-    services never activate on bad configuration."""
+def test_start_hook_survives_bad_config_for_diagnostics(monkeypatch):
+    """Missing/malformed config must NOT abort infinitemarkets_start —
+    raising deactivates the extension and its routes 404, hiding the
+    config_problem banner meant to explain the fix. The hook stays up
+    with no workers registered; every route still re-validates via
+    ext_settings() and refuses to operate on bad configuration."""
     import infinitemarkets
 
-    monkeypatch.delenv("INFINITEMARKETS_MASTER_KEYS", raising=False)
-    # Reference the exception through the SAME module instance under test —
-    # runtime fixtures purge/reimport infinitemarkets*, so a module-level
-    # ``gsettings`` may hold a different class object.
+    # Malformed (not absent — absent triggers valid auto-generation).
+    monkeypatch.setenv("INFINITEMARKETS_MASTER_KEYS", "not-json")
+    monkeypatch.setenv("INFINITEMARKETS_PRIVACY_KEY", "00")
+    before = list(infinitemarkets._owned_tasks)
+    infinitemarkets.infinitemarkets_start()
+    assert infinitemarkets._owned_tasks == before
+    # Operations still refuse: ext_settings keeps raising.
     with pytest.raises(infinitemarkets.settings.SettingsError):
-        infinitemarkets.infinitemarkets_start()
+        infinitemarkets.settings.ext_settings()
 
 
 # --- AES-256-GCM envelope -----------------------------------------------------

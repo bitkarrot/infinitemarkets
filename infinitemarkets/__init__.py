@@ -62,10 +62,26 @@ def infinitemarkets_start() -> None:
 
     from .db import topology_supported
     from .security import audit_capture_warnings
-    from .settings import ext_settings  # raises on invalid configuration
+    from .settings import (  # validates; failure stays diagnostic
+        ext_settings,
+        generated_keyfile_diverged,
+    )
 
-    _settings = ext_settings()
-    from .settings import generated_keyfile_diverged
+    try:
+        _settings = ext_settings()
+    except Exception as exc:
+        # Configuration failures must NOT raise here — an exception
+        # deactivates the extension and its routes 404, which hides the
+        # very config_problem banner meant to explain the fix. Stay
+        # active with workers disabled: every route re-validates via
+        # ext_settings() and refuses to operate on bad config.
+        logger.error(
+            "infinitemarkets: invalid configuration — routes stay up "
+            "for diagnostics but workers and operations are disabled: "
+            f"{exc}"
+        )
+        started_at = int(time.time())
+        return
 
     diverged = generated_keyfile_diverged(_settings)
     if diverged:
