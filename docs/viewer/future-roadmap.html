@@ -163,8 +163,14 @@ document.addEventListener('click', e => { if (!menu.hidden && !e.target.closest(
   article.style.setProperty('--accent', '#c8f53c');
 
   const heads = [...article.querySelectorAll('h2')];
-  toc.innerHTML = heads.map(h => `<a href="#${h.id}">${h.textContent}</a>`).join('');
-  document.getElementById('menuToc').innerHTML = toc.innerHTML;
+  heads.forEach(h => {
+    const a = document.createElement('a');
+    a.href = '#' + h.id;
+    a.textContent = h.textContent;
+    toc.appendChild(a);
+    const clone = a.cloneNode(true);
+    document.getElementById('menuToc').appendChild(clone);
+  });
   const links = [...toc.querySelectorAll('a')];
   const spy = new IntersectionObserver(entries => {
     entries.forEach(e => {

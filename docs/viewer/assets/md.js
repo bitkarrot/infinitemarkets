@@ -5,7 +5,7 @@
 (function () {
   const TAGS = ['shipped', 'tested', 'spec-aligned', 'todo', 'roadmap'];
   const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  const slug = s => s.toLowerCase().replace(/<[^>]+>|[*`]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
   function inline(src) {
     const codes = [];
