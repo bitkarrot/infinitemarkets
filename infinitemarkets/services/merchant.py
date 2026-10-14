@@ -209,6 +209,25 @@ async def create_merchant(user, *, wallet_id: str, display_name: str | None = No
             f"UPDATE {tx.table('merchants')} SET pubkey = :pk WHERE id = :id",
             {"pk": pubkey, "id": merchant_id},
         )
+        # Seed the visible starter relay set at creation — the admin
+        # panel shows editable rows instead of an empty list. Merchants
+        # can replace them wholesale via PATCH relay_configs.
+        from . import relay as relay_service
+
+        for url, direction in relay_service.starter_relay_rows():
+            await tx.execute(
+                f"INSERT INTO {tx.table('relay_configs')} "
+                "(id, merchant_id, relay_url, direction, enabled,"
+                " created_at, updated_at) VALUES (:i, :m, :u, :d, TRUE,"
+                " :t, :t)",
+                {
+                    "i": uuid.uuid4().hex,
+                    "m": merchant_id,
+                    "u": url,
+                    "d": direction,
+                    "t": now,
+                },
+            )
     row = await get_merchant_row(merchant_id, str(user.id))
     return _public_merchant(row)
 

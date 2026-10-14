@@ -27,7 +27,8 @@ from ..db import (
 )
 from ..security import unprocessable
 
-# Starter publication relays — merchant-editable, seeded on first publish.
+# Starter publication relays — merchant-editable, seeded at merchant
+# creation (and as a safety net on first publish when no rows exist).
 DEFAULT_RELAYS = (
     "wss://relay.damus.io",
     "wss://nos.lol",
@@ -49,6 +50,16 @@ DEFAULT_INBOX_RELAYS = (
     "wss://nos.lol",
     "wss://relay.damus.io",
 )
+
+
+def starter_relay_rows() -> list[tuple[str, str]]:
+    """Union of the starter sets with merged directions — a relay present
+    in both becomes a single ``both`` row. Seeded at merchant creation so
+    the admin panel shows usable rows from the start."""
+    dirs: dict[str, str] = {u: "public" for u in DEFAULT_RELAYS}
+    for url in DEFAULT_INBOX_RELAYS:
+        dirs[url] = "both" if url in dirs else "inbox"
+    return sorted(dirs.items())
 
 
 def _now() -> int:
