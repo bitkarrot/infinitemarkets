@@ -643,6 +643,13 @@
                             :options="gmCatalog.collections" option-label="title"
                             option-value="id" emit-value map-options
                             hint="Replaces current collection memberships for the selected products."></q-select>
+                  <q-select v-if="gmCatalog.bulkEditor.action === 'attach-shipping'"
+                            v-model="gmCatalog.bulkEditor.shippingOptionId" outlined
+                            label="Shipping option"
+                            :options="gmShippingChoices" option-label="title"
+                            option-value="id" option-disable="disable"
+                            emit-value map-options
+                            hint="Added to each selected product; existing shipping options are kept."></q-select>
                   <q-select v-if="gmCatalog.bulkEditor.action === 'visibility'"
                             v-model="gmCatalog.bulkEditor.visibility" outlined
                             label="Visibility" :options="gmCatalog.visibilities"></q-select>

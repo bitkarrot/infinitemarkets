@@ -1237,7 +1237,8 @@ async def bulk_products(
             "invalid-content", "product_ids must contain 1 to 100 product IDs"
         )
     if action not in {
-        "price-markup", "move-collection", "visibility", "draft", "publish", "delete"
+        "price-markup", "move-collection", "visibility", "draft", "publish",
+        "delete", "attach-shipping"
     }:
         raise unprocessable("invalid-content", "unsupported bulk action")
 
@@ -1261,6 +1262,10 @@ async def bulk_products(
         not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{32}", value)
     ):
         raise unprocessable("invalid-content", "collection is required")
+    elif action == "attach-shipping" and (
+        not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{32}", value)
+    ):
+        raise unprocessable("invalid-content", "shipping option is required")
 
     now = _now()
     async with DomainTransaction() as tx:
@@ -1305,6 +1310,20 @@ async def bulk_products(
                 )
             collection_ids.add(value)
 
+        if action == "attach-shipping":
+            option = await tx.fetch_one(
+                f"SELECT id, deleted_at, active FROM {tx.table('shipping_options')} "
+                "WHERE id = :i AND merchant_id = :m",
+                {"i": value, "m": merchant_id},
+            )
+            if not option or option["deleted_at"] is not None:
+                raise not_found("shipping option not found")
+            if not option["active"]:
+                raise unprocessable(
+                    "invalid-content",
+                    "shipping option is inactive — activate it first",
+                )
+
         for product_id in ids:
             row = by_id[product_id]
             assignments = ["revision = revision + 1", "updated_at = :t"]
@@ -1338,6 +1357,19 @@ async def bulk_products(
                     "(id, product_id, collection_id) VALUES (:i, :p, :c)",
                     {"i": uuid.uuid4().hex, "p": product_id, "c": value},
                 )
+            elif action == "attach-shipping":
+                linked = await tx.fetch_one(
+                    f"SELECT id FROM {tx.table('product_shipping_options')} "
+                    "WHERE product_id = :p AND shipping_option_id = :s",
+                    {"p": product_id, "s": value},
+                )
+                if not linked:
+                    await tx.execute(
+                        f"INSERT INTO {tx.table('product_shipping_options')} "
+                        "(id, product_id, shipping_option_id) "
+                        "VALUES (:i, :p, :s)",
+                        {"i": uuid.uuid4().hex, "p": product_id, "s": value},
+                    )
             if action == "draft":
                 await tx.execute(
                     f"DELETE FROM {tx.table('product_collections')} "
