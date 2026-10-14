@@ -506,8 +506,9 @@
         }
         ed.saving = true;
         try {
-          await self.gmApi("POST", "/products/bulk", body);
-          self.gmCatalog.notice = selected.length + " products updated.";
+          var result = await self.gmApi("POST", "/products/bulk", body);
+          self.gmCatalog.notice =
+            ((result && result.updated) || selected.length) + " products updated.";
           ed.show = false;
           await self.gmLoadCatalog();
         } catch (e) {

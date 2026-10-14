@@ -649,7 +649,7 @@
                             :options="gmShippingChoices" option-label="title"
                             option-value="id" option-disable="disable"
                             emit-value map-options
-                            hint="Added to each selected product; existing shipping options are kept."></q-select>
+                            hint="Added to selected physical products and their variations; existing shipping options are kept. Digital products are skipped."></q-select>
                   <q-select v-if="gmCatalog.bulkEditor.action === 'visibility'"
                             v-model="gmCatalog.bulkEditor.visibility" outlined
                             label="Visibility" :options="gmCatalog.visibilities"></q-select>

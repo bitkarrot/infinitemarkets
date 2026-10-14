@@ -22,7 +22,7 @@ from __future__ import annotations
 import json
 import uuid
 
-from lnbits.db import Connection
+from lnbits.db import SQLITE, Connection
 from loguru import logger
 
 from . import crypto
@@ -1435,13 +1435,67 @@ async def m016_inbox_scope_backlog(db: Connection):
 
 
 async def m017_import_identity_live_only(db: Connection):
-    """Soft-deleted products keep their import identity for audit, but they
-    must not block a re-upload of the same source rows: uniqueness applies
-    to live products only."""
+    """Re-upload after delete: soft-deleted products keep their import
+    identity for audit, but uniqueness applies to live products only. An
+    import whose products were all deleted is retired (``retired_at``) —
+    kept for audit — so its source hash is unique among live imports only."""
     s = db.references_schema
     await db.execute(f"DROP INDEX {s}ux_products_import_identity")
     await db.execute(
         f"CREATE UNIQUE INDEX ux_products_import_identity ON {s}products"
         "(merchant_id, import_source_kind, import_source_instance, "
         "import_legacy_id) WHERE deleted_at IS NULL"
+    )
+    if db.type == SQLITE:
+        # SQLite cannot drop a table UNIQUE constraint: rebuild the table.
+        # FK enforcement is off for the swap (children reference the table
+        # by name, so they bind to the rebuilt copy) and re-checked after.
+        await db.execute("PRAGMA foreign_keys=OFF")
+        await db.execute(
+            "CREATE TABLE catalog_imports_m017 ("
+            "id TEXT PRIMARY KEY, merchant_id TEXT NOT NULL "
+            "REFERENCES merchants(id) ON DELETE RESTRICT, "
+            "source_kind TEXT NOT NULL, source_instance TEXT NOT NULL, "
+            "source_hash TEXT NOT NULL, source_currency TEXT NOT NULL, "
+            "commitment_json TEXT NOT NULL, commitment_id TEXT NOT NULL, "
+            "state TEXT NOT NULL, product_count INTEGER NOT NULL, "
+            "liability_count INTEGER NOT NULL DEFAULT 0, "
+            f"created_at {db.big_int} NOT NULL, retired_at {db.big_int})"
+        )
+        columns = (
+            "id, merchant_id, source_kind, source_instance, source_hash, "
+            "source_currency, commitment_json, commitment_id, state, "
+            "product_count, liability_count, created_at"
+        )
+        await db.execute(
+            f"INSERT INTO catalog_imports_m017 ({columns}) "
+            f"SELECT {columns} FROM catalog_imports"
+        )
+        await db.execute("DROP TABLE catalog_imports")
+        await db.execute(
+            "ALTER TABLE catalog_imports_m017 RENAME TO catalog_imports"
+        )
+        violations = await db.fetchall("PRAGMA foreign_key_check")
+        await db.execute("PRAGMA foreign_keys=ON")
+        if violations:
+            raise RuntimeError("catalog_imports rebuild broke foreign keys")
+    else:
+        await db.execute(
+            f"ALTER TABLE {s}catalog_imports ADD COLUMN retired_at {db.big_int}"
+        )
+        for row in await db.fetchall(
+            "SELECT constraint_name FROM information_schema.table_constraints "
+            "WHERE table_schema = :s AND table_name = 'catalog_imports' "
+            "AND constraint_type = 'UNIQUE'",
+            {"s": db.schema},
+        ):
+            await db.execute(
+                f"ALTER TABLE {s}catalog_imports "
+                f'DROP CONSTRAINT "{row["constraint_name"]}"'
+            )
+    await db.execute(
+        f"CREATE UNIQUE INDEX ux_catalog_imports_live_source "
+        f"ON {s}catalog_imports"
+        "(merchant_id, source_kind, source_instance, source_hash) "
+        "WHERE retired_at IS NULL"
     )

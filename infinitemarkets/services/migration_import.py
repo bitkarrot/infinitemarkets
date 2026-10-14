@@ -608,40 +608,6 @@ async def execute_shopify_import(
     )
 
 
-async def _purge_stale_import(tx, import_id: str) -> None:
-    """Delete an import record whose products were all soft-deleted so the
-    same file can be uploaded again. Children go first — every FK into
-    catalog_imports is ON DELETE RESTRICT."""
-    await tx.execute(
-        f"DELETE FROM {tx.table('liability_partitions')} WHERE epoch_id IN "
-        f"(SELECT id FROM {tx.table('cutover_epochs')} WHERE import_id = :i) "
-        "OR liability_id IN "
-        f"(SELECT id FROM {tx.table('imported_liabilities')} WHERE import_id = :i)",
-        {"i": import_id},
-    )
-    await tx.execute(
-        f"DELETE FROM {tx.table('cutover_events')} WHERE epoch_id IN "
-        f"(SELECT id FROM {tx.table('cutover_epochs')} WHERE import_id = :i)",
-        {"i": import_id},
-    )
-    await tx.execute(
-        f"DELETE FROM {tx.table('cutover_epochs')} WHERE import_id = :i",
-        {"i": import_id},
-    )
-    await tx.execute(
-        f"DELETE FROM {tx.table('imported_liabilities')} WHERE import_id = :i",
-        {"i": import_id},
-    )
-    await tx.execute(
-        f"DELETE FROM {tx.table('import_rows')} WHERE import_id = :i",
-        {"i": import_id},
-    )
-    await tx.execute(
-        f"DELETE FROM {tx.table('catalog_imports')} WHERE id = :i",
-        {"i": import_id},
-    )
-
-
 async def execute_catalog_import(
     merchant_id: str, user, data: bytes, *, currency: str,
     source_instance: str, expected_hash: str, source_kind: str,
@@ -718,15 +684,21 @@ async def execute_catalog_import(
         previous = await tx.fetch_one(
             f"SELECT id, product_count, commitment_id, state FROM {tx.table('catalog_imports')} "
             "WHERE merchant_id = :m AND source_kind = :k "
-            "AND source_instance = :s AND source_hash = :h",
+            "AND source_instance = :s AND source_hash = :h "
+            "AND retired_at IS NULL",
             {"m": merchant_id, "k": source_kind,
              "s": source_instance, "h": expected_hash},
         )
         if previous:
+            # import_rows tracks parents only; their variations count too.
+            imported = (
+                f"SELECT product_id FROM {tx.table('import_rows')} "
+                "WHERE import_id = :i"
+            )
             live = await tx.fetch_one(
-                f"SELECT COUNT(*) AS n FROM {tx.table('import_rows')} r "
-                f"JOIN {tx.table('products')} p ON p.id = r.product_id "
-                "WHERE r.import_id = :i AND p.deleted_at IS NULL",
+                f"SELECT COUNT(*) AS n FROM {tx.table('products')} "
+                f"WHERE deleted_at IS NULL AND (id IN ({imported}) "
+                f"OR parent_product_id IN ({imported}))",
                 {"i": previous["id"]},
             )
             if live and live["n"]:
@@ -734,9 +706,13 @@ async def execute_catalog_import(
                         "state": previous["state"], "already_imported": True,
                         "commitment_id": previous["commitment_id"]}
             # Every product this import created was deleted — the merchant
-            # is re-uploading the same file to restore them. Retire the
-            # stale import record and run the import again.
-            await _purge_stale_import(tx, previous["id"])
+            # is re-uploading the same file to restore them. Retire the old
+            # import (kept intact for audit) and run the import again.
+            await tx.execute(
+                f"UPDATE {tx.table('catalog_imports')} SET retired_at = :t "
+                "WHERE id = :i",
+                {"t": now, "i": previous["id"]},
+            )
         for product in products:
             legacy_ids = [product["handle"]]
             if len(product["variants"]) > 1:
@@ -1149,7 +1125,7 @@ async def list_imports(merchant_id: str, user) -> list[dict]:
         rows = await conn.fetchall(
             f"SELECT id, source_kind, source_instance, source_hash, "
             "source_currency, state, product_count, liability_count, "
-            "commitment_id, created_at "
+            "commitment_id, created_at, retired_at "
             f"FROM {table('catalog_imports')} WHERE merchant_id = :m "
             "ORDER BY created_at DESC, id DESC LIMIT 100",
             {"m": merchant_id},
@@ -1168,7 +1144,7 @@ async def audit_import(merchant_id: str, user, import_id: str) -> dict:
         record = await conn.fetchone(
             f"SELECT id, source_kind, source_instance, source_hash, "
             "source_currency, state, product_count, liability_count, "
-            "commitment_json, commitment_id, created_at "
+            "commitment_json, commitment_id, created_at, retired_at "
             f"FROM {table('catalog_imports')} "
             "WHERE id = :i AND merchant_id = :m",
             {"i": import_id, "m": merchant_id},

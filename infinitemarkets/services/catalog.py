@@ -1289,6 +1289,51 @@ async def bulk_products(
                 )
             return {"deleted": len(ids), "product_ids": ids}
 
+        if action == "attach-shipping":
+            option = await tx.fetch_one(
+                f"SELECT id, deleted_at, active FROM {tx.table('shipping_options')} "
+                "WHERE id = :i AND merchant_id = :m",
+                {"i": value, "m": merchant_id},
+            )
+            if not option or option["deleted_at"] is not None:
+                raise not_found("shipping option not found")
+            if not option["active"]:
+                raise unprocessable(
+                    "invalid-content",
+                    "shipping option is inactive — activate it first",
+                )
+            # Checkout matches shipping on the purchased variation, so a
+            # variable parent carries the option down to its variations.
+            parents = [
+                product_id for product_id in ids
+                if by_id[product_id]["product_type"] == "variable"
+            ]
+            if parents:
+                parent_params = {f"p{i}": pid for i, pid in enumerate(parents)}
+                parent_params["m"] = merchant_id
+                variations = await tx.fetch_all(
+                    f"SELECT *, {released_product_select('products', tx.table)} "
+                    f"FROM {tx.table('products')} WHERE merchant_id = :m "
+                    "AND deleted_at IS NULL AND parent_product_id IN ("
+                    + ", ".join(f":p{i}" for i in range(len(parents)))
+                    + f") ORDER BY created_at, id{tx.for_update}",
+                    parent_params,
+                )
+                for variation in variations:
+                    if variation["id"] not in by_id:
+                        by_id[variation["id"]] = variation
+                        ids.append(variation["id"])
+            # Shipping applies to physical goods only (as in the editor).
+            ids = [
+                product_id for product_id in ids
+                if by_id[product_id]["format"] == "physical"
+            ]
+            if not ids:
+                raise unprocessable(
+                    "invalid-content",
+                    "shipping options apply to physical products only",
+                )
+
         collection_ids: set[str] = set()
         for product_id in ids:
             collection_ids.update(
@@ -1309,20 +1354,6 @@ async def bulk_products(
                     "draft products cannot be moved to a collection",
                 )
             collection_ids.add(value)
-
-        if action == "attach-shipping":
-            option = await tx.fetch_one(
-                f"SELECT id, deleted_at, active FROM {tx.table('shipping_options')} "
-                "WHERE id = :i AND merchant_id = :m",
-                {"i": value, "m": merchant_id},
-            )
-            if not option or option["deleted_at"] is not None:
-                raise not_found("shipping option not found")
-            if not option["active"]:
-                raise unprocessable(
-                    "invalid-content",
-                    "shipping option is inactive — activate it first",
-                )
 
         for product_id in ids:
             row = by_id[product_id]

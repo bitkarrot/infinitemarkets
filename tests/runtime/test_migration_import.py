@@ -630,6 +630,35 @@ async def test_reimport_after_products_deleted(runtime_env):
     assert repeated.json()["import_id"] != first.json()["import_id"]
     relisted = await imported_rows()
     assert len(relisted) == 4
+    # the retired import keeps its signed record and rows for audit
+    audits = "/infinitemarkets/api/v1/migration/imports"
+    old_audit = await client.get(f"{audits}/{first.json()['import_id']}")
+    assert old_audit.status_code == 200, old_audit.text
+    assert old_audit.json()["retired_at"] is not None
+    assert len(old_audit.json()["rows"]) == 2
+    new_audit = await client.get(f"{audits}/{repeated.json()['import_id']}")
+    assert new_audit.status_code == 200, new_audit.text
+    assert new_audit.json()["retired_at"] is None
+    listed = {row["id"]: row for row in (await client.get(audits)).json()}
+    assert listed[first.json()["import_id"]]["retired_at"] is not None
+
+    # a live variation keeps its import live even if the parent is deleted
+    parents = [row["id"] for row in relisted if row["product_type"] == "variable"]
+    assert len(parents) == 1
+    removed = await client.post(
+        f"{products_api}/bulk",
+        json={"product_ids": parents, "action": "delete"},
+        headers=headers,
+    )
+    assert removed.status_code == 200, removed.text
+    again = await client.post(
+        f"{import_api}/execute", data=form, files=upload, headers=headers,
+    )
+    assert again.status_code == 200, again.text
+    assert again.json()["already_imported"]
+    assert again.json()["import_id"] == repeated.json()["import_id"]
+    relisted = await imported_rows()
+    assert len(relisted) == 3
 
     removed = await client.post(
         f"{products_api}/bulk",
