@@ -1432,3 +1432,16 @@ async def m016_inbox_scope_backlog(db: Connection):
         f"CREATE INDEX IF NOT EXISTS idx_inbox_scope_backlog "
         f"ON {s}inbox_events(merchant_id, source_relay_url, processed_state)"
     )
+
+
+async def m017_import_identity_live_only(db: Connection):
+    """Soft-deleted products keep their import identity for audit, but they
+    must not block a re-upload of the same source rows: uniqueness applies
+    to live products only."""
+    s = db.references_schema
+    await db.execute(f"DROP INDEX {s}ux_products_import_identity")
+    await db.execute(
+        f"CREATE UNIQUE INDEX ux_products_import_identity ON {s}products"
+        "(merchant_id, import_source_kind, import_source_instance, "
+        "import_legacy_id) WHERE deleted_at IS NULL"
+    )

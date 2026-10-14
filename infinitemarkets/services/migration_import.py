@@ -608,6 +608,40 @@ async def execute_shopify_import(
     )
 
 
+async def _purge_stale_import(tx, import_id: str) -> None:
+    """Delete an import record whose products were all soft-deleted so the
+    same file can be uploaded again. Children go first — every FK into
+    catalog_imports is ON DELETE RESTRICT."""
+    await tx.execute(
+        f"DELETE FROM {tx.table('liability_partitions')} WHERE epoch_id IN "
+        f"(SELECT id FROM {tx.table('cutover_epochs')} WHERE import_id = :i) "
+        "OR liability_id IN "
+        f"(SELECT id FROM {tx.table('imported_liabilities')} WHERE import_id = :i)",
+        {"i": import_id},
+    )
+    await tx.execute(
+        f"DELETE FROM {tx.table('cutover_events')} WHERE epoch_id IN "
+        f"(SELECT id FROM {tx.table('cutover_epochs')} WHERE import_id = :i)",
+        {"i": import_id},
+    )
+    await tx.execute(
+        f"DELETE FROM {tx.table('cutover_epochs')} WHERE import_id = :i",
+        {"i": import_id},
+    )
+    await tx.execute(
+        f"DELETE FROM {tx.table('imported_liabilities')} WHERE import_id = :i",
+        {"i": import_id},
+    )
+    await tx.execute(
+        f"DELETE FROM {tx.table('import_rows')} WHERE import_id = :i",
+        {"i": import_id},
+    )
+    await tx.execute(
+        f"DELETE FROM {tx.table('catalog_imports')} WHERE id = :i",
+        {"i": import_id},
+    )
+
+
 async def execute_catalog_import(
     merchant_id: str, user, data: bytes, *, currency: str,
     source_instance: str, expected_hash: str, source_kind: str,
@@ -689,16 +723,38 @@ async def execute_catalog_import(
              "s": source_instance, "h": expected_hash},
         )
         if previous:
-            return {"import_id": previous["id"], "product_count": previous["product_count"],
-                    "state": previous["state"], "already_imported": True,
-                    "commitment_id": previous["commitment_id"]}
+            live = await tx.fetch_one(
+                f"SELECT COUNT(*) AS n FROM {tx.table('import_rows')} r "
+                f"JOIN {tx.table('products')} p ON p.id = r.product_id "
+                "WHERE r.import_id = :i AND p.deleted_at IS NULL",
+                {"i": previous["id"]},
+            )
+            if live and live["n"]:
+                return {"import_id": previous["id"], "product_count": previous["product_count"],
+                        "state": previous["state"], "already_imported": True,
+                        "commitment_id": previous["commitment_id"]}
+            # Every product this import created was deleted — the merchant
+            # is re-uploading the same file to restore them. Retire the
+            # stale import record and run the import again.
+            await _purge_stale_import(tx, previous["id"])
         for product in products:
+            legacy_ids = [product["handle"]]
+            if len(product["variants"]) > 1:
+                legacy_ids.extend(
+                    f"{product['handle']}::{index + 1}"
+                    for index in range(len(product["variants"]))
+                )
+            placeholders = ", ".join(f":l{i}" for i in range(len(legacy_ids)))
+            params = {"m": merchant_id, "k": source_kind,
+                      "s": source_instance}
+            params.update({f"l{i}": lid for i, lid in enumerate(legacy_ids)})
             existing = await tx.fetch_one(
                 f"SELECT id FROM {tx.table('products')} "
                 "WHERE merchant_id = :m AND import_source_kind = :k "
-                "AND import_source_instance = :s AND import_legacy_id = :l",
-                {"m": merchant_id, "k": source_kind,
-                 "s": source_instance, "l": product["handle"]},
+                "AND import_source_instance = :s "
+                f"AND import_legacy_id IN ({placeholders}) "
+                "AND deleted_at IS NULL",
+                params,
             )
             if existing:
                 raise conflict("import-conflict", "Source product was imported before")
