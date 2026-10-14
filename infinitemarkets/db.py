@@ -44,7 +44,9 @@ def worker_db() -> Database:
     concurrent worker (outbox publisher, email sender, ...) owns its own
     handle — same file on SQLite, same schema on PostgreSQL.
     """
-    return Database("ext_infinitemarkets")
+    wdb = Database("ext_infinitemarkets")
+    _register_sqlite_pragmas(wdb)
+    return wdb
 
 
 def table(name: str) -> str:
@@ -81,6 +83,38 @@ def topology_supported() -> tuple[bool, str | None]:
     return True, None
 
 
+_PRAGMAS_REGISTERED: set[int] = set()
+
+
+def _register_sqlite_pragmas(database: Database | None = None) -> None:
+    """Attach per-connection pragmas to a host engine (SQLite only).
+
+    DomainTransaction holds ``BEGIN IMMEDIATE`` writes on its own raw
+    connection — without a busy timeout, every ``db.connect()`` write
+    elsewhere (e.g. the public rate-limiter upsert) fails instantly with
+    "database is locked" instead of waiting the transaction out. The
+    engine ``connect`` listener covers all future physical connections
+    — including the pooled host connections that bypass this module's
+    helper. Each ``Database`` handle owns its own engine, so worker_db()
+    registers too.
+    """
+    database = database or db
+    if database.type != SQLITE or id(database.engine) in _PRAGMAS_REGISTERED:
+        return
+    from sqlalchemy import event
+
+    @event.listens_for(database.engine.sync_engine, "connect")
+    def _set_conn_pragmas(dbapi_conn, _rec):
+        cur = dbapi_conn.cursor()
+        try:
+            cur.execute("PRAGMA foreign_keys=ON")
+            cur.execute("PRAGMA busy_timeout=15000")
+        finally:
+            cur.close()
+
+    _PRAGMAS_REGISTERED.add(id(database.engine))
+
+
 @asynccontextmanager
 async def connect() -> AsyncIterator[Connection]:
     """Host connection for single-statement reads/writes (auto-commit).
@@ -88,10 +122,16 @@ async def connect() -> AsyncIterator[Connection]:
     Foreign-key enforcement is per-connection on SQLite — enabled here so
     every consumer of this helper gets it.
     """
+    _register_sqlite_pragmas()
     async with db.connect() as conn:
         if db.type == SQLITE:
             await _raw_sqlite(conn).execute("PRAGMA foreign_keys=ON")
         yield conn
+
+
+# db.engine exists from Database.__init__ — registering at import covers
+# every connection this engine ever makes (pooled host path included).
+_register_sqlite_pragmas()
 
 
 def _raw_sqlite(conn: Connection):
@@ -182,7 +222,7 @@ class DomainTransaction:
 
                 self._raw = await aiosqlite.connect(self._db.path)
                 await self._raw.execute("PRAGMA foreign_keys=ON")
-                await self._raw.execute("PRAGMA busy_timeout=5000")
+                await self._raw.execute("PRAGMA busy_timeout=15000")
                 await self._raw.execute("BEGIN IMMEDIATE")
             else:
                 cm = self._db.engine.connect()
