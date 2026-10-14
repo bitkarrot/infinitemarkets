@@ -94,7 +94,7 @@ https://raw.githubusercontent.com/bitkarrot/infinitemarkets/main/manifest.json
 
 The extension then appears in the extension manager and installs with sha256 verification against the release archive. The zip layout follows the LNbits contract: a single top-level `infinitemarkets/` directory containing `config.json` and the package.
 
-The archive is self-contained: LNbits does not install Python dependencies for extensions, so the pinned `nostr-sdk` wheels (PINS.md §3) are vendored under `infinitemarkets/_vendor/` for Linux (glibc and musl, x86_64 and aarch64), macOS, and Windows amd64 — including for single-binary LNbits builds that have no Python environment to install into. A host that already provides `nostr_sdk` is unaffected; the vendored copy is only a fallback.
+The archive is self-contained: LNbits does not install Python dependencies for extensions, so the pinned `nostr-sdk` wheels (PINS.md §3) are vendored under `infinitemarkets/_vendor/` for Linux (glibc and musl; x86_64, aarch64, armv7l, i686), macOS, and Windows amd64 — including for single-binary LNbits builds that have no Python environment to install into. A host that already provides `nostr_sdk` is unaffected; the vendored copy is only a fallback.
 
 > Note: use the `raw.githubusercontent.com` manifest URL, not the GitHub release-asset URL — LNbits fetches manifests with redirects disabled, and `releases/download/...` URLs 302 to a signed asset host. `main/manifest.json` always points at the latest release; the manifest embeds the sha256 of that release's zip.
 

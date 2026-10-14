@@ -57,6 +57,18 @@ VENDOR_WHEELS: dict[str, tuple[str, str]] = {
         "nostr_sdk-0.44.8-cp39-abi3-manylinux_2_17_aarch64.whl",
         "7b7a684afbfc9118aa2dd3adc7f06fa0d0f872e7ccfdf7542d2ba649f4b3689b",
     ),
+    "nostr_sdk-0.44.8-cp39-abi3-manylinux_2_17_armv7l.whl": (
+        "https://files.pythonhosted.org/packages/09/9f/"
+        "15bf74e0f4079b5386af44dde78824033922bd61b89575ee7f1da9fd2045/"
+        "nostr_sdk-0.44.8-cp39-abi3-manylinux_2_17_armv7l.whl",
+        "9811e6d8c9082673525345c0e446cadf19841982009e4f97451e702577765887",
+    ),
+    "nostr_sdk-0.44.8-cp39-abi3-manylinux_2_17_i686.whl": (
+        "https://files.pythonhosted.org/packages/af/0e/"
+        "cf6211ed51b00cc4ef624afd926a23b502897ca340da10e7ebe4beecc0df/"
+        "nostr_sdk-0.44.8-cp39-abi3-manylinux_2_17_i686.whl",
+        "a9b8de045f1b54da8554602483bdc5864ede3abf62776734ddda20ea2857de5e",
+    ),
     "nostr_sdk-0.44.8-cp39-abi3-musllinux_1_2_x86_64.whl": (
         "https://files.pythonhosted.org/packages/9b/82/"
         "28078b60a488efca13e34daaa2bb6e7fdc5c97e33f2ead52feba06179ad6/"
@@ -68,6 +80,18 @@ VENDOR_WHEELS: dict[str, tuple[str, str]] = {
         "ba457ede5ab84383fbad6d1d62d3bf2ddab7ff00f0f3dedc8476dfed3213/"
         "nostr_sdk-0.44.8-cp39-abi3-musllinux_1_2_aarch64.whl",
         "b142daccbcaf421accf094f33797f2edb7c8b212996412c9ee9dd824dff28bd4",
+    ),
+    "nostr_sdk-0.44.8-cp39-abi3-musllinux_1_2_armv7l.whl": (
+        "https://files.pythonhosted.org/packages/e4/89/"
+        "fb5a23621246d172725b2ff825a5e1247946b6ee37c776edd1b58c6b95a0/"
+        "nostr_sdk-0.44.8-cp39-abi3-musllinux_1_2_armv7l.whl",
+        "4a2314145250c8039a7987db1244de6c1bbe82c5d35394951f2278a5042ddd48",
+    ),
+    "nostr_sdk-0.44.8-cp39-abi3-musllinux_1_2_i686.whl": (
+        "https://files.pythonhosted.org/packages/16/b0/"
+        "541b3da4991d6711b42ac13617b5fb43e417e8c9e7c1bd509f244463647a/"
+        "nostr_sdk-0.44.8-cp39-abi3-musllinux_1_2_i686.whl",
+        "976bbfff3877c320e107cde7a7ba1b0979780d9b1c930bddc9fc13ed7184f95b",
     ),
     "nostr_sdk-0.44.8-cp39-abi3-macosx_11_0_arm64.whl": (
         "https://files.pythonhosted.org/packages/6b/59/"
