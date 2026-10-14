@@ -64,7 +64,12 @@ def infinitemarkets_start() -> None:
     from .security import audit_capture_warnings
     from .settings import ext_settings  # raises on invalid configuration
 
-    ext_settings()
+    _settings = ext_settings()
+    from .settings import generated_keyfile_diverged
+
+    diverged = generated_keyfile_diverged(_settings)
+    if diverged:
+        logger.error(f"infinitemarkets: {diverged}")
     ok, reason = topology_supported()
     if not ok:
         raise RuntimeError(f"infinitemarkets unsupported topology: {reason}")
