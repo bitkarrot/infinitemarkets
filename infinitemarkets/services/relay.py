@@ -33,6 +33,8 @@ DEFAULT_RELAYS = (
     "wss://relay.damus.io",
     "wss://nos.lol",
     "wss://relay.nostr.net",
+    "wss://relay.plebeian.market",
+    "wss://relay.conduit.market",
 )
 
 # Starter blossom media endpoints (https media servers, not nostr relays).
