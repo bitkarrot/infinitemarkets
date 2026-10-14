@@ -152,8 +152,22 @@ def enforce_mutation_security(request: Request) -> None:
     # could otherwise smuggle a forged bearer to skip the Origin check).
     if request.cookies.get("cookie_access_token"):
         origin = request.headers.get("origin")
+        # Accept the configured canonical storefront origin OR the
+        # request's own effective origin. The second case covers admins
+        # reaching the host on a different hostname than
+        # PUBLIC_BASE_URL (e.g. shop.example.com fronts the shop while
+        # admin work happens on host.internal). It cannot weaken the
+        # CSRF contract: a cross-origin page's Origin never equals the
+        # target's own origin, so those requests still fail here.
+        effective = (
+            f"{request.base_url.scheme}://{request.base_url.netloc}"
+        )
         canonical = ext_settings().public_base_url
-        if not origin or origin.lower() == "null" or origin != canonical:
+        if (
+            not origin
+            or origin.lower() == "null"
+            or origin not in (canonical, effective)
+        ):
             raise forbidden("cross-origin cookie mutation rejected")
 
         # Double-submit CSRF: per-session cookie == header.

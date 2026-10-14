@@ -788,3 +788,80 @@ async def test_messages_health_and_relay_auth(runtime_env):
         headers=await cookie(),
     )
     assert resp.status_code == 404, resp.text
+
+
+def _mutation_scope(origin: str, host: str) -> dict:
+    """Synthetic POST request scope for the §5.1 boundary drill."""
+    csrf = "a" * 48
+    return {
+        "type": "http",
+        "method": "POST",
+        "scheme": "https",
+        "server": (host, 443),
+        "path": "/x",
+        "query_string": b"",
+        "headers": [
+            (b"host", host.encode()),
+            (b"origin", origin.encode()),
+            (b"cookie",
+             f"cookie_access_token=t; gm_csrf={csrf}".encode()),
+            (b"x-csrf-token", csrf.encode()),
+        ],
+    }
+
+
+def test_mutation_same_origin_alias_accepted(monkeypatch):
+    """Origin equal to the request's own origin — but different from the
+    canonical PUBLIC_BASE_URL — must pass: multi-hostname deployments
+    (shop on one domain, admin on another) are legitimate."""
+    import base64 as _b64
+    import json as _json
+
+    from starlette.requests import Request
+
+    from infinitemarkets import security as _sec
+
+    monkeypatch.setenv(
+        "INFINITEMARKETS_MASTER_KEYS",
+        _json.dumps({"v1": _b64.b64encode(bytes(32)).decode()}),
+    )
+    monkeypatch.setenv("INFINITEMARKETS_ACTIVE_KEY_VERSION", "v1")
+    monkeypatch.setenv(
+        "INFINITEMARKETS_PRIVACY_KEY",
+        _b64.b64encode(bytes([9]) * 32).decode(),
+    )
+    monkeypatch.setenv("INFINITEMARKETS_PUBLIC_BASE_URL", ORIGIN)
+    # Origin == request origin (admin-alias.example), != canonical.
+    _sec.enforce_mutation_security(
+        Request(_mutation_scope("https://admin-alias.example",
+                                "admin-alias.example"))
+    )
+
+
+def test_mutation_foreign_origin_still_rejected(monkeypatch):
+    """Origin matching NEITHER canonical nor effective origin rejects —
+    the CSRF contract is unchanged."""
+    import base64 as _b64
+    import json as _json
+
+    from starlette.requests import Request
+
+    from infinitemarkets import security as _sec
+
+    monkeypatch.setenv(
+        "INFINITEMARKETS_MASTER_KEYS",
+        _json.dumps({"v1": _b64.b64encode(bytes(32)).decode()}),
+    )
+    monkeypatch.setenv("INFINITEMARKETS_ACTIVE_KEY_VERSION", "v1")
+    monkeypatch.setenv(
+        "INFINITEMARKETS_PRIVACY_KEY",
+        _b64.b64encode(bytes([9]) * 32).decode(),
+    )
+    monkeypatch.setenv("INFINITEMARKETS_PUBLIC_BASE_URL", ORIGIN)
+    import pytest as _pytest
+
+    with _pytest.raises(_sec.ProblemError):
+        _sec.enforce_mutation_security(
+            Request(_mutation_scope("https://evil.example",
+                                    "admin-alias.example"))
+        )
