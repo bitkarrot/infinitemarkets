@@ -657,7 +657,10 @@ async def test_variable_parent_stock_is_children_sum(runtime_env):
     assert resp.status_code == 200
     # aggregate 13 → plain "In stock", never the number
     assert "In stock" in resp.text
-    assert "13" not in re.sub(r"<script[\s\S]*</script>", "", resp.text, flags=re.IGNORECASE)
+    assert "13" not in re.sub(
+        r"<script\b[^>]*>[\s\S]*</script\b[^>]*>", "", resp.text,
+        flags=re.IGNORECASE,
+    )
     # child with 3 units → low-stock copy, still no count
     assert "Low Stock, Order Soon!" in resp.text
     assert "3 left" not in resp.text and "10 left" not in resp.text
@@ -684,4 +687,7 @@ async def test_low_stock_and_sold_out_copy(runtime_env):
         f"/infinitemarkets/p/{merchant['pubkey']}/{full['d_tag']}"
     )
     assert "In stock" in resp.text
-    assert "50" not in re.sub(r"<script[\s\S]*</script>", "", resp.text, flags=re.IGNORECASE)
+    assert "50" not in re.sub(
+        r"<script\b[^>]*>[\s\S]*</script\b[^>]*>", "", resp.text,
+        flags=re.IGNORECASE,
+    )
