@@ -21,12 +21,14 @@ from starlette.formparsers import MultiPartException, MultiPartParser
 
 from .security import (
     ProblemError,
+    config_problem,
     enforce_mutation_security,
     issue_csrf_cookie,
     problem_for,
     unprocessable,
 )
 from .services import merchant as merchant_service
+from .settings import SettingsError
 
 infinitemarkets_api_router = APIRouter(prefix="/api/v1")
 
@@ -53,6 +55,13 @@ def problem_boundary(fn):
             result = await fn(*args, **kwargs)
         except ProblemError as exc:
             resp = problem_for(exc)
+        except SettingsError as exc:
+            # Surface host-misconfiguration to the admin UI instead of an
+            # opaque 500 — the detail names the env var to set.
+            resp = config_problem(exc)
+        else:
+            resp = None
+        if resp is not None:
             if isinstance(request, Request) and request.cookies.get(
                 "cookie_access_token"
             ):

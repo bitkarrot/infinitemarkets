@@ -26,13 +26,14 @@ from .db import (
 )
 from .security import (
     ProblemError,
+    config_problem,
     not_found,
     problem_for,
     unprocessable,
 )
 from .services import checkout as checkout_service
 from .services import nip89, nostr_auth, readiness
-from .settings import ext_settings
+from .settings import SettingsError, ext_settings
 
 infinitemarkets_public_api_router = APIRouter(prefix="/api/v1/public")
 
@@ -63,9 +64,11 @@ def public_boundary(fn):
             return await fn(*args, **kwargs)
         except ProblemError as exc:
             resp = problem_for(exc)
-            for k, v in PUBLIC_HEADERS.items():
-                resp.headers[k] = v
-            return resp
+        except SettingsError as exc:
+            resp = config_problem(exc)
+        for k, v in PUBLIC_HEADERS.items():
+            resp.headers[k] = v
+        return resp
 
     return wrapper
 
