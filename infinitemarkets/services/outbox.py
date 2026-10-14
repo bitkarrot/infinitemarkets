@@ -700,8 +700,11 @@ async def publish_intent(row: dict, *, transport, keystore, relay_targets,
             await _maybe_update_inbox_state(tx, row, state)
             return state
 
-        # sign inside the tx window — key released immediately after
-        event = await _sign(settings, keystore, row, unsigned, created_at)
+        # sign inside the tx window — key released immediately after;
+        # conn=tx keeps the key read on THIS connection — a second
+        # connection here deadlocks sqlite (lock inversion via db.lock).
+        event = await _sign(settings, keystore, row, unsigned, created_at,
+                            conn=tx)
         event_id = event.id().to_hex()
         await tx.execute(
             f"UPDATE {tx.table('outbox_events')} SET last_signed_at = :n WHERE id = :i",
@@ -1080,7 +1083,7 @@ async def _record_address(tx, row, event_id, created_at, now):
     )
 
 
-async def _sign(settings, keystore, row, unsigned, created_at):
+async def _sign(settings, keystore, row, unsigned, created_at, conn=None):
     """Deterministic dict -> UnsignedEvent -> merchant-signed Event."""
     from nostr_sdk import EventBuilder, Kind, PublicKey, Tag, Timestamp
 
@@ -1089,9 +1092,11 @@ async def _sign(settings, keystore, row, unsigned, created_at):
     builder = builder.custom_created_at(Timestamp.from_secs(created_at))
     pubkey_hex = row["event_address"].split(":", 2)[1] \
         if row.get("event_address") and ":" in row["event_address"] \
-        else await keystore.public_key(row["merchant_id"])
+        else await keystore.public_key(row["merchant_id"], conn)
     unsigned_event = builder.build(PublicKey.parse(pubkey_hex))
-    return await keystore.sign_event(row["merchant_id"], unsigned_event)
+    return await keystore.sign_event(
+        row["merchant_id"], unsigned_event, conn=conn
+    )
 
 
 def _targets_inbox_set(row: dict) -> bool:

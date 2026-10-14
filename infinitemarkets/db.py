@@ -18,6 +18,9 @@ Conventions (verified against the pinned host, e336fe1):
 
 from __future__ import annotations
 
+import asyncio
+import time
+import weakref
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from typing import AsyncIterator
@@ -34,7 +37,40 @@ class LeaseLostError(RuntimeError):
     pass
 
 
-db = Database("ext_infinitemarkets")
+_IN_DOMAIN_TX: ContextVar[bool] = ContextVar("im_in_domain_tx", default=False)
+
+
+class _ExtDatabase(Database):
+    """Shared-handle guard: db.connect() inside an active
+    DomainTransaction can lock-invert (tx holds the file's write lock,
+    the nested connect waits on this handle's asyncio.Lock which may be
+    held by a task waiting on that write lock) — deadlock. On sqlite the
+    in-tx path must ride the transaction's own connection instead.
+    """
+
+    @asynccontextmanager
+    async def connect(self):
+        if self.type == SQLITE and _IN_DOMAIN_TX.get():
+            from loguru import logger
+
+            logger.warning(
+                "infinitemarkets: db.connect() inside an active "
+                "DomainTransaction — pass conn=tx instead"
+            )
+        async with super().connect() as conn:
+            yield conn
+
+
+db = _ExtDatabase("ext_infinitemarkets")
+
+#: Tasks currently inside a DomainTransaction — diagnostic for lock
+#: contention ("database is locked"): who holds the writer.
+_ACTIVE_TX: dict[int, tuple[str, float]] = {}
+
+
+def active_transactions() -> dict[int, tuple[str, float]]:
+    """{task id: (coroutine name, entered_at epoch)} — for debugging."""
+    return dict(_ACTIVE_TX)
 
 
 def worker_db() -> Database:
@@ -83,7 +119,10 @@ def topology_supported() -> tuple[bool, str | None]:
     return True, None
 
 
-_PRAGMAS_REGISTERED: set[int] = set()
+#: Engines already carrying pragma listeners — a WeakSet so a disposed
+#: worker engine's id() can never be mistaken for a live registration
+#: (ids recycle; workers create+dispose an engine every tick).
+_PRAGMAS_ENGINES: "weakref.WeakSet" = weakref.WeakSet()
 
 
 def _register_sqlite_pragmas(database: Database | None = None) -> None:
@@ -99,20 +138,27 @@ def _register_sqlite_pragmas(database: Database | None = None) -> None:
     registers too.
     """
     database = database or db
-    if database.type != SQLITE or id(database.engine) in _PRAGMAS_REGISTERED:
+    if database.type != SQLITE:
+        return
+    engine = database.engine.sync_engine
+    if engine in _PRAGMAS_ENGINES:
         return
     from sqlalchemy import event
 
-    @event.listens_for(database.engine.sync_engine, "connect")
+    @event.listens_for(engine, "connect")
     def _set_conn_pragmas(dbapi_conn, _rec):
         cur = dbapi_conn.cursor()
         try:
+            # WAL: readers never block the writer and a writer never
+            # blocks readers — only writer↔writer still serializes (with
+            # busy_timeout covering the wait). Persists on the db file.
+            cur.execute("PRAGMA journal_mode=WAL")
             cur.execute("PRAGMA foreign_keys=ON")
             cur.execute("PRAGMA busy_timeout=15000")
         finally:
             cur.close()
 
-    _PRAGMAS_REGISTERED.add(id(database.engine))
+    _PRAGMAS_ENGINES.add(engine)
 
 
 @asynccontextmanager
@@ -213,6 +259,7 @@ class DomainTransaction:
         self._host_conn_cm = None
         self._pg_tx = None
         self._raw = None
+        self._tx_ctx = None
         self._fence = ACTIVE_TASK_LEASE.get()
 
     async def __aenter__(self) -> "DomainTransaction":
@@ -221,6 +268,7 @@ class DomainTransaction:
                 import aiosqlite
 
                 self._raw = await aiosqlite.connect(self._db.path)
+                await self._raw.execute("PRAGMA journal_mode=WAL")
                 await self._raw.execute("PRAGMA foreign_keys=ON")
                 await self._raw.execute("PRAGMA busy_timeout=15000")
                 await self._raw.execute("BEGIN IMMEDIATE")
@@ -232,6 +280,16 @@ class DomainTransaction:
                 self._pg_tx = await raw.begin()
                 await self.execute(f"SET LOCAL search_path TO {SCHEMA}, public")
             await self._check_fence()
+            if self._dialect == "sqlite":
+                self._tx_ctx = _IN_DOMAIN_TX.set(True)
+            try:
+                task = asyncio.current_task()
+                coro = task.get_coro() if task else None
+                _ACTIVE_TX[id(task)] = (
+                    getattr(coro, "__qualname__", "unknown"), time.time()
+                )
+            except Exception:
+                pass
             return self
         except BaseException as exc:
             if self._raw is not None:
@@ -275,6 +333,12 @@ class DomainTransaction:
             else:
                 await self.rollback()
         finally:
+            if self._tx_ctx is not None:
+                _IN_DOMAIN_TX.reset(self._tx_ctx)
+            try:
+                _ACTIVE_TX.pop(id(asyncio.current_task()), None)
+            except Exception:
+                pass
             if self._raw is not None:
                 await self._raw.close()
             if self._host_conn_cm is not None:
@@ -327,3 +391,11 @@ class DomainTransaction:
     ) -> dict | None:
         rows = await self.fetch_all(sql, params)
         return rows[0] if rows else None
+
+    # Host-Connection spellings — a DomainTransaction passed as ``conn``
+    # into helpers written against db.connect() semantics must answer
+    # identically; otherwise those helpers open a second connection to
+    # the same file and self-deadlock on sqlite (busy_timeout cannot
+    # resolve a task waiting on its own lock).
+    fetchone = fetch_one
+    fetchall = fetch_all

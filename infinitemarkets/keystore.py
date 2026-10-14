@@ -156,14 +156,26 @@ class MerchantKeyStore:
             },
         )
 
-    async def _load_nsec(self, merchant_id: str) -> bytes:
-        """Decrypt the merchant nsec inside the operation; caller releases."""
-        async with db.connect() as conn:
-            row = await conn.fetchone(
-                f"SELECT key_version, nonce, ciphertext FROM {table('merchant_keys')} "
-                "WHERE merchant_id = :m",
-                {"m": merchant_id},
-            )
+    async def _load_nsec(
+        self, merchant_id: str, conn=None
+    ) -> bytes:
+        """Decrypt the merchant nsec inside the operation; caller releases.
+
+        ``conn`` may be a live DomainTransaction — callers inside a write
+        transaction MUST pass it: a fresh ``db.connect()`` here would wait
+        on the pooled-handle lock and deadlock the whole task on sqlite.
+        """
+        if conn is None:
+            async with db.connect() as conn:
+                return await self._load_nsec(merchant_id, conn)
+        t = (conn.table if isinstance(conn, DomainTransaction) else table)(
+            "merchant_keys"
+        )
+        row = await conn.fetchone(
+            f"SELECT key_version, nonce, ciphertext FROM {t} "
+            "WHERE merchant_id = :m",
+            {"m": merchant_id},
+        )
         if not row:
             raise KeystoreError("merchant key not found")
         version = row["key_version"]
@@ -184,23 +196,23 @@ class MerchantKeyStore:
             key_version=version,
         )
 
-    async def _keys(self, merchant_id: str) -> Keys:
-        nsec = await self._load_nsec(merchant_id)
+    async def _keys(self, merchant_id: str, conn=None) -> Keys:
+        nsec = await self._load_nsec(merchant_id, conn)
         try:
             return Keys.parse(nsec.hex())
         finally:
             del nsec
 
-    async def public_key(self, merchant_id: str) -> str:
-        keys = await self._keys(merchant_id)
+    async def public_key(self, merchant_id: str, conn=None) -> str:
+        keys = await self._keys(merchant_id, conn)
         try:
             return keys.public_key().to_hex()
         finally:
             del keys
 
-    async def export_key(self, merchant_id: str) -> str:
+    async def export_key(self, merchant_id: str, conn=None) -> str:
         """Return the merchant nsec to the owner after an explicit request."""
-        nsec = await self._load_nsec(merchant_id)
+        nsec = await self._load_nsec(merchant_id, conn)
         try:
             keys = Keys.parse(nsec.hex())
             try:
@@ -210,9 +222,11 @@ class MerchantKeyStore:
         finally:
             del nsec
 
-    async def sign_event(self, merchant_id: str, unsigned: UnsignedEvent):
+    async def sign_event(
+        self, merchant_id: str, unsigned: UnsignedEvent, conn=None
+    ):
         """Sign ``unsigned`` with the merchant key; key is released on exit."""
-        keys = await self._keys(merchant_id)
+        keys = await self._keys(merchant_id, conn)
         try:
             signer = NostrSigner.keys(keys)
             return await signer.sign_event(unsigned)
@@ -350,7 +364,9 @@ class MerchantKeyStore:
 
     # --- Release B/C interface members (section 11.1) -------------------------
 
-    async def nip17_wrap(self, merchant_id, unsigned_rumor, recipient_pubkey):
+    async def nip17_wrap(
+        self, merchant_id, unsigned_rumor, recipient_pubkey, conn=None
+    ):
         """Seal + gift-wrap ``unsigned_rumor`` for ``recipient_pubkey``.
 
         The merchant nsec is decrypted inside this operation and released
@@ -367,7 +383,7 @@ class MerchantKeyStore:
             gift_wrap_from_seal,
         )
 
-        keys = await self._keys(merchant_id)
+        keys = await self._keys(merchant_id, conn)
         try:
             recipient = (
                 recipient_pubkey
@@ -385,8 +401,10 @@ class MerchantKeyStore:
         finally:
             del keys
 
-    async def nip17_unwrap(self, merchant_id, signed_gift_wrap,
-                           expected_rumor_recipient=None):
+    async def nip17_unwrap(
+        self, merchant_id, signed_gift_wrap,
+        expected_rumor_recipient=None, conn=None,
+    ):
         """The explicit section 8.5 verification chain for one wrap.
 
         ``signed_gift_wrap`` is a signed kind-1059 ``Event`` or its raw JSON
@@ -399,7 +417,7 @@ class MerchantKeyStore:
         event objects leak out (the caller adapts to domain). Rejections
         raise :class:`WrapRejection` with a bounded reason.
         """
-        keys = await self._keys(merchant_id)
+        keys = await self._keys(merchant_id, conn)
         try:
             return _unwrap_gift_wrap(
                 keys, signed_gift_wrap, expected_rumor_recipient
