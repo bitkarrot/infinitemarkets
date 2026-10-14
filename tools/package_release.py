@@ -113,6 +113,32 @@ VENDOR_WHEELS: dict[str, tuple[str, str]] = {
     ),
 }
 
+# Frozen (Nuitka/PyInstaller) LNbits builds ship a bundled-but-incomplete
+# stdlib — html.parser + _markupbase were observed missing. The archive
+# carries the pristine CPython files under _vendor/py/ (loaded only when
+# the host lacks them; see infinitemarkets/_vendored.py). Keyed by the
+# path inside _vendor/py/ -> (CPython source path, sha256).
+CPYTHON_TAG = "v3.12.11"
+STDLIB_FILES: dict[str, tuple[str, str]] = {
+    "_markupbase.py": (
+        "Lib/_markupbase.py",
+        "cb14dd6f2e2439eb70b806cd49d19911363d424c2b6b9f4b73c9c08022d47030",
+    ),
+    "html/__init__.py": (
+        "Lib/html/__init__.py",
+        "923d82d821e75e8d235392c10c145ab8587927b3faf9c952bbd48081eebd8522",
+    ),
+    "html/entities.py": (
+        "Lib/html/entities.py",
+        "d9c65fb2828dbc1f3e399058a341d51e9375ec5bca95a8e92599c41bd5b78bde",
+    ),
+    "html/parser.py": (
+        "Lib/html/parser.py",
+        "ab5a0a2fce2bec75d969dbe057b490ef574f9ac57cce9e0eaaf7a220b301e838",
+    ),
+}
+VENDOR_STDLIB_CACHE = ROOT / ".cache" / "vendor-stdlib"
+
 
 def tracked_files() -> list[str]:
     out = subprocess.run(
@@ -140,8 +166,27 @@ def fetch_wheel(filename: str, url: str, sha256: str) -> Path:
     return wheel
 
 
+def fetch_stdlib(rel: str, source: str, sha256: str) -> Path:
+    """Return the cached pinned CPython Lib file, downloading if needed."""
+    VENDOR_STDLIB_CACHE.mkdir(parents=True, exist_ok=True)
+    target = VENDOR_STDLIB_CACHE / rel
+    if target.exists() and hashlib.sha256(target.read_bytes()).hexdigest() == sha256:
+        return target
+    url = ("https://raw.githubusercontent.com/python/cpython/"
+           f"{CPYTHON_TAG}/{source}")
+    print(f"fetching cpython {rel} @ {CPYTHON_TAG}")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    urllib.request.urlretrieve(url, target)
+    digest = hashlib.sha256(target.read_bytes()).hexdigest()
+    if digest != sha256:
+        target.unlink()
+        sys.exit(f"error: sha256 mismatch for {rel}: got {digest}")
+    return target
+
+
 def write_vendored(zf: zipfile.ZipFile) -> int:
-    """Write each pinned wheel's package contents under _vendor/<tag>/."""
+    """Write each pinned wheel's package contents under _vendor/<tag>/,
+    plus the pinned stdlib files under _vendor/py/."""
     count = 0
     for filename, (url, sha256) in VENDOR_WHEELS.items():
         wheel = fetch_wheel(filename, url, sha256)
@@ -158,6 +203,13 @@ def write_vendored(zf: zipfile.ZipFile) -> int:
                 info.compress_type = zipfile.ZIP_DEFLATED
                 zf.writestr(info, wf.read(member))
                 count += 1
+    for rel, (source, sha256) in STDLIB_FILES.items():
+        data = fetch_stdlib(rel, source, sha256).read_bytes()
+        info = zipfile.ZipInfo(f"{EXT_DIR}/_vendor/py/{rel}", date_time=FIXED_DATE)
+        info.external_attr = 0o644 << 16
+        info.compress_type = zipfile.ZIP_DEFLATED
+        zf.writestr(info, data)
+        count += 1
     return count
 
 
