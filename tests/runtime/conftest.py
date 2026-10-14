@@ -54,10 +54,21 @@ async def _isolated_postgres_schema():
         existing = await conn.fetchone(
             "SELECT nspname FROM pg_namespace WHERE nspname = 'infinitemarkets'"
         )
-    if existing:
-        raise RuntimeError(
-            "Runtime tests require a disposable database without a infinitemarkets schema"
-        )
+        if existing:
+            # A worker cancelled mid-tick can still finish a db.connect() on
+            # the shared session loop, and every PostgreSQL connect runs
+            # CREATE SCHEMA IF NOT EXISTS — leaving an EMPTY schema behind.
+            # The remnant carries no data: drop it under RESTRICT, which
+            # refuses a schema containing objects, so one racing connect
+            # cannot cascade-fail every later module. A non-empty schema
+            # still fails the disposability check.
+            try:
+                await conn.execute("DROP SCHEMA infinitemarkets RESTRICT")
+            except Exception:
+                raise RuntimeError(
+                    "Runtime tests require a disposable database without"
+                    " a infinitemarkets schema"
+                )
     try:
         yield
     finally:
@@ -222,6 +233,17 @@ async def _runtime_app(data_folder: Path, ext_root: Path):
                 await check_and_register_extensions(app)
             yield app
     finally:
+        # Shutdown cancels task_manager tasks but never invokes the
+        # extension stop hook — its untracked resources (inbox handler
+        # task, relay transport) would leak onto the session loop and
+        # keep connecting to the schema the next module just dropped.
+        ext_module = sys.modules.get("infinitemarkets")
+        stop = getattr(ext_module, "infinitemarkets_stop", None)
+        if stop is not None:
+            try:
+                await asyncio.wait_for(stop(), timeout=15)
+            except Exception:  # noqa: BLE001 — teardown is best-effort
+                pass
         os.chdir(previous_cwd)
         for key, value in snapshot.items():
             setattr(settings, key, value)
