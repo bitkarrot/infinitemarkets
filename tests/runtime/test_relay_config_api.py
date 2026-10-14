@@ -701,3 +701,43 @@ async def test_catalog_relay_check(runtime_env, monkeypatch):
         headers=_headers(env, csrf),
     )
     assert invalid.status_code == 422, invalid.text
+
+
+async def test_starter_relays_seeded_at_merchant_creation(runtime_env):
+    """A brand-new merchant has the starter relay set immediately — no
+    publish/inbox-enable step needed to see relay rows. Uses its own
+    merchant: the shared fixture merchant may already have had its rows
+    replaced by earlier PATCH tests."""
+    import uuid  # noqa: PLC0415
+
+    from lnbits.core.crud import create_wallet  # noqa: PLC0415
+    from lnbits.core.crud.users import create_account  # noqa: PLC0415
+    from lnbits.core.models.users import Account  # noqa: PLC0415
+
+    from infinitemarkets.db import db, table  # noqa: PLC0415
+    from infinitemarkets.services import merchant as merchant_service
+
+    acct = Account(id=uuid.uuid4().hex,
+                   username=f"relayseed{uuid.uuid4().hex[:8]}",
+                   password_hash="x")
+    await create_account(acct)
+    wallet = await create_wallet(user_id=acct.id, wallet_name="seed-w")
+    created = await merchant_service.create_merchant(
+        acct, wallet_id=wallet.id, display_name="seed test"
+    )
+    async with db.connect() as conn:
+        rows = await conn.fetchall(
+            f"SELECT relay_url, direction, enabled FROM {table('relay_configs')} "
+            "WHERE merchant_id = :m",
+            {"m": created["id"]},
+        )
+    dirs = {r["relay_url"]: r["direction"] for r in rows}
+    assert dirs["wss://nos.lol"] == "both"
+    assert dirs["wss://relay.damus.io"] == "both"
+    for url in (
+        "wss://relay.nostr.net",
+        "wss://relay.plebeian.market",
+        "wss://relay.conduit.market",
+    ):
+        assert dirs[url] == "public"
+    assert all(r["enabled"] for r in rows)

@@ -865,3 +865,46 @@ def test_mutation_foreign_origin_still_rejected(monkeypatch):
             Request(_mutation_scope("https://evil.example",
                                     "admin-alias.example"))
         )
+
+
+def test_vendored_stdlib_fills_missing_html_parser(tmp_path, monkeypatch):
+    """Simulate the frozen-host case: the bundled html package exists but
+    lacks html.parser. The shim must extend html.__path__ so the vendored
+    file resolves."""
+    import _markupbase
+    import html as _html
+    import html.parser as _real_parser
+    import importlib.util
+    import pathlib
+    import shutil
+    import sys
+
+    vendor = tmp_path / "_vendor" / "py"
+    (vendor / "html").mkdir(parents=True)
+    shutil.copy(_real_parser.__file__, vendor / "html" / "parser.py")
+    shutil.copy(_markupbase.__file__, vendor / "_markupbase.py")
+
+    real_path = list(_html.__path__)
+    _html.__path__ = []
+    sys.modules.pop("html.parser", None)
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "_vendored",
+            str(pathlib.Path(__file__).parents[2]
+                / "infinitemarkets" / "_vendored.py"),
+        )
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        monkeypatch.setattr(mod, "VENDOR_DIR", tmp_path / "_vendor")
+        monkeypatch.setattr(mod, "PURE_DIR", vendor)
+        assert mod._module_missing("html.parser")
+        mod.ensure_vendored()
+        import html.parser as loaded
+
+        assert str(vendor / "html") in loaded.__file__
+        parser = loaded.HTMLParser(convert_charrefs=True)
+        parser.feed("<p>x</p>")
+        parser.close()
+    finally:
+        _html.__path__ = real_path
+        sys.modules.pop("html.parser", None)
