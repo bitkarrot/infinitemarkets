@@ -551,7 +551,7 @@ rule when deciding which extension owns stock.
 
 - Add the manifest in **LNbits → Server → Extensions → Manifest sources**:
   `https://raw.githubusercontent.com/bitkarrot/infinitemarkets/main/manifest.json`
-- Set 4 host env vars: `INFINITEMARKETS_MASTER_KEYS`, `_ACTIVE_KEY_VERSION`, `_PRIVACY_KEY`, `_PUBLIC_BASE_URL`
+- Install and open it — keys auto-generate; `PUBLIC_BASE_URL` falls back to `LNBITS_BASEURL` when it is a canonical https origin. Set `INFINITEMARKETS_*` vars explicitly to manage keys/origin yourself
 - Bind a merchant wallet, then publish your first product
 
 **Links**

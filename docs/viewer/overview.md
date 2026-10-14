@@ -362,7 +362,7 @@ and reviews are out of scope for v1.
 ## Get started
 
 1. In LNbits, open **Server → Extensions → Manifest sources** and add `https://raw.githubusercontent.com/bitkarrot/infinitemarkets/main/manifest.json`
-2. Set four host environment variables: `INFINITEMARKETS_MASTER_KEYS`, `INFINITEMARKETS_ACTIVE_KEY_VERSION`, `INFINITEMARKETS_PRIVACY_KEY`, and `INFINITEMARKETS_PUBLIC_BASE_URL` (see the [README](https://github.com/bitkarrot/infinitemarkets#configuration))
+2. Install the extension — keys auto-generate on first run and `PUBLIC_BASE_URL` falls back to the host's `LNBITS_BASEURL` when it is a canonical https origin. For explicit management or non-default hosts, set `INFINITEMARKETS_MASTER_KEYS`, `INFINITEMARKETS_PRIVACY_KEY`, and `INFINITEMARKETS_PUBLIC_BASE_URL` — copying the auto-generated values, not fresh material (see the [README](https://github.com/bitkarrot/infinitemarkets#configuration))
 3. Bind a merchant wallet and publish your first product
 
 **More:** [install steps with a copy-ready manifest URL](https://infinitemarkets-docs.vercel.app/#start) · [source code and issues](https://github.com/bitkarrot/infinitemarkets) · [slide deck](slides.html) · [architecture diagrams](architecture.html) · [demo video](https://infinitemarkets-docs.vercel.app/#demo)

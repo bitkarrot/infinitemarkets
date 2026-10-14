@@ -304,8 +304,8 @@
       <div><div><h3>Add the manifest</h3>
         <p>In LNbits: <b>Server → Extensions → Manifest sources</b>.</p>
         <div class="copy"><code id="manifest">https://raw.githubusercontent.com/bitkarrot/infinitemarkets/main/manifest.json</code><button data-copy="manifest">Copy</button></div></div></div>
-      <div><div><h3>Set four host variables</h3>
-        <p><code>INFINITEMARKETS_MASTER_KEYS</code>, <code>…_ACTIVE_KEY_VERSION</code>, <code>…_PRIVACY_KEY</code> and <code>…_PUBLIC_BASE_URL</code>. The extension won't start without them.</p></div></div>
+      <div><div><h3>Open it — that's it</h3>
+        <p>Keys auto-generate on first run; the base URL falls back to <code>LNBITS_BASEURL</code> when it is a canonical https origin. Set <code>INFINITEMARKETS_*</code> vars to manage keys/origin explicitly.</p></div></div>
       <div><div><h3>Bind a wallet and publish</h3>
         <p>Pick the merchant wallet, add a product, and it appears on your storefront and on Nostr.</p></div></div>
     </div>

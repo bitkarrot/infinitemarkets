@@ -112,15 +112,17 @@ Symlink or copy `infinitemarkets/` into the host's extensions directory, or run 
 
 All extension settings use the `INFINITEMARKETS_` prefix and are read from the **host** environment — i.e. the environment of the LNbits process itself (its `.env`, systemd unit, Docker env, or shell — wherever `LNBITS_*` settings already live), not a file inside the extension.
 
-The extension **refuses to start** until the required values below are present and valid. Missing or malformed values surface directly in the extension's admin page as an `Extension not configured` banner naming the offending variable — not a bare 500.
+Invalid or missing values never take the extension down: routes stay up and the admin page renders an `Extension not configured` banner naming the offending variable — workers and operations stay disabled until the values are valid, and every API surface answers `application/problem+json` rather than a bare 500.
 
 **Zero-config bootstrap:** if neither `INFINITEMARKETS_MASTER_KEYS` nor `INFINITEMARKETS_PRIVACY_KEY` is set, the extension generates a `v1` master key and a privacy key once and persists them to `infinitemarkets-keys.json` in the LNbits data folder (mode `0600`, next to `database.sqlite3` — a DB-only leak cannot decrypt stored fields). The admin page shows a warning while generated keys are in use; set the variables explicitly to take over key management — env vars always win over the file. Setting only *one* of the two keeps the strict contract for both.
 
 `INFINITEMARKETS_PUBLIC_BASE_URL` still needs an explicit `https://` origin — it defaults to the host's own `LNBITS_BASEURL` when that value is already a canonical https origin.
 
-### Generating the required secrets
+### Generating the secrets (explicit key management)
 
-Run each `openssl` command once per environment and store the output somewhere safe (a password manager or secrets store). The values are random 32-byte keys — they are **not** recoverable if lost, and losing them makes previously stored encrypted fields (buyer identifiers, Nostr payloads, private-link token hashes) unreadable.
+**If the extension has already run once, do not generate fresh values** — copy the `master_keys`/`privacy_key` out of `infinitemarkets-keys.json` instead. Fresh material makes every field encrypted under the generated keys unreadable.
+
+For a brand-new install taking over key management from the start, run each `openssl` command once per environment and store the output somewhere safe (a password manager or secrets store). The values are random 32-byte keys — they are **not** recoverable if lost, and losing them makes previously stored encrypted fields (buyer identifiers, Nostr payloads, private-link token hashes) unreadable.
 
 ```bash
 # 1. Generate a master key (32 random bytes, base64-encoded)
@@ -185,6 +187,7 @@ INFINITEMARKETS_PUBLIC_BASE_URL=https://shop.example.com
 | `INFINITEMARKETS_CHECKOUT_RATE_LIMIT_HOURLY` | `100` | Checkout requests/hour per IP |
 | `INFINITEMARKETS_EMAIL_ENABLED` | `true` | Order notification email |
 | `INFINITEMARKETS_EMAIL_MAX_ATTEMPTS` | `5` | Email retry bound |
+| `INFINITEMARKETS_ADMIN_ORIGINS` | — | Extra comma-separated origins allowed to submit cookie-authed admin mutations (e.g. an internal admin hostname). `PUBLIC_BASE_URL` and the host's `nostr_absolute_request_urls` are always allowed |
 
 ## Storefront modes
 
