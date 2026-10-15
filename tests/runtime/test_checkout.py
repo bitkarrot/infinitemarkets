@@ -547,6 +547,91 @@ async def test_shipping_rejects_invalid_coverage(runtime_env, problem):
     assert error.value.status == 422
 
 
+@pytest.mark.parametrize(
+    "address",
+    [
+        {"country": "US"},
+        {"country": "US", "line1": "1 Main St"},
+        {"country": "US", "city": "Springfield"},
+        {"country": "US", "line1": "   ", "city": "Springfield"},
+    ],
+    ids=["no-street-no-city", "no-city", "no-street", "blank-street"],
+)
+async def test_checkout_requires_delivery_address(runtime_env, address):
+    """§8.1 step 7 — a physical web order without street + city can never
+    be fulfilled; rejected at intake before any order row exists."""
+    client = runtime_env["client"]
+    headers = {"Origin": ORIGIN, "X-CSRF-Token": client.cookies.get("gm_csrf")}
+    response = await client.post(
+        f"{API}/shipping", headers=headers,
+        json={
+            "title": "addressed shipping", "service": "standard",
+            "base_price_minor": 10, "currency": "SAT", "countries": ["US"],
+        },
+    )
+    assert response.status_code == 201, response.text
+    option = response.json()
+    response = await client.post(
+        f"{API}/products", headers=headers,
+        json={
+            "category_id": runtime_env["category_id"], "title": "addressed item",
+            "format": "physical", "visibility": "on-sale", "currency": "SAT",
+            "amount_minor": 100, "stock_on_hand": 5,
+            "shipping_option_ids": [option["id"]],
+        },
+    )
+    assert response.status_code == 201, response.text
+    product = response.json()
+    from infinitemarkets.security import ProblemError
+
+    with pytest.raises(ProblemError) as error:
+        await _svcs()["checkout"].checkout(
+            payload=await _payload(
+                runtime_env, [{"d_tag": product["d_tag"], "quantity": 1}],
+                shipping_option_d=option["d_tag"], address=address,
+            ),
+            idempotency_key=uuid.uuid4().hex * 2,
+            client_scope=uuid.uuid4().hex,
+        )
+    assert error.value.status == 422
+    assert error.value.code == "invalid-content"
+
+
+async def test_quote_still_quotes_destination_only(runtime_env):
+    """The quote preview needs only the destination — street-level fields
+    stay a checkout-time (not quote-time) requirement."""
+    client = runtime_env["client"]
+    headers = {"Origin": ORIGIN, "X-CSRF-Token": client.cookies.get("gm_csrf")}
+    response = await client.post(
+        f"{API}/shipping", headers=headers,
+        json={
+            "title": "quoted shipping", "service": "standard",
+            "base_price_minor": 10, "currency": "SAT", "countries": ["US"],
+        },
+    )
+    assert response.status_code == 201, response.text
+    option = response.json()
+    response = await client.post(
+        f"{API}/products", headers=headers,
+        json={
+            "category_id": runtime_env["category_id"], "title": "quoted item",
+            "format": "physical", "visibility": "on-sale", "currency": "SAT",
+            "amount_minor": 100, "stock_on_hand": 5,
+            "shipping_option_ids": [option["id"]],
+        },
+    )
+    assert response.status_code == 201, response.text
+    product = response.json()
+    preview = await client.post(
+        f"{API}/public/quote",
+        json=await _payload(
+            runtime_env, [{"d_tag": product["d_tag"], "quantity": 1}],
+            shipping_option_d=option["d_tag"], address={"country": "US"},
+        ),
+    )
+    assert preview.status_code == 200, preview.text
+
+
 @pytest.mark.parametrize("currency,base,fees,extra,expected", [
     ("SAT", 500, {}, None, 500),
     ("USD", 550, {}, None, 550),
@@ -590,7 +675,8 @@ async def test_shipping_quotes_include_precision_and_components(
     product = response.json()
     payload = await _payload(
         runtime_env, [{"d_tag": product["d_tag"], "quantity": 2}],
-        shipping_option_d=shipping["d_tag"], address={"country": "US", "line1": "Test"},
+        shipping_option_d=shipping["d_tag"],
+        address={"country": "US", "line1": "1 Main St", "city": "Springfield"},
     )
     preview = await client.post(f"{API}/public/quote", json=payload)
     assert preview.status_code == 200, preview.text

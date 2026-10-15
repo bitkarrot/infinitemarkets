@@ -172,7 +172,8 @@
             <h3 class="co-title">Delivery</h3>
             <div class="field">
               <label for="gm-country">Shipping country</label>
-              <select id="gm-country" name="country" autocomplete="country-name">
+              <select id="gm-country" name="country" autocomplete="country-name"
+                      required>
                 <option value="">Choose a country…</option>
               </select>
               <p class="field-error" data-error-for="country"
@@ -181,10 +182,11 @@
             {% if product.shipping %}
             <div class="field">
               <label for="gm-shipping">Shipping option</label>
-              <select id="gm-shipping" name="shipping_option">
+              <select id="gm-shipping" name="shipping_option" required>
                 <option value="">Choose a shipping option…</option>
                 {% for s in product.shipping %}
-                <option value="{{ s.d_tag }}">
+                <option value="{{ s.d_tag }}"
+                        data-countries="{{ s.countries | join(',') }}">
                   {{ s.title or (s.service | capitalize) }}{% if s.title and s.service and (s.service | lower) not in (s.title | lower) %} · {{ s.service | capitalize }}{% endif %}
                 </option>
                 {% endfor %}
@@ -196,23 +198,29 @@
             <div class="field">
               <label for="gm-line1">Street address</label>
               <input type="text" id="gm-line1" name="line1" maxlength="200"
-                     autocomplete="address-line1">
+                     autocomplete="address-line1" required>
+              <p class="field-error" data-error-for="line1"
+                 aria-live="polite" hidden></p>
             </div>
             <div class="field">
               <label for="gm-city">City</label>
               <input type="text" id="gm-city" name="city" maxlength="100"
-                     autocomplete="address-level2">
+                     autocomplete="address-level2" required>
+              <p class="field-error" data-error-for="city"
+                 aria-live="polite" hidden></p>
             </div>
             <div class="field-row">
               <div class="field">
-                <label for="gm-region">State / region code</label>
+                <label for="gm-region">State / region code
+                  <span class="optional">(optional)</span></label>
                 <input type="text" id="gm-region" name="region" maxlength="100"
                        autocomplete="address-level1" placeholder="e.g. CA">
                 <p class="field-error" data-error-for="region"
                    aria-live="polite" hidden></p>
               </div>
               <div class="field">
-                <label for="gm-postal">Postal code</label>
+                <label for="gm-postal">Postal code
+                  <span class="optional">(optional)</span></label>
                 <input type="text" id="gm-postal" name="postal_code"
                        maxlength="20" autocomplete="postal-code">
               </div>

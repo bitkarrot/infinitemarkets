@@ -424,6 +424,37 @@ async def _resolve_shipping(
     return option
 
 
+# Web-form bounds (public_product.html maxlengths) — country/region are
+# already shape-checked by ``_resolve_shipping``.
+_ADDRESS_LIMITS = {"line1": 200, "city": 100, "postal_code": 20}
+
+
+def _require_delivery_address(address: dict) -> None:
+    """Web checkout needs a deliverable street address for physical items.
+
+    ``_resolve_shipping`` only proves country/region coverage — a bare
+    destination cannot be fulfilled. Street + city are required; region
+    and postal code stay optional (several destinations have no postal
+    system). Gamma orders keep the §8.1 step-7 minimum and never reach
+    this check.
+    """
+    for field in ("line1", "city"):
+        if not isinstance(address.get(field), str) or not address[field].strip():
+            raise unprocessable(
+                "invalid-content", "Address required",
+                "a street address and city are required for delivery",
+            )
+    for field, limit in _ADDRESS_LIMITS.items():
+        value = address.get(field)
+        if value is not None and (
+            not isinstance(value, str) or len(value.strip()) > limit
+        ):
+            raise unprocessable(
+                "invalid-content", "Invalid address",
+                f"address.{field} must be at most {limit} characters",
+            )
+
+
 WEIGHT_FACTORS = {
     "mg": "0.000001", "g": "0.001", "kg": "1", "t": "1000",
     "lb": "0.45359237", "oz": "0.028349523125",
@@ -787,6 +818,8 @@ async def _run_checkout(
         )
 
     resolved, address, shipping_option = await _resolve_cart(merchant["id"], payload)
+    if shipping_option is not None:
+        _require_delivery_address(address)
 
     email = payload.get("email")
     email_opt_in = bool(payload.get("email_opt_in"))

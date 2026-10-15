@@ -61,16 +61,18 @@ async def _setup(runtime_env):
         f"{API}/shipping",
         json={"title": "post", "service": "standard",
               "base_price_minor": 500, "currency": "SAT",
-              "countries": ["US"]},
+              "countries": ["US", "DE"]},
         headers=await cookie(),
     )
     assert resp.status_code == 201, resp.text
+    shipping = resp.json()
     resp = await client.post(
         f"{API}/products",
         json={
             "category_id": cid, "title": "mug", "amount_minor": 4200,
             "currency": "SAT", "visibility": "on-sale",
             "stock_on_hand": 5, "format": "physical",
+            "shipping_option_ids": [shipping["id"]],
         },
         headers=await cookie(),
     )
@@ -119,6 +121,13 @@ async def test_product_page_checkout_card(runtime_env):
     # consent copy.
     for field in ("country", "line1", "city", "region", "postal_code"):
         assert f'name="{field}"' in html, field
+    # Shipping options carry their destination coverage so the buyer's
+    # country select can only offer places the shop actually ships to;
+    # street + city are required, region/postal stay optional (§8.1).
+    assert 'data-countries="US,DE"' in html
+    for required in ("gm-line1", "gm-city", "gm-country", "gm-shipping"):
+        field = html.split(f'id="{required}"', 1)[1].split(">", 1)[0]
+        assert "required" in field, required
     assert 'name="email_opt_in"' in html
     assert "Send transactional updates. No marketing." in html
     # Persistent Items/Shipping/Total summary.
