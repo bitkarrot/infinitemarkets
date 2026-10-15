@@ -680,6 +680,7 @@ GET   /orders/{id}/events              audit log
 
 ```text
 GET   /public/merchants/{pubkey}                    profile + preferences (no internals)
+GET   /public/merchants/{pubkey}/sitemap.xml        public storefront, product and collection URLs
 GET   /public/products/{merchant_pubkey}/{d_tag}    rendered listing + availability
 GET   /public/collections/{merchant_pubkey}/{d_tag}
 GET   /public/shipping/{merchant_pubkey}/{d_tag}
@@ -712,6 +713,13 @@ apply to the selected currency only (price sort is unavailable across mixed
 currencies until `currency` is selected).
 `page` is 1-based with 24 products per page; filter and sort changes reset to
 page 1. The public slug, not the internal category id, is used in links.
+
+Each full-mode storefront advertises its per-merchant sitemap through
+`<link rel="sitemap">`. The extension is mounted beneath `/infinitemarkets`
+on a shared LNbits origin, so it cannot provide a standards-compliant
+origin-root `/robots.txt` for an individual merchant. Deployments that manage
+the origin-root robots file may add the merchant sitemap URL there; the
+extension does not expose a nested per-merchant `robots.txt` endpoint.
 
 The `naddr` handler decodes bech32, requires kind `30402`, a local merchant pubkey, and
 a valid `d` identifier, and ignores embedded relay hints for server-side fetching. It

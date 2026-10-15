@@ -155,9 +155,19 @@ def _product_meta_description(product: dict) -> str:
         return explicit
     summary = (product.get("summary") or "").strip()
     if summary:
-        return summary
+        return _truncate_meta_description(summary)
     desc = _plain_text(product.get("description_md"))
-    return desc[:160] if desc else ""
+    return _truncate_meta_description(desc or product.get("title") or "")
+
+
+def _truncate_meta_description(value: str) -> str:
+    value = re.sub(r"\s+", " ", value).strip()
+    if len(value) <= 160:
+        return value
+    excerpt = value[:157]
+    if " " in excerpt:
+        excerpt = excerpt.rsplit(" ", 1)[0]
+    return excerpt.rstrip() + "..."
 
 
 def _collection_meta_title(collection: dict) -> str:
@@ -169,7 +179,17 @@ def _collection_meta_description(collection: dict) -> str:
     if explicit:
         return explicit
     desc = _plain_text(collection.get("description"))
-    return desc[:160] if desc else ""
+    return _truncate_meta_description(desc or collection.get("title") or "")
+
+
+# ISO currency codes offered by the catalog UI or supported by the FX layer.
+_SCHEMA_PRICE_CURRENCIES = frozenset({
+    "USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "BRL", "MXN",
+    "INR", "KRW", "PLN", "SEK", "NOK", "DKK", "NZD", "SGD", "HKD",
+    "ZAR", "BIF", "CLP", "DJF", "GNF", "ISK", "KMF", "PYG", "RWF",
+    "UGX", "UYI", "VND", "VUV", "XAF", "XOF", "XPF", "BHD", "IQD",
+    "JOD", "KWD", "LYD", "OMR", "TND", "CLF", "UYW",
+})
 
 
 def _schema_price(amount_minor: int | None, currency: str | None,
@@ -177,8 +197,10 @@ def _schema_price(amount_minor: int | None, currency: str | None,
     if amount_minor is None:
         return None
     code = (currency or "SAT").upper()
-    if code in ("SAT", "SATS"):
-        return f"{int(amount_minor)}", code
+    # Only emit offers for known ISO 4217 values supported by the catalog UI.
+    # Lightning units and arbitrary custom currency labels aren't ISO codes.
+    if code not in _SCHEMA_PRICE_CURRENCIES:
+        return None
     places = 2 if decimals is None else int(decimals)
     value = Decimal(int(amount_minor)).scaleb(-places)
     return f"{value:.{places}f}", code
@@ -192,7 +214,7 @@ def _availability_state(state: str) -> str:
     }.get(state, "https://schema.org/InStock")
 
 
-def _product_jsonld(product: dict, canonical_url: str,
+def _product_jsonld(request: Request, product: dict, canonical_url: str,
                     meta_description: str) -> dict:
     price = _schema_price(
         product["price"]["amount_minor"],
@@ -205,7 +227,10 @@ def _product_jsonld(product: dict, canonical_url: str,
         "name": product.get("title") or "",
         "description": meta_description,
         "url": canonical_url,
-        "image": [img["url"] for img in product.get("images", [])],
+        "image": [
+            _absolute_url(request, img["url"])
+            for img in product.get("images", [])
+        ],
     }
     if price is not None:
         data["offers"] = {
@@ -218,7 +243,7 @@ def _product_jsonld(product: dict, canonical_url: str,
     return data
 
 
-def _collection_jsonld(collection: dict, canonical_url: str,
+def _collection_jsonld(request: Request, collection: dict, canonical_url: str,
                        meta_description: str) -> dict:
     data: dict = {
         "@context": "https://schema.org",
@@ -228,7 +253,7 @@ def _collection_jsonld(collection: dict, canonical_url: str,
         "url": canonical_url,
     }
     if collection.get("image"):
-        data["image"] = collection["image"]
+        data["image"] = _absolute_url(request, collection["image"])
     return data
 
 
@@ -307,9 +332,6 @@ async def _store_ctx(merchant: dict, theme: dict | None) -> dict:
         "storefront_mode": await mode_service.get_mode(merchant["id"]),
         "sitemap_url": (
             f"/infinitemarkets/public/merchants/{merchant['pubkey']}/sitemap.xml"
-        ),
-        "robots_url": (
-            f"/infinitemarkets/public/merchants/{merchant['pubkey']}/robots.txt"
         ),
         **nostr,
     }
@@ -518,7 +540,9 @@ async def product_preview(
             "meta_title": meta_title,
             "meta_description": meta_description,
             "og_image_url": _absolute_url(request, og_image),
-            "product_jsonld": _product_jsonld(payload, canonical, meta_description),
+            "product_jsonld": _product_jsonld(
+                request, payload, canonical, meta_description
+            ),
             **store,
         },
     )
@@ -577,7 +601,9 @@ async def product_page(request: Request, pubkey: str, d_tag: str):
             "meta_title": meta_title,
             "meta_description": meta_description,
             "og_image_url": _absolute_url(request, og_image),
-            "product_jsonld": _product_jsonld(payload, canonical, meta_description),
+            "product_jsonld": _product_jsonld(
+                request, payload, canonical, meta_description
+            ),
             **store,
         },
     )
@@ -774,7 +800,9 @@ async def collection_page(request: Request, pubkey: str, d_tag: str):
             "meta_title": meta_title,
             "meta_description": meta_description,
             "og_image_url": _absolute_url(request, row.get("image")),
-            "collection_jsonld": _collection_jsonld(row, canonical, meta_description),
+            "collection_jsonld": _collection_jsonld(
+                request, row, canonical, meta_description
+            ),
             **store,
         },
     )
@@ -855,7 +883,10 @@ async def merchant_page(request: Request, pubkey: str):
     else:
         share_image = hero_image
     share_title = store["brand_name"] or merchant.get("display_name") or "Our store"
-    share_description = (hero["subtitle"] or "").strip()[:200]
+    share_description = (
+        (hero["subtitle"] or "").strip()
+        or f"Shop products from {share_title}."
+    )[:160]
     return _public_response(
         request,
         "public_merchant.html",
@@ -898,19 +929,31 @@ async def merchant_sitemap(request: Request, pubkey: str):
         return _public_response(request, "public_invalid.html", {},
                                 status=404)
     from .db import db, table
+    from .services import storefront_mode as mode_service
 
-    async with db.connect() as conn:
-        products = await conn.fetchall(
-            f"SELECT d_tag, updated_at FROM {table('products')} "
-            "WHERE merchant_id = :m AND deleted_at IS NULL AND NOT draft "
-            "AND parent_product_id IS NULL AND visibility != 'hidden'",
-            {"m": merchant["id"]},
-        )
-        collections = await conn.fetchall(
-            f"SELECT d_tag, updated_at FROM {table('collections')} "
-            "WHERE merchant_id = :m AND deleted_at IS NULL",
-            {"m": merchant["id"]},
-        )
+    indexable = await mode_service.get_mode(merchant["id"]) != "nostr_only"
+    products = []
+    collections = []
+    if indexable:
+        async with db.connect() as conn:
+            products = await conn.fetchall(
+                f"SELECT d_tag, updated_at FROM {table('products')} "
+                "WHERE merchant_id = :m AND deleted_at IS NULL AND NOT draft "
+                "AND parent_product_id IS NULL AND visibility != 'hidden' "
+                f"AND {released_product_clause('products', table)}",
+                {"m": merchant["id"]},
+            )
+            collections = await conn.fetchall(
+                f"SELECT c.d_tag, c.updated_at FROM {table('collections')} c "
+                "WHERE c.merchant_id = :m AND c.deleted_at IS NULL AND EXISTS ("
+                f"SELECT 1 FROM {table('product_collections')} pc "
+                f"JOIN {table('products')} p ON p.id = pc.product_id "
+                "WHERE pc.collection_id = c.id "
+                "AND p.deleted_at IS NULL AND NOT p.draft "
+                "AND p.parent_product_id IS NULL AND p.visibility != 'hidden' "
+                f"AND {released_product_clause('p', table)})",
+                {"m": merchant["id"]},
+            )
     base = f"{request.url.scheme}://{request.url.netloc}"
     urlset = ET.Element(
         "urlset", xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
@@ -921,7 +964,8 @@ async def merchant_sitemap(request: Request, pubkey: str):
         ET.SubElement(url, "loc").text = loc
         ET.SubElement(url, "lastmod").text = _sitemap_date(ts)
 
-    add_url(f"{base}/infinitemarkets/public/merchants/{pubkey}", None)
+    if indexable:
+        add_url(f"{base}/infinitemarkets/public/merchants/{pubkey}", None)
     for p in products:
         add_url(
             f"{base}/infinitemarkets/p/{pubkey}/{p['d_tag']}",
@@ -936,30 +980,6 @@ async def merchant_sitemap(request: Request, pubkey: str):
         urlset, encoding="unicode"
     )
     return Response(content=body, media_type="application/xml; charset=utf-8")
-
-
-@infinitemarkets_generic_router.get(
-    "/public/merchants/{pubkey}/robots.txt", response_class=Response
-)
-async def merchant_robots(request: Request, pubkey: str):
-    """Per-merchant robots.txt pointing at the storefront sitemap."""
-    limited = await _public_guard(request)
-    if limited is not None:
-        return limited
-    merchant = await nip89.merchant_by_pubkey(pubkey)
-    if not merchant or merchant["state"] in ("deactivating", "inactive"):
-        return _public_response(request, "public_invalid.html", {},
-                                status=404)
-    base = f"{request.url.scheme}://{request.url.netloc}"
-    sitemap = f"{base}/infinitemarkets/public/merchants/{pubkey}/sitemap.xml"
-    body = (
-        "User-agent: *\n"
-        "Allow: /infinitemarkets/public/merchants/\n"
-        "Allow: /infinitemarkets/p/\n"
-        "Allow: /infinitemarkets/public/collections/\n"
-        f"Sitemap: {sitemap}\n"
-    )
-    return Response(content=body, media_type="text/plain; charset=utf-8")
 
 
 @infinitemarkets_generic_router.get(

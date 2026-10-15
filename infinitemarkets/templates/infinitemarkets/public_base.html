@@ -7,7 +7,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
-  <title>{% block title %}Infinitemarkets{% endblock %}{% if brand_name %} · {{ brand_name }}{% endif %}</title>
+  <title>{% if brand_name %}{{ brand_name }} · {% endif %}{% block title %}Infinitemarkets{% endblock %}</title>
   <link rel="stylesheet" href="/infinitemarkets/static/infinitemarkets/css/gm-public.css?v={{ asset_revision }}">
   {% if theme_css %}<style>{{ theme_css | safe }}</style>{% endif %}
   {% if sitemap_url %}<link rel="sitemap" type="application/xml" title="Sitemap" href="{{ sitemap_url }}">{% endif %}

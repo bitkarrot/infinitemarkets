@@ -234,6 +234,7 @@ HTTP_ROUTES: tuple[str, ...] = (
     "GET /orders/{id}/events",
     # 5.4 public — catalog and checkout
     "GET /public/merchants/{pubkey}",
+    "GET /public/merchants/{pubkey}/sitemap.xml",
     "GET /public/products/{merchant_pubkey}/{d_tag}",
     "GET /public/collections/{merchant_pubkey}/{d_tag}",
     "GET /public/shipping/{merchant_pubkey}/{d_tag}",
