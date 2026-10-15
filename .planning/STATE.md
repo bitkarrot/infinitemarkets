@@ -6,9 +6,9 @@ current_phase: "05"
 current_phase_name: Correctness, Recovery, and Security Hardening
 status: milestone-closed
 stopped_at: product release v1.0.0 tagged and published 2026-10-13; v1.0 milestone archived
-last_updated: "2026-10-15T03:00:00+00:00"
+last_updated: "2026-10-15T05:30:00+00:00"
 last_activity: 2026-10-15
-last_activity_desc: product releases through v1.0.10 published (dismissable keyfile warning, category moves, collection counts, publish + inbox indicators)
+last_activity_desc: product releases through v1.0.11 published (state-aware blocked-mode copy, solid Settings buttons, quick-gate fast tier)
 progress:
   total_phases: 6
   completed_phases: 3
@@ -29,8 +29,8 @@ See: .planning/PROJECT.md (updated 2026-10-11)
 
 Phase: 5 of 6 (Correctness, Recovery, and Security Hardening)
 Plan: milestone v1.0 archived and tagged 2026-10-13 (commit 3c0ad9a); next milestone unplanned — deferred scope candidates noted in ROADMAP
-Status: milestone v1.0 shipped; product releases through v1.0.10 cut 2026-10-15 — all Phase 5 gates closed or operator-disposed
-Last activity: 2026-10-15 — v1.0.10 published: dismissable keyfile warning (ack sidecar), product/bulk category moves, collection product counts, not-live catalog banner, Nostr inbox enable card; Devin Review fixes landed on both PRs
+Status: milestone v1.0 shipped; product releases through v1.0.11 cut 2026-10-15 — all Phase 5 gates closed or operator-disposed
+Last activity: 2026-10-15 — v1.0.11 published: state-aware blocked-mode cards, solid Settings buttons, `make verify-fast` quick gate (290 tests, ~50s), route-registry parity restored
 
 Progress: 3 phase acceptance scopes closed, 2 reopened, 1 in progress. Phase 5 has six reviewed plans; all plan gates closed or operator-disposed as of 2026-10-13. No overall
 acceptance percentage is implied by plan/artifact counters. There are 17 executed plan
@@ -55,7 +55,11 @@ dismissable auto-generated-keys warning (ack sidecar bound to keyfile
 bytes); product PATCH category reassignment + bulk move-category
 (variations follow their parent); Collections product counts;
 not-live catalog banner with direct publish; Nostr inbox enable/disable
-card gating showcase/nostr_only; reviews #19/#20 fix commits folded in.
+card gating showcase/nostr_only; reviews #19/#20 fix commits folded in;
+blocked-mode cards name the live inbox state; Settings actions use
+solid-filled buttons; pytest `fast` marker marks the ~50s quick-gate
+tier (all qualification + non-host runtime files); AGENTS.md records
+the pre-push verification contract.
 
 ## Performance Metrics
 

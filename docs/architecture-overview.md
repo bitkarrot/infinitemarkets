@@ -208,7 +208,7 @@ superseded, failed — plus their `relay_publications` evidence and
 touched; the daily `retention_prune` still covers inbox ciphertext, token
 copies, peer-relay cache, and terminal-order PII.
 
-**v1.0.9–v1.0.10 admin polish.** The auto-generated-keyfile warning is
+**v1.0.9–v1.0.11 admin polish.** The auto-generated-keyfile warning is
 dismissable — the acknowledgement lives in `infinitemarkets-keys.ack`
 beside the keyfile and binds to its bytes, so a regenerated keyfile
 re-warns. `PATCH /products/{id}` honours `category_id` (a variable
@@ -219,3 +219,6 @@ products sit under a `draft`/`publication_pending` merchant — checkout
 stays closed — with a direct Publish everything action, and Settings →
 Merchant gains a Nostr inbox card exposing `inbox_state` plus
 enable/disable (the kind-10050 gate for Showcase/Nostr-only modes).
+Blocked storefront-mode cards read the live inbox state (pending /
+error / deactivating) rather than a static reason, and Settings actions
+use solid-filled buttons throughout.
