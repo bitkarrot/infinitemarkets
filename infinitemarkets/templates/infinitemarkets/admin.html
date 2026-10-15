@@ -587,13 +587,16 @@
                 <div class="gm-editor-wide gm-seo-preview">
                   <div class="text-caption text-grey-7">Search preview</div>
                   <div class="text-primary text-body2" style="font-weight: 500;">
-                    {{ gmCatalog.editor.form.meta_title || gmCatalog.editor.form.title }}
+                    {{ gmBrandName() ? gmBrandName() + ' · ' : '' }}{{ gmCatalog.editor.form.meta_title || gmCatalog.editor.form.title }}
                   </div>
                   <div class="text-caption" style="color: #006621;">
                     {{ gmOrigin() }}/infinitemarkets/p/{{ gm.merchant.pubkey }}/{{ gmCatalog.editor.form.d_tag }}
                   </div>
                   <div class="text-body2 text-grey-8">
-                    {{ gmCatalog.editor.form.meta_description || gmCatalog.editor.form.summary || gmCatalog.editor.form.description_md }}
+                    {{ gmSerpText(gmCatalog.editor.form.meta_description || gmCatalog.editor.form.summary || gmCatalog.editor.form.description_md) }}
+                  </div>
+                  <div class="text-caption text-grey-8">
+                    {{ gmSerpPrice(gmCatalog.editor.form.price_major, gmCatalog.editor.form.currency, gmCatalog.editor.form.currency_decimals) }}
                   </div>
                 </div>
                 <q-select v-model="gmCatalog.editor.form.product_type" dense
@@ -909,13 +912,13 @@
                 <div class="gm-editor-wide gm-seo-preview">
                   <div class="text-caption text-grey-7">Search preview</div>
                   <div class="text-primary text-body2" style="font-weight: 500;">
-                    {{ gmCatalog.collectionEditor.form.meta_title || gmCatalog.collectionEditor.form.title }}
+                    {{ gmBrandName() ? gmBrandName() + ' · ' : '' }}{{ gmCatalog.collectionEditor.form.meta_title || gmCatalog.collectionEditor.form.title }}
                   </div>
                   <div class="text-caption" style="color: #006621;">
                     {{ gmOrigin() }}/infinitemarkets/public/collections/{{ gm.merchant.pubkey }}/{{ gmCatalog.collectionEditor.form.d_tag }}
                   </div>
                   <div class="text-body2 text-grey-8">
-                    {{ gmCatalog.collectionEditor.form.meta_description || gmCatalog.collectionEditor.form.description }}
+                    {{ gmSerpText(gmCatalog.collectionEditor.form.meta_description || gmCatalog.collectionEditor.form.description) }}
                   </div>
                 </div>
                 <q-input v-model="gmCatalog.collectionEditor.form.image" dense
@@ -2435,14 +2438,21 @@
                   <div class="q-pa-sm">
                     <div class="text-caption q-mb-sm">
                       The image social apps show when your storefront link is
-                      shared. Pick the brand logo or the hero background.
+                      shared. Pick the brand logo, hero background, or a custom
+                      image URL (recommended 1200 × 630).
                     </div>
                     <q-select v-model="gmSettings.theme.share.card_image" dense
                               outlined class="q-mb-sm"
                               label="Card image"
                               :options="[{ value: 'brand_logo', label: 'Brand logo' },
-                                         { value: 'hero_image', label: 'Hero background' }]"
+                                         { value: 'hero_image', label: 'Hero background' },
+                                         { value: 'custom_image', label: 'Custom image URL' }]"
                               emit-value map-options></q-select>
+                    <q-input v-if="gmSettings.theme.share.card_image === 'custom_image'"
+                             v-model="gmSettings.theme.share.custom_image_url" dense
+                             outlined class="q-mb-sm"
+                             label="Custom share image URL (https or /images/…)">
+                    </q-input>
                   </div>
                 </q-expansion-item>
 

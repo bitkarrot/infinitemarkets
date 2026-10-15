@@ -342,7 +342,7 @@
               : "",
             title: "", summary: "", description_md: "",
             meta_title: "", meta_description: "",
-            product_type: "simple", format: "digital",
+            d_tag: "", product_type: "simple", format: "digital",
             price_major: 0, currency: "SAT", currency_decimals: 0,
             visibility: "on-sale", draft: false,
             stock_on_hand: null,
@@ -362,6 +362,7 @@
           form: {
             id: d.id,
             category_id: d.category_id,
+            d_tag: d.d_tag || "",
             title: d.title || "", summary: d.summary || "",
             description_md: d.description_md || "",
             meta_title: d.meta_title || "", meta_description: d.meta_description || "",
@@ -583,7 +584,7 @@
         this.gmCatalog.tab = "collections";
         this.gmCatalog.collectionEditor = {
           show: true, saving: false, error: null, isNew: true,
-          form: { title: "", description: "", meta_title: "", meta_description: "", image: "", location: "" }
+          form: { title: "", description: "", meta_title: "", meta_description: "", d_tag: "", image: "", location: "" }
         };
       },
       gmEditCollection: function (row) {
@@ -591,7 +592,7 @@
         this.gmCatalog.collectionEditor = {
           show: true, saving: false, error: null, isNew: false,
           form: {
-            id: row.id, title: row.title || "",
+            id: row.id, d_tag: row.d_tag || "", title: row.title || "",
             description: row.description || "",
             meta_title: row.meta_title || "", meta_description: row.meta_description || "",
             image: row.image || "",

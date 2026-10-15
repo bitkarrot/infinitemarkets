@@ -843,9 +843,12 @@ async def merchant_page(request: Request, pubkey: str):
     }
     share_cfg = (theme or {}).get("share") or {}
     card_source = share_cfg.get("card_image") or "brand_logo"
+    custom_image = share_cfg.get("custom_image_url") or ""
     brand_logo = (theme.get("brand") or {}).get("logo_url") or ""
     hero_image = hero["image_url"]
-    if card_source == "hero_image" and hero_image:
+    if card_source == "custom_image" and custom_image:
+        share_image = custom_image
+    elif card_source == "hero_image" and hero_image:
         share_image = hero_image
     elif brand_logo:
         share_image = brand_logo
