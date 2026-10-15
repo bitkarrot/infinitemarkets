@@ -199,6 +199,37 @@ def _load_published_keyfile(path: Path) -> tuple[dict[str, bytes], bytes]:
             time.sleep(0.05)
 
 
+def generated_keys_acknowledged() -> bool:
+    """True once the operator dismisses the auto-generated-keys warning.
+
+    The flag lives inside the keyfile itself, so a regenerated keyfile
+    (fresh material) re-surfaces the warning."""
+    try:
+        data = json.loads(generated_keys_path().read_text())
+        return data.get("acknowledged") is True
+    except Exception:  # noqa: BLE001 — absent/malformed file warns
+        return False
+
+
+def acknowledge_generated_keys() -> None:
+    """Record the dismissal inside the keyfile — atomic rewrite, mode
+    stays 0600."""
+    path = generated_keys_path()
+    data = json.loads(path.read_text())
+    data["acknowledged"] = True
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".imkeys-")
+    try:
+        with os.fdopen(fd, "w") as fh:
+            _write_json_synced(fh, data)
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, path)
+    finally:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+
+
 def _generated_keys() -> tuple[dict[str, bytes], bytes]:
     """Load the persisted generated keyring, or publish a fresh one.
 

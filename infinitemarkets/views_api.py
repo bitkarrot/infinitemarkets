@@ -104,6 +104,10 @@ class PatchMerchantBody(_Strict):
     blossom_servers: list[str] | None = None
 
 
+class DismissWarningBody(_Strict):
+    id: str
+
+
 class ImportKeyBody(_Strict):
     nsec: str = Field(min_length=1, max_length=128)
 
@@ -187,6 +191,19 @@ async def patch_merchant(
 ):
     return await merchant_service.patch_merchant(
         merchant_id, user, _patch_dict(body)
+    )
+
+
+@infinitemarkets_api_router.post("/merchants/{merchant_id}/warnings/dismiss")
+@problem_boundary
+async def dismiss_warning(
+    request: Request,
+    merchant_id: str,
+    body: DismissWarningBody,
+    user: User = Depends(check_user_exists),
+):
+    return await merchant_service.dismiss_warning(
+        merchant_id, user, body.id
     )
 
 

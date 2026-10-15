@@ -15,6 +15,11 @@
   <q-banner v-for="(w, i) in gm.warnings" :key="'w' + i"
             class="bg-warning text-dark q-mb-sm" data-gm="audit-banner">
     {{ w }}
+    <template v-slot:action v-if="w === gm.dismissableWarning">
+      <q-btn flat dense label="Dismiss" :loading="gm.dismissingWarning"
+             data-gm="dismiss-warning"
+             @click="gmDismissWarning(w)"></q-btn>
+    </template>
   </q-banner>
 
   <div v-if="!gm.loaded" class="q-pa-md">
