@@ -162,6 +162,9 @@ async def _store_ctx(merchant: dict, theme: dict | None) -> dict:
         # opt-in ``gallery`` look reaches chrome pages, not only product.
         "layout": theme_service.theme_layout(theme),
         "grid": theme_service.storefront_grid(theme),
+        # Dark presets mark the .gm-public root so the shopper scheme
+        # toggle starts in the correct state.
+        "base_scheme": theme_service.base_scheme(theme),
         "nav_collections": collections[:NAV_COLLECTIONS_MAX],
         "all_collections": collections,
         # D-06 + 03.1-D13: the buyer sign-in affordance renders while

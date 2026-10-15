@@ -27,6 +27,14 @@ from ..db import db, table
 from ..security import unprocessable
 
 PRESETS = ("warm-market", "clean-minimal", "high-contrast", "lightnin-dark")
+# Which color scheme a preset owns — the counterpart scheme is derived
+# (and optionally merchant-tinted via ``counterpart``) per save.
+PRESET_SCHEME = {
+    "warm-market": "light",
+    "clean-minimal": "light",
+    "high-contrast": "dark",
+    "lightnin-dark": "dark",
+}
 LAYOUTS = ("editorial", "guided", "compact", "gallery")
 GRID_MODES = ("standard", "quad")
 FONT_STACKS = ("system", "serif", "mono")
@@ -141,7 +149,7 @@ _GATED_PAIRS = (
 
 DEFAULT_THEME = {"preset": "warm-market", "layout": "editorial",
                  "brand": None, "advanced": None, "hero": None,
-                 "footer": None, "storefront": None}
+                 "footer": None, "storefront": None, "counterpart": None}
 
 # Hero (storefront index intro) — bounded content fields, not tokens:
 # slogan/subtitle are length-capped; URLs may be #anchors, same-origin
@@ -408,13 +416,40 @@ def _validate_advanced(advanced: dict, opted_in: bool) -> dict:
     return out
 
 
+def _validate_counterpart(counterpart: dict) -> dict:
+    """Counterpart-scheme overrides — the shopper-facing scheme opposite
+    the preset's own (dark mode for light presets, light mode for dark
+    presets). Only the page background is merchant-tinted; surfaces,
+    text and brand colors stay auto-derived."""
+    if not isinstance(counterpart, dict):
+        raise unprocessable(
+            "invalid-content", "counterpart must be an object"
+        )
+    unknown = set(counterpart) - {"--color-bg"}
+    if unknown:
+        raise unprocessable(
+            "invalid-content",
+            f"unknown counterpart fields: {sorted(unknown)}",
+        )
+    out = {}
+    bg = str(counterpart.get("--color-bg") or "").strip()
+    if bg:
+        if not _HEX_COLOR.match(bg):
+            raise unprocessable(
+                "invalid-content",
+                "counterpart --color-bg must be a #rrggbb color",
+            )
+        out["--color-bg"] = bg.lower()
+    return out
+
+
 def validate_theme(payload: dict) -> dict:
     """Validate a theme patch into the persisted token object."""
     if not isinstance(payload, dict):
         raise unprocessable("invalid-content", "theme must be an object")
     unknown = set(payload) - {
         "preset", "layout", "brand", "advanced", "advanced_opt_in",
-        "hero", "footer", "storefront",
+        "hero", "footer", "storefront", "counterpart",
     }
     if unknown:
         raise unprocessable(
@@ -444,9 +479,13 @@ def validate_theme(payload: dict) -> dict:
             payload["advanced"], bool(payload.get("advanced_opt_in"))
         )
         theme["advanced_opt_in"] = True
-    # WCAG gates run against the fully resolved token set — a brand accent
-    # or advanced override can't silently break contrast.
+    if payload.get("counterpart") is not None:
+        theme["counterpart"] = _validate_counterpart(payload["counterpart"])
+    # WCAG gates run against the fully resolved token sets — a brand
+    # accent, advanced override, or counterpart background can't
+    # silently break contrast in either scheme.
     _enforce_contrast(resolve_tokens(theme))
+    _enforce_contrast(counterpart_scheme_tokens(theme))
     return theme
 
 
@@ -465,11 +504,12 @@ def resolve_tokens(theme: dict | None) -> dict[str, str]:
     return tokens
 
 
-# --- viewer dark scheme ------------------------------------------------------------
+# --- viewer counterpart scheme -----------------------------------------------------
 
 # Warm dark neutrals — the dark counterpart of the Warm Market palette.
-# The merchant brand never picks these; they only color surfaces/text
-# when the shopper opts into dark mode (or their system requests it).
+# Text colors are never merchant-picked; surfaces derive from the
+# merchant's optional counterpart background (or these curated values)
+# so a shopper's dark mode stays coherent.
 _DARK_SURFACES: dict[str, str] = {
     "--color-bg": "#1b1510",
     "--color-surface": "#241c15",
@@ -483,6 +523,17 @@ _DARK_SURFACES: dict[str, str] = {
     "--shadow-lg": "0 18px 52px rgba(0, 0, 0, 0.55)",
 }
 
+# Neutral light palette — the light counterpart of the dark presets.
+_LIGHT_SURFACES: dict[str, str] = {
+    "--color-bg": "#f5f6f8",
+    "--color-surface": "#ffffff",
+    "--color-surface-alt": "#e8ebef",
+    "--color-border": "rgba(23, 27, 34, 0.12)",
+    "--color-text": "#171b22",
+    "--color-text-muted": "#4d5665",
+    "--color-focus": "#165dff",
+}
+
 
 def _mix_hex(a: str, b: str, t: float) -> str:
     """srgb channel mix of ``a`` toward ``b`` by t in [0, 1]."""
@@ -492,6 +543,34 @@ def _mix_hex(a: str, b: str, t: float) -> str:
         va, vb = int(ca[i : i + 2], 16), int(cb[i : i + 2], 16)
         out.append(round(va + (vb - va) * t))
     return "#" + "".join(f"{v:02x}" for v in out)
+
+
+def _counterpart_bg(theme: dict | None) -> str | None:
+    return ((theme or {}).get("counterpart") or {}).get("--color-bg")
+
+
+def _dark_surfaces(bg: str | None) -> dict[str, str]:
+    """Dark surface ramp — curated defaults, or derived from a merchant
+    ``counterpart`` background so cards/highlights stay tonal."""
+    if not bg:
+        return dict(_DARK_SURFACES)
+    out = dict(_DARK_SURFACES)
+    out["--color-bg"] = bg
+    out["--color-surface"] = _mix_hex(bg, "#ffffff", 0.07)
+    out["--color-surface-alt"] = _mix_hex(bg, "#ffffff", 0.13)
+    return out
+
+
+def _light_surfaces(bg: str | None) -> dict[str, str]:
+    """Light surface ramp — curated defaults, or derived from a merchant
+    ``counterpart`` background (cards lift lighter, highlights sink)."""
+    if not bg:
+        return dict(_LIGHT_SURFACES)
+    out = dict(_LIGHT_SURFACES)
+    out["--color-bg"] = bg
+    out["--color-surface"] = _mix_hex(bg, "#ffffff", 0.55)
+    out["--color-surface-alt"] = _mix_hex(bg, "#000000", 0.05)
+    return out
 
 
 def _lighten_to(color: str, bg: str, target: float) -> str:
@@ -509,20 +588,43 @@ def _lighten_to(color: str, bg: str, target: float) -> str:
     return mixed
 
 
-def dark_scheme_tokens(theme: dict | None) -> dict[str, str]:
-    """Derive the dark-scheme token set from the resolved light tokens.
+def _darken_to(color: str, bg: str, target: float) -> str:
+    """Mirror of ``_lighten_to`` for the light counterpart of a dark
+    preset — a light primary vanishes on light surfaces, so it mixes
+    toward black until the WCAG pair clears."""
+    mixed = color
+    t = 0.0
+    while contrast_ratio(mixed, bg) < target and t < 0.85:
+        t += 0.05
+        mixed = _mix_hex(color, "#000000", t)
+    return mixed
 
-    Brand color is preserved: the primary (and hover/accent/focus) are
-    lightened just enough to meet the same WCAG pairs on dark surfaces,
-    and --color-on-primary flips to the dark surface color because the
+
+def dark_scheme_tokens(theme: dict | None) -> dict[str, str]:
+    """Derive the dark-scheme token set from the resolved base tokens.
+
+    Dark presets ARE the dark scheme — this returns the base set. For
+    light presets the dark counterpart is derived: surfaces come from
+    ``_dark_surfaces`` (curated, or mixed from the merchant's
+    ``counterpart --color-bg``) and the brand colors lighten just enough
+    to meet the same WCAG pairs on the dark surfaces, with
+    --color-on-primary flipping to the dark background because the
     lightened primary now carries dark text.
     """
+    theme = theme or DEFAULT_THEME
     tokens = resolve_tokens(theme)
-    dark = dict(_DARK_SURFACES)
+    if PRESET_SCHEME.get(theme.get("preset"), "light") == "dark":
+        tokens["color-scheme"] = "dark"
+        return tokens
+    dark = _dark_surfaces(_counterpart_bg(theme))
     bg = dark["--color-bg"]
-    dark["--color-primary"] = _lighten_to(tokens["--color-primary"], bg, 4.5)
+    # Surface is the lightest gated dark background — clearing 4.5:1 on
+    # it clears bg too (primary/on-primary uses bg and must also pass).
+    dark["--color-primary"] = _lighten_to(
+        tokens["--color-primary"], dark["--color-surface"], 4.5
+    )
     dark["--color-primary-hover"] = _lighten_to(
-        tokens["--color-primary-hover"], bg, 4.5
+        tokens["--color-primary-hover"], dark["--color-surface"], 4.5
     )
     dark["--color-on-primary"] = bg
     accent = tokens["--color-accent"]
@@ -534,28 +636,83 @@ def dark_scheme_tokens(theme: dict | None) -> dict[str, str]:
     return dark
 
 
+def light_scheme_tokens(theme: dict | None) -> dict[str, str]:
+    """Derive the light-scheme counterpart for dark presets — mirrors
+    ``dark_scheme_tokens``: surfaces from ``_light_surfaces`` (curated,
+    or mixed from the merchant's ``counterpart --color-bg``), brand
+    colors darkened to the same WCAG pairs, --color-on-primary flips to
+    the light background.
+
+    For light presets the light scheme is the base set itself.
+    """
+    theme = theme or DEFAULT_THEME
+    tokens = resolve_tokens(theme)
+    if PRESET_SCHEME.get(theme.get("preset"), "light") != "dark":
+        tokens["color-scheme"] = "light"
+        return tokens
+    light = _light_surfaces(_counterpart_bg(theme))
+    bg = light["--color-bg"]
+    light["--color-primary"] = _darken_to(tokens["--color-primary"], bg, 4.5)
+    light["--color-primary-hover"] = _darken_to(
+        tokens["--color-primary-hover"], bg, 4.5
+    )
+    light["--color-on-primary"] = bg
+    accent = tokens["--color-accent"]
+    light["--color-accent"] = (
+        accent if contrast_ratio(accent, bg) >= 3.0
+        else _darken_to(accent, bg, 3.0)
+    )
+    light["color-scheme"] = "light"
+    return light
+
+
+def counterpart_scheme_tokens(theme: dict | None) -> dict[str, str]:
+    """The scheme opposite the preset's own — dark variant for light
+    presets, light variant for dark presets."""
+    if PRESET_SCHEME.get((theme or DEFAULT_THEME).get("preset"),
+                         "light") == "dark":
+        return light_scheme_tokens(theme)
+    return dark_scheme_tokens(theme)
+
+
 def emit_css(theme: dict | None) -> str:
     """Resolved tokens as `.gm-public`-scoped custom-property blocks —
     the ONLY place theme values become CSS.
 
-    Emits the light base plus a dark-scheme variant: explicit shopper
-    choice (`data-scheme="dark"`) always applies, and absent an explicit
-    override the viewer's `prefers-color-scheme` picks the dark set.
-    The attribute selectors (0,2,0) outrank this inline `.gm-public`
-    block so merchant tokens never defeat the shopper's dark choice.
+    Emits the preset's base scheme plus the derived counterpart scheme.
+    For light presets the dark variant applies on explicit shopper
+    choice (`data-scheme="dark"`) or, absent an override, via the
+    viewer's `prefers-color-scheme` — the attribute selectors (0,2,0)
+    outrank this inline `.gm-public` block so merchant tokens never
+    defeat the shopper's dark choice. For dark presets the dark preset
+    stays the default; the light variant only applies on an explicit
+    `data-scheme="light"` shopper choice.
     """
+    theme = theme or DEFAULT_THEME
+    scheme = PRESET_SCHEME.get(theme.get("preset"), "light")
     tokens = resolve_tokens(theme)
     body = ";\n  ".join(f"{k}: {v}" for k, v in sorted(tokens.items()))
-    dark_body = ";\n    ".join(
-        f"{k}: {v}" for k, v in sorted(dark_scheme_tokens(theme).items())
-    )
+    cp = counterpart_scheme_tokens(theme)
+    cp_body = ";\n    ".join(f"{k}: {v}" for k, v in sorted(cp.items()))
+    if scheme == "dark":
+        light_sel = ".gm-public[data-scheme=\"light\"]"
+        return (
+            f".gm-public {{\n  {body};\n  color-scheme: dark;\n}}\n"
+            f"{light_sel} {{\n    {cp_body};\n}}\n"
+        )
     dark_sel = ".gm-public[data-scheme=\"dark\"]"
     return (
         f".gm-public {{\n  {body};\n  color-scheme: light;\n}}\n"
-        f"{dark_sel} {{\n    {dark_body};\n}}\n"
+        f"{dark_sel} {{\n    {cp_body};\n}}\n"
         "@media (prefers-color-scheme: dark) {\n"
-        f"  .gm-public:not([data-scheme=\"light\"]) {{\n    {dark_body};\n  }}\n"
+        f"  .gm-public:not([data-scheme=\"light\"]) {{\n    {cp_body};\n  }}\n"
         "}"
+    )
+
+
+def base_scheme(theme: dict | None) -> str:
+    return PRESET_SCHEME.get(
+        (theme or DEFAULT_THEME).get("preset"), "light"
     )
 
 

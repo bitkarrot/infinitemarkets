@@ -23,6 +23,20 @@ REQUIRED_HEADERS = {
 }
 
 
+def _buyer_visible(html: str) -> str:
+    """Text a buyer could see — script/style bodies and ``?v=`` asset
+    hashes are excluded: their contents may carry any digit sequence and
+    would false-positive stock-count assertions."""
+    html = re.sub(
+        r"<script\b[^>]*>[\s\S]*</script\b[^>]*>", "", html,
+        flags=re.IGNORECASE,
+    )
+    html = re.sub(
+        r"<style\b[^>]*>[\s\S]*</style\s*>", "", html, flags=re.IGNORECASE
+    )
+    return re.sub(r"\?v=[0-9a-f]+", "", html)
+
+
 def _csrf(client) -> str:
     return client.cookies.get("gm_csrf") or ""
 
@@ -657,10 +671,7 @@ async def test_variable_parent_stock_is_children_sum(runtime_env):
     assert resp.status_code == 200
     # aggregate 13 → plain "In stock", never the number
     assert "In stock" in resp.text
-    assert "13" not in re.sub(
-        r"<script\b[^>]*>[\s\S]*</script\b[^>]*>", "", resp.text,
-        flags=re.IGNORECASE,
-    )
+    assert "13" not in _buyer_visible(resp.text)
     # child with 3 units → low-stock copy, still no count
     assert "Low Stock, Order Soon!" in resp.text
     assert "3 left" not in resp.text and "10 left" not in resp.text
@@ -687,10 +698,7 @@ async def test_low_stock_and_sold_out_copy(runtime_env):
         f"/infinitemarkets/p/{merchant['pubkey']}/{full['d_tag']}"
     )
     assert "In stock" in resp.text
-    assert "50" not in re.sub(
-        r"<script\b[^>]*>[\s\S]*</script\b[^>]*>", "", resp.text,
-        flags=re.IGNORECASE,
-    )
+    assert "50" not in _buyer_visible(resp.text)
 
 
 async def test_public_page_invalid_config_renders_503(runtime_env, monkeypatch):

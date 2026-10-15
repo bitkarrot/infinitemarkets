@@ -274,8 +274,8 @@ async def test_advanced_tokens_preserve_secondary_text_and_focus(runtime_env, to
 
 
 def test_dark_scheme_tokens_meet_the_same_contrast_gate():
-    """Every preset (and a merchant-darkened primary) derives a dark set
-    that still clears the WCAG pairs on the dark surfaces."""
+    """Every preset's dark scheme — derived for light presets, the
+    preset itself for dark presets — clears the WCAG pairs."""
     from infinitemarkets.services import themes
 
     for preset in themes.PRESETS:
@@ -289,12 +289,6 @@ def test_dark_scheme_tokens_meet_the_same_contrast_gate():
         assert themes.contrast_ratio(
             dark["--color-on-primary"], dark["--color-primary"]
         ) >= 4.5, preset
-        css = themes.emit_css({"preset": preset})
-        assert 'data-scheme="dark"' in css
-        assert "prefers-color-scheme: dark" in css
-        assert '[data-scheme="light"]' in css
-        # base light tokens still emitted alongside the dark variant
-        assert themes.resolve_tokens({"preset": preset})["--color-bg"] in css
 
     # A merchant primary that is already dark gets lightened for dark mode.
     dark = themes.dark_scheme_tokens(
@@ -305,6 +299,130 @@ def test_dark_scheme_tokens_meet_the_same_contrast_gate():
     assert themes.contrast_ratio(
         dark["--color-primary"], dark["--color-bg"]
     ) >= 4.5
+
+
+def test_emit_css_scheme_blocks_per_preset_direction():
+    """Light presets emit a dark counterpart (shopper toggle or
+    prefers-dark); dark presets keep their palette as the default and
+    emit a light counterpart for explicit data-scheme="light" only."""
+    from infinitemarkets.services import themes
+
+    for preset in themes.PRESETS:
+        css = themes.emit_css({"preset": preset})
+        scheme = themes.PRESET_SCHEME[preset]
+        base_bg = themes.resolve_tokens({"preset": preset})["--color-bg"]
+        assert f"--color-bg: {base_bg}" in css
+        assert f"color-scheme: {scheme}" in css
+        if scheme == "light":
+            assert 'data-scheme="dark"]' in css
+            assert "prefers-color-scheme: dark" in css
+            assert '[data-scheme="light"]' in css
+        else:
+            assert 'data-scheme="light"]' in css
+            # dark is the default — no prefers-* media auto-switch
+            assert "prefers-color-scheme" not in css
+            assert 'data-scheme="dark"' not in css
+
+
+def test_light_scheme_tokens_clear_the_same_gate():
+    """Dark presets derive a light set that clears the WCAG pairs, with
+    the brand primary darkened until it does."""
+    from infinitemarkets.services import themes
+
+    for preset in ("high-contrast", "lightnin-dark"):
+        light = themes.light_scheme_tokens({"preset": preset})
+        bg = light["--color-bg"]
+        assert light["color-scheme"] == "light"
+        for key in ("--color-text", "--color-text-muted",
+                    "--color-primary", "--color-primary-hover",
+                    "--color-focus"):
+            assert themes.contrast_ratio(light[key], bg) >= 4.5, (
+                preset, key)
+        assert themes.contrast_ratio(
+            light["--color-on-primary"], light["--color-primary"]
+        ) >= 4.5, preset
+        # the near-white preset primary must darken to stay legible
+        assert light["--color-primary"] != \
+            themes.resolve_tokens({"preset": preset})["--color-primary"]
+
+
+async def test_counterpart_bg_override(runtime_env):
+    """counterpart --color-bg tints the opposite scheme's page
+    background; surfaces and brand colors derive from it."""
+    from infinitemarkets.services import themes
+
+    resp, _ = await _patch_theme(
+        runtime_env,
+        {"preset": "warm-market",
+         "counterpart": {"--color-bg": "#101828"}},
+    )
+    assert resp.status_code == 200, resp.text
+    theme = resp.json()["theme"]
+    assert theme["counterpart"] == {"--color-bg": "#101828"}
+    dark = themes.dark_scheme_tokens(theme)
+    assert dark["--color-bg"] == "#101828"
+    # surfaces derive tonally from the merchant bg
+    assert dark["--color-surface"] != themes._DARK_SURFACES["--color-surface"]
+    themes._enforce_contrast(dark)
+
+
+async def test_counterpart_bg_light_variant(runtime_env):
+    """Dark presets take a light counterpart background the same way."""
+    from infinitemarkets.services import themes
+
+    resp, _ = await _patch_theme(
+        runtime_env,
+        {"preset": "lightnin-dark",
+         "counterpart": {"--color-bg": "#fdf8ee"}},
+    )
+    assert resp.status_code == 200, resp.text
+    theme = resp.json()["theme"]
+    light = themes.light_scheme_tokens(theme)
+    assert light["--color-bg"] == "#fdf8ee"
+    themes._enforce_contrast(light)
+    # restore the shared merchant to the default preset for later tests
+    resp, _ = await _patch_theme(
+        runtime_env, {"preset": "warm-market", "counterpart": {}}
+    )
+    assert resp.status_code == 200, resp.text
+
+
+async def test_counterpart_bg_contrast_gated(runtime_env):
+    """A counterpart bg that breaks the derived pairs is refused — too
+    light a dark-mode bg, too dark a light-mode bg."""
+    resp, _ = await _patch_theme(
+        runtime_env,
+        {"preset": "warm-market",
+         "counterpart": {"--color-bg": "#eeeeee"}},
+    )
+    assert resp.status_code == 422
+    assert resp.json()["type"] == "urn:infinitemarkets:contrast-gate"
+    resp, _ = await _patch_theme(
+        runtime_env,
+        {"preset": "lightnin-dark",
+         "counterpart": {"--color-bg": "#222222"}},
+    )
+    assert resp.status_code == 422
+    assert resp.json()["type"] == "urn:infinitemarkets:contrast-gate"
+    resp, _ = await _patch_theme(
+        runtime_env, {"preset": "warm-market", "counterpart": {}}
+    )
+    assert resp.status_code == 200, resp.text
+
+
+async def test_counterpart_validation_bounds(runtime_env):
+    resp, _ = await _patch_theme(
+        runtime_env,
+        {"counterpart": {"--color-text": "#000000"}},
+    )
+    assert resp.status_code == 422
+    body = resp.json()
+    assert "counterpart" in (body["title"] + body.get("detail", ""))
+    resp, _ = await _patch_theme(
+        runtime_env,
+        {"counterpart": {"--color-bg": "blue"}},
+    )
+    assert resp.status_code == 422
 
 
 async def test_public_pages_carry_scheme_toggle_and_dark_tokens(runtime_env):
