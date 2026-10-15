@@ -157,6 +157,8 @@
             busy: false
           },
           expandedProducts: [],
+          expandedCollections: [],
+          collectionMembers: {},
           dryRun: { show: false, json: "", loading: false }
         }
       };
@@ -599,6 +601,37 @@
             location: row.location || ""
           }
         };
+      },
+      gmCollectionExpanded: function (id) {
+        return this.gmCatalog.expandedCollections.includes(id);
+      },
+      gmCollectionMembers: function (id) {
+        return (this.gmCatalog.collectionMembers[id] || {}).items || [];
+      },
+      gmCollectionMembersLoading: function (id) {
+        return !!(this.gmCatalog.collectionMembers[id] || {}).loading;
+      },
+      gmToggleCollectionExpand: async function (row) {
+        var self = this;
+        var id = row.id;
+        var i = self.gmCatalog.expandedCollections.indexOf(id);
+        if (i >= 0) {
+          self.gmCatalog.expandedCollections.splice(i, 1);
+          return;
+        }
+        self.gmCatalog.expandedCollections.push(id);
+        if (self.gmCatalog.collectionMembers[id]) return;
+        self.gmCatalog.collectionMembers[id] = { loading: true, items: [] };
+        try {
+          var d = await self.gmApi("GET", "/collections/" + id);
+          self.gmCatalog.collectionMembers[id] = {
+            loading: false,
+            items: d.members || []
+          };
+        } catch (e) {
+          self.gmCatalog.collectionMembers[id] = { loading: false, items: [] };
+          self.gmCatalog.error = self.gmProblemCopy(e.problem);
+        }
       },
       gmSaveCollection: async function () {
         var self = this;

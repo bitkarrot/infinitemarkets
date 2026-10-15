@@ -943,7 +943,15 @@
                   <template v-slot:body="props">
                     <q-tr :props="props">
                       <q-td key="title" :props="props" data-col="title">
+                        <q-btn flat dense round size="sm"
+                               :icon="gmCollectionExpanded(props.row.id) ? 'expand_less' : 'expand_more'"
+                               :aria-label="(gmCollectionExpanded(props.row.id) ? 'Hide' : 'Show') + ' products in ' + (props.row.title || props.row.d_tag)"
+                               @click="gmToggleCollectionExpand(props.row)">
+                        </q-btn>
                         {{ props.row.title || props.row.d_tag }}
+                      </q-td>
+                      <q-td key="products" :props="props" data-col="products">
+                        {{ props.row.product_count || 0 }}
                       </q-td>
                       <q-td key="id" :props="props" data-col="id">
                         {{ gmTrunc(props.row.d_tag, 8, 4) }}
@@ -958,6 +966,29 @@
                                @click="gmAskDelete('collection', props.row)">
                           <q-tooltip>Delete</q-tooltip>
                         </q-btn>
+                      </q-td>
+                    </q-tr>
+                    <q-tr v-if="gmCollectionExpanded(props.row.id)" :props="props"
+                          class="gm-collection-members">
+                      <q-td colspan="100%">
+                        <div v-if="gmCollectionMembersLoading(props.row.id)"
+                             class="text-grey-7">
+                          Loading products…
+                        </div>
+                        <div v-else-if="!gmCollectionMembers(props.row.id).length"
+                             class="text-grey-7">
+                          No products in this collection.
+                        </div>
+                        <ul v-else class="gm-collection-member-list">
+                          <li v-for="m in gmCollectionMembers(props.row.id)"
+                              :key="m.id">
+                            <a href="#" @click.prevent="gmEditProduct(m)">
+                              {{ m.title || m.d_tag }}
+                            </a>
+                            <span v-if="m.draft"
+                                  class="text-caption text-grey-7"> (draft)</span>
+                          </li>
+                        </ul>
                       </q-td>
                     </q-tr>
                   </template>
@@ -3389,6 +3420,12 @@
 }
 .gm-seo-desc { color: #4d5156; font-size: 13px; }
 .gm-seo-price { color: #4d5156; font-size: 12px; }
+.gm-collection-member-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0 4px 44px;
+}
+.gm-collection-member-list li { padding: 2px 0; }
 .gm-bulk-bar {
   display: flex;
   align-items: center;
