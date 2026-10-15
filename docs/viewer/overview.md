@@ -19,7 +19,7 @@ Video: media/infinite-markets-demo.mp4 | media/demo-poster.jpg | The 2-minute pr
 
 | | |
 |---|---|
-| **What** | A standard Python LNbits extension (`infinitemarkets`), v1.0.0 |
+| **What** | A standard Python LNbits extension (`infinitemarkets`), v1.0.11 |
 | **Requires** | LNbits ≥ 1.6.0 and a bound merchant wallet |
 | **Sells through** | Its own web storefront, embeds, and Gamma / NIP-99 Nostr marketplaces |
 | **Payments** | Lightning invoices from the merchant's LNbits wallet |
@@ -342,7 +342,7 @@ Conduit [spec-aligned], but this hasn't been tested yet [todo].
 **Where it stands.** v1.0 shipped 2026-10-13: web commerce, Gamma NIP-17
 orders, buyer accounts, and catalog import/export are implemented, and the
 Phase 5 hardening pass repaired and regression-verified every reopened
-correctness/recovery finding. Version 0.6.3 is published through an LNbits
+correctness/recovery finding. Version 1.0.11 is published through an LNbits
 extension manifest with a sha256-verified archive. Conformance testing covers
 a gated relay environment, egress / relay-auth / paid-relay drills, the
 Plebeian test suite, and a **live plebeian.market checkout verified
@@ -352,7 +352,7 @@ and reviews are out of scope for v1.
 
 **Risks.**
 
-1. **This is experimental software:** v1.0.0, built on a draft marketplace spec. Start with small amounts.
+1. **This is experimental software:** v1.0.11, built on a draft marketplace spec. Start with small amounts.
 2. **It depends on community support and feedback:** interop relies on marketplace clients, the spec working group, and real merchants using it.
 3. **Maintenance has a cost:** keeping up with LNbits releases, spec revisions, marketplace changes, and security updates takes ongoing time and resources.
 
