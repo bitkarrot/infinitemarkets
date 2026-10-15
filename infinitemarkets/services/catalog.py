@@ -323,6 +323,55 @@ async def _enqueue_product(
     )
 
 
+async def _reproject_nip15_after_move(
+    tx: DomainTransaction, merchant_id: str, product_id: str,
+    old_category_id: str, new_category_id: str, pubkey: str,
+) -> None:
+    """A move changes the kind-30018 stall id: republish the listing when
+    the destination publishes NIP-15, else withdraw the old stall's copy."""
+    from . import events
+
+    row = await tx.fetch_one(
+        f"SELECT draft, deleted_at, d_tag, revision, nip15_product_id, "
+        f"product_type, parent_product_id, import_source_kind, "
+        f"{released_product_select('products', tx.table)} "
+        f"FROM {tx.table('products')} WHERE id = :i",
+        {"i": product_id},
+    )
+    if (
+        not row or row["draft"] or row["deleted_at"] is not None
+        or (row["import_source_kind"] is not None and not row["import_released"])
+    ):
+        return
+    flags = {
+        c["id"]: bool(c["publish_nip15"])
+        for c in await tx.fetch_all(
+            f"SELECT id, publish_nip15 FROM {tx.table('categories')} "
+            "WHERE id IN (:o, :n)",
+            {"o": old_category_id, "n": new_category_id},
+        )
+    }
+    if flags.get(new_category_id):
+        kind = 30018
+    elif flags.get(old_category_id):
+        kind = 5
+    else:
+        return
+    parent_d = None
+    if row["product_type"] == "variation" and row["parent_product_id"]:
+        parent = await tx.fetch_one(
+            f"SELECT d_tag FROM {tx.table('products')} WHERE id = :i",
+            {"i": row["parent_product_id"]},
+        )
+        parent_d = parent["d_tag"] if parent else None
+    nip15_id = events.nip15_product_id(dict(row), parent_d)
+    await enqueue_intent(
+        tx, merchant_id, "products", product_id, kind,
+        revision=row["revision"],
+        event_address=f"30018:{pubkey}:{nip15_id}",
+    )
+
+
 async def enqueue_stock_projection(tx: DomainTransaction, product_id: str) -> None:
     row = await tx.fetch_one(
         f"SELECT p.merchant_id, p.revision, p.parent_product_id, m.pubkey "
@@ -1150,7 +1199,9 @@ async def patch_product(merchant_id: str, user, product_id: str,
                         "Product has variations",
                         "cannot change type while variations reference it",
                     )
-        if "category_id" in patch:
+        old_category_id = None
+        if patch.get("category_id", row["category_id"]) != row["category_id"]:
+            # Unchanged category_id (the editor always sends it) is a no-op.
             # _PRODUCT_FIELDS deliberately omits category_id — a move
             # republishes both stalls, and a variable parent's
             # variations follow it to the new category.
@@ -1170,46 +1221,49 @@ async def patch_product(merchant_id: str, user, product_id: str,
                     "Move the parent product",
                     "variations belong to their parent's category",
                 )
-            if patch["category_id"] != row["category_id"]:
-                old_category_id = row["category_id"]
-                # The product's own revision bump happens in the shared
-                # tail below; only its variations bump here so each
-                # child republishes at its own revision.
+            old_category_id = row["category_id"]
+            # The product's own revision bump happens in the shared
+            # tail below; only its variations bump here so each
+            # child republishes at its own revision.
+            await tx.execute(
+                f"UPDATE {tx.table('products')} "
+                "SET category_id = :c WHERE id = :i",
+                {"c": patch["category_id"], "i": product_id},
+            )
+            children = await tx.fetch_all(
+                f"SELECT id FROM {tx.table('products')} "
+                "WHERE parent_product_id = :i AND merchant_id = :m "
+                "AND deleted_at IS NULL",
+                {"i": product_id, "m": merchant_id},
+            )
+            for moved_id in [c["id"] for c in children]:
                 await tx.execute(
                     f"UPDATE {tx.table('products')} "
-                    "SET category_id = :c WHERE id = :i",
-                    {"c": patch["category_id"], "i": product_id},
+                    "SET category_id = :c, revision = revision + 1, "
+                    "updated_at = :t WHERE id = :i",
+                    {"c": patch["category_id"], "t": now,
+                     "i": moved_id},
                 )
-                children = await tx.fetch_all(
-                    f"SELECT id FROM {tx.table('products')} "
-                    "WHERE parent_product_id = :i AND merchant_id = :m "
-                    "AND deleted_at IS NULL",
-                    {"i": product_id, "m": merchant_id},
+                moved = await tx.fetch_one(
+                    f"SELECT revision FROM {tx.table('products')} "
+                    "WHERE id = :i",
+                    {"i": moved_id},
                 )
-                for moved_id in [c["id"] for c in children]:
-                    await tx.execute(
-                        f"UPDATE {tx.table('products')} "
-                        "SET category_id = :c, revision = revision + 1, "
-                        "updated_at = :t WHERE id = :i",
-                        {"c": patch["category_id"], "t": now,
-                         "i": moved_id},
-                    )
-                    moved = await tx.fetch_one(
-                        f"SELECT revision FROM {tx.table('products')} "
-                        "WHERE id = :i",
-                        {"i": moved_id},
-                    )
-                    await _enqueue_product(
-                        tx, merchant_id, moved_id, moved["revision"],
-                        merchant["pubkey"],
-                    )
-                await _enqueue_stall_if_enabled(
-                    tx, merchant_id, old_category_id, merchant["pubkey"]
-                )
-                await _enqueue_stall_if_enabled(
-                    tx, merchant_id, patch["category_id"],
+                await _enqueue_product(
+                    tx, merchant_id, moved_id, moved["revision"],
                     merchant["pubkey"],
                 )
+                await _reproject_nip15_after_move(
+                    tx, merchant_id, moved_id, old_category_id,
+                    patch["category_id"], merchant["pubkey"],
+                )
+            await _enqueue_stall_if_enabled(
+                tx, merchant_id, old_category_id, merchant["pubkey"]
+            )
+            await _enqueue_stall_if_enabled(
+                tx, merchant_id, patch["category_id"],
+                merchant["pubkey"],
+            )
         # stock auto-status: available reaching 0 -> sold (§6.1)
         if "stock_on_hand" in fields or "stock_reserved" in fields:
             on_hand = fields.get("stock_on_hand", row["stock_on_hand"])
@@ -1269,6 +1323,11 @@ async def patch_product(merchant_id: str, user, product_id: str,
         await _enqueue_product(
             tx, merchant_id, product_id, new_revision, merchant["pubkey"]
         )
+        if old_category_id is not None:
+            await _reproject_nip15_after_move(
+                tx, merchant_id, product_id, old_category_id,
+                patch["category_id"], merchant["pubkey"],
+            )
         if (row["product_type"] == "variable" and row["import_source_kind"]
                 and not fields.get("draft", row["draft"])
                 and fields.get("visibility", row["visibility"]) != "hidden"):
@@ -1354,6 +1413,7 @@ async def bulk_products(
             return {"deleted": len(ids), "product_ids": ids}
         moved_categories: set[str] = set()
         moved_children: list[str] = []
+        moved_from: dict[str, str] = {}
 
         if action == "attach-shipping":
             option = await tx.fetch_one(
@@ -1474,6 +1534,7 @@ async def bulk_products(
                     )
                 if row["category_id"] != value:
                     moved_categories.add(row["category_id"])
+                    moved_from[product_id] = row["category_id"]
                     children = await tx.fetch_all(
                         f"SELECT id FROM {tx.table('products')} "
                         "WHERE parent_product_id = :i "
@@ -1489,6 +1550,7 @@ async def bulk_products(
                             {"c": value, "t": now, "i": child["id"]},
                         )
                         moved_children.append(child["id"])
+                        moved_from[child["id"]] = row["category_id"]
                     assignments.append("category_id = :v")
                     update_params["v"] = value
             elif action == "attach-shipping":
@@ -1563,6 +1625,11 @@ async def bulk_products(
             )
             await _enqueue_product(
                 tx, merchant_id, moved_id, moved["revision"],
+                merchant["pubkey"],
+            )
+        for moved_id, old_category_id in moved_from.items():
+            await _reproject_nip15_after_move(
+                tx, merchant_id, moved_id, old_category_id, value,
                 merchant["pubkey"],
             )
         if moved_categories:
@@ -1778,7 +1845,9 @@ async def list_collections(merchant_id: str, user) -> list[dict]:
                 f"FROM {table('product_collections')} pc "
                 f"JOIN {table('products')} p ON p.id = pc.product_id "
                 "AND p.deleted_at IS NULL "
-                "GROUP BY pc.collection_id"
+                "WHERE p.merchant_id = :m "
+                "GROUP BY pc.collection_id",
+                {"m": merchant_id},
             )
         by_id = {r["c"]: r["n"] for r in counts}
         for row in rows:

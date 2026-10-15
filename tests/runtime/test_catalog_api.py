@@ -1019,3 +1019,112 @@ async def test_collections_list_product_counts(runtime_env):
     by_id = {c["id"]: c for c in cols}
     assert by_id[col.json()["id"]]["product_count"] == 1
     assert by_id[empty.json()["id"]]["product_count"] == 0
+
+
+async def test_variation_save_with_unchanged_category(runtime_env):
+    """The editor always sends category_id — an unchanged value on a
+    variation is a no-op, so price-only edits save."""
+    cid = await _category(runtime_env)
+    client = runtime_env["client"]
+    headers = await _cookie(runtime_env)
+    parent = await client.post(
+        f"{API}/products",
+        json={"category_id": cid, "title": "unchanged parent",
+              "amount_minor": 500, "currency": "USD",
+              "product_type": "variable"},
+        headers=headers,
+    )
+    variation = await client.post(
+        f"{API}/products",
+        json={"category_id": cid, "title": "unchanged var",
+              "amount_minor": 500, "currency": "USD",
+              "product_type": "variation",
+              "parent_product_id": parent.json()["id"]},
+        headers=headers,
+    )
+    assert variation.status_code == 201, variation.text
+    resp = await client.patch(
+        f"{API}/products/{variation.json()['id']}",
+        json={"category_id": cid, "amount_minor": 1200}, headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["amount_minor"] == 1200
+    assert resp.json()["category_id"] == cid
+
+
+async def test_category_move_reprojects_nip15_listing(runtime_env):
+    """Moving into a NIP-15 stall queues kind-30018 for the product and
+    its variations (single + bulk); moving out of one tombstones the old
+    kind-30018 address instead of leaving the stale stall id live."""
+    cid = await _category(runtime_env)
+    client = runtime_env["client"]
+    headers = await _cookie(runtime_env)
+    stall = await client.post(
+        f"{API}/categories",
+        json={"name": "nip15 stall", "default_currency": "USD",
+              "publish_nip15": True},
+        headers=headers,
+    )
+    stall_id = stall.json()["id"]
+    parent = await client.post(
+        f"{API}/products",
+        json={"category_id": cid, "title": "nip15 parent",
+              "amount_minor": 500, "currency": "USD",
+              "product_type": "variable"},
+        headers=headers,
+    )
+    pid = parent.json()["id"]
+    variation = await client.post(
+        f"{API}/products",
+        json={"category_id": cid, "title": "nip15 var",
+              "amount_minor": 500, "currency": "USD",
+              "product_type": "variation", "parent_product_id": pid},
+        headers=headers,
+    )
+    vid = variation.json()["id"]
+    plain = await client.post(
+        f"{API}/products",
+        json={"category_id": cid, "title": "nip15 plain",
+              "amount_minor": 100, "currency": "USD"},
+        headers=headers,
+    )
+    plain_id = plain.json()["id"]
+
+    def kinds(intents, aggregate_id):
+        return {
+            i["event_kind"]: i for i in intents
+            if i["aggregate_id"] == aggregate_id
+            and i["state"] == "pending"
+        }
+
+    resp = await client.patch(
+        f"{API}/products/{pid}", json={"category_id": stall_id},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    intents = await _outbox(runtime_env, "products")
+    for aid in (pid, vid):
+        nip15 = kinds(intents, aid).get(30018)
+        assert nip15 is not None, aid
+        assert nip15["event_address"].startswith("30018:")
+
+    resp = await client.patch(
+        f"{API}/products/{pid}", json={"category_id": cid},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    intents = await _outbox(runtime_env, "products")
+    for aid in (pid, vid):
+        live = kinds(intents, aid)
+        assert 30018 not in live, aid
+        assert live[5]["event_address"].startswith("30018:"), aid
+
+    resp = await client.post(
+        f"{API}/products/bulk",
+        json={"product_ids": [plain_id], "action": "move-category",
+              "value": stall_id},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    intents = await _outbox(runtime_env, "products")
+    assert 30018 in kinds(intents, plain_id)

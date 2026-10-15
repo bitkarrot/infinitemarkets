@@ -462,6 +462,7 @@
             modeRes.blocked_reason || "";
           self.gmSettings.inbox.state =
             (res[2] && res[2].inbox_state) || "off";
+          self.gmPollInbox();
           self.gmSettings.wallets = self.gm.wallets || [];
           var m = self.gm.merchant;
           self.gmSettings.walletId = m.wallet_id || null;
@@ -691,13 +692,9 @@
           self.gmSettings.notice =
             "Inbox enabling — pending until a relay accepts the kind-10050.";
           /* Showcase/Nostr-only cards unblock once the inbox is active —
-             re-read the mode gate alongside the new inbox state. */
-          var modeRes = await self.gmApi(
-            "GET", "/merchants/" + self.gmMerchantId() + "/storefront-mode"
-          );
-          self.gmSettings.mode.blocked = modeRes.blocked || {};
-          self.gmSettings.mode.blockedReason =
-            modeRes.blocked_reason || "";
+             re-read the mode gate now and poll until activation lands. */
+          await self.gmRefreshModeGate();
+          self.gmPollInbox();
         } catch (e) {
           self.gmSettings.error = self.gmProblemCopy(e.problem);
         }
@@ -711,16 +708,45 @@
             "POST", "/merchants/" + self.gmMerchantId() + "/inbox/disable"
           );
           self.gmSettings.inbox.state = res.inbox_state || "deactivating";
-          var modeRes = await self.gmApi(
-            "GET", "/merchants/" + self.gmMerchantId() + "/storefront-mode"
-          );
-          self.gmSettings.mode.blocked = modeRes.blocked || {};
-          self.gmSettings.mode.blockedReason =
-            modeRes.blocked_reason || "";
+          await self.gmRefreshModeGate();
+          self.gmPollInbox();
         } catch (e) {
           self.gmSettings.error = self.gmProblemCopy(e.problem);
         }
         self.gmSettings.inbox.busy = false;
+      },
+      gmRefreshModeGate: async function () {
+        var modeRes = await this.gmApi(
+          "GET", "/merchants/" + this.gmMerchantId() + "/storefront-mode"
+        );
+        this.gmSettings.mode.blocked = modeRes.blocked || {};
+        this.gmSettings.mode.blockedReason = modeRes.blocked_reason || "";
+      },
+      /* Inbox activation/deactivation completes in the outbox worker —
+         poll /inbox-state while it is in flight and re-read the mode gate
+         when it settles. Stops on a terminal state or leaving Settings. */
+      gmPollInbox: function () {
+        var self = this;
+        clearTimeout(self.gmInboxPollTimer);
+        var state = self.gmSettings.inbox.state;
+        if (state !== "pending" && state !== "deactivating") return;
+        self.gmInboxPollTimer = setTimeout(async function () {
+          var mid = self.gmMerchantId();
+          if (self.gm.view !== "settings" || !mid) return;
+          try {
+            var res = await self.gmApi(
+              "GET", "/merchants/" + mid + "/inbox-state"
+            );
+            var next = res.inbox_state || "off";
+            if (next !== self.gmSettings.inbox.state) {
+              self.gmSettings.inbox.state = next;
+              await self.gmRefreshModeGate();
+            }
+          } catch (e) {
+            /* transient — retry on the next tick */
+          }
+          self.gmPollInbox();
+        }, 3000);
       },
       gmPublishEverything: async function () {
         var self = this;

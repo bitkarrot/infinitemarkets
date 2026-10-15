@@ -190,6 +190,7 @@ async def test_catalog_move_category_inbox_and_live_banner(runtime_env):
     assert "gmEnableInbox" in settings_js
     assert "/inbox/enable" in settings_js
     assert "/inbox-state" in settings_js
+    assert "gmPollInbox" in settings_js
 
 
 async def test_warning_banner_dismissable(runtime_env):
