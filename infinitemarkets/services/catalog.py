@@ -1150,6 +1150,66 @@ async def patch_product(merchant_id: str, user, product_id: str,
                         "Product has variations",
                         "cannot change type while variations reference it",
                     )
+        if "category_id" in patch:
+            # _PRODUCT_FIELDS deliberately omits category_id — a move
+            # republishes both stalls, and a variable parent's
+            # variations follow it to the new category.
+            target = await tx.fetch_one(
+                f"SELECT id, import_review FROM {tx.table('categories')} "
+                "WHERE id = :c AND merchant_id = :m AND deleted_at IS NULL",
+                {"c": patch["category_id"], "m": merchant_id},
+            )
+            if not target or target["import_review"]:
+                raise unprocessable(
+                    "invalid-content",
+                    "Choose a live category for this product",
+                )
+            if row["product_type"] == "variation":
+                raise conflict(
+                    "invalid-transition",
+                    "Move the parent product",
+                    "variations belong to their parent's category",
+                )
+            if patch["category_id"] != row["category_id"]:
+                old_category_id = row["category_id"]
+                # The product's own revision bump happens in the shared
+                # tail below; only its variations bump here so each
+                # child republishes at its own revision.
+                await tx.execute(
+                    f"UPDATE {tx.table('products')} "
+                    "SET category_id = :c WHERE id = :i",
+                    {"c": patch["category_id"], "i": product_id},
+                )
+                children = await tx.fetch_all(
+                    f"SELECT id FROM {tx.table('products')} "
+                    "WHERE parent_product_id = :i AND merchant_id = :m "
+                    "AND deleted_at IS NULL",
+                    {"i": product_id, "m": merchant_id},
+                )
+                for moved_id in [c["id"] for c in children]:
+                    await tx.execute(
+                        f"UPDATE {tx.table('products')} "
+                        "SET category_id = :c, revision = revision + 1, "
+                        "updated_at = :t WHERE id = :i",
+                        {"c": patch["category_id"], "t": now,
+                         "i": moved_id},
+                    )
+                    moved = await tx.fetch_one(
+                        f"SELECT revision FROM {tx.table('products')} "
+                        "WHERE id = :i",
+                        {"i": moved_id},
+                    )
+                    await _enqueue_product(
+                        tx, merchant_id, moved_id, moved["revision"],
+                        merchant["pubkey"],
+                    )
+                await _enqueue_stall_if_enabled(
+                    tx, merchant_id, old_category_id, merchant["pubkey"]
+                )
+                await _enqueue_stall_if_enabled(
+                    tx, merchant_id, patch["category_id"],
+                    merchant["pubkey"],
+                )
         # stock auto-status: available reaching 0 -> sold (§6.1)
         if "stock_on_hand" in fields or "stock_reserved" in fields:
             on_hand = fields.get("stock_on_hand", row["stock_on_hand"])
@@ -1237,8 +1297,8 @@ async def bulk_products(
             "invalid-content", "product_ids must contain 1 to 100 product IDs"
         )
     if action not in {
-        "price-markup", "move-collection", "visibility", "draft", "publish",
-        "delete", "attach-shipping"
+        "price-markup", "move-collection", "move-category", "visibility",
+        "draft", "publish", "delete", "attach-shipping"
     }:
         raise unprocessable("invalid-content", "unsupported bulk action")
 
@@ -1262,6 +1322,10 @@ async def bulk_products(
         not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{32}", value)
     ):
         raise unprocessable("invalid-content", "collection is required")
+    elif action == "move-category" and (
+        not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{32}", value)
+    ):
+        raise unprocessable("invalid-content", "category is required")
     elif action == "attach-shipping" and (
         not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{32}", value)
     ):
@@ -1288,6 +1352,8 @@ async def bulk_products(
                     tx, merchant_id, product_id, merchant["pubkey"]
                 )
             return {"deleted": len(ids), "product_ids": ids}
+        moved_categories: set[str] = set()
+        moved_children: list[str] = []
 
         if action == "attach-shipping":
             option = await tx.fetch_one(
@@ -1354,6 +1420,17 @@ async def bulk_products(
                     "draft products cannot be moved to a collection",
                 )
             collection_ids.add(value)
+        if action == "move-category":
+            target = await tx.fetch_one(
+                f"SELECT id, import_review FROM {tx.table('categories')} "
+                "WHERE id = :i AND merchant_id = :m AND deleted_at IS NULL",
+                {"i": value, "m": merchant_id},
+            )
+            if not target or target["import_review"]:
+                raise unprocessable(
+                    "invalid-content",
+                    "Choose a live category for these products",
+                )
 
         for product_id in ids:
             row = by_id[product_id]
@@ -1388,6 +1465,32 @@ async def bulk_products(
                     "(id, product_id, collection_id) VALUES (:i, :p, :c)",
                     {"i": uuid.uuid4().hex, "p": product_id, "c": value},
                 )
+            elif action == "move-category":
+                if row["product_type"] == "variation":
+                    raise unprocessable(
+                        "invalid-content",
+                        "variations follow their parent's category — "
+                        "select the parent product instead",
+                    )
+                if row["category_id"] != value:
+                    moved_categories.add(row["category_id"])
+                    children = await tx.fetch_all(
+                        f"SELECT id FROM {tx.table('products')} "
+                        "WHERE parent_product_id = :i "
+                        "AND merchant_id = :m AND deleted_at IS NULL",
+                        {"i": product_id, "m": merchant_id},
+                    )
+                    for child in children:
+                        await tx.execute(
+                            f"UPDATE {tx.table('products')} "
+                            "SET category_id = :c, "
+                            "revision = revision + 1, updated_at = :t "
+                            "WHERE id = :i",
+                            {"c": value, "t": now, "i": child["id"]},
+                        )
+                        moved_children.append(child["id"])
+                    assignments.append("category_id = :v")
+                    update_params["v"] = value
             elif action == "attach-shipping":
                 linked = await tx.fetch_one(
                     f"SELECT id FROM {tx.table('product_shipping_options')} "
@@ -1453,6 +1556,21 @@ async def bulk_products(
                 await _publish_import_variants(
                     tx, merchant_id, product_id, merchant["pubkey"], visible, now
                 )
+        for moved_id in moved_children:
+            moved = await tx.fetch_one(
+                f"SELECT revision FROM {tx.table('products')} WHERE id = :i",
+                {"i": moved_id},
+            )
+            await _enqueue_product(
+                tx, merchant_id, moved_id, moved["revision"],
+                merchant["pubkey"],
+            )
+        if moved_categories:
+            moved_categories.add(value)
+        for category_id in moved_categories:
+            await _enqueue_stall_if_enabled(
+                tx, merchant_id, category_id, merchant["pubkey"]
+            )
     return {"updated": len(ids), "product_ids": ids}
 
 
@@ -1650,7 +1768,22 @@ async def create_collection(merchant_id: str, user, payload: dict) -> dict:
 
 async def list_collections(merchant_id: str, user) -> list[dict]:
     await _merchant_owned(merchant_id, user)
-    return await _fetchall("collections", merchant_id)
+    rows = await _fetchall("collections", merchant_id)
+    if rows:
+        from ..db import db, table
+
+        async with db.connect() as conn:
+            counts = await conn.fetchall(
+                f"SELECT pc.collection_id AS c, COUNT(*) AS n "
+                f"FROM {table('product_collections')} pc "
+                f"JOIN {table('products')} p ON p.id = pc.product_id "
+                "AND p.deleted_at IS NULL "
+                "GROUP BY pc.collection_id"
+            )
+        by_id = {r["c"]: r["n"] for r in counts}
+        for row in rows:
+            row["product_count"] = by_id.get(row["id"], 0)
+    return rows
 
 
 async def get_collection(merchant_id: str, user, collection_id: str) -> dict:

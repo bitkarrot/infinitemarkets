@@ -517,6 +517,18 @@
             <q-btn flat label="Retry" @click="gmLoadCatalog"></q-btn>
           </template>
         </q-banner>
+        <q-banner v-if="gm.merchant && gm.merchant.state !== 'active'"
+                  class="bg-warning text-dark q-mb-md"
+                  data-gm="catalog-not-live">
+          Your shop isn't live yet — published products appear on the
+          storefront, but checkout stays closed until the shop itself is
+          published (current state: {{ gm.merchant.state }}).
+          <template v-slot:action>
+            <q-btn flat dense label="Publish everything"
+                   :loading="gmCatalog.publishing"
+                   @click="gmPublishFromCatalog"></q-btn>
+          </template>
+        </q-banner>
         <q-tabs v-model="gmCatalog.tab" dense class="q-mb-md">
           <q-tab name="products" label="Products"></q-tab>
           <q-tab name="categories" label="Categories"></q-tab>
@@ -648,6 +660,12 @@
                             :options="gmCatalog.collections" option-label="title"
                             option-value="id" emit-value map-options
                             hint="Replaces current collection memberships for the selected products."></q-select>
+                  <q-select v-if="gmCatalog.bulkEditor.action === 'move-category'"
+                            v-model="gmCatalog.bulkEditor.categoryId" outlined
+                            label="Destination category"
+                            :options="gmCatalog.categories" option-label="name"
+                            option-value="id" emit-value map-options
+                            hint="Moves each selected product to this category; variable products bring their variations along."></q-select>
                   <q-select v-if="gmCatalog.bulkEditor.action === 'attach-shipping'"
                             v-model="gmCatalog.bulkEditor.shippingOptionId" outlined
                             label="Shipping option"
@@ -1970,6 +1988,37 @@
                   </q-card-section>
                 </q-card>
 
+                <q-card flat bordered class="q-mt-md" data-gm="inbox-card">
+                  <q-card-section>
+                    <div class="text-subtitle2 q-mb-sm">
+                      Nostr inbox
+                      <q-badge outline class="q-ml-sm"
+                               :label="gmSettings.inbox.state || 'off'">
+                      </q-badge>
+                    </div>
+                    <div class="text-caption q-mb-sm">
+                      Buyers can order over Nostr only while the inbox is
+                      listening. Enabling publishes your inbox relays
+                      (kind-10050); the state flips to active once a relay
+                      accepts it. Required for Showcase and Nostr-only
+                      storefront modes — configured inbox relays alone do
+                      not start it.
+                    </div>
+                    <q-btn unelevated color="primary" class="q-mr-sm"
+                           v-if="['off', 'error'].includes(gmSettings.inbox.state)"
+                           label="Enable Nostr inbox"
+                           :loading="gmSettings.inbox.busy"
+                           data-gm="inbox-enable"
+                           @click="gmEnableInbox"></q-btn>
+                    <q-btn outline color="negative"
+                           v-else-if="gmSettings.inbox.state === 'active' || gmSettings.inbox.state === 'pending'"
+                           label="Disable Nostr inbox"
+                           :loading="gmSettings.inbox.busy"
+                           data-gm="inbox-disable"
+                           @click="gmDisableInbox"></q-btn>
+                  </q-card-section>
+                </q-card>
+
                 <q-card flat bordered class="q-mt-md">
                   <q-card-section>
                     <div class="text-subtitle2 q-mb-sm">Store status</div>
@@ -2016,6 +2065,7 @@
                         <div v-if="gmSettings.mode.blocked[m]"
                              class="text-caption text-negative">
                           Blocked — {{ gmSettings.mode.blockedReason }}
+                          Enable it in the Nostr inbox card above.
                         </div>
                       </div>
                     </div>

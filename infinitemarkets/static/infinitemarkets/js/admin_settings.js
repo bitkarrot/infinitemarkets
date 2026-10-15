@@ -304,6 +304,7 @@
           newBlossom: "",
           directions: DIRECTIONS,
           publishing: false,
+          inbox: { state: "off", busy: false },
           deactivate: {
             show: false, step: 1, blockers: [], busy: false,
             retireKeys: false
@@ -447,7 +448,8 @@
         try {
           var res = await Promise.all([
             self.gmApi("GET", "/merchants/" + mid + "/relay-health"),
-            self.gmApi("GET", "/merchants/" + mid + "/storefront-mode")
+            self.gmApi("GET", "/merchants/" + mid + "/storefront-mode"),
+            self.gmApi("GET", "/merchants/" + mid + "/inbox-state")
           ]);
           self.gmSettings.relays = res[0].relays || [];
           self.gmSettings.blossom = res[0].blossom_servers || [];
@@ -458,6 +460,8 @@
           self.gmSettings.mode.blocked = modeRes.blocked || {};
           self.gmSettings.mode.blockedReason =
             modeRes.blocked_reason || "";
+          self.gmSettings.inbox.state =
+            (res[2] && res[2].inbox_state) || "off";
           self.gmSettings.wallets = self.gm.wallets || [];
           var m = self.gm.merchant;
           self.gmSettings.walletId = m.wallet_id || null;
@@ -675,6 +679,48 @@
       },
       gmRemoveBlossom: function (idx) {
         this.gmSettings.blossom.splice(idx, 1);
+      },
+      gmEnableInbox: async function () {
+        var self = this;
+        self.gmSettings.inbox.busy = true;
+        try {
+          var res = await self.gmApi(
+            "POST", "/merchants/" + self.gmMerchantId() + "/inbox/enable"
+          );
+          self.gmSettings.inbox.state = res.inbox_state || "pending";
+          self.gmSettings.notice =
+            "Inbox enabling — pending until a relay accepts the kind-10050.";
+          /* Showcase/Nostr-only cards unblock once the inbox is active —
+             re-read the mode gate alongside the new inbox state. */
+          var modeRes = await self.gmApi(
+            "GET", "/merchants/" + self.gmMerchantId() + "/storefront-mode"
+          );
+          self.gmSettings.mode.blocked = modeRes.blocked || {};
+          self.gmSettings.mode.blockedReason =
+            modeRes.blocked_reason || "";
+        } catch (e) {
+          self.gmSettings.error = self.gmProblemCopy(e.problem);
+        }
+        self.gmSettings.inbox.busy = false;
+      },
+      gmDisableInbox: async function () {
+        var self = this;
+        self.gmSettings.inbox.busy = true;
+        try {
+          var res = await self.gmApi(
+            "POST", "/merchants/" + self.gmMerchantId() + "/inbox/disable"
+          );
+          self.gmSettings.inbox.state = res.inbox_state || "deactivating";
+          var modeRes = await self.gmApi(
+            "GET", "/merchants/" + self.gmMerchantId() + "/storefront-mode"
+          );
+          self.gmSettings.mode.blocked = modeRes.blocked || {};
+          self.gmSettings.mode.blockedReason =
+            modeRes.blocked_reason || "";
+        } catch (e) {
+          self.gmSettings.error = self.gmProblemCopy(e.problem);
+        }
+        self.gmSettings.inbox.busy = false;
       },
       gmPublishEverything: async function () {
         var self = this;

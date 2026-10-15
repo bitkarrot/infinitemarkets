@@ -171,6 +171,27 @@ async def test_settings_wallet_select_current(runtime_env):
     assert "gmSettings.walletId = m.wallet_id" in js
 
 
+async def test_catalog_move_category_inbox_and_live_banner(runtime_env):
+    """Catalog UX contracts: bulk move-category control, collection
+    product counts, the not-live publish banner, and the Nostr inbox
+    enable control that unblocks showcase/nostr_only modes."""
+    html = (await runtime_env["client"].get("/infinitemarkets/")).text
+    assert 'data-gm="catalog-not-live"' in html
+    assert 'data-gm="inbox-card"' in html
+    assert 'data-gm="inbox-enable"' in html
+    catalog_js = (await runtime_env["client"].get(
+        f"{JS}/admin_catalog.js")).text
+    assert "gmPublishFromCatalog" in catalog_js
+    assert "move-category" in catalog_js
+    assert "categoryId" in catalog_js
+    assert "product_count" in catalog_js
+    settings_js = (await runtime_env["client"].get(
+        f"{JS}/admin_settings.js")).text
+    assert "gmEnableInbox" in settings_js
+    assert "/inbox/enable" in settings_js
+    assert "/inbox-state" in settings_js
+
+
 async def test_warning_banner_dismissable(runtime_env):
     """Dismissable warnings get an action button bound to the dismiss
     route; audit/topology banners stay non-dismissable."""

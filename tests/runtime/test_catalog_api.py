@@ -868,3 +868,154 @@ async def test_owner_scoping(runtime_env):
             },
         )
         assert resp.status_code == 404
+
+
+async def test_patch_product_moves_category(runtime_env):
+    """The editor's Category select is the one-place fix: PATCH honours
+    category_id, carries a variable parent's variations along, republishes
+    both stalls, and refuses to move a bare variation."""
+    cid = await _category(runtime_env)
+    client = runtime_env["client"]
+    headers = await _cookie(runtime_env)
+    other = await client.post(
+        f"{API}/categories",
+        json={"name": "other", "publish_nip15": True},
+        headers=headers,
+    )
+    assert other.status_code == 201, other.text
+    other_id = other.json()["id"]
+    parent = await client.post(
+        f"{API}/products",
+        json={"category_id": cid, "title": "variable parent",
+              "amount_minor": 500, "currency": "USD",
+              "product_type": "variable"},
+        headers=headers,
+    )
+    assert parent.status_code == 201, parent.text
+    variation = await client.post(
+        f"{API}/products",
+        json={"category_id": cid, "title": "size M",
+              "amount_minor": 500, "currency": "USD",
+              "product_type": "variation",
+              "parent_product_id": parent.json()["id"]},
+        headers=headers,
+    )
+    assert variation.status_code == 201, variation.text
+
+    # A variation cannot move alone — its category is the parent's.
+    resp = await client.patch(
+        f"{API}/products/{variation.json()['id']}",
+        json={"category_id": other_id}, headers=headers,
+    )
+    assert resp.status_code == 409
+
+    resp = await client.patch(
+        f"{API}/products/{parent.json()['id']}",
+        json={"category_id": other_id}, headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["category_id"] == other_id
+    child = (await client.get(
+        f"{API}/products/{variation.json()['id']}")).json()
+    assert child["category_id"] == other_id
+
+    # Stall (kind-30017) intents queued for the nip15-enabled target
+    # category — the source category has no stall to republish.
+    intents = await _outbox(runtime_env, "categories")
+    assert any(i["event_kind"] == 30017 for i in intents)
+
+    resp = await client.patch(
+        f"{API}/products/{parent.json()['id']}",
+        json={"category_id": "0" * 32}, headers=headers,
+    )
+    assert resp.status_code == 422
+
+
+async def test_bulk_move_category(runtime_env):
+    """Bulk move-category rehomes selected products (variations ride
+    with a selected parent; a bare selected variation is refused)."""
+    cid = await _category(runtime_env)
+    client = runtime_env["client"]
+    headers = await _cookie(runtime_env)
+    target = await client.post(
+        f"{API}/categories", json={"name": "bulk target"},
+        headers=headers,
+    )
+    target_id = target.json()["id"]
+    parent = await client.post(
+        f"{API}/products",
+        json={"category_id": cid, "title": "bulk parent",
+              "amount_minor": 300, "currency": "USD",
+              "product_type": "variable"},
+        headers=headers,
+    )
+    variation = await client.post(
+        f"{API}/products",
+        json={"category_id": cid, "title": "bulk var",
+              "amount_minor": 300, "currency": "USD",
+              "product_type": "variation",
+              "parent_product_id": parent.json()["id"]},
+        headers=headers,
+    )
+    plain = await client.post(
+        f"{API}/products",
+        json={"category_id": cid, "title": "bulk plain",
+              "amount_minor": 100, "currency": "USD"},
+        headers=headers,
+    )
+
+    # Selecting a variation directly is refused (it follows its parent).
+    resp = await client.post(
+        f"{API}/products/bulk",
+        json={"product_ids": [variation.json()["id"]],
+              "action": "move-category", "value": target_id},
+        headers=headers,
+    )
+    assert resp.status_code == 422
+
+    resp = await client.post(
+        f"{API}/products/bulk",
+        json={"product_ids": [parent.json()["id"], plain.json()["id"]],
+              "action": "move-category", "value": target_id},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    for pid in (parent.json()["id"], plain.json()["id"],
+                variation.json()["id"]):
+        row = (await client.get(f"{API}/products/{pid}")).json()
+        assert row["category_id"] == target_id
+
+    resp = await client.post(
+        f"{API}/products/bulk",
+        json={"product_ids": [plain.json()["id"]],
+              "action": "move-category", "value": "0" * 32},
+        headers=headers,
+    )
+    assert resp.status_code == 422
+
+
+async def test_collections_list_product_counts(runtime_env):
+    """Collections rows carry product_count like categories do."""
+    cid = await _category(runtime_env)
+    client = runtime_env["client"]
+    headers = await _cookie(runtime_env)
+    col = await client.post(
+        f"{API}/collections", json={"title": "counted"},
+        headers=headers,
+    )
+    empty = await client.post(
+        f"{API}/collections", json={"title": "empty"},
+        headers=headers,
+    )
+    prod = await client.post(
+        f"{API}/products",
+        json={"category_id": cid, "title": "member",
+              "amount_minor": 100, "currency": "USD",
+              "collection_ids": [col.json()["id"]]},
+        headers=headers,
+    )
+    assert prod.status_code == 201, prod.text
+    cols = (await client.get(f"{API}/collections")).json()
+    by_id = {c["id"]: c for c in cols}
+    assert by_id[col.json()["id"]]["product_count"] == 1
+    assert by_id[empty.json()["id"]]["product_count"] == 0

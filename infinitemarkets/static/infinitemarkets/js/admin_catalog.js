@@ -59,6 +59,7 @@
   ];
   var COLLECTION_COLUMNS = [
     { name: "title", label: "Title", field: "title", align: "left", sortable: true, style: "width: 280px", headerStyle: "width: 280px" },
+    { name: "products", label: "Products", field: "product_count", align: "left", style: "width: 100px", headerStyle: "width: 100px" },
     { name: "id", label: "ID", field: "d_tag", align: "left", style: "width: 220px", headerStyle: "width: 220px" },
     { name: "actions", label: "Actions", field: "id", align: "left", style: "width: 120px", headerStyle: "width: 120px" }
   ];
@@ -89,6 +90,7 @@
   var BULK_ACTIONS = [
     { label: "Increase prices by percentage", value: "price-markup" },
     { label: "Move to collection", value: "move-collection" },
+    { label: "Move to category", value: "move-category" },
     { label: "Attach shipping option", value: "attach-shipping" },
     { label: "Set visibility", value: "visibility" },
     { label: "Move to draft", value: "draft" },
@@ -118,10 +120,11 @@
           shippingColumns: SHIPPING_COLUMNS,
           selectedProducts: [],
           bulkActions: BULK_ACTIONS,
+          publishing: false,
           bulkEditor: {
             show: false, saving: false, error: null, action: null,
-            markup: 10, collectionId: null, shippingOptionId: null,
-            visibility: "on-sale"
+            markup: 10, collectionId: null, categoryId: null,
+            shippingOptionId: null, visibility: "on-sale"
           },
           bulkDeleteDialog: { show: false, busy: false, error: null },
           notice: null,
@@ -306,6 +309,27 @@
         self.gmCatalog.loading = false;
       },
 
+      gmPublishFromCatalog: async function () {
+        /* Same activation as Settings → Store status — the products
+           page is where a "published" product that still can't take
+           orders surfaces, so the action lives here too. */
+        var self = this;
+        self.gmCatalog.publishing = true;
+        try {
+          await self.gmApi(
+            "POST",
+            "/merchants/" + self.gmMerchantId() + "/publish",
+            {}
+          );
+          self.gmCatalog.notice =
+            "Publish queued — check Publications for delivery evidence.";
+          await self.gmLoad();
+        } catch (e) {
+          self.gmCatalog.error = self.gmProblemCopy(e.problem);
+        }
+        self.gmCatalog.publishing = false;
+      },
+
       /* --- products ---------------------------------------------------- */
       gmNewProduct: function () {
         this.gmCatalog.tab = "products";
@@ -457,8 +481,8 @@
         this.gmCatalog.editor.show = false;
         this.gmCatalog.bulkEditor = {
           show: true, saving: false, error: null, action: null,
-          markup: 10, collectionId: null, shippingOptionId: null,
-          visibility: "on-sale"
+          markup: 10, collectionId: null, categoryId: null,
+          shippingOptionId: null, visibility: "on-sale"
         };
       },
       gmApplyBulk: async function () {
@@ -495,6 +519,12 @@
             return;
           }
           body.value = ed.collectionId;
+        } else if (ed.action === "move-category") {
+          if (!ed.categoryId) {
+            ed.error = "Choose a destination category.";
+            return;
+          }
+          body.value = ed.categoryId;
         } else if (ed.action === "attach-shipping") {
           if (!ed.shippingOptionId) {
             ed.error = "Choose a shipping option.";
