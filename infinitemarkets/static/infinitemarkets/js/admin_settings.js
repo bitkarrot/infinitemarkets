@@ -865,6 +865,29 @@
           }[m] || ""
         );
       },
+      /* Blocked cards name the live inbox state instead of the static
+         server reason — "pending" means a relay still hasn't accepted
+         the kind-10050, "error" means it tried and failed. */
+      gmBlockedModeReason: function () {
+        var s = this.gmSettings.inbox.state;
+        if (s === "pending")
+          return (
+            "your Nostr inbox is enabling — waiting for a relay to " +
+            "accept the kind-10050. It flips to active on its own."
+          );
+        if (s === "error")
+          return (
+            "your Nostr inbox failed to activate — check relay " +
+            "auth/evidence in Messages, then retry Enable above."
+          );
+        if (s === "deactivating")
+          return "your Nostr inbox is switching off — try again shortly.";
+        return (
+          (this.gmSettings.mode.blockedReason ||
+            "requires an active Nostr inbox (kind-10050 published)") +
+          " Enable it in the Nostr inbox card above."
+        );
+      },
       gmSelectMode: async function (mode) {
         /* Step 1 of the two-step apply — fetch the impact preview. */
         var self = this;

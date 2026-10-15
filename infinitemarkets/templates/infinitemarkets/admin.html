@@ -1816,7 +1816,7 @@
                              type="textarea" autogrow label="Bio"
                              maxlength="2000" class="q-mb-sm"></q-input>
                     <div class="row items-center q-gutter-sm">
-                      <q-btn color="primary" outline dense label="Save identity"
+                      <q-btn color="primary" unelevated dense label="Save identity"
                              :loading="gmSettings.identitySaving"
                              @click="gmSaveIdentity"></q-btn>
                       <q-btn v-if="gm.merchant.npub" color="primary" flat dense
@@ -1831,7 +1831,7 @@
                              @click="gmCopy(gm.merchant.pubkey)"></q-btn>
                     </div>
                     <div class="q-mt-sm">
-                      <q-btn v-if="!gmSettings.nsecReveal" color="primary" outline dense
+                      <q-btn v-if="!gmSettings.nsecReveal" color="primary" unelevated dense
                              icon="vpn_key" label="Show private key"
                              aria-label="Show private key"
                              :loading="gmSettings.nsecRevealing"
@@ -1895,7 +1895,7 @@
                     <div class="text-caption q-mb-sm">
                       {{ gmSettings.nsecNote }}
                     </div>
-                    <q-btn color="primary" outline dense label="Import key"
+                    <q-btn color="primary" unelevated dense label="Import key"
                            :loading="gmSettings.importing"
                            :disable="!gmSettings.nsecInput"
                            @click="gmImportKey"></q-btn>
@@ -1961,7 +1961,7 @@
                                 option-value="value" option-label="label"
                                 emit-value map-options
                                 style="min-width: 130px"></q-select>
-                      <q-btn color="primary" outline dense label="Add relay"
+                      <q-btn color="primary" unelevated dense label="Add relay"
                              @click="gmAddRelay"></q-btn>
                     </div>
                     <div class="text-subtitle2 q-mt-md q-mb-sm">
@@ -1979,7 +1979,7 @@
                     <div class="row q-gutter-sm q-mt-sm items-center">
                       <q-input v-model="gmSettings.newBlossom" dense outlined
                                class="col" label="https://blossom.example"></q-input>
-                      <q-btn color="primary" outline dense label="Add media server"
+                      <q-btn color="primary" unelevated dense label="Add media server"
                              @click="gmAddBlossom"></q-btn>
                     </div>
                     <q-btn unelevated color="primary" class="q-mt-md"
@@ -2010,7 +2010,7 @@
                            :loading="gmSettings.inbox.busy"
                            data-gm="inbox-enable"
                            @click="gmEnableInbox"></q-btn>
-                    <q-btn outline color="negative"
+                    <q-btn unelevated color="negative"
                            v-else-if="gmSettings.inbox.state === 'active' || gmSettings.inbox.state === 'pending'"
                            label="Disable Nostr inbox"
                            :loading="gmSettings.inbox.busy"
@@ -2029,7 +2029,7 @@
                            label="Publish everything"
                            :loading="gmSettings.publishing"
                            @click="gmPublishEverything"></q-btn>
-                    <q-btn outline color="negative" label="Begin deactivation"
+                    <q-btn unelevated color="negative" label="Begin deactivation"
                            @click="gmSettings.deactivate.show = true"></q-btn>
                     <div class="text-caption q-mt-md">
                       Gamma orders (NIP-17): managed from the Messages
@@ -2064,8 +2064,7 @@
                         <div class="text-caption">{{ gmModeBlurb(m) }}</div>
                         <div v-if="gmSettings.mode.blocked[m]"
                              class="text-caption text-negative">
-                          Blocked — {{ gmSettings.mode.blockedReason }}
-                          Enable it in the Nostr inbox card above.
+                          Blocked — {{ gmBlockedModeReason() }}
                         </div>
                       </div>
                     </div>
@@ -2108,7 +2107,7 @@
                       <q-input v-model="gmNotify.newEmail" dense outlined
                                class="col" label="you@example.com"
                                type="email"></q-input>
-                      <q-btn color="primary" outline dense label="Add address"
+                      <q-btn color="primary" unelevated dense label="Add address"
                              :disable="gmNotify.emails.length >= 5"
                              @click="gmAddEmail"></q-btn>
                     </div>
@@ -2619,7 +2618,7 @@
                         <div class="text-weight-medium">{{ s.title }}</div>
                         <div class="text-caption text-grey-7">{{ s.desc }}</div>
                       </div>
-                      <q-btn color="primary" outline dense no-caps icon="content_copy"
+                      <q-btn color="primary" unelevated dense no-caps icon="content_copy"
                              label="Copy snippet" :data-gm="'embed-copy-' + s.id"
                              @click="gmCopyEmbed(s)"></q-btn>
                     </div>
