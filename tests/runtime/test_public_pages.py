@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import struct
 import uuid
 import xml.etree.ElementTree as ET
 
@@ -26,9 +27,11 @@ REQUIRED_HEADERS = {
 
 
 def _buyer_visible(html: str) -> str:
-    """Text a buyer could see — script/style bodies and ``?v=`` asset
-    hashes are excluded: their contents may carry any digit sequence and
-    would false-positive stock-count assertions."""
+    """Visible text only, excluding metadata, code, SVG paths and attributes."""
+    html = re.sub(
+        r"<head\b[^>]*>[\s\S]*?</head\s*>", "", html,
+        flags=re.IGNORECASE,
+    )
     html = re.sub(
         r"<script\b[^>]*>[\s\S]*</script\b[^>]*>", "", html,
         flags=re.IGNORECASE,
@@ -36,7 +39,11 @@ def _buyer_visible(html: str) -> str:
     html = re.sub(
         r"<style\b[^>]*>[\s\S]*</style\s*>", "", html, flags=re.IGNORECASE
     )
-    return re.sub(r"\?v=[0-9a-f]+", "", html)
+    html = re.sub(
+        r"<svg\b[^>]*>[\s\S]*?</svg\s*>", "", html, flags=re.IGNORECASE
+    )
+    html = re.sub(r"<[^>]+>", " ", html)
+    return re.sub(r"\s+", " ", html)
 
 
 def _csrf(client) -> str:
@@ -154,6 +161,23 @@ async def test_product_seo_metadata_and_schema(runtime_env):
     assert '<meta property="og:title" content="Search Title">' in resp.text
     assert f'<link rel="canonical" href="{ORIGIN}/infinitemarkets/p/' in resp.text
     assert "<title>SEO Store · Search Title</title>" in resp.text
+    assert (
+        f'<meta property="og:image" content="{ORIGIN}/infinitemarkets/p/'
+        f"{merchant['pubkey']}/{usd['d_tag']}/og.png\">" in resp.text
+    )
+    assert (
+        '<meta property="og:image:alt" '
+        'content="SEO Test Product from SEO Store">' in resp.text
+    )
+    assert '<meta property="og:image:width" content="1200">' in resp.text
+    assert '<meta property="og:image:height" content="630">' in resp.text
+    assert '<meta property="og:availability" content="instock">' in resp.text
+    assert (
+        '<meta property="product:price:amount" content="15.00">' in resp.text
+    )
+    assert (
+        '<meta property="product:price:currency" content="USD">' in resp.text
+    )
 
     schema_match = re.search(
         r'<script type="application/ld\+json">(.*?)</script>',
@@ -179,6 +203,14 @@ async def test_product_seo_metadata_and_schema(runtime_env):
         ).group(1)
     )
     assert "offers" not in sat_schema
+    assert '<meta property="product:price:amount"' not in sat_resp.text
+    sat_image = await client.get(
+        f"/infinitemarkets/p/{merchant['pubkey']}/{sats['d_tag']}/og.png"
+    )
+    assert sat_image.status_code == 200
+    assert sat_image.headers["content-type"] == "image/png"
+    assert sat_image.content.startswith(b"\x89PNG\r\n\x1a\n")
+    assert struct.unpack(">II", sat_image.content[16:24]) == (1200, 630)
 
 
 async def test_prices_render_in_major_units(runtime_env):
@@ -459,6 +491,19 @@ async def test_collection_and_merchant_pages(runtime_env):
         r'<meta name="description" content="([^"]*)"', resp.text
     ).group(1)
     assert share_description
+    merchant_og_image = re.search(
+        r'<meta property="og:image" content="([^"]+)"', resp.text
+    ).group(1)
+    assert merchant_og_image.endswith(
+        f"/public/merchants/{merchant['pubkey']}/og.png"
+    )
+    assert '<meta property="og:image:alt"' in resp.text
+    merchant_card = await client.get(
+        f"/infinitemarkets/public/merchants/{merchant['pubkey']}/og.png"
+    )
+    assert merchant_card.status_code == 200
+    assert merchant_card.headers["content-type"] == "image/png"
+    assert struct.unpack(">II", merchant_card.content[16:24]) == (1200, 630)
     assert merchant["pubkey"] in resp.text or "merchant" in resp.text
     # Storefront index: the on-sale product card + collection link render
     # (draft/hidden/variation rows are filtered server-side).

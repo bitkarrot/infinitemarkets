@@ -137,6 +137,10 @@ def _canonical_url(request: Request) -> str:
     return f"{request.url.scheme}://{request.url.netloc}{request.url.path}"
 
 
+def _product_og_image_url(request: Request) -> str:
+    return _absolute_url(request, f"{request.url.path}/og.png")
+
+
 def _plain_text(markdown: str | None) -> str:
     if not markdown:
         return ""
@@ -517,7 +521,11 @@ async def product_preview(
     canonical = _canonical_url(request)
     meta_title = _product_meta_title(product)
     meta_description = _product_meta_description(product)
-    og_image = payload.get("images", [{}])[0].get("url") if payload.get("images") else None
+    og_image = (
+        payload.get("images", [{}])[0].get("url")
+        if payload.get("images") else None
+    )
+    brand_name = _brand_ctx(merchant, theme)["brand_name"] or "Our store"
     return _public_response(
         request,
         "public_product.html",
@@ -540,6 +548,10 @@ async def product_preview(
             "meta_title": meta_title,
             "meta_description": meta_description,
             "og_image_url": _absolute_url(request, og_image),
+            "og_image_alt": (
+                f"{product.get('title') or 'Product'} from {brand_name}"
+            ),
+            "og_image_generated": False,
             "product_jsonld": _product_jsonld(
                 request, payload, canonical, meta_description
             ),
@@ -579,7 +591,12 @@ async def product_page(request: Request, pubkey: str, d_tag: str):
     canonical = _canonical_url(request)
     meta_title = _product_meta_title(product)
     meta_description = _product_meta_description(product)
-    og_image = payload.get("images", [{}])[0].get("url") if payload.get("images") else None
+    brand_name = _brand_ctx(product["_merchant"], theme)["brand_name"] or "Our store"
+    og_price = _schema_price(
+        product.get("amount_minor"),
+        product.get("currency"),
+        product.get("currency_decimals"),
+    )
     return _public_response(
         request,
         "public_product.html",
@@ -600,13 +617,88 @@ async def product_page(request: Request, pubkey: str, d_tag: str):
             "canonical_url": canonical,
             "meta_title": meta_title,
             "meta_description": meta_description,
-            "og_image_url": _absolute_url(request, og_image),
+            "og_image_url": _product_og_image_url(request),
+            "og_image_alt": (
+                f"{product.get('title') or 'Product'} from {brand_name}"
+            ),
+            "og_image_generated": True,
+            "og_price": og_price,
+            "og_availability": {
+                "available": "instock",
+                "sold": "outofstock",
+                "preorder": "preorder",
+            }.get(state),
             "product_jsonld": _product_jsonld(
                 request, payload, canonical, meta_description
             ),
             **store,
         },
     )
+
+
+@infinitemarkets_generic_router.get(
+    "/p/{pubkey}/{d_tag}/og.png", response_class=Response
+)
+async def product_og_image(request: Request, pubkey: str, d_tag: str):
+    limited = await _public_guard(request)
+    if limited is not None:
+        return limited
+    product = await nip89.product_by_address(pubkey, d_tag)
+    if not product:
+        return Response(status_code=404)
+    state = nip89.availability_state(product)
+    if state in ("unavailable", "hidden", "inactive"):
+        return Response(status_code=404)
+    from .services import og_images
+    from .services import storefront_mode as mode_service
+    from .services import themes as theme_service
+
+    merchant = product["_merchant"]
+    theme = await theme_service.get_theme(merchant["id"])
+    if await mode_service.get_mode(merchant["id"]) == "nostr_only":
+        return Response(status_code=404)
+    detail = await nip89.product_detail(product)
+    brand_name = _brand_ctx(merchant, theme)["brand_name"] or "Our store"
+    product_title = product.get("title") or "Product"
+    tokens = theme_service.resolve_tokens(theme)
+    image_url = detail["images"][0]["url"] if detail["images"] else ""
+    summary = (
+        product.get("summary")
+        or _plain_text(product.get("description_md"))
+    )
+    price = nip89.price_label(
+        product.get("amount_minor"),
+        product.get("currency"),
+        product.get("currency_decimals"),
+    )
+    cache_key = json.dumps(
+        [
+            "product", pubkey, d_tag, product.get("updated_at"), theme,
+            product_title, summary, price, image_url,
+        ],
+        sort_keys=True,
+    )
+    png, etag = await og_images.render_branded_card(
+        cache_key,
+        brand_name=brand_name,
+        title=product_title,
+        subtitle=summary,
+        price=price,
+        accent=tokens.get("--color-primary", "#a34f2a"),
+        background=tokens.get("--color-bg", "#f7f1e8"),
+        surface=tokens.get("--color-surface", "#fffaf3"),
+        text_color=tokens.get("--color-text", "#2b241f"),
+        logo_url=((theme or {}).get("brand") or {}).get("logo_url") or "",
+        product_image_url=image_url,
+    )
+    headers = {
+        "Cache-Control": "public, max-age=43200, stale-while-revalidate=86400",
+        "ETag": f'"{etag}"',
+        "X-Content-Type-Options": "nosniff",
+    }
+    if request.headers.get("if-none-match") == headers["ETag"]:
+        return Response(status_code=304, headers=headers)
+    return Response(content=png, media_type="image/png", headers=headers)
 
 
 def _browse_price(value: str | None) -> Decimal | None:
@@ -800,6 +892,10 @@ async def collection_page(request: Request, pubkey: str, d_tag: str):
             "meta_title": meta_title,
             "meta_description": meta_description,
             "og_image_url": _absolute_url(request, row.get("image")),
+            "og_image_alt": (
+                f"{row.get('title') or 'Collection'} from "
+                f"{store['brand_name'] or merchant.get('display_name') or 'Our store'}"
+            ),
             "collection_jsonld": _collection_jsonld(
                 request, row, canonical, meta_description
             ),
@@ -872,16 +968,13 @@ async def merchant_page(request: Request, pubkey: str):
     share_cfg = (theme or {}).get("share") or {}
     card_source = share_cfg.get("card_image") or "brand_logo"
     custom_image = share_cfg.get("custom_image_url") or ""
-    brand_logo = (theme.get("brand") or {}).get("logo_url") or ""
-    hero_image = hero["image_url"]
-    if card_source == "custom_image" and custom_image:
+    generated_share_image = not (
+        card_source == "custom_image" and custom_image
+    )
+    if not generated_share_image:
         share_image = custom_image
-    elif card_source == "hero_image" and hero_image:
-        share_image = hero_image
-    elif brand_logo:
-        share_image = brand_logo
     else:
-        share_image = hero_image
+        share_image = f"{request.url.path}/og.png"
     share_title = store["brand_name"] or merchant.get("display_name") or "Our store"
     share_description = (
         (hero["subtitle"] or "").strip()
@@ -910,10 +1003,82 @@ async def merchant_page(request: Request, pubkey: str):
             "share_title": share_title,
             "share_description": share_description,
             "share_image_url": _absolute_url(request, share_image),
+            "share_image_alt": (
+                f"Store preview for {share_title}, featuring its branding."
+            ),
+            "share_image_generated": generated_share_image,
             **store,
             "collections": store["all_collections"],
         },
     )
+
+
+@infinitemarkets_generic_router.get(
+    "/public/merchants/{pubkey}/og.png", response_class=Response
+)
+async def merchant_og_image(request: Request, pubkey: str):
+    limited = await _public_guard(request)
+    if limited is not None:
+        return limited
+    merchant = await nip89.merchant_by_pubkey(pubkey)
+    if not merchant or merchant["state"] in ("deactivating", "inactive"):
+        return Response(status_code=404)
+    from .services import og_images
+    from .services import storefront_mode as mode_service
+    from .services import themes as theme_service
+
+    theme = await theme_service.get_theme(merchant["id"])
+    if await mode_service.get_mode(merchant["id"]) == "nostr_only":
+        return Response(status_code=404)
+    profile = (
+        json.loads(merchant["profile_json"]) if merchant["profile_json"] else {}
+    )
+    brand_name = _brand_ctx(merchant, theme)["brand_name"] or "Our store"
+    hero = (theme or {}).get("hero") or {}
+    hero_image = hero.get("image_url") or ""
+    share = (theme or {}).get("share") or {}
+    show_hero_image = (
+        share.get("card_image") == "hero_image" and bool(hero_image)
+    )
+    logo_url = (
+        ((theme or {}).get("brand") or {}).get("logo_url")
+        or profile.get("picture") or ""
+    )
+    card_image_url = (
+        hero_image if show_hero_image or not logo_url else ""
+    )
+    tokens = theme_service.resolve_tokens(theme)
+    cache_key = json.dumps(
+        [
+            "merchant", pubkey, merchant.get("updated_at"), theme,
+            brand_name, hero.get("slogan"), hero.get("subtitle"),
+        ],
+        sort_keys=True,
+    )
+    png, etag = await og_images.render_branded_card(
+        cache_key,
+        brand_name=brand_name,
+        title=hero.get("slogan") or f"Shop {brand_name}",
+        subtitle=(
+            hero.get("subtitle") or profile.get("about") or
+            f"Explore products from {brand_name}."
+        ),
+        eyebrow="SHOP THE STORE",
+        accent=tokens.get("--color-primary", "#a34f2a"),
+        background=tokens.get("--color-bg", "#f7f1e8"),
+        surface=tokens.get("--color-surface", "#fffaf3"),
+        text_color=tokens.get("--color-text", "#2b241f"),
+        logo_url=logo_url,
+        product_image_url=card_image_url,
+    )
+    headers = {
+        "Cache-Control": "public, max-age=43200, stale-while-revalidate=86400",
+        "ETag": f'"{etag}"',
+        "X-Content-Type-Options": "nosniff",
+    }
+    if request.headers.get("if-none-match") == headers["ETag"]:
+        return Response(status_code=304, headers=headers)
+    return Response(content=png, media_type="image/png", headers=headers)
 
 
 @infinitemarkets_generic_router.get(

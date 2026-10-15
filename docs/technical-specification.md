@@ -680,6 +680,7 @@ GET   /orders/{id}/events              audit log
 
 ```text
 GET   /public/merchants/{pubkey}                    profile + preferences (no internals)
+GET   /public/merchants/{pubkey}/og.png             generated 1200x630 storefront share card
 GET   /public/merchants/{pubkey}/sitemap.xml        public storefront, product and collection URLs
 GET   /public/products/{merchant_pubkey}/{d_tag}    rendered listing + availability
 GET   /public/collections/{merchant_pubkey}/{d_tag}
@@ -689,6 +690,7 @@ GET   /public/order-status                          token via X-Order-Token head
 POST  /public/order-email-opt-out                   token via X-Order-Token; sets email_opt_in=false
 GET   /p/{naddr}                                    NIP-89 handler for kind-30402 naddr
 GET   /p/{merchant_pubkey}/{d_tag}                  canonical buyer-facing HTML product page
+GET   /p/{merchant_pubkey}/{d_tag}/og.png           generated 1200x630 product share card
 GET   /order                                        buyer order page; token is URL fragment only
 GET   /orders                                       signed-in buyer order-history page (NIP-07 session)
 GET   /profile                                      signed-in buyer kind-0 profile editor page
@@ -720,6 +722,12 @@ on a shared LNbits origin, so it cannot provide a standards-compliant
 origin-root `/robots.txt` for an individual merchant. Deployments that manage
 the origin-root robots file may add the merchant sitemap URL there; the
 extension does not expose a nested per-merchant `robots.txt` endpoint.
+
+Storefront and product share-card routes return 1200x630 PNGs. Their pages
+emit `og:image:alt` with descriptive text; generated cards use the shop name,
+product/store title, and available logo or product/hero imagery. Remote image
+fetches are HTTPS-only, public-IP checked, size-limited, and do not follow
+redirects; unsafe or unavailable images fall back to a text-and-brand card.
 
 The `naddr` handler decodes bech32, requires kind `30402`, a local merchant pubkey, and
 a valid `d` identifier, and ignores embedded relay hints for server-side fetching. It

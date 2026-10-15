@@ -13,7 +13,9 @@
   <meta name="twitter:description" content="{{ meta_description }}">
   {% if og_image_url %}
   <meta property="og:image" content="{{ og_image_url }}">
+  <meta property="og:image:alt" content="{{ og_image_alt }}">
   <meta name="twitter:image" content="{{ og_image_url }}">
+  <meta name="twitter:image:alt" content="{{ og_image_alt }}">
   {% endif %}
   <script type="application/ld+json">{{ collection_jsonld | tojson }}</script>
 {% endblock %}

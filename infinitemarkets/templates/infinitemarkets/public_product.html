@@ -5,6 +5,7 @@
   <meta name="description" content="{{ meta_description }}">
   <meta name="twitter:card" content="summary_large_image">
   <meta property="og:url" content="{{ canonical_url }}">
+  <meta property="og:site_name" content="{{ brand_name }}">
   <meta property="og:type" content="product">
   <meta property="og:title" content="{{ meta_title or product.title }}">
   <meta name="twitter:title" content="{{ meta_title or product.title }}">
@@ -12,7 +13,21 @@
   <meta name="twitter:description" content="{{ meta_description }}">
   {% if og_image_url %}
   <meta property="og:image" content="{{ og_image_url }}">
+  <meta property="og:image:alt" content="{{ og_image_alt }}">
+  <meta name="twitter:image:alt" content="{{ og_image_alt }}">
+  {% if og_image_generated %}
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  {% endif %}
   <meta name="twitter:image" content="{{ og_image_url }}">
+  {% endif %}
+  {% if og_price %}
+  <meta property="product:price:amount" content="{{ og_price[0] }}">
+  <meta property="product:price:currency" content="{{ og_price[1] }}">
+  {% endif %}
+  {% if og_availability %}
+  <meta property="og:availability" content="{{ og_availability }}">
   {% endif %}
   <script type="application/ld+json">{{ product_jsonld | tojson }}</script>
 {% endblock %}
