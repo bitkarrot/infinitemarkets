@@ -73,6 +73,8 @@ class Product(BaseModel):
     title: str | None = None
     summary: str | None = None
     description_md: str | None = None
+    meta_title: str | None = None
+    meta_description: str | None = None
     amount_minor: int | None = None
     currency: str | None = None
     currency_decimals: int | None = None
@@ -145,6 +147,8 @@ class Collection(BaseModel):
     d_tag: str
     title: str | None = None
     description: str | None = None
+    meta_title: str | None = None
+    meta_description: str | None = None
     image: str | None = None
     location: str | None = None
     geohash: str | None = None

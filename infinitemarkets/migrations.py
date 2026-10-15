@@ -1499,3 +1499,20 @@ async def m017_import_identity_live_only(db: Connection):
         "(merchant_id, source_kind, source_instance, source_hash) "
         "WHERE retired_at IS NULL"
     )
+
+
+async def m018_seo_fields(db: Connection):
+    """Per-product and per-collection search engine listing metadata."""
+    s = db.references_schema
+    await db.execute(
+        f"ALTER TABLE {s}products ADD COLUMN meta_title TEXT"
+    )
+    await db.execute(
+        f"ALTER TABLE {s}products ADD COLUMN meta_description TEXT"
+    )
+    await db.execute(
+        f"ALTER TABLE {s}collections ADD COLUMN meta_title TEXT"
+    )
+    await db.execute(
+        f"ALTER TABLE {s}collections ADD COLUMN meta_description TEXT"
+    )

@@ -552,7 +552,7 @@ async def test_brand_name_overrides_display_name_in_hero(runtime_env):
         assert resp.status_code == 200
         assert '<h1 class="merchant-title">Corner Store</h1>' in resp.text
         assert 'merchant-title">admin shop<' not in resp.text
-        assert "<title>Shop · Corner Store" in resp.text
+        assert "<title>Corner Store · Shop" in resp.text
     finally:
         # preset reset clears the brand block for later tests
         await _patch_theme(runtime_env, {"preset": "warm-market"})

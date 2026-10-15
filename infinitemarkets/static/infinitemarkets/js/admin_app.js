@@ -149,6 +149,25 @@
       gmOrigin: function () {
         return window.location.origin;
       },
+      gmBrandName: function () {
+        var t = (this.gmSettings || {}).theme || {};
+        return ((t.brand || {}).name || "").trim()
+          || (this.gm.merchant || {}).display_name || "";
+      },
+      gmSerpText: function (s) {
+        s = String(s || "").trim().replace(/\s+/g, " ");
+        if (s.length <= 160) return s;
+        return s.slice(0, 157).replace(/\s+\S*$/, "") + "...";
+      },
+      gmSerpPrice: function (major, currency, decimals) {
+        if (currency == null) return "";
+        var n = Number(major || 0);
+        if (Number.isNaN(n)) n = 0;
+        var d = Number(decimals);
+        if (Number.isNaN(d) || decimals == null) d = 0;
+        var s = n.toFixed(d).replace(/\.?0+$/, "");
+        return s + " " + String(currency).toUpperCase();
+      },
       gmLoad: async function () {
         var self = this;
         self.gm.loadError = null;

@@ -1,6 +1,24 @@
 {% extends "templates/infinitemarkets/public_base.html" %}
 {% import "templates/infinitemarkets/public_browse_controls.html" as browse_controls %}
-{% block title %}{{ collection.title }}{% endblock %}
+{% block title %}{{ meta_title or collection.title }}{% endblock %}
+{% block seo %}
+  <link rel="canonical" href="{{ canonical_url }}">
+  <meta name="description" content="{{ meta_description }}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta property="og:url" content="{{ canonical_url }}">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{{ meta_title or collection.title }}">
+  <meta name="twitter:title" content="{{ meta_title or collection.title }}">
+  <meta property="og:description" content="{{ meta_description }}">
+  <meta name="twitter:description" content="{{ meta_description }}">
+  {% if og_image_url %}
+  <meta property="og:image" content="{{ og_image_url }}">
+  <meta property="og:image:alt" content="{{ og_image_alt }}">
+  <meta name="twitter:image" content="{{ og_image_url }}">
+  <meta name="twitter:image:alt" content="{{ og_image_alt }}">
+  {% endif %}
+  <script type="application/ld+json">{{ collection_jsonld | tojson }}</script>
+{% endblock %}
 {% block content %}
 <header class="collection-header">
   <p class="eyebrow">Collection</p>

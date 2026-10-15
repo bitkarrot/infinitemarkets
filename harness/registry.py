@@ -234,6 +234,8 @@ HTTP_ROUTES: tuple[str, ...] = (
     "GET /orders/{id}/events",
     # 5.4 public — catalog and checkout
     "GET /public/merchants/{pubkey}",
+    "GET /public/merchants/{pubkey}/og.png",
+    "GET /public/merchants/{pubkey}/sitemap.xml",
     "GET /public/products/{merchant_pubkey}/{d_tag}",
     "GET /public/collections/{merchant_pubkey}/{d_tag}",
     "GET /public/shipping/{merchant_pubkey}/{d_tag}",
@@ -242,6 +244,7 @@ HTTP_ROUTES: tuple[str, ...] = (
     "POST /public/order-email-opt-out",
     "GET /p/{naddr}",
     "GET /p/{merchant_pubkey}/{d_tag}",
+    "GET /p/{merchant_pubkey}/{d_tag}/og.png",
     "GET /order",
     # 5.4 public — buyer sign-in + identity linking (03-03/03.1-02)
     # GET /profile + /public/nostr/profile* were spec-declared in 03-03

@@ -513,7 +513,8 @@
               hero_hidden: !!(t.storefront || {}).hero_hidden
             },
             share: {
-              card_image: (t.share || {}).card_image || "brand_logo"
+              card_image: (t.share || {}).card_image || "brand_logo",
+              custom_image_url: (t.share || {}).custom_image_url || ""
             }
           };
         } catch (e) {
@@ -1069,7 +1070,7 @@
           hero: t.hero || {},
           footer: t.footer || {},
           storefront: t.storefront || {},
-          share: t.share || {card_image: "brand_logo"},
+          share: t.share || {card_image: "brand_logo", custom_image_url: ""},
           counterpart: t.counterpart || {},
           advanced_opt_in: !!t.advanced_opt_in
         };

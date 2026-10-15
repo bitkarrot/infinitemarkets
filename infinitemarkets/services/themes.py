@@ -39,7 +39,7 @@ LAYOUTS = ("editorial", "guided", "compact", "gallery")
 GRID_MODES = ("standard", "quad")
 FONT_STACKS = ("system", "serif", "mono")
 CORNERS = ("sharp", "rounded", "soft")
-SHARE_CARD_IMAGES = ("brand_logo", "hero_image")
+SHARE_CARD_IMAGES = ("brand_logo", "hero_image", "custom_image")
 
 # Preset palettes — exact sketch values (sketch-findings theme-system.md);
 # high-contrast meets WCAG AAA by design.
@@ -378,7 +378,7 @@ def _validate_share(share: dict) -> dict:
     """Social share preview: which merchant image to use as the card."""
     if not isinstance(share, dict):
         raise unprocessable("invalid-content", "share must be an object")
-    unknown = set(share) - {"card_image"}
+    unknown = set(share) - {"card_image", "custom_image_url"}
     if unknown:
         raise unprocessable(
             "invalid-content", f"unknown share fields: {sorted(unknown)}"
@@ -391,6 +391,9 @@ def _validate_share(share: dict) -> dict:
             f"card_image must be one of {SHARE_CARD_IMAGES}",
         )
     out["card_image"] = card_image
+    custom = share.get("custom_image_url")
+    if custom is not None:
+        out["custom_image_url"] = _validate_media_url(custom, "share custom image")
     return out
 
 
