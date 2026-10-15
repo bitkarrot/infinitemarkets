@@ -16,6 +16,7 @@ import pytest
 import pytest_asyncio
 
 pytestmark = [
+    pytest.mark.fast,
     pytest.mark.runtime,
     pytest.mark.asyncio(loop_scope="session"),
 ]

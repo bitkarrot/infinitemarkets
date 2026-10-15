@@ -45,7 +45,7 @@ from nostr_sdk import (
 from harness import relay as relay_module
 from harness import sdk
 
-pytestmark = pytest.mark.protocol
+pytestmark = [pytest.mark.protocol, pytest.mark.fast]
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "golden" / "nip17"
 GENERATED_SEED = 20260920  # recorded per D-08 (deterministic edge cases)

@@ -41,6 +41,7 @@ from harness import host as host_module
 from harness import relay as relay_module
 
 pytestmark = [
+    pytest.mark.fast,
     pytest.mark.host,
     pytest.mark.asyncio(loop_scope="session"),
 ]

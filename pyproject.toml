@@ -40,6 +40,14 @@ asyncio_default_fixture_loop_scope = "function"
 pythonpath = ["."]
 testpaths = ["tests"]
 addopts = "-ra"
+markers = [
+    "fast: quick-gate subset — everything here runs in seconds; the expected pre-push check",
+    "sdk: nostr-sdk boundary probes",
+    "db: database dialect drills",
+    "protocol: NIP wire/event-shape conformance",
+    "host: tests that boot or bind the host process",
+    "runtime: full host-boot runtime suite",
+]
 
 [tool.ruff]
 line-length = 100

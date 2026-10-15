@@ -11,7 +11,7 @@ import json
 
 import pytest
 
-pytestmark = pytest.mark.runtime
+pytestmark = [pytest.mark.runtime, pytest.mark.fast]
 
 PUBKEY = "ab" * 32
 

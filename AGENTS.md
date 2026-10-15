@@ -9,11 +9,16 @@ contract tier — always run it when touching spec docs, routes, schema,
 state machines, or `harness/registry.py`:
 
 ```bash
-uv run pytest tests/qualification -q      # static contract checks, sub-second
+make verify-fast                          # ~50s — 290 contract+unit tests; REQUIRED before every push
 uv run pytest tests/runtime -q            # host-boot runtime suite (~6 min)
 uv run ruff check .
 node --check <edited .js files>
 ```
+
+`fast` marks the quick-gate subset: all `tests/qualification/` files plus
+the non-host-boot runtime files (crypto_keystore, db, keystore_nip17,
+catalog_events). New tests that don't boot the host should carry
+`pytest.mark.fast` so the gate stays representative.
 
 Known fragile contract surfaces (touch them together, never alone):
 - `docs/technical-specification.md` §5 routes ↔ `harness/registry.py::HTTP_ROUTES`

@@ -27,7 +27,7 @@ import pytest
 
 from harness import email as email_module
 
-pytestmark = pytest.mark.db
+pytestmark = [pytest.mark.db, pytest.mark.fast]
 
 T0 = 2_000_000_000
 BUYER = "buyer-boundary@example.org"

@@ -30,7 +30,7 @@ import pytest
 
 from harness import saga, tx
 
-pytestmark = pytest.mark.db
+pytestmark = [pytest.mark.db, pytest.mark.fast]
 
 ON_HAND = 5
 QTY = 2

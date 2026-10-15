@@ -34,7 +34,7 @@ from harness import evidence, sdk
 from harness import pins as pins_module
 from harness import relay as relay_module
 
-pytestmark = pytest.mark.sdk
+pytestmark = [pytest.mark.sdk, pytest.mark.fast]
 
 # Oversized-input probe bounds. Measured against the installed 0.44.8:
 # ~0.09s/MB wall time, ~1.05x input-size peak Python allocation. The bounds

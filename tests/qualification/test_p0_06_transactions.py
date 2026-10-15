@@ -46,7 +46,7 @@ import pytest
 from harness import db as db_module
 from harness import state, tx
 
-pytestmark = pytest.mark.db
+pytestmark = [pytest.mark.db, pytest.mark.fast]
 
 RESERVATION_EXPIRES_AT = 1_800_000_000
 N_BUYERS = 6

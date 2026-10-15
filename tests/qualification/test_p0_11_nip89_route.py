@@ -30,7 +30,7 @@ from nostr_sdk import Coordinate, Kind, Nip19Coordinate, PublicKey, RelayUrl
 from harness import nip89, sdk
 from harness import relay as relay_module
 
-pytestmark = pytest.mark.protocol
+pytestmark = [pytest.mark.protocol, pytest.mark.fast]
 
 FIXTURES_89 = Path(__file__).resolve().parent.parent / "fixtures" / "golden" / "nip89"
 FIXTURES_15 = Path(__file__).resolve().parent.parent / "fixtures" / "golden" / "nip15"

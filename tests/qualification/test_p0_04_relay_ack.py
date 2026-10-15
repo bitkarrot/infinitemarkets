@@ -27,7 +27,7 @@ from nostr_sdk import ClientBuilder, EventBuilder, NostrSigner, RelayUrl
 from harness import evidence, sdk
 from harness import relay as relay_module
 
-pytestmark = pytest.mark.protocol
+pytestmark = [pytest.mark.protocol, pytest.mark.fast]
 
 SMOKE_RELAY_ENV = "GAMMA_QUAL_SMOKE_RELAY"
 

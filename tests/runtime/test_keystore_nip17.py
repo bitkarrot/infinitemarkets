@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.runtime
+pytestmark = [pytest.mark.runtime, pytest.mark.fast]
 
 FIXTURES = (
     Path(__file__).resolve().parents[1] / "fixtures" / "golden" / "nip17"

@@ -12,7 +12,7 @@ from infinitemarkets import crypto
 from infinitemarkets import settings as gsettings
 from infinitemarkets.security import validate_relay_url
 
-pytestmark = pytest.mark.runtime
+pytestmark = [pytest.mark.runtime, pytest.mark.fast]
 
 
 def _keyring(n: int = 2) -> dict[str, bytes]:

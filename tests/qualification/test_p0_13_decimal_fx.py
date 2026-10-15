@@ -33,7 +33,7 @@ import pytest
 from harness import evidence, fx
 from harness.fx import FxQuote, FxRejection
 
-pytestmark = pytest.mark.db
+pytestmark = [pytest.mark.db, pytest.mark.fast]
 
 NOW = 1_760_000_000
 

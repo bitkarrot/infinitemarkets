@@ -28,7 +28,7 @@ import pytest
 
 from harness import authprobe, evidence, registry, schema, state
 
-pytestmark = pytest.mark.protocol
+pytestmark = [pytest.mark.protocol, pytest.mark.fast]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SPEC = (REPO_ROOT / "docs" / "technical-specification.md").read_text()

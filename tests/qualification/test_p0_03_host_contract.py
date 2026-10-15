@@ -48,6 +48,7 @@ from harness import host as host_module
 # exactly how the host's own test suite runs it. Host probes therefore share
 # a session-scoped loop; other markers keep function-scoped loops.
 pytestmark = [
+    pytest.mark.fast,
     pytest.mark.host,
     pytest.mark.asyncio(loop_scope="session"),
 ]
