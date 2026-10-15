@@ -114,6 +114,23 @@ def _brand_ctx(merchant: dict | None, theme: dict | None) -> dict:
     }
 
 
+def _absolute_url(request: Request, url: str) -> str:
+    """Make a merchant media URL absolute for OpenGraph/Twitter cards.
+
+    Same-origin ``/path`` URLs are prefixed with the request origin so
+    crawlers see a fully qualified image address, while ``https://`` URLs
+    are left untouched.
+    """
+    url = (url or "").strip()
+    if not url:
+        return ""
+    if url.startswith(("http://", "https://")):
+        return url
+    if url.startswith("/"):
+        return f"{request.url.scheme}://{request.url.netloc}{url}"
+    return url
+
+
 NAV_COLLECTIONS_MAX = 6
 
 
@@ -684,6 +701,18 @@ async def merchant_page(request: Request, pubkey: str):
         ),
         "secondary": hero_cfg.get("secondary") or {},
     }
+    share_cfg = (theme or {}).get("share") or {}
+    card_source = share_cfg.get("card_image") or "brand_logo"
+    brand_logo = (theme.get("brand") or {}).get("logo_url") or ""
+    hero_image = hero["image_url"]
+    if card_source == "hero_image" and hero_image:
+        share_image = hero_image
+    elif brand_logo:
+        share_image = brand_logo
+    else:
+        share_image = hero_image
+    share_title = store["brand_name"] or merchant.get("display_name") or "Our store"
+    share_description = (hero["subtitle"] or "").strip()[:200]
     return _public_response(
         request,
         "public_merchant.html",
@@ -700,6 +729,13 @@ async def merchant_page(request: Request, pubkey: str):
             "browse": browse,
             "theme_css": theme_service.emit_css(theme),
             "nav_active": "shop",
+            "canonical_url": (
+                f"{request.url.scheme}://{request.url.netloc}"
+                f"{request.url.path}"
+            ),
+            "share_title": share_title,
+            "share_description": share_description,
+            "share_image_url": _absolute_url(request, share_image),
             **store,
             "collections": store["all_collections"],
         },

@@ -350,7 +350,8 @@
               secondary: {label: "", url: ""}
             },
             footer: {tagline: "", note: "", logo_url: ""},
-            storefront: {grid: "standard", hero_hidden: false}
+            storefront: {grid: "standard", hero_hidden: false},
+            share: {card_image: "brand_logo"}
           },
           previewScheme: "base",
           saving: false,
@@ -510,6 +511,9 @@
             storefront: {
               grid: (t.storefront || {}).grid || "standard",
               hero_hidden: !!(t.storefront || {}).hero_hidden
+            },
+            share: {
+              card_image: (t.share || {}).card_image || "brand_logo"
             }
           };
         } catch (e) {
@@ -1065,6 +1069,7 @@
           hero: t.hero || {},
           footer: t.footer || {},
           storefront: t.storefront || {},
+          share: t.share || {card_image: "brand_logo"},
           counterpart: t.counterpart || {},
           advanced_opt_in: !!t.advanced_opt_in
         };

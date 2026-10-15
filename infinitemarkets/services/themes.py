@@ -39,6 +39,7 @@ LAYOUTS = ("editorial", "guided", "compact", "gallery")
 GRID_MODES = ("standard", "quad")
 FONT_STACKS = ("system", "serif", "mono")
 CORNERS = ("sharp", "rounded", "soft")
+SHARE_CARD_IMAGES = ("brand_logo", "hero_image")
 
 # Preset palettes — exact sketch values (sketch-findings theme-system.md);
 # high-contrast meets WCAG AAA by design.
@@ -149,7 +150,8 @@ _GATED_PAIRS = (
 
 DEFAULT_THEME = {"preset": "warm-market", "layout": "editorial",
                  "brand": None, "advanced": None, "hero": None,
-                 "footer": None, "storefront": None, "counterpart": None}
+                 "footer": None, "storefront": None, "counterpart": None,
+                 "share": None}
 
 # Hero (storefront index intro) — bounded content fields, not tokens:
 # slogan/subtitle are length-capped; URLs may be #anchors, same-origin
@@ -372,6 +374,26 @@ def _validate_storefront(storefront: dict) -> dict:
     return out
 
 
+def _validate_share(share: dict) -> dict:
+    """Social share preview: which merchant image to use as the card."""
+    if not isinstance(share, dict):
+        raise unprocessable("invalid-content", "share must be an object")
+    unknown = set(share) - {"card_image"}
+    if unknown:
+        raise unprocessable(
+            "invalid-content", f"unknown share fields: {sorted(unknown)}"
+        )
+    out = {}
+    card_image = str(share.get("card_image") or "brand_logo").strip()
+    if card_image not in SHARE_CARD_IMAGES:
+        raise unprocessable(
+            "invalid-content",
+            f"card_image must be one of {SHARE_CARD_IMAGES}",
+        )
+    out["card_image"] = card_image
+    return out
+
+
 def _validate_advanced(advanced: dict, opted_in: bool) -> dict:
     if not opted_in:
         raise unprocessable(
@@ -449,7 +471,7 @@ def validate_theme(payload: dict) -> dict:
         raise unprocessable("invalid-content", "theme must be an object")
     unknown = set(payload) - {
         "preset", "layout", "brand", "advanced", "advanced_opt_in",
-        "hero", "footer", "storefront", "counterpart",
+        "hero", "footer", "storefront", "counterpart", "share",
     }
     if unknown:
         raise unprocessable(
@@ -474,6 +496,8 @@ def validate_theme(payload: dict) -> dict:
         theme["footer"] = _validate_footer(payload["footer"])
     if payload.get("storefront") is not None:
         theme["storefront"] = _validate_storefront(payload["storefront"])
+    if payload.get("share") is not None:
+        theme["share"] = _validate_share(payload["share"])
     if payload.get("advanced") is not None:
         theme["advanced"] = _validate_advanced(
             payload["advanced"], bool(payload.get("advanced_opt_in"))
