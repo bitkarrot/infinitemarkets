@@ -1747,10 +1747,16 @@ unverified URLs keep their original reference.
 ### 13.3 Storefront profile
 
 The merchant theme gains a `storefront` tier — `{grid: standard|quad,
-hero_hidden: bool}` — and `footer.logo_url`. `quad` renders the compact
+hero_hidden: bool}` — a `counterpart` tier (`{"--color-bg"}` tinting the
+derived opposite scheme's page background; surfaces mix from it), and
+`footer.logo_url`. `quad` renders the compact
 four-column desktop / two-column mobile grid; `hero_hidden` suppresses the index
 hero. The `lightnin-dark` preset mirrors the charcoal/yellow reference
-storefront; all gated contrast pairs pass ≥4.5:1.
+storefront; all gated contrast pairs pass ≥4.5:1 in both schemes — dark
+presets derive a real light variant (light surfaces, brand colors
+darkened) applied only on explicit shopper `data-scheme="light"`, while
+light presets emit the dark variant for `data-scheme="dark"` and
+`prefers-color-scheme: dark`.
 
 ---
 

@@ -167,8 +167,9 @@ full numbered flow.
 Shoppers browse categories and collections, filter by price, and pay with
 any Lightning wallet, with no account needed. They can sign in with Nostr
 (NIP-07) or an email magic link to see their order history. Merchants pick
-from theme presets and four layouts, set their brand, and fine-tune colors
-behind WCAG contrast checks.
+from theme presets and four layouts, set their brand, and fine-tune colors —
+including the opposite color scheme's page background — behind WCAG
+contrast checks.
 
 ![Product page](img/store-product.jpg "Product page with Lightning checkout")
 ![Mobile storefront](img/store-mobile.jpg "Mobile-first layouts")

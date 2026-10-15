@@ -6,9 +6,9 @@ current_phase: "05"
 current_phase_name: Correctness, Recovery, and Security Hardening
 status: milestone-closed
 stopped_at: product release v1.0.0 tagged and published 2026-10-13; v1.0 milestone archived
-last_updated: "2026-10-13T05:30:00+00:00"
-last_activity: 2026-10-13
-last_activity_desc: product release v1.0.0 published; v1.0 milestone archived and tagged
+last_updated: "2026-10-15T01:00:00+00:00"
+last_activity: 2026-10-15
+last_activity_desc: product releases through v1.0.9 published (wallet selector, counterpart scheme, bulk shipping, re-import fix, review hardening)
 progress:
   total_phases: 6
   completed_phases: 3
@@ -29,8 +29,8 @@ See: .planning/PROJECT.md (updated 2026-10-11)
 
 Phase: 5 of 6 (Correctness, Recovery, and Security Hardening)
 Plan: milestone v1.0 archived and tagged 2026-10-13 (commit 3c0ad9a); next milestone unplanned — deferred scope candidates noted in ROADMAP
-Status: product release v1.0.0 cut 2026-10-13 — milestone v1.0 shipped, all Phase 5 gates closed or operator-disposed
-Last activity: 2026-10-13 — v1.0 milestone archived and tagged: live UAT passed, paid-order audit performed, F1 + WR-01 operator-accepted, audit reconciled to passed
+Status: milestone v1.0 shipped; product releases through v1.0.9 cut 2026-10-15 — all Phase 5 gates closed or operator-disposed
+Last activity: 2026-10-15 — v1.0.9 published: counterpart-scheme background control + real light variant for dark presets, wallet selector fix, bulk-attach shipping + catalog re-import fix, Devin Review hardening (keyfile race, SDK pin, admin origins, public 503)
 
 Progress: 3 phase acceptance scopes closed, 2 reopened, 1 in progress. Phase 5 has six reviewed plans; all plan gates closed or operator-disposed as of 2026-10-13. No overall
 acceptance percentage is implied by plan/artifact counters. There are 17 executed plan
@@ -39,6 +39,18 @@ summaries plus 4 explicitly superseded/re-scoped Phase 4 disposition records;
 100% for that artifact ratio; it is not milestone acceptance or Phase 5 progress.
 
 **Ad-hoc work since 03.1 (not phase-planned, committed + deployed, released as v0.1/v0.2/v0.3/v0.4/v0.5/v0.6/v0.6.1 and packaged for v0.6.2):** storefront filters + collection links; configurable index hero; dark/light shopper toggle; Messages list+thread redesign and counterparty kind-0 profiles; Publications timestamps/row detail, live relay catalog check, filters/sorting, and fresh kind-5 reissue; brand logo URL + footer copy; point-and-click Fine-tune + accent move; single-column merchant settings; primary-colored settings buttons; embeddable shop component (`gm-embed.js` + public products API + CORS), iframe embed with widened CSP, admin Embed snippets; About/More section + screenshots; outbox history prune control; Merchant Nostr Profile (avatar, bio, banner, NIP-05, Lightning address) and owner-only `nsec` reveal; redacted email previews + terminal-history cleanup; sortable Catalog columns and first-column quick actions; searchable country/EU shipping picker; LNbits-style Catalog tables and scrolling mobile section nav; Releases v0.1, v0.2, v0.3, v0.4, v0.5, v0.6, v0.6.1.
+
+**Ad-hoc work since v1.0.0 (released as v1.0.1–v1.0.9):** vendored
+nostr-sdk wheels + stdlib for frozen hosts; persistent auto-generated
+encryption keys + `LNBITS_BASEURL` fallback; same-origin cookie-mutation
+acceptance; starter relay seeding at merchant creation; plebeian +
+conduit market relays; code-scanning/Devin Review fixes (lock-inversion
+deadlock, origin trust, keyfile race, SDK pin, admin-origins
+strictness, public 503 page); sqlite `busy_timeout` on all connections;
+settings wallet selector shows the bound wallet (`wallet_id` in the
+owner-scoped merchant projection); counterpart-scheme background control
++ derived light variant for dark presets; bulk-attach shipping options;
+catalog re-import after delete; `docs/` getting-started updates.
 
 ## Performance Metrics
 

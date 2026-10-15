@@ -165,10 +165,22 @@ These shipped after 03.1, alongside the Phase-4 implementation — committed on
 **Theme system additions** (`services/themes.py`, `views.py::_brand_ctx`):
 brand `logo_url` (same bounded URL rules as hero images — `/path` or
 `https:`), `footer.tagline`/`footer.note` (plain text, escaped, bounded),
-a derived dark-scheme token set emitted alongside light tokens with a
+a derived counterpart-scheme token set emitted alongside base tokens with a
 shopper `data-scheme` toggle persisted in localStorage, and the point-and-click
 Fine-tune admin panel which writes the same allowlisted advanced tokens
 (the Lightning accent lives in `brand.accent` and is edited there).
+
+Each preset owns one scheme (`warm-market`/`clean-minimal` → light,
+`high-contrast`/`lightnin-dark` → dark); the opposite scheme is derived —
+surfaces from a curated ramp and brand colors lightened/darkened until
+the WCAG ≥4.5:1 gated pairs hold on the lightest gated surface. The
+merchant `counterpart` field (`{"--color-bg": "#rrggbb"}`) tints that
+derived scheme's page background; surfaces then mix from it. Light
+presets apply the dark variant on `data-scheme="dark"` or
+`prefers-color-scheme: dark`; dark presets stay default and apply the
+light variant only on an explicit `data-scheme="light"` choice, with the
+`.gm-public` root carrying `data-scheme="dark"` so the toggle starts
+consistent. The save gate checks both schemes.
 
 **Admin surfaces.** About + More nav section (version from `config.json`,
 creator credit, screenshot gallery, link cards), the Embed snippets tab,
