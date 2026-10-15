@@ -121,7 +121,7 @@ html[data-theme="dark"] {
 - Some values are hard-coded instead of tokenised: the pain-card blue `#8eaeff`
   and the dark link `#7fa9ff`. Inline `style="--k: …"` attributes are fine; raw
   colours are not.
-- Docs version strings were synced to `manifest.json` on 2026-10-13 (v1.0.0).
+- Docs version strings were synced to `manifest.json` on 2026-10-15 (v1.0.11).
 
 ## Exports
 `assets/style.css` is the source of truth. For Tailwind v4 `@theme`, DTCG
