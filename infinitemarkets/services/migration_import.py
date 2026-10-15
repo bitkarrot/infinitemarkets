@@ -684,21 +684,53 @@ async def execute_catalog_import(
         previous = await tx.fetch_one(
             f"SELECT id, product_count, commitment_id, state FROM {tx.table('catalog_imports')} "
             "WHERE merchant_id = :m AND source_kind = :k "
-            "AND source_instance = :s AND source_hash = :h",
+            "AND source_instance = :s AND source_hash = :h "
+            "AND retired_at IS NULL",
             {"m": merchant_id, "k": source_kind,
              "s": source_instance, "h": expected_hash},
         )
         if previous:
-            return {"import_id": previous["id"], "product_count": previous["product_count"],
-                    "state": previous["state"], "already_imported": True,
-                    "commitment_id": previous["commitment_id"]}
+            # import_rows tracks parents only; their variations count too.
+            imported = (
+                f"SELECT product_id FROM {tx.table('import_rows')} "
+                "WHERE import_id = :i"
+            )
+            live = await tx.fetch_one(
+                f"SELECT COUNT(*) AS n FROM {tx.table('products')} "
+                f"WHERE deleted_at IS NULL AND (id IN ({imported}) "
+                f"OR parent_product_id IN ({imported}))",
+                {"i": previous["id"]},
+            )
+            if live and live["n"]:
+                return {"import_id": previous["id"], "product_count": previous["product_count"],
+                        "state": previous["state"], "already_imported": True,
+                        "commitment_id": previous["commitment_id"]}
+            # Every product this import created was deleted — the merchant
+            # is re-uploading the same file to restore them. Retire the old
+            # import (kept intact for audit) and run the import again.
+            await tx.execute(
+                f"UPDATE {tx.table('catalog_imports')} SET retired_at = :t "
+                "WHERE id = :i",
+                {"t": now, "i": previous["id"]},
+            )
         for product in products:
+            legacy_ids = [product["handle"]]
+            if len(product["variants"]) > 1:
+                legacy_ids.extend(
+                    f"{product['handle']}::{index + 1}"
+                    for index in range(len(product["variants"]))
+                )
+            placeholders = ", ".join(f":l{i}" for i in range(len(legacy_ids)))
+            params = {"m": merchant_id, "k": source_kind,
+                      "s": source_instance}
+            params.update({f"l{i}": lid for i, lid in enumerate(legacy_ids)})
             existing = await tx.fetch_one(
                 f"SELECT id FROM {tx.table('products')} "
                 "WHERE merchant_id = :m AND import_source_kind = :k "
-                "AND import_source_instance = :s AND import_legacy_id = :l",
-                {"m": merchant_id, "k": source_kind,
-                 "s": source_instance, "l": product["handle"]},
+                "AND import_source_instance = :s "
+                f"AND import_legacy_id IN ({placeholders}) "
+                "AND deleted_at IS NULL",
+                params,
             )
             if existing:
                 raise conflict("import-conflict", "Source product was imported before")
@@ -1093,7 +1125,7 @@ async def list_imports(merchant_id: str, user) -> list[dict]:
         rows = await conn.fetchall(
             f"SELECT id, source_kind, source_instance, source_hash, "
             "source_currency, state, product_count, liability_count, "
-            "commitment_id, created_at "
+            "commitment_id, created_at, retired_at "
             f"FROM {table('catalog_imports')} WHERE merchant_id = :m "
             "ORDER BY created_at DESC, id DESC LIMIT 100",
             {"m": merchant_id},
@@ -1112,7 +1144,7 @@ async def audit_import(merchant_id: str, user, import_id: str) -> dict:
         record = await conn.fetchone(
             f"SELECT id, source_kind, source_instance, source_hash, "
             "source_currency, state, product_count, liability_count, "
-            "commitment_json, commitment_id, created_at "
+            "commitment_json, commitment_id, created_at, retired_at "
             f"FROM {table('catalog_imports')} "
             "WHERE id = :i AND merchant_id = :m",
             {"i": import_id, "m": merchant_id},

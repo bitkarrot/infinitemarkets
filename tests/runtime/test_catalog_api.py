@@ -612,6 +612,159 @@ async def test_bulk_product_updates_are_atomic_and_publication_safe(runtime_env)
         assert (await client.get(f"{API}/products/{product_id}")).status_code == 404
 
 
+async def test_bulk_attach_shipping_option(runtime_env):
+    cid = await _category(runtime_env)
+    client = runtime_env["client"]
+    headers = await _cookie(runtime_env)
+    option = await client.post(
+        f"{API}/shipping",
+        json={
+            "title": "bulk post", "service": "standard",
+            "base_price_minor": 500, "currency": "USD",
+            "countries": ["US"], "active": True,
+        },
+        headers=headers,
+    )
+    assert option.status_code == 201, option.text
+    option_id = option.json()["id"]
+    products = []
+    for title in ("ship one", "ship two"):
+        response = await client.post(
+            f"{API}/products",
+            json={
+                "category_id": cid, "title": title, "amount_minor": 100,
+                "currency": "USD", "format": "physical",
+            },
+            headers=headers,
+        )
+        assert response.status_code == 201, response.text
+        products.append(response.json()["id"])
+
+    response = await client.post(
+        f"{API}/products/bulk",
+        json={"product_ids": products, "action": "attach-shipping"},
+        headers=headers,
+    )
+    assert response.status_code == 422
+
+    response = await client.post(
+        f"{API}/products/bulk",
+        json={
+            "product_ids": products,
+            "action": "attach-shipping",
+            "value": "0" * 32,
+        },
+        headers=headers,
+    )
+    assert response.status_code == 404
+
+    response = await client.post(
+        f"{API}/products/bulk",
+        json={
+            "product_ids": products,
+            "action": "attach-shipping",
+            "value": option_id,
+        },
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["updated"] == 2
+    for product_id in products:
+        detail = (await client.get(f"{API}/products/{product_id}")).json()
+        assert [
+            s["shipping_option_id"] for s in detail["shipping_options"]
+        ] == [option_id]
+
+    # re-attaching the same option is idempotent — no duplicate rows
+    response = await client.post(
+        f"{API}/products/bulk",
+        json={
+            "product_ids": products,
+            "action": "attach-shipping",
+            "value": option_id,
+        },
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    detail = (await client.get(f"{API}/products/{products[0]}")).json()
+    assert len(detail["shipping_options"]) == 1
+
+    inactive = await client.post(
+        f"{API}/shipping",
+        json={
+            "title": "off", "service": "standard", "base_price_minor": 100,
+            "currency": "USD", "countries": ["US"], "active": False,
+        },
+        headers=headers,
+    )
+    assert inactive.status_code == 201, inactive.text
+    response = await client.post(
+        f"{API}/products/bulk",
+        json={
+            "product_ids": products,
+            "action": "attach-shipping",
+            "value": inactive.json()["id"],
+        },
+        headers=headers,
+    )
+    assert response.status_code == 422
+
+    # a variable parent carries the option to its variations (checkout
+    # matches shipping on the purchased variation); digital is skipped
+    created = {}
+    for key, body in (
+        ("parent", {"title": "ship shirt", "product_type": "variable"}),
+        ("digital", {"title": "ship ebook", "format": "digital"}),
+    ):
+        response = await client.post(
+            f"{API}/products",
+            json={"category_id": cid, "amount_minor": 100,
+                  "currency": "USD", **body},
+            headers=headers,
+        )
+        assert response.status_code == 201, response.text
+        created[key] = response.json()["id"]
+    variations = []
+    for size in ("S", "M"):
+        response = await client.post(
+            f"{API}/products",
+            json={"category_id": cid, "title": f"ship shirt {size}",
+                  "amount_minor": 100, "currency": "USD",
+                  "product_type": "variation",
+                  "parent_product_id": created["parent"]},
+            headers=headers,
+        )
+        assert response.status_code == 201, response.text
+        variations.append(response.json()["id"])
+
+    response = await client.post(
+        f"{API}/products/bulk",
+        json={"product_ids": [created["digital"]],
+              "action": "attach-shipping", "value": option_id},
+        headers=headers,
+    )
+    assert response.status_code == 422
+
+    response = await client.post(
+        f"{API}/products/bulk",
+        json={"product_ids": [created["parent"], created["digital"]],
+              "action": "attach-shipping", "value": option_id},
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["updated"] == 3
+    assert set(response.json()["product_ids"]) == {
+        created["parent"], *variations
+    }
+    for product_id in (created["parent"], *variations):
+        detail = (await client.get(f"{API}/products/{product_id}")).json()
+        assert [
+            s["shipping_option_id"] for s in detail["shipping_options"]
+        ] == [option_id]
+    digital = (await client.get(f"{API}/products/{created['digital']}")).json()
+    assert digital["shipping_options"] == []
+
+
 async def test_delete_reference_report_and_strip(runtime_env):
     client = runtime_env["client"]
     headers = await _cookie(runtime_env)

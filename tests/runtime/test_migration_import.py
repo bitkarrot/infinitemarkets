@@ -564,6 +564,133 @@ async def test_imported_drafts_publish_after_review(runtime_env):
     assert event_audit.status_code == 200
 
 
+async def test_reimport_after_products_deleted(runtime_env):
+    """Deleted imported products can be uploaded again: the identical file
+    recreates them instead of short-circuiting on already_imported, and a
+    corrected file no longer conflicts on soft-deleted import identities."""
+    client = runtime_env["client"]
+    origin = "https://shop.example"
+    current = await client.get("/infinitemarkets/api/v1/merchants/current")
+    headers = {"Origin": origin, "X-CSRF-Token": client.cookies.get("gm_csrf")}
+    if current.status_code == 404:
+        merchant = await client.post(
+            "/infinitemarkets/api/v1/merchants",
+            json={"wallet_id": runtime_env["wallet"].id},
+            headers=headers,
+        )
+        assert merchant.status_code == 201, merchant.text
+    else:
+        assert current.status_code == 200, current.text
+    data = SAMPLE.read_bytes()
+    import_api = "/infinitemarkets/api/v1/migration/shopify"
+    products_api = "/infinitemarkets/api/v1/products"
+    # a dedicated source_instance keeps this test independent of imports
+    # earlier tests in the module ran for the same merchant
+    instance = "reimport-store"
+
+    async def imported_rows():
+        listed = await client.get(products_api)
+        assert listed.status_code == 200
+        return [
+            row for row in listed.json()
+            if row["import_source_instance"] == instance
+        ]
+
+    upload = {"file": ("shopify.csv", data, "text/csv")}
+    preview = await client.post(
+        f"{import_api}/preview",
+        data={"currency": "USD", "source_instance": instance},
+        files=upload, headers=headers,
+    )
+    assert preview.status_code == 200, preview.text
+    form = {
+        "currency": "USD", "source_instance": instance,
+        "source_hash": preview.json()["source_hash"],
+    }
+    first = await client.post(
+        f"{import_api}/execute", data=form, files=upload, headers=headers,
+    )
+    assert first.status_code == 200, first.text
+    assert not first.json()["already_imported"]
+    ids = [row["id"] for row in await imported_rows()]
+    assert len(ids) == 4
+    removed = await client.post(
+        f"{products_api}/bulk",
+        json={"product_ids": ids, "action": "delete"},
+        headers=headers,
+    )
+    assert removed.status_code == 200, removed.text
+    assert await imported_rows() == []
+
+    repeated = await client.post(
+        f"{import_api}/execute", data=form, files=upload, headers=headers,
+    )
+    assert repeated.status_code == 200, repeated.text
+    assert not repeated.json()["already_imported"]
+    assert repeated.json()["import_id"] != first.json()["import_id"]
+    relisted = await imported_rows()
+    assert len(relisted) == 4
+    # the retired import keeps its signed record and rows for audit
+    audits = "/infinitemarkets/api/v1/migration/imports"
+    old_audit = await client.get(f"{audits}/{first.json()['import_id']}")
+    assert old_audit.status_code == 200, old_audit.text
+    assert old_audit.json()["retired_at"] is not None
+    assert len(old_audit.json()["rows"]) == 2
+    new_audit = await client.get(f"{audits}/{repeated.json()['import_id']}")
+    assert new_audit.status_code == 200, new_audit.text
+    assert new_audit.json()["retired_at"] is None
+    listed = {row["id"]: row for row in (await client.get(audits)).json()}
+    assert listed[first.json()["import_id"]]["retired_at"] is not None
+
+    # a live variation keeps its import live even if the parent is deleted
+    parents = [row["id"] for row in relisted if row["product_type"] == "variable"]
+    assert len(parents) == 1
+    removed = await client.post(
+        f"{products_api}/bulk",
+        json={"product_ids": parents, "action": "delete"},
+        headers=headers,
+    )
+    assert removed.status_code == 200, removed.text
+    again = await client.post(
+        f"{import_api}/execute", data=form, files=upload, headers=headers,
+    )
+    assert again.status_code == 200, again.text
+    assert again.json()["already_imported"]
+    assert again.json()["import_id"] == repeated.json()["import_id"]
+    relisted = await imported_rows()
+    assert len(relisted) == 3
+
+    removed = await client.post(
+        f"{products_api}/bulk",
+        json={
+            "product_ids": [row["id"] for row in relisted],
+            "action": "delete",
+        },
+        headers=headers,
+    )
+    assert removed.status_code == 200, removed.text
+
+    corrected = data.replace(b"Ceramic Mug", b"Ceramic Mug XL")
+    corrected_upload = {"file": ("shopify.csv", corrected, "text/csv")}
+    corrected_preview = await client.post(
+        f"{import_api}/preview",
+        data={"currency": "USD", "source_instance": instance},
+        files=corrected_upload, headers=headers,
+    )
+    assert corrected_preview.status_code == 200, corrected_preview.text
+    corrected_form = {
+        "currency": "USD", "source_instance": instance,
+        "source_hash": corrected_preview.json()["source_hash"],
+    }
+    corrected_import = await client.post(
+        f"{import_api}/execute", data=corrected_form,
+        files=corrected_upload, headers=headers,
+    )
+    assert corrected_import.status_code == 200, corrected_import.text
+    titles = [row["title"] for row in await imported_rows()]
+    assert "Ceramic Mug XL" in titles
+
+
 async def test_imported_product_publishes_normally(runtime_env):
     """Imported products can be patched, published and rendered normally."""
     from infinitemarkets.db import DomainTransaction, db, table

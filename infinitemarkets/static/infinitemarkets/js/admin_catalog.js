@@ -89,6 +89,7 @@
   var BULK_ACTIONS = [
     { label: "Increase prices by percentage", value: "price-markup" },
     { label: "Move to collection", value: "move-collection" },
+    { label: "Attach shipping option", value: "attach-shipping" },
     { label: "Set visibility", value: "visibility" },
     { label: "Move to draft", value: "draft" },
     { label: "Remove draft status", value: "publish" }
@@ -119,7 +120,8 @@
           bulkActions: BULK_ACTIONS,
           bulkEditor: {
             show: false, saving: false, error: null, action: null,
-            markup: 10, collectionId: null, visibility: "on-sale"
+            markup: 10, collectionId: null, shippingOptionId: null,
+            visibility: "on-sale"
           },
           bulkDeleteDialog: { show: false, busy: false, error: null },
           notice: null,
@@ -455,7 +457,8 @@
         this.gmCatalog.editor.show = false;
         this.gmCatalog.bulkEditor = {
           show: true, saving: false, error: null, action: null,
-          markup: 10, collectionId: null, visibility: "on-sale"
+          markup: 10, collectionId: null, shippingOptionId: null,
+          visibility: "on-sale"
         };
       },
       gmApplyBulk: async function () {
@@ -492,13 +495,20 @@
             return;
           }
           body.value = ed.collectionId;
+        } else if (ed.action === "attach-shipping") {
+          if (!ed.shippingOptionId) {
+            ed.error = "Choose a shipping option.";
+            return;
+          }
+          body.value = ed.shippingOptionId;
         } else if (ed.action === "visibility") {
           body.value = ed.visibility;
         }
         ed.saving = true;
         try {
-          await self.gmApi("POST", "/products/bulk", body);
-          self.gmCatalog.notice = selected.length + " products updated.";
+          var result = await self.gmApi("POST", "/products/bulk", body);
+          self.gmCatalog.notice =
+            ((result && result.updated) || selected.length) + " products updated.";
           ed.show = false;
           await self.gmLoadCatalog();
         } catch (e) {

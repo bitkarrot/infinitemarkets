@@ -135,6 +135,7 @@ class BulkProductsBody(_Strict):
         "draft",
         "publish",
         "delete",
+        "attach-shipping",
     ]
     value: Any = None
 

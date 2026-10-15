@@ -1237,7 +1237,8 @@ async def bulk_products(
             "invalid-content", "product_ids must contain 1 to 100 product IDs"
         )
     if action not in {
-        "price-markup", "move-collection", "visibility", "draft", "publish", "delete"
+        "price-markup", "move-collection", "visibility", "draft", "publish",
+        "delete", "attach-shipping"
     }:
         raise unprocessable("invalid-content", "unsupported bulk action")
 
@@ -1261,6 +1262,10 @@ async def bulk_products(
         not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{32}", value)
     ):
         raise unprocessable("invalid-content", "collection is required")
+    elif action == "attach-shipping" and (
+        not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{32}", value)
+    ):
+        raise unprocessable("invalid-content", "shipping option is required")
 
     now = _now()
     async with DomainTransaction() as tx:
@@ -1283,6 +1288,51 @@ async def bulk_products(
                     tx, merchant_id, product_id, merchant["pubkey"]
                 )
             return {"deleted": len(ids), "product_ids": ids}
+
+        if action == "attach-shipping":
+            option = await tx.fetch_one(
+                f"SELECT id, deleted_at, active FROM {tx.table('shipping_options')} "
+                "WHERE id = :i AND merchant_id = :m",
+                {"i": value, "m": merchant_id},
+            )
+            if not option or option["deleted_at"] is not None:
+                raise not_found("shipping option not found")
+            if not option["active"]:
+                raise unprocessable(
+                    "invalid-content",
+                    "shipping option is inactive — activate it first",
+                )
+            # Checkout matches shipping on the purchased variation, so a
+            # variable parent carries the option down to its variations.
+            parents = [
+                product_id for product_id in ids
+                if by_id[product_id]["product_type"] == "variable"
+            ]
+            if parents:
+                parent_params = {f"p{i}": pid for i, pid in enumerate(parents)}
+                parent_params["m"] = merchant_id
+                variations = await tx.fetch_all(
+                    f"SELECT *, {released_product_select('products', tx.table)} "
+                    f"FROM {tx.table('products')} WHERE merchant_id = :m "
+                    "AND deleted_at IS NULL AND parent_product_id IN ("
+                    + ", ".join(f":p{i}" for i in range(len(parents)))
+                    + f") ORDER BY created_at, id{tx.for_update}",
+                    parent_params,
+                )
+                for variation in variations:
+                    if variation["id"] not in by_id:
+                        by_id[variation["id"]] = variation
+                        ids.append(variation["id"])
+            # Shipping applies to physical goods only (as in the editor).
+            ids = [
+                product_id for product_id in ids
+                if by_id[product_id]["format"] == "physical"
+            ]
+            if not ids:
+                raise unprocessable(
+                    "invalid-content",
+                    "shipping options apply to physical products only",
+                )
 
         collection_ids: set[str] = set()
         for product_id in ids:
@@ -1338,6 +1388,19 @@ async def bulk_products(
                     "(id, product_id, collection_id) VALUES (:i, :p, :c)",
                     {"i": uuid.uuid4().hex, "p": product_id, "c": value},
                 )
+            elif action == "attach-shipping":
+                linked = await tx.fetch_one(
+                    f"SELECT id FROM {tx.table('product_shipping_options')} "
+                    "WHERE product_id = :p AND shipping_option_id = :s",
+                    {"p": product_id, "s": value},
+                )
+                if not linked:
+                    await tx.execute(
+                        f"INSERT INTO {tx.table('product_shipping_options')} "
+                        "(id, product_id, shipping_option_id) "
+                        "VALUES (:i, :p, :s)",
+                        {"i": uuid.uuid4().hex, "p": product_id, "s": value},
+                    )
             if action == "draft":
                 await tx.execute(
                     f"DELETE FROM {tx.table('product_collections')} "
