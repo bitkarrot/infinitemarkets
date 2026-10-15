@@ -341,6 +341,7 @@
               ? this.gmCatalog.categories[0].id
               : "",
             title: "", summary: "", description_md: "",
+            meta_title: "", meta_description: "",
             product_type: "simple", format: "digital",
             price_major: 0, currency: "SAT", currency_decimals: 0,
             visibility: "on-sale", draft: false,
@@ -363,6 +364,7 @@
             category_id: d.category_id,
             title: d.title || "", summary: d.summary || "",
             description_md: d.description_md || "",
+            meta_title: d.meta_title || "", meta_description: d.meta_description || "",
             product_type: d.product_type || "simple",
             format: d.format || "digital",
             price_major: (d.amount_minor || 0) /
@@ -403,6 +405,8 @@
           title: f.title,
           summary: f.summary || undefined,
           description_md: f.description_md || undefined,
+          meta_title: f.meta_title || undefined,
+          meta_description: f.meta_description || undefined,
           product_type: f.product_type,
           format: f.format,
           amount_minor: Math.round(
@@ -579,7 +583,7 @@
         this.gmCatalog.tab = "collections";
         this.gmCatalog.collectionEditor = {
           show: true, saving: false, error: null, isNew: true,
-          form: { title: "", description: "", image: "", location: "" }
+          form: { title: "", description: "", meta_title: "", meta_description: "", image: "", location: "" }
         };
       },
       gmEditCollection: function (row) {
@@ -588,7 +592,9 @@
           show: true, saving: false, error: null, isNew: false,
           form: {
             id: row.id, title: row.title || "",
-            description: row.description || "", image: row.image || "",
+            description: row.description || "",
+            meta_title: row.meta_title || "", meta_description: row.meta_description || "",
+            image: row.image || "",
             location: row.location || ""
           }
         };
@@ -602,6 +608,8 @@
         var body = {
           title: f.title,
           description: f.description || undefined,
+          meta_title: f.meta_title || undefined,
+          meta_description: f.meta_description || undefined,
           image: f.image || undefined,
           location: f.location || undefined
         };

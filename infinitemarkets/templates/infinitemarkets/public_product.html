@@ -1,5 +1,21 @@
 {% extends "templates/infinitemarkets/public_base.html" %}
-{% block title %}{{ product.title }}{% endblock %}
+{% block title %}{{ meta_title or product.title }}{% endblock %}
+{% block seo %}
+  <link rel="canonical" href="{{ canonical_url }}">
+  <meta name="description" content="{{ meta_description }}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta property="og:url" content="{{ canonical_url }}">
+  <meta property="og:type" content="product">
+  <meta property="og:title" content="{{ meta_title or product.title }}">
+  <meta name="twitter:title" content="{{ meta_title or product.title }}">
+  <meta property="og:description" content="{{ meta_description }}">
+  <meta name="twitter:description" content="{{ meta_description }}">
+  {% if og_image_url %}
+  <meta property="og:image" content="{{ og_image_url }}">
+  <meta name="twitter:image" content="{{ og_image_url }}">
+  {% endif %}
+  <script type="application/ld+json">{{ product_jsonld | tojson }}</script>
+{% endblock %}
 {% block head %}
 {#- Host-vendored, same-origin vendor scripts for the invoice QR (script-src
     'self' CSP permits them; nothing third-party ever loads). -#}

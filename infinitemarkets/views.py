@@ -12,13 +12,15 @@ from __future__ import annotations
 
 import json
 import re
+import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from decimal import Decimal
 from hashlib import sha256
 from pathlib import Path
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from lnbits.core.models import User
 from lnbits.decorators import check_user_exists
 from lnbits.helpers import template_renderer
@@ -131,6 +133,111 @@ def _absolute_url(request: Request, url: str) -> str:
     return url
 
 
+def _canonical_url(request: Request) -> str:
+    return f"{request.url.scheme}://{request.url.netloc}{request.url.path}"
+
+
+def _plain_text(markdown: str | None) -> str:
+    if not markdown:
+        return ""
+    html = nip89.render_markdown(markdown)
+    text = re.sub(r"<[^>]+>", " ", html)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _product_meta_title(product: dict) -> str:
+    return (product.get("meta_title") or product.get("title") or "").strip()
+
+
+def _product_meta_description(product: dict) -> str:
+    explicit = (product.get("meta_description") or "").strip()
+    if explicit:
+        return explicit
+    summary = (product.get("summary") or "").strip()
+    if summary:
+        return summary
+    desc = _plain_text(product.get("description_md"))
+    return desc[:160] if desc else ""
+
+
+def _collection_meta_title(collection: dict) -> str:
+    return (collection.get("meta_title") or collection.get("title") or "").strip()
+
+
+def _collection_meta_description(collection: dict) -> str:
+    explicit = (collection.get("meta_description") or "").strip()
+    if explicit:
+        return explicit
+    desc = _plain_text(collection.get("description"))
+    return desc[:160] if desc else ""
+
+
+def _schema_price(amount_minor: int | None, currency: str | None,
+                  decimals: int | None) -> tuple[str, str] | None:
+    if amount_minor is None:
+        return None
+    code = (currency or "SAT").upper()
+    if code in ("SAT", "SATS"):
+        return f"{int(amount_minor)}", code
+    places = 2 if decimals is None else int(decimals)
+    value = Decimal(int(amount_minor)).scaleb(-places)
+    return f"{value:.{places}f}", code
+
+
+def _availability_state(state: str) -> str:
+    return {
+        "available": "https://schema.org/InStock",
+        "sold": "https://schema.org/OutOfStock",
+        "preorder": "https://schema.org/PreOrder",
+    }.get(state, "https://schema.org/InStock")
+
+
+def _product_jsonld(product: dict, canonical_url: str,
+                    meta_description: str) -> dict:
+    price = _schema_price(
+        product["price"]["amount_minor"],
+        product["price"]["currency"],
+        product["price"]["decimals"],
+    )
+    data: dict = {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        "name": product.get("title") or "",
+        "description": meta_description,
+        "url": canonical_url,
+        "image": [img["url"] for img in product.get("images", [])],
+    }
+    if price is not None:
+        data["offers"] = {
+            "@type": "Offer",
+            "priceCurrency": price[1],
+            "price": price[0],
+            "availability": _availability_state(product.get("availability", "")),
+            "url": canonical_url,
+        }
+    return data
+
+
+def _collection_jsonld(collection: dict, canonical_url: str,
+                       meta_description: str) -> dict:
+    data: dict = {
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        "name": collection.get("title") or "",
+        "description": meta_description,
+        "url": canonical_url,
+    }
+    if collection.get("image"):
+        data["image"] = collection["image"]
+    return data
+
+
+def _sitemap_date(ts: int | None) -> str:
+    if ts is None:
+        return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
+
+
 NAV_COLLECTIONS_MAX = 6
 
 
@@ -198,6 +305,12 @@ async def _store_ctx(merchant: dict, theme: dict | None) -> dict:
         # D-07: the four-state storefront mode drives buy controls and
         # browse depth server-side.
         "storefront_mode": await mode_service.get_mode(merchant["id"]),
+        "sitemap_url": (
+            f"/infinitemarkets/public/merchants/{merchant['pubkey']}/sitemap.xml"
+        ),
+        "robots_url": (
+            f"/infinitemarkets/public/merchants/{merchant['pubkey']}/robots.txt"
+        ),
         **nostr,
     }
 
@@ -379,6 +492,10 @@ async def product_preview(
     theme = await theme_service.get_theme(merchant["id"])
     store = await _store_ctx(merchant, theme)
     payload = nip89.public_product_json(product, detail)
+    canonical = _canonical_url(request)
+    meta_title = _product_meta_title(product)
+    meta_description = _product_meta_description(product)
+    og_image = payload.get("images", [{}])[0].get("url") if payload.get("images") else None
     return _public_response(
         request,
         "public_product.html",
@@ -397,6 +514,11 @@ async def product_preview(
                 product["format"] == "digital"
                 and product.get("delivery_enc") is not None
             ),
+            "canonical_url": canonical,
+            "meta_title": meta_title,
+            "meta_description": meta_description,
+            "og_image_url": _absolute_url(request, og_image),
+            "product_jsonld": _product_jsonld(payload, canonical, meta_description),
             **store,
         },
     )
@@ -429,11 +551,16 @@ async def product_page(request: Request, pubkey: str, d_tag: str):
         # D-08: browse depth gated; the notice page keeps the Track-order
         # link so existing private order links keep working.
         return _nostr_only_response(request, product["_merchant"], store)
+    payload = nip89.public_product_json(product, detail)
+    canonical = _canonical_url(request)
+    meta_title = _product_meta_title(product)
+    meta_description = _product_meta_description(product)
+    og_image = payload.get("images", [{}])[0].get("url") if payload.get("images") else None
     return _public_response(
         request,
         "public_product.html",
         {
-            "product": nip89.public_product_json(product, detail),
+            "product": payload,
             "state": state,
             "description_html": nip89.render_markdown(
                 product.get("description_md")
@@ -446,6 +573,11 @@ async def product_page(request: Request, pubkey: str, d_tag: str):
                 product["format"] == "digital"
                 and product.get("delivery_enc") is not None
             ),
+            "canonical_url": canonical,
+            "meta_title": meta_title,
+            "meta_description": meta_description,
+            "og_image_url": _absolute_url(request, og_image),
+            "product_jsonld": _product_jsonld(payload, canonical, meta_description),
             **store,
         },
     )
@@ -624,6 +756,9 @@ async def collection_page(request: Request, pubkey: str, d_tag: str):
     store = await _store_ctx(merchant, theme)
     if store["storefront_mode"] == "nostr_only":
         return _nostr_only_response(request, merchant, store)
+    canonical = _canonical_url(request)
+    meta_title = _collection_meta_title(row)
+    meta_description = _collection_meta_description(row)
     return _public_response(
         request,
         "public_collection.html",
@@ -635,6 +770,11 @@ async def collection_page(request: Request, pubkey: str, d_tag: str):
             "theme_css": theme_service.emit_css(theme),
             "layout": theme_service.theme_layout(theme),
             "nav_active": d_tag,
+            "canonical_url": canonical,
+            "meta_title": meta_title,
+            "meta_description": meta_description,
+            "og_image_url": _absolute_url(request, row.get("image")),
+            "collection_jsonld": _collection_jsonld(row, canonical, meta_description),
             **store,
         },
     )
@@ -740,6 +880,83 @@ async def merchant_page(request: Request, pubkey: str):
             "collections": store["all_collections"],
         },
     )
+
+
+@infinitemarkets_generic_router.get(
+    "/public/merchants/{pubkey}/sitemap.xml", response_class=Response
+)
+async def merchant_sitemap(request: Request, pubkey: str):
+    """Per-merchant sitemap of storefront, products and collections."""
+    limited = await _public_guard(request)
+    if limited is not None:
+        return limited
+    merchant = await nip89.merchant_by_pubkey(pubkey)
+    if not merchant or merchant["state"] in ("deactivating", "inactive"):
+        return _public_response(request, "public_invalid.html", {},
+                                status=404)
+    from .db import db, table
+
+    async with db.connect() as conn:
+        products = await conn.fetchall(
+            f"SELECT d_tag, updated_at FROM {table('products')} "
+            "WHERE merchant_id = :m AND deleted_at IS NULL AND NOT draft "
+            "AND parent_product_id IS NULL AND visibility != 'hidden'",
+            {"m": merchant["id"]},
+        )
+        collections = await conn.fetchall(
+            f"SELECT d_tag, updated_at FROM {table('collections')} "
+            "WHERE merchant_id = :m AND deleted_at IS NULL",
+            {"m": merchant["id"]},
+        )
+    base = f"{request.url.scheme}://{request.url.netloc}"
+    urlset = ET.Element(
+        "urlset", xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+    )
+
+    def add_url(loc: str, ts: int | None) -> None:
+        url = ET.SubElement(urlset, "url")
+        ET.SubElement(url, "loc").text = loc
+        ET.SubElement(url, "lastmod").text = _sitemap_date(ts)
+
+    add_url(f"{base}/infinitemarkets/public/merchants/{pubkey}", None)
+    for p in products:
+        add_url(
+            f"{base}/infinitemarkets/p/{pubkey}/{p['d_tag']}",
+            p["updated_at"],
+        )
+    for c in collections:
+        add_url(
+            f"{base}/infinitemarkets/public/collections/{pubkey}/{c['d_tag']}",
+            c["updated_at"],
+        )
+    body = '<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(
+        urlset, encoding="unicode"
+    )
+    return Response(content=body, media_type="application/xml; charset=utf-8")
+
+
+@infinitemarkets_generic_router.get(
+    "/public/merchants/{pubkey}/robots.txt", response_class=Response
+)
+async def merchant_robots(request: Request, pubkey: str):
+    """Per-merchant robots.txt pointing at the storefront sitemap."""
+    limited = await _public_guard(request)
+    if limited is not None:
+        return limited
+    merchant = await nip89.merchant_by_pubkey(pubkey)
+    if not merchant or merchant["state"] in ("deactivating", "inactive"):
+        return _public_response(request, "public_invalid.html", {},
+                                status=404)
+    base = f"{request.url.scheme}://{request.url.netloc}"
+    sitemap = f"{base}/infinitemarkets/public/merchants/{pubkey}/sitemap.xml"
+    body = (
+        "User-agent: *\n"
+        "Allow: /infinitemarkets/public/merchants/\n"
+        "Allow: /infinitemarkets/p/\n"
+        "Allow: /infinitemarkets/public/collections/\n"
+        f"Sitemap: {sitemap}\n"
+    )
+    return Response(content=body, media_type="text/plain; charset=utf-8")
 
 
 @infinitemarkets_generic_router.get(

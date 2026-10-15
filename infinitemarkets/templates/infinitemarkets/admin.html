@@ -573,6 +573,29 @@
                 <q-input v-model="gmCatalog.editor.form.description_md" dense
                          outlined type="textarea" class="gm-editor-wide"
                          label="Description (markdown)"></q-input>
+                <q-separator class="gm-editor-wide"></q-separator>
+                <div class="gm-editor-wide text-subtitle2">Search engine listing</div>
+                <q-input v-model="gmCatalog.editor.form.meta_title" dense outlined
+                         class="gm-editor-wide" label="SEO title (optional)"
+                         hint="Defaults to product title. Max 70 characters."
+                         counter :maxlength="70"></q-input>
+                <q-input v-model="gmCatalog.editor.form.meta_description" dense
+                         outlined type="textarea" class="gm-editor-wide"
+                         label="SEO description (optional)" autogrow
+                         hint="Defaults to summary or description. Max 160 characters."
+                         counter :maxlength="160"></q-input>
+                <div class="gm-editor-wide gm-seo-preview">
+                  <div class="text-caption text-grey-7">Search preview</div>
+                  <div class="text-primary text-body2" style="font-weight: 500;">
+                    {{ gmCatalog.editor.form.meta_title || gmCatalog.editor.form.title }}
+                  </div>
+                  <div class="text-caption" style="color: #006621;">
+                    {{ gmOrigin() }}/infinitemarkets/p/{{ gm.merchant.pubkey }}/{{ gmCatalog.editor.form.d_tag }}
+                  </div>
+                  <div class="text-body2 text-grey-8">
+                    {{ gmCatalog.editor.form.meta_description || gmCatalog.editor.form.summary || gmCatalog.editor.form.description_md }}
+                  </div>
+                </div>
                 <q-select v-model="gmCatalog.editor.form.product_type" dense
                           outlined label="Type"
                           :options="gmCatalog.productTypes"></q-select>
@@ -872,6 +895,29 @@
                 <q-input v-model="gmCatalog.collectionEditor.form.description" dense
                          outlined type="textarea" class="gm-editor-wide"
                          label="Description (optional)"></q-input>
+                <q-separator class="gm-editor-wide"></q-separator>
+                <div class="gm-editor-wide text-subtitle2">Search engine listing</div>
+                <q-input v-model="gmCatalog.collectionEditor.form.meta_title" dense outlined
+                         class="gm-editor-wide" label="SEO title (optional)"
+                         hint="Defaults to collection title. Max 70 characters."
+                         counter :maxlength="70"></q-input>
+                <q-input v-model="gmCatalog.collectionEditor.form.meta_description" dense
+                         outlined type="textarea" class="gm-editor-wide"
+                         label="SEO description (optional)" autogrow
+                         hint="Defaults to collection description. Max 160 characters."
+                         counter :maxlength="160"></q-input>
+                <div class="gm-editor-wide gm-seo-preview">
+                  <div class="text-caption text-grey-7">Search preview</div>
+                  <div class="text-primary text-body2" style="font-weight: 500;">
+                    {{ gmCatalog.collectionEditor.form.meta_title || gmCatalog.collectionEditor.form.title }}
+                  </div>
+                  <div class="text-caption" style="color: #006621;">
+                    {{ gmOrigin() }}/infinitemarkets/public/collections/{{ gm.merchant.pubkey }}/{{ gmCatalog.collectionEditor.form.d_tag }}
+                  </div>
+                  <div class="text-body2 text-grey-8">
+                    {{ gmCatalog.collectionEditor.form.meta_description || gmCatalog.collectionEditor.form.description }}
+                  </div>
+                </div>
                 <q-input v-model="gmCatalog.collectionEditor.form.image" dense
                          outlined class="gm-editor-wide"
                          label="Image URL (optional)"></q-input>

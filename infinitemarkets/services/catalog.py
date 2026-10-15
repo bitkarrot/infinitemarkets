@@ -37,6 +37,8 @@ from .outbox import enqueue_intent
 TITLE_MAX = 200
 SUMMARY_MAX = 500
 DESC_MAX = 64 * 1024
+META_TITLE_MAX = 70
+META_DESCRIPTION_MAX = 160
 IMAGES_MAX = 20
 CURRENCY_RE = re.compile(r"^[A-Z0-9]{3,8}$")
 D_TAG_RE = re.compile(r"^[a-z0-9-]{8,64}$|^[0-9a-f]{8,64}$")
@@ -99,6 +101,23 @@ def _check_summary(v: str | None) -> str | None:
     if v is not None and len(v) > SUMMARY_MAX:
         raise unprocessable(
             "invalid-content", f"summary exceeds {SUMMARY_MAX} chars"
+        )
+    return v
+
+
+def _check_meta_title(v: str | None) -> str | None:
+    if v is not None and len(v) > META_TITLE_MAX:
+        raise unprocessable(
+            "invalid-content", f"meta title exceeds {META_TITLE_MAX} chars"
+        )
+    return v
+
+
+def _check_meta_description(v: str | None) -> str | None:
+    if v is not None and len(v) > META_DESCRIPTION_MAX:
+        raise unprocessable(
+            "invalid-content",
+            f"meta description exceeds {META_DESCRIPTION_MAX} chars",
         )
     return v
 
@@ -708,7 +727,8 @@ async def _validate_variation(
 
 
 _PRODUCT_FIELDS = (
-    "title", "summary", "description_md", "amount_minor", "currency",
+    "title", "summary", "description_md", "meta_title", "meta_description",
+    "amount_minor", "currency",
     "currency_decimals", "recurring_frequency", "visibility",
     "nip99_status", "draft", "stock_on_hand", "stock_reserved",
     "location", "geohash",
@@ -728,6 +748,10 @@ def _sanitize_product_fields(patch: dict) -> dict:
                 v = _check_title(v)
             elif f == "summary":
                 v = _check_summary(v)
+            elif f == "meta_title":
+                v = _check_meta_title(v)
+            elif f == "meta_description":
+                v = _check_meta_description(v)
             elif f == "draft":
                 v = bool(v)
             out[f] = v
@@ -1778,8 +1802,8 @@ async def delete_product(merchant_id: str, user, product_id: str) -> dict:
 
 
 _COLLECTION_FIELDS = {
-    "d_tag", "title", "description", "image", "location", "geohash",
-    "shipping_option_ids",
+    "d_tag", "title", "description", "meta_title", "meta_description",
+    "image", "location", "geohash", "shipping_option_ids",
 }
 
 
@@ -1788,6 +1812,8 @@ async def create_collection(merchant_id: str, user, payload: dict) -> dict:
     _reject_unknown(payload, _COLLECTION_FIELDS)
     title = _check_title(payload.get("title"))
     description = _check_description(payload.get("description"))
+    meta_title = _check_meta_title(payload.get("meta_title"))
+    meta_description = _check_meta_description(payload.get("meta_description"))
     image = payload.get("image")
     if image is not None and not image.startswith("https://"):
         raise unprocessable(
@@ -1801,15 +1827,17 @@ async def create_collection(merchant_id: str, user, payload: dict) -> dict:
         await _check_d_tag_free(tx, "collections", merchant_id, d_tag)
         await tx.execute(
             f"INSERT INTO {tx.table('collections')} "
-            "(id, merchant_id, d_tag, title, description, image, location,"
-            " geohash, created_at, updated_at) "
-            "VALUES (:i, :m, :d, :t2, :desc, :img, :loc, :g, :t, :t)",
+            "(id, merchant_id, d_tag, title, description, meta_title,"
+            " meta_description, image, location, geohash, created_at, updated_at) "
+            "VALUES (:i, :m, :d, :t2, :desc, :mt, :md, :img, :loc, :g, :t, :t)",
             {
                 "i": collection_id,
                 "m": merchant_id,
                 "d": d_tag,
                 "t2": title,
                 "desc": description,
+                "mt": meta_title,
+                "md": meta_description,
                 "img": image,
                 "loc": payload.get("location"),
                 "g": payload.get("geohash"),
@@ -1889,8 +1917,8 @@ async def patch_collection(merchant_id: str, user, collection_id: str,
     row = await _fetch("collections", collection_id, merchant_id)
     if row["deleted_at"] is not None:
         raise not_found("collection not found")
-    allowed = {"title", "description", "image", "location", "geohash",
-               "shipping_option_ids"}
+    allowed = {"title", "description", "meta_title", "meta_description",
+               "image", "location", "geohash", "shipping_option_ids"}
     unknown = set(patch) - allowed
     if unknown:
         raise unprocessable(
@@ -1898,13 +1926,18 @@ async def patch_collection(merchant_id: str, user, collection_id: str,
         )
     now = _now()
     async with DomainTransaction() as tx:
-        for col in ("title", "description", "image", "location", "geohash"):
+        for col in ("title", "description", "meta_title", "meta_description",
+                    "image", "location", "geohash"):
             if col in patch:
                 v = patch[col]
                 if col == "title":
                     v = _check_title(v)
                 elif col == "description":
                     v = _check_description(v)
+                elif col == "meta_title":
+                    v = _check_meta_title(v)
+                elif col == "meta_description":
+                    v = _check_meta_description(v)
                 elif col == "image" and v is not None and not v.startswith(
                     "https://"
                 ):

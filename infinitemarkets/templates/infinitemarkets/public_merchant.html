@@ -1,7 +1,7 @@
 {% extends "templates/infinitemarkets/public_base.html" %}
 {% import "templates/infinitemarkets/public_browse_controls.html" as browse_controls %}
 {% block title %}Shop{% endblock %}
-{% block head %}
+{% block seo %}
   <link rel="canonical" href="{{ canonical_url }}">
   <meta property="og:url" content="{{ canonical_url }}">
   <meta property="og:type" content="website">
@@ -10,6 +10,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="{{ share_title }}">
   {% if share_description %}
+  <meta name="description" content="{{ share_description }}">
   <meta property="og:description" content="{{ share_description }}">
   <meta name="twitter:description" content="{{ share_description }}">
   {% endif %}
