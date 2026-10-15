@@ -15,7 +15,7 @@
 </head>
 <body>
 {%- set track_url = '/infinitemarkets/order' ~ ('?shop=' ~ shop_pubkey if shop_pubkey else '') -%}
-<div class="gm-public gm-embed" data-layout="{{ layout }}" data-shop="{{ shop_pubkey or '' }}" data-embed="1">
+<div class="gm-public gm-embed" data-layout="{{ layout }}" data-shop="{{ shop_pubkey or '' }}" data-embed="1"{% if base_scheme == 'dark' %} data-scheme="dark"{% endif %}>
   <div class="embed-toolbar">
     {% if storefront_url %}
     <a class="brand" href="{{ storefront_url }}" target="_blank" rel="noopener">

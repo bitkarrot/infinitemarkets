@@ -85,6 +85,34 @@
     "high-contrast": "High Contrast",
     "lightnin-dark": "Lightnin' Dark"
   };
+  /* Which scheme each preset owns — mirrors themes.py PRESET_SCHEME;
+     the opposite scheme is derived (and tinted via theme.counterpart). */
+  var PRESET_SCHEME = {
+    "warm-market": "light",
+    "clean-minimal": "light",
+    "high-contrast": "dark",
+    "lightnin-dark": "dark"
+  };
+  /* Counterpart surface ramps — mirror themes.py _DARK_SURFACES /
+     _LIGHT_SURFACES and the mix-derivation for a merchant-chosen
+     counterpart background. */
+  var DARK_SURFACES = {
+    "--color-bg": "#1b1510", "--color-surface": "#241c15",
+    "--color-surface-alt": "#2e241b",
+    "--color-border": "rgba(245, 239, 230, 0.12)",
+    "--color-text": "#f5efe6", "--color-text-muted": "#b8a996",
+    "--color-focus": "#8ab5ff",
+    "--shadow-sm": "0 1px 2px rgba(0, 0, 0, 0.45)",
+    "--shadow-md": "0 8px 24px rgba(0, 0, 0, 0.45)",
+    "--shadow-lg": "0 18px 52px rgba(0, 0, 0, 0.55)"
+  };
+  var LIGHT_SURFACES = {
+    "--color-bg": "#f5f6f8", "--color-surface": "#ffffff",
+    "--color-surface-alt": "#e8ebef",
+    "--color-border": "rgba(23, 27, 34, 0.12)",
+    "--color-text": "#171b22", "--color-text-muted": "#4d5665",
+    "--color-focus": "#165dff"
+  };
   var GATED_PAIRS = [
     ["--color-text", "--color-bg"],
     ["--color-text", "--color-surface"],
@@ -178,6 +206,72 @@
     var lo = Math.min(l1, l2);
     return (hi + 0.05) / (lo + 0.05);
   }
+  function mixHex(a, b, t) {
+    var ca = String(a).replace("#", "");
+    var cb = String(b).replace("#", "");
+    var out = "#";
+    [0, 2, 4].forEach(function (i) {
+      var va = parseInt(ca.slice(i, i + 2), 16);
+      var vb = parseInt(cb.slice(i, i + 2), 16);
+      out += ("0" + Math.round(va + (vb - va) * t).toString(16)).slice(-2);
+    });
+    return out;
+  }
+  function lightenTo(color, bg, target) {
+    var mixed = color, t = 0;
+    while (contrast(mixed, bg) < target && t < 0.85) {
+      t += 0.05;
+      mixed = mixHex(color, "#ffffff", t);
+    }
+    return mixed;
+  }
+  function darkenTo(color, bg, target) {
+    var mixed = color, t = 0;
+    while (contrast(mixed, bg) < target && t < 0.85) {
+      t += 0.05;
+      mixed = mixHex(color, "#000000", t);
+    }
+    return mixed;
+  }
+  function darkSurfaces(bg) {
+    var out = Object.assign({}, DARK_SURFACES);
+    if (!bg) return out;
+    out["--color-bg"] = bg;
+    out["--color-surface"] = mixHex(bg, "#ffffff", 0.07);
+    out["--color-surface-alt"] = mixHex(bg, "#ffffff", 0.13);
+    return out;
+  }
+  function lightSurfaces(bg) {
+    var out = Object.assign({}, LIGHT_SURFACES);
+    if (!bg) return out;
+    out["--color-bg"] = bg;
+    out["--color-surface"] = mixHex(bg, "#ffffff", 0.55);
+    out["--color-surface-alt"] = mixHex(bg, "#000000", 0.05);
+    return out;
+  }
+  /* Mirror of themes.py counterpart_scheme_tokens: for a light preset
+     the dark scheme is derived (surfaces + lightened brand colors on
+     the lightest gated surface); for a dark preset the light scheme is
+     derived symmetrically. */
+  function counterpartTokens(baseTokens, theme) {
+    var dark = PRESET_SCHEME[theme.preset] !== "dark";
+    var cpBg = (theme.counterpart || {})["--color-bg"];
+    var surfaces = dark ? darkSurfaces(cpBg) : lightSurfaces(cpBg);
+    var out = Object.assign({}, baseTokens, surfaces);
+    var bg = out["--color-bg"];
+    var on = dark ? out["--color-surface"] : bg;
+    out["--color-primary"] = (dark ? lightenTo : darkenTo)(
+      baseTokens["--color-primary"], on, 4.5);
+    out["--color-primary-hover"] = (dark ? lightenTo : darkenTo)(
+      baseTokens["--color-primary-hover"], on, 4.5);
+    var accent = baseTokens["--color-accent"];
+    out["--color-accent"] = contrast(accent, bg) >= 3.0
+      ? accent
+      : (dark ? lightenTo : darkenTo)(accent, bg, 3.0);
+    out["--color-on-primary"] = bg;
+    out["color-scheme"] = dark ? "dark" : "light";
+    return out;
+  }
 
   window.app.mixin({
     data: function () {
@@ -248,6 +342,7 @@
           theme: {
             preset: "warm-market", layout: "editorial",
             brand: {}, advanced: {}, advanced_opt_in: false,
+            counterpart: {},
             hero: {
               slogan: "", subtitle: "", image_url: "",
               primary: {label: "", url: ""},
@@ -256,6 +351,7 @@
             footer: {tagline: "", note: "", logo_url: ""},
             storefront: {grid: "standard", hero_hidden: false}
           },
+          previewScheme: "base",
           saving: false,
           themeError: null,
           themeNotice: null
@@ -263,9 +359,9 @@
       };
     },
     computed: {
-      /* Fully resolved token set for the live preview — same merge order
-         as services/themes.py resolve_tokens. */
-      gmPreviewTokens: function () {
+      /* Fully resolved base-scheme token set — same merge order as
+         services/themes.py resolve_tokens. */
+      gmBaseTokens: function () {
         var t = this.gmSettings.theme;
         var tokens = Object.assign(
           {}, PRESET_TOKENS[t.preset] || PRESET_TOKENS["warm-market"]
@@ -281,6 +377,41 @@
         }
         return tokens;
       },
+      /* The opposite scheme's derived tokens — what shoppers get when
+         they flip the storefront's light/dark toggle. */
+      gmCounterpartTokens: function () {
+        return counterpartTokens(this.gmBaseTokens, this.gmSettings.theme);
+      },
+      gmPreviewTokens: function () {
+        return this.gmSettings.previewScheme === "counterpart"
+          ? this.gmCounterpartTokens
+          : this.gmBaseTokens;
+      },
+      gmSchemeOptions: function () {
+        var base = PRESET_SCHEME[this.gmSettings.theme.preset] === "dark"
+          ? "Dark" : "Light";
+        var other = base === "Dark" ? "Light" : "Dark";
+        return [
+          { label: base, value: "base" },
+          { label: other, value: "counterpart" }
+        ];
+      },
+      gmCounterpartLabel: function () {
+        return PRESET_SCHEME[this.gmSettings.theme.preset] === "dark"
+          ? "Light-mode background"
+          : "Dark-mode background";
+      },
+      gmCounterpartHelp: function () {
+        var scheme =
+          PRESET_SCHEME[this.gmSettings.theme.preset] === "dark"
+            ? "light" : "dark";
+        return "Page background when a shopper switches to " + scheme +
+          " mode — the other colors are derived automatically.";
+      },
+      gmCounterpartIsCustom: function () {
+        var cp = this.gmSettings.theme.counterpart || {};
+        return !!cp["--color-bg"];
+      },
       gmPreviewStyle: function () {
         var tokens = this.gmPreviewTokens;
         var parts = [];
@@ -289,25 +420,21 @@
         });
         return parts.join(";");
       },
-      /* WCAG meters — computed live on every edit, before save. */
+      /* WCAG meters — computed live on every edit, before save. The
+         meter list shows the scheme being previewed; the save gate
+         checks both schemes. */
       gmContrastPairs: function () {
-        var tokens = this.gmPreviewTokens;
-        return GATED_PAIRS.map(function (pair) {
-          var fg = tokens[pair[0]];
-          var bg = tokens[pair[1]];
-          var ratio = contrast(fg, bg);
-          return {
-            pair: (TUNE_LABELS[pair[0]] || pair[0]) + " on " +
-              (TUNE_LABELS[pair[1]] || pair[1]),
-            ratio: ratio,
-            ok: ratio >= 4.5
-          };
-        });
+        return this.gmPairsFor(this.gmPreviewTokens);
       },
       gmContrastOk: function () {
-        return this.gmContrastPairs.every(function (p) {
-          return p.ok;
-        });
+        var self = this;
+        return [this.gmBaseTokens, this.gmCounterpartTokens].every(
+          function (tokens) {
+            return self.gmPairsFor(tokens).every(function (p) {
+              return p.ok;
+            });
+          }
+        );
       }
     },
     methods: {
@@ -356,6 +483,7 @@
             brand: Object.assign({}, t.brand || {}),
             advanced: Object.assign({}, t.advanced || {}),
             advanced_opt_in: !!t.advanced_opt_in,
+            counterpart: Object.assign({}, t.counterpart || {}),
             hero: {
               slogan: h.slogan || "",
               subtitle: h.subtitle || "",
@@ -709,8 +837,34 @@
       },
 
       /* --- B6 appearance -------------------------------------------------- */
+      gmPairsFor: function (tokens) {
+        return GATED_PAIRS.map(function (pair) {
+          var fg = tokens[pair[0]];
+          var bg = tokens[pair[1]];
+          var ratio = contrast(fg, bg);
+          return {
+            pair: (TUNE_LABELS[pair[0]] || pair[0]) + " on " +
+              (TUNE_LABELS[pair[1]] || pair[1]),
+            ratio: ratio,
+            ok: ratio >= 4.5
+          };
+        });
+      },
       gmSetPreset: function (preset) {
-        this.gmSettings.theme.preset = preset;
+        var t = this.gmSettings.theme;
+        /* A counterpart tint is scheme-specific — switching direction
+           (light<->dark preset) drops it rather than fail the gate on
+           the wrong scheme. */
+        if (PRESET_SCHEME[preset] !== PRESET_SCHEME[t.preset]) {
+          t.counterpart = {};
+        }
+        t.preset = preset;
+      },
+      gmCounterpartSet: function (value) {
+        this.gmSettings.theme.counterpart = { "--color-bg": value };
+      },
+      gmCounterpartReset: function () {
+        this.gmSettings.theme.counterpart = {};
       },
       gmSetLayout: function (layout) {
         this.gmSettings.theme.layout = layout;
@@ -764,7 +918,8 @@
       gmTuneCustomCount: function () {
         var t = this.gmSettings.theme;
         return Object.keys(t.advanced || {}).length +
-          ((t.brand || {}).accent ? 1 : 0);
+          ((t.brand || {}).accent ? 1 : 0) +
+          (((t.counterpart || {})["--color-bg"]) ? 1 : 0);
       },
       gmResetTier: function (tier) {
         var t = this.gmSettings.theme;
@@ -776,18 +931,29 @@
         } else if (tier === "advanced") {
           t.advanced = {};
           t.advanced_opt_in = false;
+          t.counterpart = {};
           if (t.brand) delete t.brand.accent;
         }
       },
       gmSaveTheme: async function () {
         var self = this;
         if (!self.gmContrastOk) {
-          var failing = self.gmContrastPairs.filter(function (p) {
-            return !p.ok;
-          })[0];
+          var opts = self.gmSchemeOptions;
+          var failing = null;
+          var failingScheme = "";
+          [self.gmBaseTokens, self.gmCounterpartTokens].forEach(
+            function (tokens, i) {
+              var bad = self.gmPairsFor(tokens).filter(function (p) {
+                return !p.ok;
+              })[0];
+              if (bad && !failing) {
+                failing = bad;
+                failingScheme = opts[i].label + ": ";
+              }
+            });
           self.gmSettings.themeError =
-            "Contrast gate failed: " + failing.pair + " = " +
-            failing.ratio.toFixed(2) + ":1 (needs ≥4.5:1)";
+            "Contrast gate failed: " + failingScheme + failing.pair +
+            " = " + failing.ratio.toFixed(2) + ":1 (needs ≥4.5:1)";
           return;
         }
         self.gmSettings.saving = true;
@@ -804,6 +970,7 @@
           hero: t.hero || {},
           footer: t.footer || {},
           storefront: t.storefront || {},
+          counterpart: t.counterpart || {},
           advanced_opt_in: !!t.advanced_opt_in
         };
         if (t.advanced_opt_in) {

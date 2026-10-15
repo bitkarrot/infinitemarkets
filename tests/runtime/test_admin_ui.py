@@ -171,6 +171,19 @@ async def test_settings_wallet_select_current(runtime_env):
     assert "gmSettings.walletId = m.wallet_id" in js
 
 
+async def test_appearance_counterpart_scheme_controls(runtime_env):
+    """The fine-tune section exposes the counterpart-scheme background
+    control and a light/dark preview toggle."""
+    html = (await runtime_env["client"].get("/infinitemarkets/")).text
+    assert 'data-tune="counterpart-bg"' in html
+    assert 'data-gm="preview-scheme"' in html
+    assert "gmCounterpartTokens" in html
+    js = (await runtime_env["client"].get(f"{JS}/admin_settings.js")).text
+    assert "gmCounterpartSet" in js
+    assert "counterpartTokens" in js
+    assert "counterpart" in js
+
+
 async def test_migration_admin_surface(runtime_env):
     html = (await runtime_env["client"].get("/infinitemarkets/")).text
     assert 'data-gm-nav="migration"' in html

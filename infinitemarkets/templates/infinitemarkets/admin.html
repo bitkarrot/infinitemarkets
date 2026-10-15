@@ -2347,7 +2347,7 @@
                          class="gm-tune-row" :data-tune="c.token">
                       <label class="gm-tune-swatch">
                         <input type="color"
-                               :value="gmPreviewTokens[c.token]"
+                               :value="gmBaseTokens[c.token]"
                                :aria-label="c.label"
                                @input="gmTuneSet(c.token, $event.target.value)">
                       </label>
@@ -2364,6 +2364,31 @@
                              :aria-label="'Reset ' + c.label"
                              @click="gmTuneReset(c.token)">
                         <q-tooltip>Back to preset</q-tooltip>
+                      </q-btn>
+                    </div>
+
+                    <div class="gm-tune-row" data-tune="counterpart-bg">
+                      <label class="gm-tune-swatch">
+                        <input type="color"
+                               :value="gmCounterpartTokens['--color-bg']"
+                               :aria-label="gmCounterpartLabel"
+                               @input="gmCounterpartSet($event.target.value)">
+                      </label>
+                      <div class="gm-tune-text">
+                        <div class="text-body2">
+                          {{ gmCounterpartLabel }}
+                          <q-badge v-if="gmCounterpartIsCustom" outline
+                                   label="custom" class="q-ml-xs"></q-badge>
+                        </div>
+                        <div class="text-caption text-grey-7">
+                          {{ gmCounterpartHelp }}
+                        </div>
+                      </div>
+                      <q-btn color="primary" v-if="gmCounterpartIsCustom" flat dense round
+                             icon="restart_alt" size="sm"
+                             :aria-label="'Reset ' + gmCounterpartLabel"
+                             @click="gmCounterpartReset">
+                        <q-tooltip>Back to auto</q-tooltip>
                       </q-btn>
                     </div>
 
@@ -2449,8 +2474,16 @@
               </div>
 
               <div class="col-12 col-md-5">
-                <div class="text-subtitle2 q-mb-sm">
-                  Public storefront preview
+                <div class="row items-center justify-between q-mb-sm">
+                  <div class="text-subtitle2">
+                    Public storefront preview
+                  </div>
+                  <q-btn-toggle v-model="gmSettings.previewScheme" dense
+                                flat no-caps size="sm" toggle-color="primary"
+                                :options="gmSchemeOptions"
+                                data-gm="preview-scheme"
+                                aria-label="Preview color scheme">
+                  </q-btn-toggle>
                 </div>
                 <div class="gm-preview gm-public" :style="gmPreviewStyle"
                      data-gm="theme-preview">

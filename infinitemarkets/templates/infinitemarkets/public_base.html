@@ -22,7 +22,7 @@
     <span class="brand-mark" aria-hidden="true">{{ brand_initials or 'G' }}</span>
   {%- endif -%}
 {%- endmacro -%}
-<div class="gm-public" data-layout="{{ layout }}" data-grid="{{ grid or 'standard' }}" data-shop="{{ shop_pubkey or '' }}">
+<div class="gm-public" data-layout="{{ layout }}" data-grid="{{ grid or 'standard' }}" data-shop="{{ shop_pubkey or '' }}"{% if base_scheme == 'dark' %} data-scheme="dark"{% endif %}>
   <a class="skip-link" href="#gm-main">Skip to content</a>
   <header class="store-header">
     <div class="store-header-inner">
