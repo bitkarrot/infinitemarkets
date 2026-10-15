@@ -188,6 +188,7 @@
           notice: null,
           /* B4 */
           wallets: [],
+          walletId: null,
           walletBlocked: false,
           displayName: "",
           profileJson: {},
@@ -332,6 +333,7 @@
             modeRes.blocked_reason || "";
           self.gmSettings.wallets = self.gm.wallets || [];
           var m = self.gm.merchant;
+          self.gmSettings.walletId = m.wallet_id || null;
           self.gmSettings.displayName = m.display_name || "";
           var profile = {};
           try {
@@ -485,6 +487,8 @@
       },
       gmChangeWallet: async function (walletId) {
         var self = this;
+        var prev = self.gmSettings.walletId;
+        self.gmSettings.walletId = walletId;
         try {
           await self.gmApi(
             "PATCH", "/merchants/" + self.gmMerchantId(),
@@ -492,9 +496,11 @@
           );
           self.gmSettings.notice = "Wallet updated.";
           self.gmSettings.walletBlocked = false;
+          self.gm.merchant.wallet_id = walletId;
         } catch (e) {
           /* 409 wallet-mismatch — open invoice_pending/awaiting_payment
              orders exist; the disabled-reason surfaces verbatim. */
+          self.gmSettings.walletId = prev;
           self.gmSettings.walletBlocked = true;
           self.gmSettings.error = self.gmProblemCopy(e.problem);
         }

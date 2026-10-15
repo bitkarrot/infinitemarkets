@@ -16,6 +16,7 @@ import json
 import time
 import uuid
 
+from loguru import logger
 from nostr_sdk import PublicKey
 
 from .. import crypto
@@ -122,7 +123,26 @@ def _encrypt_wallet_id(
     return enc, digest
 
 
-def _public_merchant(row: dict) -> dict:
+def _decrypt_wallet_id(settings: ExtSettings, row: dict) -> str | None:
+    enc = row.get("wallet_id_enc")
+    if not enc:
+        return None
+    try:
+        ver = crypto.envelope_version(enc)
+        return crypto.decrypt(
+            enc, settings.master_keys[ver],
+            record_id=row["id"], table="merchants",
+            column="wallet_id_enc", key_version=ver,
+        ).decode()
+    except Exception:  # noqa: BLE001 — projection degrades, never 500s
+        logger.warning(
+            "infinitemarkets: could not decrypt wallet_id_enc "
+            f"for merchant {row['id']}"
+        )
+        return None
+
+
+def _public_merchant(row: dict, settings: ExtSettings) -> dict:
     """Merchant projection — never includes wallet_id_enc or key material."""
     try:
         npub = PublicKey.parse(row["pubkey"]).to_bech32()
@@ -131,6 +151,7 @@ def _public_merchant(row: dict) -> dict:
     return {
         "id": row["id"],
         "user_id": row["user_id"],
+        "wallet_id": _decrypt_wallet_id(settings, row),
         "pubkey": row["pubkey"],
         "npub": npub,
         "display_name": row["display_name"],
@@ -229,7 +250,7 @@ async def create_merchant(user, *, wallet_id: str, display_name: str | None = No
                 },
             )
     row = await get_merchant_row(merchant_id, str(user.id))
-    return _public_merchant(row)
+    return _public_merchant(row, settings)
 
 
 async def current_merchant(user, settings: ExtSettings | None = None) -> dict:
@@ -241,7 +262,7 @@ async def current_merchant(user, settings: ExtSettings | None = None) -> dict:
         )
     if not row:
         raise not_found("no merchant for this user")
-    merchant = _public_merchant(dict(row))
+    merchant = _public_merchant(dict(row), settings)
     from . import relay as relay_service
 
     merchant["relay_health"] = await relay_service.relay_health(row["id"])
@@ -434,7 +455,7 @@ async def patch_merchant(merchant_id: str, user, patch: dict,
 
         await relay_service.set_blossom_servers(merchant_id, blossom_servers)
     row = await get_merchant_row(merchant_id, str(user.id))
-    return _public_merchant(row)
+    return _public_merchant(row, settings)
 
 
 async def _replace_relay_configs(tx: DomainTransaction, merchant_id: str,
@@ -543,7 +564,7 @@ async def import_nsec(merchant_id: str, user, nsec_bech32: str,
             tx, merchant_id, "merchant_profile", merchant_id, 0
         )
     row = await get_merchant_row(merchant_id, str(user.id))
-    return _public_merchant(row)
+    return _public_merchant(row, settings)
 
 
 async def export_nsec(merchant_id: str, user,

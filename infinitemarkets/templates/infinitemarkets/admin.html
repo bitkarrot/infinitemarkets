@@ -1848,7 +1848,7 @@
                     <q-select :options="gmSettings.wallets" option-value="id"
                               option-label="name" emit-value map-options
                               outlined dense label="Receiving wallet"
-                              :model-value="null"
+                              :model-value="gmSettings.walletId"
                               @update:model-value="gmChangeWallet">
                       <q-tooltip v-if="gmSettings.walletBlocked">
                         Wallet change is blocked while orders are awaiting

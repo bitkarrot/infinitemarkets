@@ -156,6 +156,21 @@ async def test_settings_key_reveal(runtime_env):
     assert "nsec1" not in html + js
 
 
+async def test_settings_wallet_select_current(runtime_env):
+    """The B4 wallet picker shows the merchant's current receiving
+    wallet — the API exposes the owner-scoped wallet_id and the select
+    binds it instead of a hardcoded null."""
+    resp = await runtime_env["client"].get(f"{API}/merchants/current")
+    assert resp.status_code == 200
+    assert resp.json()["wallet_id"] == runtime_env["wallet"].id
+    html = (await runtime_env["client"].get("/infinitemarkets/")).text
+    assert 'label="Receiving wallet"' in html
+    assert ':model-value="gmSettings.walletId"' in html
+    assert ':model-value="null"' not in html
+    js = (await runtime_env["client"].get(f"{JS}/admin_settings.js")).text
+    assert "gmSettings.walletId = m.wallet_id" in js
+
+
 async def test_migration_admin_surface(runtime_env):
     html = (await runtime_env["client"].get("/infinitemarkets/")).text
     assert 'data-gm-nav="migration"' in html
