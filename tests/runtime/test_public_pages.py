@@ -691,3 +691,15 @@ async def test_low_stock_and_sold_out_copy(runtime_env):
         r"<script\b[^>]*>[\s\S]*</script\b[^>]*>", "", resp.text,
         flags=re.IGNORECASE,
     )
+
+
+async def test_public_page_invalid_config_renders_503(runtime_env, monkeypatch):
+    """Startup keeps routes live on bad config for diagnostics; public
+    HTML pages must then render an honest 503, never a bare 500, and
+    must not leak config detail to buyers."""
+    monkeypatch.setenv("INFINITEMARKETS_MASTER_KEYS", "not-json")
+    resp = await runtime_env["client"].get("/infinitemarkets/orders")
+    assert resp.status_code == 503, resp.text
+    assert "temporarily unavailable" in resp.text
+    assert "INFINITEMARKETS_MASTER_KEYS" not in resp.text
+    _assert_public_headers(resp)

@@ -940,3 +940,64 @@ def test_vendored_stdlib_fills_missing_html_parser(tmp_path, monkeypatch):
     finally:
         _html.__path__ = real_path
         sys.modules.pop("html.parser", None)
+
+
+def _fake_sdk(root, version: str | None, value: str):
+    import importlib
+
+    pkg = root / "imfakesdk"
+    pkg.mkdir(parents=True)
+    (pkg / "__init__.py").write_text(f"VALUE = {value!r}\n")
+    if version is not None:
+        meta = root / f"imfakesdk-{version}.dist-info"
+        meta.mkdir()
+        (meta / "METADATA").write_text(
+            f"Metadata-Version: 2.1\nName: imfakesdk\nVersion: {version}\n"
+        )
+    importlib.invalidate_caches()
+
+
+@pytest.mark.parametrize(
+    ("host_version", "expected"),
+    [("0.2.0", "host"), ("0.1.0", "vendored"), (None, "vendored")],
+)
+def test_vendored_wheel_shadows_unpinned_host_sdk(tmp_path, monkeypatch,
+                                                  host_version, expected):
+    """A host SDK is used only at exactly the pinned version; any other
+    (or unidentifiable) host copy is shadowed by the vendored wheel."""
+    import importlib
+    import sys
+
+    from infinitemarkets import _vendored
+
+    _fake_sdk(tmp_path / "host", host_version, "host")
+    _fake_sdk(tmp_path / "_vendor" / "tagx", "0.2.0", "vendored")
+    monkeypatch.syspath_prepend(str(tmp_path / "host"))
+    monkeypatch.setattr(_vendored, "VENDOR_DIR", tmp_path / "_vendor")
+    monkeypatch.setattr(_vendored, "VENDORED_MODULES", ("imfakesdk",))
+    monkeypatch.setattr(
+        _vendored, "PINNED_VERSIONS", {"imfakesdk": ("imfakesdk", "0.2.0")}
+    )
+    monkeypatch.setattr(_vendored, "_platform_tags", lambda: ["tagx"])
+    sys.modules.pop("imfakesdk", None)
+    path_before = list(sys.path)
+    try:
+        _vendored._enable_vendored_wheels()
+        assert importlib.import_module("imfakesdk").VALUE == expected
+    finally:
+        sys.modules.pop("imfakesdk", None)
+        sys.path[:] = path_before
+
+
+def test_vendored_pin_matches_project_pin():
+    import pathlib
+    import tomllib
+
+    from infinitemarkets import _vendored
+
+    root = pathlib.Path(__file__).resolve().parents[2]
+    deps = tomllib.loads((root / "pyproject.toml").read_text())["project"][
+        "dependencies"
+    ]
+    dist, version = _vendored.PINNED_VERSIONS["nostr_sdk"]
+    assert f"{dist}=={version}" in deps

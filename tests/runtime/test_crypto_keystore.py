@@ -572,3 +572,118 @@ async def test_merchant_and_key_rollback_together(keystore_env, monkeypatch):
                 {"m": captured[0]},
             )
             assert row["n"] == 0
+
+
+_BOOTSTRAP_WORKER = """
+import pathlib, sys, time
+from lnbits.settings import settings as host_settings
+data, sync, idx = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.argv[3]
+host_settings.lnbits_data_folder = str(data)
+from infinitemarkets import settings as gsettings
+(sync / f"ready-{idx}").touch()
+while not (sync / "go").exists():
+    time.sleep(0.001)
+keyring, privacy = gsettings._generated_keys()
+print(keyring["v1"].hex(), privacy.hex())
+"""
+
+
+def test_concurrent_process_bootstrap_agrees_on_one_keyfile(tmp_path):
+    """Workers racing first boot must all return the single published
+    keyring — a loser keeping its own candidate would orphan its
+    ciphertexts after restart."""
+    import json
+    import os
+    import pathlib
+    import subprocess
+    import sys
+    import time
+
+    root = pathlib.Path(__file__).resolve().parents[2]
+    data, sync = tmp_path / "data", tmp_path / "sync"
+    data.mkdir()
+    sync.mkdir()
+    env = {k: v for k, v in os.environ.items()
+           if not k.startswith("INFINITEMARKETS_")}
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(root), env.get("PYTHONPATH", "")]
+    )
+    n = 6
+    procs = [
+        subprocess.Popen(
+            [sys.executable, "-c", _BOOTSTRAP_WORKER, str(data), str(sync),
+             str(i)],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            env=env, cwd=root,
+        )
+        for i in range(n)
+    ]
+    deadline = time.monotonic() + 120
+    while len(list(sync.glob("ready-*"))) < n:
+        assert time.monotonic() < deadline, "workers never became ready"
+        assert all(p.poll() is None for p in procs), [
+            p.communicate() for p in procs if p.poll() is not None
+        ]
+        time.sleep(0.01)
+    (sync / "go").touch()
+    results = set()
+    for p in procs:
+        out, err = p.communicate(timeout=60)
+        assert p.returncode == 0, err
+        results.add(out.strip().splitlines()[-1])
+    assert len(results) == 1
+    persisted = json.loads((data / gsettings.GENERATED_KEYS_FILE).read_text())
+    master_hex, privacy_hex = results.pop().split()
+    assert base64.b64decode(persisted["master_keys"]["v1"]).hex() == master_hex
+    assert base64.b64decode(persisted["privacy_key"]).hex() == privacy_hex
+    assert not list(data.glob(".imkeys-*"))
+
+
+@pytest.mark.parametrize("hard_links", [True, False])
+def test_publish_keyfile_never_replaces_existing(monkeypatch, tmp_path,
+                                                 hard_links):
+    """Exclusive publish: first writer wins, later candidates are
+    discarded — with or without filesystem hard-link support."""
+    import json
+    import os
+
+    if not hard_links:
+        def _no_link(src, dst):
+            raise PermissionError("hard links unsupported")
+
+        monkeypatch.setattr(os, "link", _no_link)
+    path = tmp_path / gsettings.GENERATED_KEYS_FILE
+    assert gsettings._publish_keyfile(path, {"winner": 1})
+    assert (path.stat().st_mode & 0o777) == 0o600
+    assert not gsettings._publish_keyfile(path, {"winner": 2})
+    assert json.loads(path.read_text()) == {"winner": 1}
+    assert not list(tmp_path.glob(".imkeys-*"))
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
+        "https://admin.example/admin",
+        "https://admin.example?x=1",
+        "https://admin.example#frag",
+        "https://user:pw@admin.example",
+        "ftp://admin.example",
+        "admin.example",
+    ],
+)
+def test_admin_origins_reject_non_origin_entries(monkeypatch, entry):
+    """Origin trust is origin-wide — a path-scoped (or otherwise
+    non-origin) entry must fail loudly, never silently widen."""
+    monkeypatch.setenv("INFINITEMARKETS_ADMIN_ORIGINS", entry)
+    with pytest.raises(gsettings.SettingsError):
+        gsettings._origins_env("INFINITEMARKETS_ADMIN_ORIGINS")
+
+
+def test_admin_origins_accept_bare_origins(monkeypatch):
+    monkeypatch.setenv(
+        "INFINITEMARKETS_ADMIN_ORIGINS",
+        "https://admin.example, http://localhost:5000/",
+    )
+    assert gsettings._origins_env("INFINITEMARKETS_ADMIN_ORIGINS") == (
+        "https://admin.example", "http://localhost:5000",
+    )
