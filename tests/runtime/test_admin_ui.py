@@ -191,6 +191,17 @@ async def test_catalog_move_category_inbox_and_live_banner(runtime_env):
     assert "/inbox/enable" in settings_js
     assert "/inbox-state" in settings_js
     assert "gmPollInbox" in settings_js
+    assert "gmBlockedModeReason" in settings_js
+
+
+async def test_settings_buttons_are_solid(runtime_env):
+    """Settings actions use solid filled buttons — no outline style."""
+    html = (await runtime_env["client"].get("/infinitemarkets/")).text
+    section = html.split('data-gm-surface="settings"', 1)[1]
+    section = section.split("</section>", 1)[0]
+    for line in section.splitlines():
+        if "<q-btn" in line:
+            assert "outline" not in line, line.strip()
 
 
 async def test_warning_banner_dismissable(runtime_env):
