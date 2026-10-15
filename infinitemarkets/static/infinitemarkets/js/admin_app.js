@@ -186,8 +186,8 @@
             display_name: self.gm.createForm.display_name || undefined
           });
           self.gm.merchant = m;
-          self.gm.warnings = m.warnings || [];
-          self.gm.dismissableWarning = m.dismissable_warning || null;
+          /* Create returns the basic projection; reload for warnings. */
+          await self.gmLoad();
         } catch (e) {
           self.gm.loadError = self.gmProblemCopy(e.problem);
         }
