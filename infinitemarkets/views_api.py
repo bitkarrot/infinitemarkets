@@ -135,6 +135,7 @@ class BulkProductsBody(_Strict):
     action: Literal[
         "price-markup",
         "move-collection",
+        "move-category",
         "visibility",
         "draft",
         "publish",
