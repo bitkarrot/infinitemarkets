@@ -228,6 +228,11 @@ flowchart TB
 The admin panel is a full back office, and background workers keep the shop
 running when the merchant's browser is closed: publishing, relay management,
 reservation expiry, payment reconciliation, email, and data retention.
+Products can be moved between categories at any time — individually or in
+bulk — and the Catalog flags when published products sit under an
+unpublished shop (checkout stays closed until Publish everything runs).
+A Nostr inbox card in Settings exposes the inbox state and the
+enable/disable control that gates Showcase and Nostr-only storefront modes.
 
 ![Orders workspace](img/admin-orders.jpg "Orders: list and detail with the full order history")
 ![Catalog](img/admin-categories.jpg "Catalog: sortable products, drafts and previews")

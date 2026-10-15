@@ -244,8 +244,9 @@ The extension never writes core payment tables and never calls outgoing-payment 
 
 **For merchants**
 - Theme presets, 4 layouts, brand logo/hero/footer, **WCAG contrast gates** on both light & dark schemes
+- Catalog bulk edit: prices, visibility, collections, categories, shipping
 - Email notifications for order events
-- 4 storefront modes: `full`, `showcase`, `browse_only`, `nostr_only`
+- 4 storefront modes: `full`, `showcase`, `browse_only`, `nostr_only` (Nostr inbox gated)
 
 Note:
 Modes: showcase turns web checkout into a guided "Order via Nostr";

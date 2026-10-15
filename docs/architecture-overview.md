@@ -207,3 +207,15 @@ superseded, failed — plus their `relay_publications` evidence and
 `outbox_dependencies` edges on either side. In-flight rows are never
 touched; the daily `retention_prune` still covers inbox ciphertext, token
 copies, peer-relay cache, and terminal-order PII.
+
+**v1.0.9–v1.0.10 admin polish.** The auto-generated-keyfile warning is
+dismissable — the acknowledgement lives in `infinitemarkets-keys.ack`
+beside the keyfile and binds to its bytes, so a regenerated keyfile
+re-warns. `PATCH /products/{id}` honours `category_id` (a variable
+parent's variations follow; bare variations refuse — the parent owns the
+category), the bulk editor gains "Move to category", and Collections
+rows show live `product_count`. The Catalog warns when published
+products sit under a `draft`/`publication_pending` merchant — checkout
+stays closed — with a direct Publish everything action, and Settings →
+Merchant gains a Nostr inbox card exposing `inbox_state` plus
+enable/disable (the kind-10050 gate for Showcase/Nostr-only modes).

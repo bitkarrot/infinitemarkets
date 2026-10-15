@@ -6,9 +6,9 @@ current_phase: "05"
 current_phase_name: Correctness, Recovery, and Security Hardening
 status: milestone-closed
 stopped_at: product release v1.0.0 tagged and published 2026-10-13; v1.0 milestone archived
-last_updated: "2026-10-15T01:00:00+00:00"
+last_updated: "2026-10-15T03:00:00+00:00"
 last_activity: 2026-10-15
-last_activity_desc: product releases through v1.0.9 published (wallet selector, counterpart scheme, bulk shipping, re-import fix, review hardening)
+last_activity_desc: product releases through v1.0.10 published (dismissable keyfile warning, category moves, collection counts, publish + inbox indicators)
 progress:
   total_phases: 6
   completed_phases: 3
@@ -29,8 +29,8 @@ See: .planning/PROJECT.md (updated 2026-10-11)
 
 Phase: 5 of 6 (Correctness, Recovery, and Security Hardening)
 Plan: milestone v1.0 archived and tagged 2026-10-13 (commit 3c0ad9a); next milestone unplanned — deferred scope candidates noted in ROADMAP
-Status: milestone v1.0 shipped; product releases through v1.0.9 cut 2026-10-15 — all Phase 5 gates closed or operator-disposed
-Last activity: 2026-10-15 — v1.0.9 published: counterpart-scheme background control + real light variant for dark presets, wallet selector fix, bulk-attach shipping + catalog re-import fix, Devin Review hardening (keyfile race, SDK pin, admin origins, public 503)
+Status: milestone v1.0 shipped; product releases through v1.0.10 cut 2026-10-15 — all Phase 5 gates closed or operator-disposed
+Last activity: 2026-10-15 — v1.0.10 published: dismissable keyfile warning (ack sidecar), product/bulk category moves, collection product counts, not-live catalog banner, Nostr inbox enable card; Devin Review fixes landed on both PRs
 
 Progress: 3 phase acceptance scopes closed, 2 reopened, 1 in progress. Phase 5 has six reviewed plans; all plan gates closed or operator-disposed as of 2026-10-13. No overall
 acceptance percentage is implied by plan/artifact counters. There are 17 executed plan
@@ -50,7 +50,12 @@ strictness, public 503 page); sqlite `busy_timeout` on all connections;
 settings wallet selector shows the bound wallet (`wallet_id` in the
 owner-scoped merchant projection); counterpart-scheme background control
 + derived light variant for dark presets; bulk-attach shipping options;
-catalog re-import after delete; `docs/` getting-started updates.
+catalog re-import after delete; `docs/` getting-started updates;
+dismissable auto-generated-keys warning (ack sidecar bound to keyfile
+bytes); product PATCH category reassignment + bulk move-category
+(variations follow their parent); Collections product counts;
+not-live catalog banner with direct publish; Nostr inbox enable/disable
+card gating showcase/nostr_only; reviews #19/#20 fix commits folded in.
 
 ## Performance Metrics
 
