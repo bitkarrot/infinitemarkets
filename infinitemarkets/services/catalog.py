@@ -1205,6 +1205,10 @@ async def patch_product(merchant_id: str, user, product_id: str,
             # _PRODUCT_FIELDS deliberately omits category_id — a move
             # republishes both stalls, and a variable parent's
             # variations follow it to the new category.
+            if not isinstance(patch["category_id"], str):
+                raise unprocessable(
+                    "invalid-content", "category_id must be a string"
+                )
             target = await tx.fetch_one(
                 f"SELECT id, import_review FROM {tx.table('categories')} "
                 "WHERE id = :c AND merchant_id = :m AND deleted_at IS NULL",
