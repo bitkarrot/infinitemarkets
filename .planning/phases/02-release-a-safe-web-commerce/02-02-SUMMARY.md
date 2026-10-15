@@ -41,7 +41,7 @@ reopened; this header does not close F1–F4 or create a new test pass.
 ## Spec deltas (recorded per plan)
 
 - **W-NEW-1**: two admin routes beyond §5.1 — `GET /merchants/{id}/outbox` (owner-scoped, ≤100 rows, intents + per-relay publications + dependency markers) and `POST /merchants/{id}/outbox/{intent_id}/retry` (failed/partially_published only; accepted targets never resent).
-- **Blossom delta**: `blossom_servers` is a merchant `settings`-table entry (`PATCH /merchants/{id}` field + `GET …/relay-health` surface), not a `relay_configs` row — Blossom is an HTTPS media protocol, not a nostr relay. Strict `https://` validation, no userinfo/fragments/raw IPs/internal hosts, starter defaults `blossom.primal.net`, `blossom.band`.
+- **Blossom delta**: `blossom_servers` is a merchant `settings`-table entry (`PATCH /merchants/{id}` field + `GET …/relay-health` surface), not a `relay_configs` row — Blossom is an HTTPS media protocol, not a nostr relay. Strict `https://` validation, no userinfo/fragments/raw IPs/internal hosts, starter default `blossom.nostr.build`.
 - **Starter defaults**: merchants publishing with zero configured relays are seeded with visible, editable rows (`relay.damus.io`, `nos.lol`, `relay.nostr.net`) — no hidden fallback (owner directive 2026-09-22).
 - **§10 lease deviation (as planned)**: `relay_manager` ticks unleased per worker — each worker owns its own `Client` and manages only its own connections; publication evidence remains claim-fenced in the publisher.
 - **`relay_configs.direction`** uses the normative `public|inbox|both` vocabulary (fixed an earlier `outbox` default in `merchant.py`).

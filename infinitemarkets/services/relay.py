@@ -39,8 +39,7 @@ DEFAULT_RELAYS = (
 
 # Starter blossom media endpoints (https media servers, not nostr relays).
 DEFAULT_BLOSSOM_SERVERS = (
-    "https://blossom.primal.net",
-    "https://blossom.band",
+    "https://blossom.nostr.build",
 )
 
 # Starter inbox (kind-10050) relays — merchant-editable, seeded only when
