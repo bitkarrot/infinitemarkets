@@ -171,6 +171,17 @@ async def test_settings_wallet_select_current(runtime_env):
     assert "gmSettings.walletId = m.wallet_id" in js
 
 
+async def test_warning_banner_dismissable(runtime_env):
+    """Dismissable warnings get an action button bound to the dismiss
+    route; audit/topology banners stay non-dismissable."""
+    html = (await runtime_env["client"].get("/infinitemarkets/")).text
+    assert 'data-gm="dismiss-warning"' in html
+    assert "w === gm.dismissableWarning" in html
+    js = (await runtime_env["client"].get(f"{JS}/admin_app.js")).text
+    assert "gmDismissWarning" in js
+    assert "/warnings/dismiss" in js
+
+
 async def test_appearance_counterpart_scheme_controls(runtime_env):
     """The fine-tune section exposes the counterpart-scheme background
     control and a light/dark preview toggle."""

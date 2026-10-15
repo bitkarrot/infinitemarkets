@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
 import json
 import os
 import secrets
@@ -197,6 +198,57 @@ def _load_published_keyfile(path: Path) -> tuple[dict[str, bytes], bytes]:
             if time.monotonic() > deadline:
                 raise
             time.sleep(0.05)
+
+
+GENERATED_KEYS_ACK_FILE = "infinitemarkets-keys.ack"
+
+
+def _generated_keys_ack_path() -> Path:
+    return Path(host_settings.lnbits_data_folder, GENERATED_KEYS_ACK_FILE)
+
+
+def _keyfile_fingerprint() -> str | None:
+    try:
+        return hashlib.sha256(generated_keys_path().read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
+def generated_keys_acknowledged() -> bool:
+    """True once the operator dismisses the auto-generated-keys warning.
+
+    The acknowledgement is a sidecar holding the keyfile's SHA-256, so a
+    regenerated keyfile (fresh material) re-surfaces the warning."""
+    current = _keyfile_fingerprint()
+    if current is None:
+        return False
+    try:
+        acked = _generated_keys_ack_path().read_text().strip()
+    except OSError:
+        return False
+    return secrets.compare_digest(acked, current)
+
+
+def acknowledge_generated_keys() -> None:
+    """Record the dismissal in the sidecar — the keyfile itself is never
+    rewritten, so a dismissal cannot clobber concurrently replaced key
+    material. Atomic rewrite, mode 0600."""
+    current = _keyfile_fingerprint()
+    if current is None:
+        raise SettingsError(f"{generated_keys_path()} does not exist")
+    path = _generated_keys_ack_path()
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".imkeys-ack-")
+    try:
+        with os.fdopen(fd, "w") as fh:
+            fh.write(current)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, path)
+    finally:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
 
 
 def _generated_keys() -> tuple[dict[str, bytes], bytes]:
