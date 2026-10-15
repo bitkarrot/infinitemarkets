@@ -734,7 +734,8 @@ The server sets `Referrer-Policy: no-referrer`; request/header logging MUST reda
   "merchant_pubkey": "<hex>",
   "items": [{"d_tag": "<product d>", "quantity": 1}],
   "shipping_option_d": "<d or null>",
-  "address": {...},              // required iff any item is physical
+  "address": {...},              // required iff any item is physical;
+                                 // web physical orders require line1 + city (§8.1)
   "email": "...", "phone": "...", // optional contact
   "email_opt_in": true           // opt in to order status emails; requires `email` (§8.8)
 }
@@ -1161,7 +1162,9 @@ to `pending` or `partially_published` by a fencing-token compare-and-swap.
    proceed with merchant total and note the difference in payment-request content.
 7. If any item is physical, require one active same-merchant shipping option and a
    machine-readable destination country (ISO 3166-1 alpha-2) plus optional ISO 3166-2
-   region. Web checkout supplies structured fields. The Gamma profile accepts either
+   region. Web checkout supplies structured fields and additionally requires a
+   deliverable street address (`line1`) and `city` — `postal_code` stays optional
+   because several destinations have no postal system. The Gamma profile accepts either
    companion `country`/`region` tags or an `address` JSON object with those fields;
    opaque-address-only physical orders are rejected before reservation with a clear
    status message (this interop restriction belongs in `PINS.md`). Validate option

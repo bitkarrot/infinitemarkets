@@ -267,7 +267,17 @@ test('physical product requires destination + shipping', async ({
     page.locator('[data-error-for="country"]')
   ).toContainText('Choose a shipping option for this destination.')
 
+  // The country select only lists destinations the merchant ships to
+  // (the seed option covers US + DE — no world list).
+  await expect(page.locator('#gm-country option')).toHaveCount(3)
+
   await page.locator('#gm-country').selectOption('US')
+  // Destination + option chosen but no street → inline address error
+  await page.locator('button[type=submit]').click()
+  await expect(
+    page.locator('[data-error-for="line1"]')
+  ).toContainText('Enter your street address.')
+
   await page.locator('#gm-line1').fill('1 Main St')
   await page.locator('#gm-city').fill('Springfield')
   await page.locator('#gm-region').fill('US-IL')

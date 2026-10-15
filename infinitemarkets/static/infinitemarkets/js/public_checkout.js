@@ -138,14 +138,84 @@
     });
   });
 
-  /* --- country select ----------------------------------------------------- */
+  /* --- destination select -------------------------------------------------
+     The country list is built from the product's shipping options (each
+     <option> carries data-countries) — a buyer can only pick a place the
+     merchant actually ships to, so the invalid-shipping-destination
+     rejection is unreachable from the dropdown. */
   var countrySel = form.querySelector("select[name=country]");
-  if (countrySel && countrySel.options.length <= 1) {
-    GM.COUNTRIES.forEach(function (c) {
-      countrySel.appendChild(GM.h("option", { text: c[1] }));
-      countrySel.lastChild.value = c[0];
+  var shipSel = form.querySelector("select[name=shipping_option]");
+  var shipOptions = shipSel
+    ? Array.prototype.filter.call(shipSel.options, function (o) {
+        return o.hasAttribute("data-countries");
+      })
+    : [];
+  function optionCountries(opt) {
+    return (opt.getAttribute("data-countries") || "").split(",").filter(Boolean);
+  }
+  var COUNTRY_NAMES = {};
+  (GM.COUNTRIES || []).forEach(function (c) { COUNTRY_NAMES[c[0]] = c[1]; });
+  var displayNames =
+    typeof Intl !== "undefined" && Intl.DisplayNames
+      ? new Intl.DisplayNames(undefined, { type: "region" })
+      : null;
+  function countryName(code) {
+    if (COUNTRY_NAMES[code]) return COUNTRY_NAMES[code];
+    if (displayNames) {
+      try {
+        var named = displayNames.of(code);
+        if (named && named !== code) return named;
+      } catch (e) { /* fall through to the bare code */ }
+    }
+    return code;
+  }
+  function destinationCodes() {
+    var seen = {};
+    var codes = [];
+    shipOptions.forEach(function (opt) {
+      optionCountries(opt).forEach(function (code) {
+        if (!seen[code]) {
+          seen[code] = true;
+          codes.push(code);
+        }
+      });
+    });
+    return codes.sort(function (a, b) {
+      return countryName(a).localeCompare(countryName(b));
     });
   }
+  if (countrySel && countrySel.options.length <= 1) {
+    destinationCodes().forEach(function (code) {
+      var opt = GM.h("option", { text: countryName(code) });
+      opt.value = code;
+      countrySel.appendChild(opt);
+    });
+  }
+  /* Choosing a country narrows the shipping options to the ones that
+     cover it; a single remaining option selects itself. */
+  function syncShippingOptions() {
+    if (!shipSel || !countrySel) return;
+    var country = countrySel.value;
+    var enabled = 0;
+    var last = null;
+    shipOptions.forEach(function (opt) {
+      var covers =
+        !country || optionCountries(opt).indexOf(country) !== -1;
+      opt.disabled = !covers;
+      opt.hidden = !covers;
+      if (covers) {
+        enabled += 1;
+        last = opt;
+      }
+    });
+    var current = shipSel.options[shipSel.selectedIndex];
+    if (current && current.disabled) shipSel.value = "";
+    if (enabled === 1) shipSel.value = last.value;
+  }
+  if (countrySel) {
+    countrySel.addEventListener("change", syncShippingOptions);
+  }
+  syncShippingOptions();
 
   /* --- inline validation (aria-live, contract copy) ---------------------- */
   function fieldError(name, msg) {
@@ -172,7 +242,11 @@
     if (!email) fieldError("email", "");
   }
   if (emailInput) emailInput.addEventListener("input", syncEmailOptIn);
-  window.addEventListener("pageshow", syncEmailOptIn);
+  window.addEventListener("pageshow", function () {
+    syncEmailOptIn();
+    /* bfcache restores field values — re-apply coverage filtering. */
+    syncShippingOptions();
+  });
   window.setTimeout(syncEmailOptIn, 0);
   syncEmailOptIn();
 
@@ -687,16 +761,42 @@
     syncQtyButtons();
   }
 
+  /* A failed field may live in a hidden step (guided) or a collapsed
+     section (compact) — bring it into view before showing its error. */
+  function revealField(name) {
+    var input = form.querySelector('[name="' + name + '"]');
+    var sec = input && input.closest(".co-section");
+    if (!sec) return;
+    step = Number(sec.getAttribute("data-step")) || step;
+    if (effectiveLayout() === "compact") {
+      sec.setAttribute("data-open", "true");
+      var head = sec.querySelector(".co-section-head");
+      if (head) head.setAttribute("aria-expanded", "true");
+    }
+    syncVisibility();
+    if (input && input.focus) input.focus();
+  }
+
+  function failField(name, msg) {
+    revealField(name);
+    fieldError(name, msg);
+  }
+
   form.addEventListener("submit", function (ev) {
     ev.preventDefault();
     if (errorEl) errorEl.hidden = true;
     if (varError) varError.hidden = true;
+    form.querySelectorAll(".field-error").forEach(function (el) {
+      el.textContent = "";
+      el.hidden = true;
+    });
 
     var dTag = form.getAttribute("data-d-tag");
     var chosen = form.querySelector("input[name=variation]:checked");
     if (form.querySelectorAll("input[name=variation]").length) {
       if (!chosen) {
         if (varError) varError.hidden = false;
+        revealField("variation");
         return;
       }
       dTag = chosen.value;
@@ -704,7 +804,7 @@
 
     var qty = currentQty();
     if (!(qty >= 1 && qty <= 10000)) {
-      fieldError("quantity", "Enter a valid quantity.");
+      failField("quantity", "Enter a valid quantity.");
       return;
     }
 
@@ -716,15 +816,22 @@
     if (physical) {
       var country = countrySel ? countrySel.value : "";
       if (!country) {
-        fieldError("country", "Choose a shipping option for this destination.");
+        failField("country", "Choose a shipping option for this destination.");
         return;
       }
-      var shipSel = form.querySelector("select[name=shipping_option]");
       if (!shipSel || !shipSel.value) {
-        fieldError(
+        failField(
           "shipping_option",
           "Choose a shipping option for this destination."
         );
+        return;
+      }
+      if (!val("line1")) {
+        failField("line1", "Enter your street address.");
+        return;
+      }
+      if (!val("city")) {
+        failField("city", "Enter your city.");
         return;
       }
       payload.shipping_option_d = shipSel.value;
@@ -736,7 +843,7 @@
       };
       var region = regionFor(country);
       if (!regionOk(country, region)) {
-        fieldError("region", REGION_COPY);
+        failField("region", REGION_COPY);
         return;
       }
       if (region) payload.address.region = region;
@@ -745,14 +852,14 @@
     var wantsEmail = !!(emailOptIn && emailOptIn.checked);
     if (wantsEmail && !email) {
       /* consent-without-email — contract copy */
-      fieldError(
+      failField(
         "email",
         "Enter an email to receive order updates, or turn updates off."
       );
       return;
     }
     if (email && !EMAIL_RE.test(email)) {
-      fieldError("email", "Enter a valid email for order updates.");
+      failField("email", "Enter a valid email for order updates.");
       return;
     }
     if (email) payload.email = email;

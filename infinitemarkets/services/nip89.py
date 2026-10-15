@@ -9,6 +9,7 @@ invalid-link response; resolution is purely local.
 
 from __future__ import annotations
 
+import json
 import re
 import time
 from decimal import Decimal
@@ -119,7 +120,8 @@ async def product_detail(product: dict) -> dict:
         )
         shipping = await conn.fetchall(
             f"SELECT so.title, so.base_price_minor, so.currency,"
-            " so.currency_decimals, pso.extra_cost_minor, so.d_tag, so.service "
+            " so.currency_decimals, pso.extra_cost_minor, so.d_tag, so.service,"
+            " so.countries, so.regions "
             f"FROM {table('product_shipping_options')} pso "
             f"JOIN {table('shipping_options')} so "
             "ON so.id = pso.shipping_option_id "
@@ -218,6 +220,8 @@ def public_product_json(product: dict, detail: dict) -> dict:
                 "currency": s["currency"],
                 "currency_decimals": s["currency_decimals"],
                 "service": s["service"],
+                "countries": json.loads(s["countries"]) if s["countries"] else [],
+                "regions": json.loads(s["regions"]) if s["regions"] else [],
             }
             for s in detail["shipping"]
         ],
