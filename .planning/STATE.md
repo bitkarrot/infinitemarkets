@@ -4,18 +4,18 @@ milestone: v1.1
 milestone_name: Media uploads and Blossom support
 current_phase: 7
 current_phase_name: Shared Image Editors
-current_plan: 2
+current_plan: 3
 status: executing
-stopped_at: Completed 07-02-PLAN.md
-last_updated: "2026-10-16T21:46:59.660Z"
+stopped_at: Completed 07-03-PLAN.md
+last_updated: "2026-10-16T22:00:34.479Z"
 last_activity: 2026-10-16
 last_activity_desc: v1.1 roadmap and requirement traceability drafted
-state_head: 90a6288e9f43f2a8052bfd20b3e73beda8de24a0
+state_head: f4039053a7f528213b0079eaae51fd555e521364
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 8
-  completed_plans: 6
+  completed_plans: 7
   percent: 33
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-10-16)
 ## Current Position
 
 Phase: 7 of 8 — Shared Image Editors
-Current Plan: 2
+Current Plan: 3
 Total Plans in Phase: 4
 Status: Executing — 2 of 4 plans summarized (07-01 unused-listing fields, 07-02 shared picker + hero tracer)
 Last activity: 2026-10-16 — 07-02 gm-media-picker component + hero upload path
@@ -75,6 +75,7 @@ Last activity: 2026-10-16 — 07-02 gm-media-picker component + hero upload path
 | Phase 06-secure-media-storage P04 | 15min | 3 tasks | 10 files |
 | Phase 07-shared-image-editors P01 | 5min | 2 tasks | 3 files |
 | Phase 07-shared-image-editors P02 | 8min | 2 tasks | 7 files |
+| Phase 07-shared-image-editors P03 | 9min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -120,6 +121,7 @@ Decisions are logged in PROJECT.md and the normative specification.
 - [Phase 6]: 07-01: GET /media/unused response extended with files[].mtime + used_bytes/quota_bytes via _dir_bytes and MAX_MERCHANT_BYTES (D-23) — additive response-shape change, no new route
 - [Phase 7]: 07-02: first registered Vue component (gm-media-picker via window.app.component + template string) replaces mixin-only idiom for the shared upload control — host-vendored vue.global.prod.js carries the compiler (D-24)
 - [Phase 7]: 07-02: gmMediaUpload uses XHR not fetch (upload.onprogress required by MEDIA-12); FormData exactly usage/backend/file; no Idempotency-Key per D-28; appearance fields bind result.path locally else result.url (D-26)
+- [Phase 7]: 07-03: cancel-disclosure via shared gmDiscloseUnsavedUploads on every product-editor close path; save always sends images (D-21/D-27)
 
 ### Pending Todos
 
@@ -175,6 +177,6 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 ## Session Continuity
 
-Last session: 2026-10-16T21:46:59.641Z
-Stopped at: Completed 07-02-PLAN.md
+Last session: 2026-10-16T22:00:34.459Z
+Stopped at: Completed 07-03-PLAN.md
 Resume file: None

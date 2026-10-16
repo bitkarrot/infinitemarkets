@@ -21,12 +21,12 @@ Requirements for v1.1. Each maps to one roadmap phase after owner approval.
 ### Image Editor
 
 - [x] **MEDIA-08**: One reusable upload control is available for the product gallery, Merchant Nostr profile avatar/banner, and Appearance brand logo, hero background, footer logo, and custom share image.
-- [ ] **MEDIA-09**: Product images support multiple files, thumbnails, a visible primary image, ordering, per-image removal, and an explicit clear-all operation.
+- [x] **MEDIA-09**: Product images support multiple files, thumbnails, a visible primary image, ordering, per-image removal, and an explicit clear-all operation.
 - [ ] **MEDIA-10**: Single-image settings fields support replacing and clearing their image without changing unrelated profile/theme fields.
-- [ ] **MEDIA-11**: The merchant can continue to paste existing HTTPS image URLs, and editing/saving preserves supported migration-managed local `/images/...` URLs.
+- [x] **MEDIA-11**: The merchant can continue to paste existing HTTPS image URLs, and editing/saving preserves supported migration-managed local `/images/...` URLs.
 - [x] **MEDIA-12**: Upload UI reports per-file progress and errors, preserves other selected images on failure, and explains that cancelling before saving a setting/product can leave an unreferenced uploaded file.
-- [ ] **MEDIA-13**: Product image ordering, removal, and clear-all persist through the existing catalog API and are reflected in public pages and Nostr projections.
-- [ ] **MEDIA-14**: Product image count remains at 20, matching current service behavior; update technical-specification, UI, and tests to agree.
+- [x] **MEDIA-13**: Product image ordering, removal, and clear-all persist through the existing catalog API and are reflected in public pages and Nostr projections.
+- [x] **MEDIA-14**: Product image count remains at 20, matching current service behavior; update technical-specification, UI, and tests to agree.
 
 ### Protocol and Release Safety
 
@@ -75,12 +75,12 @@ Proposed mapping from the v1.1 roadmap; owner approval is pending.
 | MEDIA-06 | Phase 6 | Complete |
 | MEDIA-07 | Phase 6 | Complete |
 | MEDIA-08 | Phase 7 | Complete |
-| MEDIA-09 | Phase 7 | Pending |
+| MEDIA-09 | Phase 7 | Complete |
 | MEDIA-10 | Phase 7 | Pending |
-| MEDIA-11 | Phase 7 | Pending |
+| MEDIA-11 | Phase 7 | Complete |
 | MEDIA-12 | Phase 7 | Complete |
-| MEDIA-13 | Phase 7 | Pending |
-| MEDIA-14 | Phase 7 | Pending |
+| MEDIA-13 | Phase 7 | Complete |
+| MEDIA-14 | Phase 7 | Complete |
 | MEDIA-15 | Phase 6 | Complete |
 | MEDIA-16 | Phase 6 | Complete |
 | MEDIA-17 | Phase 8 | Pending |
