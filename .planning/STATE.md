@@ -2,19 +2,20 @@
 gsd_state_version: "1.0"
 milestone: v1.1
 milestone_name: Media uploads and Blossom support
-current_phase: 6
-current_phase_name: Secure Media Storage
-status: planning
-stopped_at: Completed 07-01-PLAN.md
-last_updated: "2026-10-16T21:42:41.013Z"
+current_phase: 7
+current_phase_name: Shared Image Editors
+current_plan: 2
+status: executing
+stopped_at: Completed 07-02-PLAN.md
+last_updated: "2026-10-16T21:46:59.660Z"
 last_activity: 2026-10-16
 last_activity_desc: v1.1 roadmap and requirement traceability drafted
-state_head: 3a63cfc7bd0f51c03cfbaf07b17a6f9eeda57c8a
+state_head: 90a6288e9f43f2a8052bfd20b3e73beda8de24a0
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 8
-  completed_plans: 5
+  completed_plans: 6
   percent: 33
 ---
 
@@ -29,10 +30,11 @@ See: .planning/PROJECT.md (updated 2026-10-16)
 
 ## Current Position
 
-Phase: 6 of 8 — Secure Media Storage (roadmap drafted; awaiting owner approval)
-Plan: —
-Status: Planning complete; implementation not started
-Last activity: 2026-10-16 — v1.1 roadmap and requirement traceability drafted
+Phase: 7 of 8 — Shared Image Editors
+Current Plan: 2
+Total Plans in Phase: 4
+Status: Executing — 2 of 4 plans summarized (07-01 unused-listing fields, 07-02 shared picker + hero tracer)
+Last activity: 2026-10-16 — 07-02 gm-media-picker component + hero upload path
 
 ## Performance Metrics
 
@@ -72,6 +74,7 @@ Last activity: 2026-10-16 — v1.1 roadmap and requirement traceability drafted
 | Phase 06 P03 | 10min | 2 tasks | 8 files |
 | Phase 06-secure-media-storage P04 | 15min | 3 tasks | 10 files |
 | Phase 07-shared-image-editors P01 | 5min | 2 tasks | 3 files |
+| Phase 07-shared-image-editors P02 | 8min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -115,6 +118,8 @@ Decisions are logged in PROJECT.md and the normative specification.
 - [Phase 6]: 06-03: remote blossom failure is request-level typed problem naming the server; earlier PUT blobs are honest orphans per D-01
 - [Phase 6]: 06-04: emit /library/infinitemarkets/ (real host mount) and rewrite legacy /images/ references via m019 — owner-locked gap closure
 - [Phase 6]: 07-01: GET /media/unused response extended with files[].mtime + used_bytes/quota_bytes via _dir_bytes and MAX_MERCHANT_BYTES (D-23) — additive response-shape change, no new route
+- [Phase 7]: 07-02: first registered Vue component (gm-media-picker via window.app.component + template string) replaces mixin-only idiom for the shared upload control — host-vendored vue.global.prod.js carries the compiler (D-24)
+- [Phase 7]: 07-02: gmMediaUpload uses XHR not fetch (upload.onprogress required by MEDIA-12); FormData exactly usage/backend/file; no Idempotency-Key per D-28; appearance fields bind result.path locally else result.url (D-26)
 
 ### Pending Todos
 
@@ -170,6 +175,6 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 ## Session Continuity
 
-Last session: 2026-10-16T21:42:40.994Z
-Stopped at: Completed 07-01-PLAN.md
+Last session: 2026-10-16T21:46:59.641Z
+Stopped at: Completed 07-02-PLAN.md
 Resume file: None

@@ -11,8 +11,8 @@ Requirements for v1.1. Each maps to one roadmap phase after owner approval.
 ### Media Storage
 
 - [x] **MEDIA-01**: Merchant can upload an image to this LNbits instance without configuring or accessing a Blossom server; if no Blossom server is configured, local LNbits storage is selected by default.
-- [ ] **MEDIA-02**: Merchant can explicitly choose Blossom for an upload; the backend targets only the primary/first configured `Media (Blossom)` server, preserves configured order, and does not dual-write or silently retry another remote server.
-- [ ] **MEDIA-03**: If a chosen Blossom upload fails, the merchant sees a plain-language error and may explicitly retry the same image to LNbits-local storage.
+- [x] **MEDIA-02**: Merchant can explicitly choose Blossom for an upload; the backend targets only the primary/first configured `Media (Blossom)` server, preserves configured order, and does not dual-write or silently retry another remote server.
+- [x] **MEDIA-03**: If a chosen Blossom upload fails, the merchant sees a plain-language error and may explicitly retry the same image to LNbits-local storage.
 - [x] **MEDIA-04**: Blossom upload authorization is signed server-side with the merchant's stored Nostr key; no nsec or reusable signing key is exposed to browser code.
 - [x] **MEDIA-05**: Uploads use bounded multipart parsing (at most 16 files/request and 25 MB/file), avoid unbounded in-memory buffering, enforce a 400 MB per-merchant LNbits-local quota, accept only signature-verified PNG/JPEG/WebP, reject SVG/GIF, compute SHA-256, and validate any returned Blossom descriptor before exposing its URL.
 - [x] **MEDIA-06**: LNbits-managed images use a merchant-scoped opaque storage namespace outside the reinstallable extension package and are served through the host image mount.
@@ -20,11 +20,11 @@ Requirements for v1.1. Each maps to one roadmap phase after owner approval.
 
 ### Image Editor
 
-- [ ] **MEDIA-08**: One reusable upload control is available for the product gallery, Merchant Nostr profile avatar/banner, and Appearance brand logo, hero background, footer logo, and custom share image.
+- [x] **MEDIA-08**: One reusable upload control is available for the product gallery, Merchant Nostr profile avatar/banner, and Appearance brand logo, hero background, footer logo, and custom share image.
 - [ ] **MEDIA-09**: Product images support multiple files, thumbnails, a visible primary image, ordering, per-image removal, and an explicit clear-all operation.
 - [ ] **MEDIA-10**: Single-image settings fields support replacing and clearing their image without changing unrelated profile/theme fields.
 - [ ] **MEDIA-11**: The merchant can continue to paste existing HTTPS image URLs, and editing/saving preserves supported migration-managed local `/images/...` URLs.
-- [ ] **MEDIA-12**: Upload UI reports per-file progress and errors, preserves other selected images on failure, and explains that cancelling before saving a setting/product can leave an unreferenced uploaded file.
+- [x] **MEDIA-12**: Upload UI reports per-file progress and errors, preserves other selected images on failure, and explains that cancelling before saving a setting/product can leave an unreferenced uploaded file.
 - [ ] **MEDIA-13**: Product image ordering, removal, and clear-all persist through the existing catalog API and are reflected in public pages and Nostr projections.
 - [ ] **MEDIA-14**: Product image count remains at 20, matching current service behavior; update technical-specification, UI, and tests to agree.
 
@@ -68,17 +68,17 @@ Proposed mapping from the v1.1 roadmap; owner approval is pending.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | MEDIA-01 | Phase 6 | Complete |
-| MEDIA-02 | Phase 7 | Pending |
-| MEDIA-03 | Phase 7 | Pending |
+| MEDIA-02 | Phase 7 | Complete |
+| MEDIA-03 | Phase 7 | Complete |
 | MEDIA-04 | Phase 6 | Complete |
 | MEDIA-05 | Phase 6 | Complete |
 | MEDIA-06 | Phase 6 | Complete |
 | MEDIA-07 | Phase 6 | Complete |
-| MEDIA-08 | Phase 7 | Pending |
+| MEDIA-08 | Phase 7 | Complete |
 | MEDIA-09 | Phase 7 | Pending |
 | MEDIA-10 | Phase 7 | Pending |
 | MEDIA-11 | Phase 7 | Pending |
-| MEDIA-12 | Phase 7 | Pending |
+| MEDIA-12 | Phase 7 | Complete |
 | MEDIA-13 | Phase 7 | Pending |
 | MEDIA-14 | Phase 7 | Pending |
 | MEDIA-15 | Phase 6 | Complete |
