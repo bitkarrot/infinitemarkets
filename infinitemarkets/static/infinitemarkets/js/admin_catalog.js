@@ -347,7 +347,7 @@
         this.gmCatalog.bulkEditor.show = false;
         this.gmCatalog.editor = {
           show: true, saving: false, error: null, isNew: true,
-          previewErrors: {},
+          previewErrors: {}, ogBust: Date.now(),
           form: {
             category_id: this.gmCatalog.categories.length
               ? this.gmCatalog.categories[0].id
@@ -371,7 +371,7 @@
         var d = await self.gmApi("GET", "/products/" + row.id);
         self.gmCatalog.editor = {
           show: true, saving: false, error: null, isNew: false,
-          previewErrors: {},
+          previewErrors: {}, ogBust: Date.now(),
           form: {
             id: d.id,
             category_id: d.category_id,
@@ -683,7 +683,8 @@
           return "";
         }
         return this.gmOrigin() + "/infinitemarkets/p/" +
-          this.gm.merchant.pubkey + "/" + f.d_tag + "/og.png";
+          this.gm.merchant.pubkey + "/" + f.d_tag + "/og.png" +
+          "?v=" + (ed.ogBust || "");
       },
       gmPreviewFailed: function (url) {
         return !!((this.gmCatalog.editor.previewErrors || {})[url]);

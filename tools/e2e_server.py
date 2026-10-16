@@ -215,7 +215,17 @@ async def _seed(app, seed: dict, relay_url: str) -> None:
         )
         cid = resp.json()["id"]
 
-        img_base = f"{BASE_URL}/infinitemarkets/static/infinitemarkets/img"
+        # Real raster images on a public CDN (https/443) so og.png share
+        # cards embed them — the hardened fetcher can't reach localhost
+        # or decode SVG. Blossom blob, sha256-addressed.
+        img_tour = (
+            "https://image.nostr.build/"
+            "19a2d7e180b4aa62e4639afb5043142dfa70083a09df7d2e85ff8ecc96aaaa8b.png"
+        )
+        img_poster = (
+            "https://image.nostr.build/"
+            "91a4d2ac9c799888bb427db3e91af5290aecf70c97b3273e42be6763c2f81d43.png"
+        )
         resp = await client.post(
             f"{api}/products",
             json={
@@ -230,7 +240,7 @@ async def _seed(app, seed: dict, relay_url: str) -> None:
                 # held reservations must never flip the product 'sold'.
                 "stock_on_hand": 200,
                 "format": "digital",
-                "images": [{"url": f"{img_base}/demo-digital.svg"}],
+                "images": [{"url": img_tour}],
                 "delivery_content": (
                     "Download your tour: https://files.example/e2e-digital-tour.zip\n"
                     "Access code: E2E-TOUR-2026"
@@ -267,7 +277,7 @@ async def _seed(app, seed: dict, relay_url: str) -> None:
                 "stock_on_hand": 100,
                 "format": "physical",
                 "shipping_option_ids": [shipping["id"]],
-                "images": [{"url": f"{img_base}/demo-poster.svg"}],
+                "images": [{"url": img_poster}],
             },
             headers=await cookie(),
         )
