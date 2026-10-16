@@ -11,7 +11,14 @@
   var FORMATS = ["digital", "physical"];
   var VISIBILITIES = ["on-sale", "hidden", "pre-order"];
   var SERVICES = ["standard", "express", "overnight", "pickup"];
-  var DURATION_UNITS = ["H", "D", "W"];
+  var DURATION_UNITS = [
+    { value: "H", label: "Hours (H)" },
+    { value: "D", label: "Days (D)" },
+    { value: "W", label: "Weeks (W)" }
+  ];
+  var REGION_CODE_RE = /^[A-Z]{2}-[A-Z0-9]{1,3}$/;
+  var REGION_DATA = typeof GM_REGIONS === "object" && GM_REGIONS
+    ? GM_REGIONS : {};
   var COUNTRY_CODES = (
     "AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ " +
     "BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ " +
@@ -114,6 +121,7 @@
           collections: [],
           shipping: [],
           countryOptions: COUNTRY_OPTIONS,
+          regionOptions: [],
           productColumns: PRODUCT_COLUMNS,
           categoryColumns: CATEGORY_COLUMNS,
           collectionColumns: COLLECTION_COLUMNS,
@@ -159,6 +167,7 @@
           expandedProducts: [],
           expandedCollections: [],
           collectionMembers: {},
+          expandedCategories: [],
           dryRun: { show: false, json: "", loading: false }
         }
       };
@@ -338,6 +347,7 @@
         this.gmCatalog.bulkEditor.show = false;
         this.gmCatalog.editor = {
           show: true, saving: false, error: null, isNew: true,
+          previewErrors: {},
           form: {
             category_id: this.gmCatalog.categories.length
               ? this.gmCatalog.categories[0].id
@@ -361,6 +371,7 @@
         var d = await self.gmApi("GET", "/products/" + row.id);
         self.gmCatalog.editor = {
           show: true, saving: false, error: null, isNew: false,
+          previewErrors: {},
           form: {
             id: d.id,
             category_id: d.category_id,
@@ -633,6 +644,55 @@
           self.gmCatalog.error = self.gmProblemCopy(e.problem);
         }
       },
+      gmCategoryExpanded: function (id) {
+        return this.gmCatalog.expandedCategories.includes(id);
+      },
+      gmCategoryProducts: function (id) {
+        /* Every product belongs to exactly one category, so the loaded
+           product list is the membership — no lazy fetch like
+           collections, whose members aren't in the list payload. */
+        return this.gmCatalog.products.filter(function (p) {
+          return p.category_id === id;
+        }).sort(function (a, b) {
+          return (a.title || a.d_tag || "")
+            .localeCompare(b.title || b.d_tag || "");
+        });
+      },
+      gmToggleCategoryExpand: function (row) {
+        var list = this.gmCatalog.expandedCategories;
+        var i = list.indexOf(row.id);
+        if (i >= 0) list.splice(i, 1);
+        else list.push(row.id);
+      },
+      gmSeoImage: function () {
+        /* First image URL — the same source the public page's JSON-LD
+           `image` uses, which is what Google renders as a thumbnail on
+           product results. */
+        var lines = (this.gmCatalog.editor.form.images_text || "")
+          .split("\n");
+        for (var i = 0; i < lines.length; i++) {
+          var u = lines[i].trim();
+          if (u) return u;
+        }
+        return "";
+      },
+      gmProductOgUrl: function () {
+        var ed = this.gmCatalog.editor;
+        var f = ed.form;
+        if (ed.isNew || !f.d_tag || !(this.gm.merchant || {}).pubkey) {
+          return "";
+        }
+        return this.gmOrigin() + "/infinitemarkets/p/" +
+          this.gm.merchant.pubkey + "/" + f.d_tag + "/og.png";
+      },
+      gmPreviewFailed: function (url) {
+        return !!((this.gmCatalog.editor.previewErrors || {})[url]);
+      },
+      gmNotePreviewError: function (url) {
+        var ed = this.gmCatalog.editor;
+        if (!ed.previewErrors) ed.previewErrors = {};
+        ed.previewErrors[url] = true;
+      },
       gmSaveCollection: async function () {
         var self = this;
         var ed = self.gmCatalog.collectionEditor;
@@ -733,6 +793,47 @@
         var f = this.gmCatalog.shippingEditor.form;
         f.countries = f.countries.filter(function (item) { return item !== code; });
       },
+      gmRegionChoices: function () {
+        /* ISO 3166-2 subdivisions of the selected destination countries —
+           regions restrict an option inside those countries, so codes
+           from elsewhere are not offered. */
+        var seen = {};
+        var opts = [];
+        (this.gmCatalog.shippingEditor.form.countries || [])
+          .forEach(function (cc) {
+            var subs = REGION_DATA[cc] || {};
+            Object.keys(subs).sort().forEach(function (sub) {
+              var code = cc + "-" + sub;
+              if (!seen[code]) {
+                seen[code] = true;
+                opts.push({ label: subs[sub] + " (" + code + ")", value: code });
+              }
+            });
+          });
+        return opts;
+      },
+      gmFilterShippingRegions: function (term, update) {
+        var query = (term || "").trim().toLowerCase();
+        var self = this;
+        var base = self.gmRegionChoices().slice();
+        var have = {};
+        base.forEach(function (o) { have[o.value] = true; });
+        (self.gmCatalog.shippingEditor.form.regions || [])
+          .forEach(function (code) {
+            if (!have[code]) base.push({ label: code, value: code });
+          });
+        update(function () {
+          self.gmCatalog.regionOptions = query
+            ? base.filter(function (item) {
+                return item.label.toLowerCase().includes(query);
+              })
+            : base;
+        });
+      },
+      gmAddShippingRegion: function (val, done) {
+        var code = (val || "").trim().toUpperCase();
+        done(REGION_CODE_RE.test(code) ? code : null, "add-unique");
+      },
       gmNewShipping: function () {
         this.gmCatalog.tab = "shipping";
         this.gmCatalog.countryOptions = COUNTRY_OPTIONS;
@@ -741,11 +842,12 @@
           form: {
             title: "", service: "standard", base_price_major: 0,
             currency: "SAT", currency_decimals: 0,
-            countries: [], regions_text: "",
+            countries: [], regions: [],
             duration_min: null, duration_max: null, duration_unit: "D",
             location: "", active: true
           }
         };
+        this.gmCatalog.regionOptions = this.gmRegionChoices();
       },
       gmEditShipping: function (row) {
         this.gmCatalog.tab = "shipping";
@@ -766,12 +868,13 @@
             countries: Array.from(new Set((row.countries || []).flatMap(function (code) {
               return code === "EU" ? EU_COUNTRIES : [code];
             }))),
-            regions_text: (row.regions || []).join(", "),
+            regions: (row.regions || []).slice(),
             duration_min: row.duration_min, duration_max: row.duration_max,
             duration_unit: row.duration_unit || "D",
             location: row.location || "", active: row.active !== false
           }
         };
+        this.gmCatalog.regionOptions = this.gmRegionChoices();
       },
       gmSaveShipping: async function () {
         var self = this;
@@ -779,12 +882,6 @@
         ed.saving = true;
         ed.error = null;
         var f = ed.form;
-        var splitList = function (s) {
-          return (s || "")
-            .split(",")
-            .map(function (x) { return x.trim().toUpperCase(); })
-            .filter(function (x) { return x.length; });
-        };
         if (!f.countries.length || f.countries.some(function (code) {
           return !COUNTRY_LABELS[code];
         })) {
@@ -806,7 +903,7 @@
             f.currency_decimals === undefined
             ? gmDecimals(f.currency) : f.currency_decimals,
           countries: Array.from(new Set(f.countries)),
-          regions: splitList(f.regions_text),
+          regions: Array.from(new Set(f.regions || [])),
           duration_min:
             f.duration_min === null || f.duration_min === ""
               ? null
