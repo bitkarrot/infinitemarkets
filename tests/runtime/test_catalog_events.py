@@ -63,6 +63,20 @@ def _events():
     return importlib.import_module("infinitemarkets.services.events")
 
 
+def _profile_event(events, merchant, public_base_url: str = ""):
+    """Call ``merchant_profile_event`` with ``public_base_url`` when the
+    signature supports it — on the pre-06-03 baseline the builder emits
+    the stored relative path verbatim, so the absolutization assertions
+    (not a signature TypeError) carry the RED."""
+    import inspect
+
+    kw = {"pubkey": PUBKEY}
+    if "public_base_url" in inspect.signature(
+            events.merchant_profile_event).parameters:
+        kw["public_base_url"] = public_base_url
+    return events.merchant_profile_event(merchant, **kw)
+
+
 async def test_product_event_deterministic():
     events = _events()
     e1 = _build(events)
@@ -211,6 +225,61 @@ async def test_identity_and_handler_events_have_no_labels():
     assert info["kind"] == 31990
     assert ["d", "infinitemarkets"] in info["tags"]
     assert ["k", "30402"] in info["tags"]
+
+
+async def test_merchant_profile_absolutizes_local_image_paths():
+    """MEDIA-07 emit side (D-04/D-07): a stored relative
+    ``/images/infinitemarkets/`` picture/banner publishes as
+    ``public_base_url`` + path in kind-0 content; absolute https values
+    pass through byte-identical; unrelated keys are untouched; an empty
+    base never concatenates."""
+    events = _events()
+    ns = "ab" * 12
+    pic_rel = f"/images/infinitemarkets/{ns}/{'cd' * 32}.png"
+    ban_rel = f"/images/infinitemarkets/{ns}/{'ef' * 32}.webp"
+    merchant = {
+        "display_name": "shop",
+        "profile_json": json.dumps({
+            "about": "Handmade goods",
+            "picture": pic_rel,
+            "banner": ban_rel,
+        }),
+        "recommended_app_d": "infinitemarkets",
+    }
+
+    ev = _profile_event(
+        events, merchant, public_base_url="https://shop.example"
+    )
+    assert ev["kind"] == 0
+    content = json.loads(ev["content"])
+    assert content["picture"] == f"https://shop.example{pic_rel}"
+    assert content["banner"] == f"https://shop.example{ban_rel}"
+    assert content["about"] == "Handmade goods"
+    assert not any(t[0] in ("L", "l") for t in ev["tags"])
+
+    # already-absolute https passes through byte-identical; a non-
+    # picture/banner key carrying the same prefix is never rewritten
+    merchant["profile_json"] = json.dumps({
+        "picture": "https://cdn.example/avatar.png",
+        "banner": "https://cdn.example/header.png",
+        "website": f"/images/infinitemarkets/{ns}/x.png",
+    })
+    content = json.loads(
+        _profile_event(
+            events, merchant, public_base_url="https://shop.example"
+        )["content"]
+    )
+    assert content["picture"] == "https://cdn.example/avatar.png"
+    assert content["banner"] == "https://cdn.example/header.png"
+    assert content["website"] == f"/images/infinitemarkets/{ns}/x.png"
+
+    # empty base: the relative value is emitted unchanged — the builder
+    # must never produce a broken concatenation
+    merchant["profile_json"] = json.dumps({"picture": pic_rel})
+    content = json.loads(
+        _profile_event(events, merchant, public_base_url="")["content"]
+    )
+    assert content["picture"] == pic_rel
 
 
 async def test_tombstone_descriptor():
