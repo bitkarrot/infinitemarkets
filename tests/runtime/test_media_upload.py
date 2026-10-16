@@ -282,3 +282,158 @@ async def test_media_upload_rejects_unknown_fields_and_usage(runtime_env):
         headers=_headers(env, csrf),
     )
     assert resp.status_code == 422, resp.text
+
+
+# --- D-02/D-12 unused-upload listing + explicit local deletion ----------------
+
+
+async def _product(env: dict, csrf: str, title: str):
+    """Create a minimal draft product; return the response body."""
+    client = env["client"]
+    cat = await client.post(
+        f"{API}/categories",
+        json={"name": f"cat-{title}", "default_currency": "USD"},
+        headers=_headers(env, csrf),
+    )
+    assert cat.status_code == 201, cat.text
+    resp = await client.post(
+        f"{API}/products",
+        json={
+            "category_id": cat.json()["id"], "title": title,
+            "amount_minor": 100, "currency": "USD",
+            "currency_decimals": 2, "visibility": "hidden",
+            "format": "digital", "draft": True,
+        },
+        headers=_headers(env, csrf),
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()
+
+
+async def _unused_names(env: dict) -> set[str]:
+    resp = await env["client"].get(
+        f"{API}/media/unused", headers=_headers(env)
+    )
+    assert resp.status_code == 200, resp.text
+    return {f["name"] for f in resp.json()["files"]}
+
+
+async def test_unused_listing_and_delete_lifecycle(runtime_env):
+    """Upload -> listed; reference via a product image -> unlisted and
+    DELETE -> 409; unreferenced DELETE -> gone; repeat -> 200 idempotent."""
+    env = runtime_env
+    mid, csrf = await _merchant_id(env)
+
+    orphan_payload = _PNG + b"orphan"
+    kept_payload = _PNG + b"kept"
+    resp = await _upload(env, csrf, [
+        ("file", ("orphan.png", orphan_payload, "image/png")),
+        ("file", ("kept.png", kept_payload, "image/png")),
+    ])
+    assert resp.status_code == 200, resp.text
+    results = {r["file"]: r for r in resp.json()["results"]}
+    orphan_name = results["orphan.png"]["path"].rsplit("/", 1)[1]
+    kept_name = results["kept.png"]["path"].rsplit("/", 1)[1]
+    kept_url = results["kept.png"]["url"]
+
+    # both unreferenced -> listed with name/bytes/sha256
+    unused = await _unused_names(env)
+    assert orphan_name in unused and kept_name in unused
+    listing = (await env["client"].get(
+        f"{API}/media/unused", headers=_headers(env)
+    )).json()["files"]
+    entry = next(f for f in listing if f["name"] == orphan_name)
+    assert entry["bytes"] == len(orphan_payload)
+    assert entry["sha256"] == hashlib.sha256(orphan_payload).hexdigest()
+
+    # referencing kept.png as a product image removes it from the list —
+    # absolute https form carries the infinitemarkets/<ns>/<name> substring.
+    product = await _product(env, csrf, "media-ref")
+    patched = await env["client"].patch(
+        f"{API}/products/{product['id']}",
+        json={"images": [{"url": kept_url}]},
+        headers=_headers(env, csrf),
+    )
+    assert patched.status_code == 200, patched.text
+    unused = await _unused_names(env)
+    assert kept_name not in unused and orphan_name in unused
+
+    # referenced file is not deletable
+    resp = await env["client"].delete(
+        f"{API}/media/unused/{kept_name}", headers=_headers(env, csrf)
+    )
+    assert resp.status_code == 409, resp.text
+    assert "media-referenced" in resp.json()["type"]
+
+    # orphan deletes, repeat is idempotent, file is really gone
+    resp = await env["client"].delete(
+        f"{API}/media/unused/{orphan_name}", headers=_headers(env, csrf)
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["deleted"] is True
+    assert not (_media_dir(mid) / orphan_name).exists()
+    assert orphan_name not in await _unused_names(env)
+    resp = await env["client"].delete(
+        f"{API}/media/unused/{orphan_name}", headers=_headers(env, csrf)
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["deleted"] is False
+
+
+async def test_unused_delete_rejects_traversal_and_bad_names(runtime_env):
+    """Names failing [0-9a-f]{64}.(png|jpg|webp) -> 422 before any
+    filesystem touch — traversal is impossible by construction."""
+    env = runtime_env
+    mid, csrf = await _merchant_id(env)
+    before = _dir_names(mid)
+    for bad in (
+        "../escape.png",
+        "..%2F..%2Fescape.png",
+        "x" * 64 + ".png",          # non-hex
+        "a" * 63 + ".png",          # short
+        "a" * 64 + ".gif",          # wrong ext
+        "a" * 64 + ".png/x",        # path suffix
+        "manifest.json",
+    ):
+        resp = await env["client"].delete(
+            f"{API}/media/unused/{bad}", headers=_headers(env, csrf)
+        )
+        assert resp.status_code in (404, 422), (bad, resp.status_code)
+    assert _dir_names(mid) == before
+
+
+async def test_sidecar_owned_files_never_listed(runtime_env):
+    """Migration-owned filenames (sidecar manifest values) are excluded
+    from /media/unused and refuse deletion — pending relinks are safe."""
+    from infinitemarkets.services import migration_media
+
+    env = runtime_env
+    mid, csrf = await _merchant_id(env)
+    media_dir = _media_dir(mid)
+    media_dir.mkdir(parents=True, exist_ok=True)
+
+    # seed a file recorded in the migration sidecar + an unrecorded one
+    sidecar_payload = _PNG + b"sidecar-owned"
+    sidecar_sha = hashlib.sha256(sidecar_payload).hexdigest()
+    sidecar_name = f"{sidecar_sha}.png"
+    (media_dir / sidecar_name).write_bytes(sidecar_payload)
+    migration_media._save_sidecar(
+        mid, {"https://cdn.example/migrated.png": sidecar_name}
+    )
+    free_payload = _PNG + b"free-standing"
+    free_sha = hashlib.sha256(free_payload).hexdigest()
+    free_name = f"{free_sha}.png"
+    (media_dir / free_name).write_bytes(free_payload)
+
+    unused = await _unused_names(env)
+    assert sidecar_name not in unused
+    assert free_name in unused
+
+    resp = await env["client"].delete(
+        f"{API}/media/unused/{sidecar_name}", headers=_headers(env, csrf)
+    )
+    assert resp.status_code == 409, resp.text
+    assert (media_dir / sidecar_name).is_file()
+
+    # restore the sidecar to its prior state for other tests
+    migration_media._save_sidecar(mid, {})
