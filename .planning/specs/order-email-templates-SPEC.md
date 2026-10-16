@@ -47,11 +47,30 @@ The host checkout is pinned (e336fe1); extending it means diverging from
 the pin or upstreaming.
 
 **Decision:** implement the SMTP send inside the extension
-(`services/email.py::_smtp_send`). It reuses the same host credentials
-(`host_settings.lnbits_email_notifications_*`), the same
-`asyncio.to_thread` + `starttls` + `sendmail` mechanics, and the same
-`asyncio.wait_for(min(30, remaining))` deadline discipline already in
-`worker_tick._send`. ~20 lines of stdlib `smtplib`; no new dependencies.
+(`services/email.py`). Two functions, split for testability:
+
+- `_build_message(...) -> EmailMessage` — pure construction: MIME tree,
+  headers, CID assembly, HTML render. Unit-testable with no network.
+- `_smtp_send(msg)` — thin transport reusing the same host credentials
+  (`host_settings.lnbits_email_notifications_*`), the same
+  `asyncio.to_thread` + `starttls` + `sendmail` mechanics, and the same
+  `asyncio.wait_for(min(30, remaining))` deadline discipline already in
+  `worker_tick._send`. ~20 lines of stdlib `smtplib`; no new
+  dependencies.
+
+**Headers added** (smtplib adds none of these; the host send doesn't
+either):
+
+- `Date` + `Message-ID` (`email.utils.formatdate` / `make_msgid`) —
+  baseline deliverability.
+- `Auto-Submitted: auto-generated` — suppresses vacation-reply loops.
+- `From: "{display_name}" <host-notifications-addr>` — display name is
+  merchant-controlled, so it must be encoded via
+  `email.headerregistry`/`formataddr` with CR/LF stripped. Fallback to
+  the bare address if the name is empty/invalid.
+- `Reply-To: notify_emails[0]` (optional but recommended) — customer
+  replies currently dead-end at the host notifications address.
+- `List-Unsubscribe` on the customer channel only (§4.4).
 
 ## 4. Design
 
@@ -79,12 +98,21 @@ persisted on the queue row.
 - System font stack: `-apple-system, "Segoe UI", Roboto, Helvetica, Arial`.
 - Single light theme (no dark-mode media queries — inconsistent client
   support).
-- **Every interpolated value passes `html.escape`** — display name, item
-  titles, quantities, totals, delivery content, custom header/footer
-  text. This is a hard contract: item titles are merchant-controlled,
-  delivery content is merchant-authored, and both land in a security
-  surface (email). Add a qualification test asserting a stored
-  `<script>`-bearing title renders escaped.
+- Hidden preheader span ("Order confirmed — {display_name}") as the
+  first element — inbox preview text costs one line.
+- Both parts `utf-8`.
+- **Every interpolated value passes `html.escape` (incl. `quote=True`
+  for attribute contexts like the status-link `href`)** — display name,
+  item titles, quantities, totals, delivery content, custom
+  header/footer text. This is a hard contract: item titles are
+  merchant-controlled, delivery content is merchant-authored, and both
+  land in a security surface (email). Add a qualification test
+  asserting a stored `<script>`-bearing title renders escaped.
+- Digital-delivery content renders inside a `pre-wrap` block after
+  escaping — it's free text (codes/links), not markup.
+- Item table uses `order_items.unit_price_minor`/`line_total_sat`/
+  `currency_decimals` for real line totals (today's text only shows
+  title × qty) and a "backordered" badge when `backordered_qty > 0`.
 - Sections:
   1. Header band — logo (`height="40"`, `alt` = escaped display name)
      or display-name wordmark when no logo; accent color as band
@@ -95,8 +123,14 @@ persisted on the queue row.
      same gate as the text render.
   5. Status-link CTA button (only while the token copy is live —
      reuse `_status_link`'s expiry/AEAD checks).
-  6. Footer: merchant name, "you opted in to order emails" notice, and
-     on the customer channel an opt-out line pointing at the order page.
+  6. Footer: merchant name + mandatory transactional notice — customer
+     channel gets "you opted in to order emails" plus an opt-out line
+     pointing at the order page; account channel gets "you requested a
+     sign-in link"; merchant/test channels get a neutral "transactional
+     notification" line. The mandatory line is fixed copy —
+     `email_footer_text` *supplements* it, never replaces it. Custom
+     header/footer text is plain text: escaped, no autolinking.
+     The text/plain footer carries the same mandatory lines.
 
 ### 4.3 Merchant customization fields
 
@@ -109,12 +143,15 @@ New nullable columns on `merchants` (new migration, next `m0xx`):
 | `email_footer_text` | TEXT | ≤240 chars |
 | `email_accent` | TEXT | `#[0-9a-fA-F]{6}` or NULL → falls back to `theme` accent |
 
-**Logo storage:** reuse the `migration_media` local store pattern —
-bounded multipart upload, magic-byte sniff (PNG/JPEG/WebP only),
-SHA-256 content-addressed filename under the merchant-namespaced media
-dir, cap ≤256 KB, and the existing per-merchant 400 MB budget applies.
-Logo uploads are *not* gated on URLs already in the catalog (unlike
-migration media) — it's a dedicated `email-logo` kind.
+**Logo storage — single-slot semantics** (resolves open question 3):
+one logo per merchant, `logo-<sha256>.<ext>` in the existing
+merchant-namespaced media dir, bounded multipart upload, magic-byte
+sniff (PNG/JPEG/WebP only), cap ≤256 KB. Re-upload atomically replaces
+and deletes the previous file; clearing the field deletes it too. No
+accounting path needed — the file nominally shares the media dir's
+400 MB budget, which is immaterial at 256 KB. Logo uploads are *not*
+gated on URLs already in the catalog (unlike migration media) — it's a
+dedicated kind.
 
 **v1.1 interaction:** the in-flight media milestone adds Blossom-hosted
 product media. Email logos stay **local-bytes-only** for CID embedding:
@@ -133,6 +170,8 @@ available locally at send time," not a storage location.
   the existing status link (`{public_base_url}/infinitemarkets/order#token`),
   which already exposes the opt-out button (`public_order.js` →
   `POST /order-email-opt-out`). **No new public page needed.**
+- Fragments are legal in the RFC 2369 URI but some clients strip them —
+  acceptable degradation; the footer link is the primary path.
 - No RFC 8058 `List-Unsubscribe-Post` one-click: it requires the token
   in URL path/query, which §5.4 forbids (fragment-only bearer tokens).
   Document as an accepted limitation.
@@ -144,7 +183,7 @@ available locally at send time," not a storage location.
 |---|---|---|
 | `customer` | full order template | unsubscribe footer + `List-Unsubscribe`; delivery block on `confirmed` |
 | `merchant` | full order template | none |
-| `account` (magic link) | header/footer shell only | no order sections; link stays fragment-URL |
+| `account` (magic link) | same shell (logo/accent/header) | no order sections; sign-in footer copy; link stays fragment-URL |
 | test send | full shell with sample content | marked preview content |
 
 ## 6. Invariants (unchanged)
@@ -152,9 +191,10 @@ available locally at send time," not a storage location.
 - Subjects: display name + event label only — no PII/ids (extend to
   headers: no addresses in `List-Unsubscribe` beyond the order URL).
 - Bodies never carry decrypted addresses, keys, BOLT11/preimage.
-- `preview_enc` keeps storing the redacted subject+text-body pair —
-  owner preview does not gain the raw HTML (it shows the redacted text
-  render; note "branded HTML also sent" in preview UI if trivial).
+- `preview_enc` gains the redacted HTML render:
+  `{"subject","text","html"}` — the owner preview must represent what
+  was actually sent, and text-only preview under-serves that once HTML
+  goes out. Additive JSON key, backward compatible with existing rows.
 - Suppression gates unchanged: `email_enabled`, host SMTP configured,
   merchant active, `notify_events` flags, per-order `email_opt_in`,
   consent re-checked at send time.
@@ -167,12 +207,19 @@ available locally at send time," not a storage location.
 
 ## 7. API surface
 
-- `PATCH .../notifications` — extend body with `email_header_text`,
-  `email_footer_text`, `email_accent` (validated above).
+- `PATCH .../notifications` — extend `PatchNotificationsBody`
+  (`extra=forbid`, so it rejects unknown fields today) with
+  `email_header_text`, `email_footer_text`, `email_accent`. The handler
+  funnels through `merchant_service.patch_merchant`, so the allowlist
+  there (`merchant.py` ~L391) gains the same three keys. Keep the
+  fields notifications-scoped only — do **not** add them to
+  `PatchMerchantBody` (which also carries `notify_*` today; leaving
+  them off keeps one canonical settings surface).
 - `POST .../notifications/logo` — bounded multipart upload (reuse
   `MultiPartParser` + bounded-stream pattern from `_catalog_upload`),
   single file, sniffs to png/jpeg/webp, writes to media dir, updates
-  `email_logo_path`. `DELETE` on the same route clears it.
+  `email_logo_path`. `DELETE` on the same route clears it and removes
+  the file.
 - **`harness/registry.py::HTTP_ROUTES` + technical-spec §5 must be
   updated in the same change** (bidirectional parity test).
 
@@ -185,13 +232,22 @@ already exercises the branded render end-to-end.
 
 ## 9. Test plan
 
+- **`harness/email.py` must be updated in parallel** — it's the
+  executable §8.8 model the qualification tests run against (SmtpStub
+  mirrors claim/suppress/rate-limit/backoff). Model the multipart
+  shape (or at minimum pass a structured message instead of a bare
+  `body: str`) so the PII/log-exposure assertions cover *both* parts.
+  This is the easiest gap to miss — the model isn't in the service
+  tree.
 - `tests/qualification/test_p0_09_email_persistence.py`: MIME
   alternative structure; text part equals existing render; CID part
   present iff logo configured; escaping of `<script>` titles;
   suppression unchanged.
 - `tests/qualification/test_p0_10_smtp_boundary.py`: no token/PII in
   either part; `List-Unsubscribe` on customer channel only; logo bytes
-  absent from preview_enc.
+  absent from preview_enc; From display-name encoding strips CR/LF.
+- Unit tests on `_build_message` directly (no network): MIME tree,
+  header set, CID wiring.
 - Route parity for the new logo route (auto-covered).
 - Validation tests: accent regex, header/footer caps, logo sniff/size
   rejections, missing-logo fallback send.
@@ -199,24 +255,46 @@ already exercises the branded render end-to-end.
 
 ## 10. Open questions
 
-1. Should `email_header_text`/`footer_text` ship at all in v1, or is
-   logo+accent enough? (Recommend shipping all three — trivial cost.)
-2. Magic-link shell: same accent/logo, or deliberately plain to look
-   credential-like? (Recommend same shell — consistent sender identity.)
-3. Does the logo upload share the migration-media 400 MB budget or get
-   its own small bucket (e.g. 2 MB total, one logo)? (Recommend the
-   shared budget — simpler, already enforced.)
+Resolved (2026-10-15 review):
+
+1. ~~header/footer text vs logo+accent only~~ → **ship all three**;
+   the custom footer supplements the mandatory footer line, never
+   replaces it (§4.2.6).
+2. ~~magic-link shell~~ → **same shell, channel-appropriate footer**
+   ("you requested a sign-in link") — consistent sender identity aids
+   phishing recognition.
+3. ~~logo budget~~ → **single-slot semantics**, one file replaced
+   atomically (§4.3); no accounting path needed.
+
+New — discovered during review:
+
+4. `notify_events` currently gates the **customer** channel too —
+   `_suppression_reason` checks the flag channel-agnostically, so a
+   merchant disabling "shipped" silently stops customer shipped emails
+   (rows enqueue, then suppress). Options: (a) document as-is — one
+   toggle gates all order email — and fix admin copy to say so;
+   (b) add a `customer_events` map for per-channel control. Recommend
+   (a) for v1 and revisit if merchants ask.
+5. Optional kill-switch: an `email_html` ext_settings flag that falls
+   back to text-only without a redeploy. Cheap insurance if the HTML
+   render misbehaves in production; include only if it stays a one-line
+   branch in `_build_message`'s caller.
 
 ## 11. Files touched
 
-- `services/email.py` — `_smtp_send`, `_render_html`, CID assembly,
-  unsubscribe header
+- `services/email.py` — `_build_message`, `_smtp_send`, `_render_html`,
+  CID assembly, headers; logo bytes read after suppression/rate-limit
+  checks (no wasted disk I/O; ≤256 KB sync read, wrap in `to_thread` if
+  it grows)
 - `services/orders.py` — none (render is at send time)
 - `services/merchant.py` — patch/validate new fields, `get_notifications`
 - `services/migration_media.py` — extract sniff/save helper or reuse
 - `migrations.py` — new `m0xx` for the four columns
-- `views_api.py` — notifications patch body + logo upload/delete route
+- `models.py` — new `Merchant` fields
+- `views_api.py` — `PatchNotificationsBody` + logo upload/delete route
 - `templates/admin.html`, `js/admin_settings.js` — settings UI
-- `harness/registry.py`, `docs/technical-specification.md` §4/§5/§8.8
+- `harness/email.py` — multipart modeling (see §9)
+- `harness/registry.py`, `docs/technical-specification.md` §4/§5/§8.8 +
+  §15 note recording the CID-only / no-remote-`img` rationale
 - `tests/qualification/test_p0_09_email_persistence.py`,
   `test_p0_10_smtp_boundary.py`
