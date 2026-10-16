@@ -437,3 +437,51 @@ async def test_sidecar_owned_files_never_listed(runtime_env):
 
     # restore the sidecar to its prior state for other tests
     migration_media._save_sidecar(mid, {})
+
+
+# --- D-07 catalog round-trip + migration coexistence ---------------------------
+
+
+async def test_uploaded_absolute_url_round_trips_through_catalog(runtime_env):
+    """D-07: the uploaded absolute https URL satisfies the catalog's
+    ``https://`` image validator — PATCH /products/{id} accepts it and the
+    stored row carries it verbatim."""
+    from infinitemarkets.db import db, table
+
+    env = runtime_env
+    mid, csrf = await _merchant_id(env)
+    resp = await _upload(
+        env, csrf, [("file", ("rt.png", _PNG + b"roundtrip", "image/png"))]
+    )
+    assert resp.status_code == 200, resp.text
+    result = resp.json()["results"][0]
+    assert result["url"].startswith("https://")
+
+    product = await _product(env, csrf, "media-roundtrip")
+    patched = await env["client"].patch(
+        f"{API}/products/{product['id']}",
+        json={"images": [{"url": result["url"]}]},
+        headers=_headers(env, csrf),
+    )
+    assert patched.status_code == 200, patched.text
+    async with db.connect() as conn:
+        row = await conn.fetchone(
+            f"SELECT url FROM {table('product_images')} "
+            "WHERE product_id = :p",
+            {"p": product["id"]},
+        )
+    assert row["url"] == result["url"]
+
+
+async def test_media_and_migration_share_namespace(runtime_env):
+    """D-01: one namespace, one quota — the general media flow resolves the
+    same directory and local path the migration flow uses."""
+    from infinitemarkets.services import media, migration_media
+
+    env = runtime_env
+    mid, _ = await _merchant_id(env)
+    assert (
+        media.local_path(mid, "probe.png")
+        == migration_media._local_url(mid, "probe.png")
+    )
+    assert media._dir_bytes(migration_media._media_dir(mid)) >= 0
