@@ -5,16 +5,16 @@ milestone_name: Media uploads and Blossom support
 current_phase: 6
 current_phase_name: Secure Media Storage
 status: planning
-stopped_at: Phase 7 context gathered
-last_updated: "2026-10-16T21:11:28.769Z"
+stopped_at: Completed 07-01-PLAN.md
+last_updated: "2026-10-16T21:42:41.013Z"
 last_activity: 2026-10-16
 last_activity_desc: v1.1 roadmap and requirement traceability drafted
-state_head: 42d07f174bce140c7fa22b75db66d742f28703b5
+state_head: 3a63cfc7bd0f51c03cfbaf07b17a6f9eeda57c8a
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 8
+  completed_plans: 5
   percent: 33
 ---
 
@@ -71,6 +71,7 @@ Last activity: 2026-10-16 — v1.1 roadmap and requirement traceability drafted
 | Phase 06 P01 | 12min | 3 tasks | 8 files |
 | Phase 06 P03 | 10min | 2 tasks | 8 files |
 | Phase 06-secure-media-storage P04 | 15min | 3 tasks | 10 files |
+| Phase 07-shared-image-editors P01 | 5min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -113,6 +114,7 @@ Decisions are logged in PROJECT.md and the normative specification.
 - [Phase 6]: 06-03: profile-origin gate is local-branch-only — usage=profile+backend=blossom allowed on private public_base_url (remote https descriptor is the recommended alternative)
 - [Phase 6]: 06-03: remote blossom failure is request-level typed problem naming the server; earlier PUT blobs are honest orphans per D-01
 - [Phase 6]: 06-04: emit /library/infinitemarkets/ (real host mount) and rewrite legacy /images/ references via m019 — owner-locked gap closure
+- [Phase 6]: 07-01: GET /media/unused response extended with files[].mtime + used_bytes/quota_bytes via _dir_bytes and MAX_MERCHANT_BYTES (D-23) — additive response-shape change, no new route
 
 ### Pending Todos
 
@@ -168,6 +170,6 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 ## Session Continuity
 
-Last session: 2026-10-16T21:11:28.740Z
-Stopped at: Phase 7 context gathered
-Resume file: .planning/phases/07-shared-image-editors/07-CONTEXT.md
+Last session: 2026-10-16T21:42:40.994Z
+Stopped at: Completed 07-01-PLAN.md
+Resume file: None
