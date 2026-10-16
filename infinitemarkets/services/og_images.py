@@ -11,7 +11,7 @@ import socket
 import ssl
 import time
 from collections import OrderedDict
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
@@ -21,6 +21,8 @@ WIDTH = 1200
 HEIGHT = 630
 _MAX_SOURCE_BYTES = 3 * 1024 * 1024
 _MAX_SOURCE_PIXELS = 16_000_000
+_MAX_IMAGE_REDIRECTS = 3
+_IMAGE_FETCH_TIMEOUT_S = 12
 _CACHE_TTL_S = 12 * 60 * 60
 _CACHE_SIZE = 64
 _CACHE_MAX_BYTES = 32 * 1024 * 1024
@@ -46,7 +48,9 @@ class _PinnedHTTPSConnection(http.client.HTTPSConnection):
         )
 
 
-def _fetch_image(host: str, address: str, path: str) -> bytes | None:
+def _fetch_image(
+    host: str, address: str, path: str,
+) -> tuple[int, str | None, bytes | None] | None:
     conn = _PinnedHTTPSConnection(host, address)
     try:
         conn.request(
@@ -58,6 +62,8 @@ def _fetch_image(host: str, address: str, path: str) -> bytes | None:
             },
         )
         response = conn.getresponse()
+        if response.status in {301, 302, 303, 307, 308}:
+            return response.status, response.getheader("Location"), None
         content_type = (response.getheader("Content-Type") or "").split(";")[0]
         if response.status != 200 or content_type not in {
             "image/png", "image/jpeg", "image/webp", "image/gif",
@@ -78,7 +84,9 @@ def _fetch_image(host: str, address: str, path: str) -> bytes | None:
             if not chunk:
                 break
             data.extend(chunk)
-        return bytes(data) if len(data) <= _MAX_SOURCE_BYTES else None
+        if len(data) > _MAX_SOURCE_BYTES:
+            return None
+        return response.status, None, bytes(data)
     except (OSError, ValueError, http.client.HTTPException):
         return None
     finally:
@@ -87,32 +95,58 @@ def _fetch_image(host: str, address: str, path: str) -> bytes | None:
 
 async def _remote_image(url: str) -> Image.Image | None:
     try:
-        parsed = urlparse((url or "").strip())
-        if (
-            parsed.scheme != "https"
-            or not parsed.hostname
-            or parsed.username
-            or parsed.password
-            or parsed.port not in (None, 443)
-        ):
-            return None
-        addresses = await asyncio.wait_for(
-            resolve_and_check_egress(parsed.hostname, 443), timeout=3.0
-        )
-        path = parsed.path or "/"
-        if parsed.query:
-            path += "?" + parsed.query
-        data = None
-        for address in addresses[:2]:
-            data = await asyncio.wait_for(
-                asyncio.to_thread(
-                    _fetch_image, parsed.hostname, str(address), path
-                ),
-                timeout=4.5,
+        current_url = (url or "").strip()
+        deadline = time.monotonic() + _IMAGE_FETCH_TIMEOUT_S
+        for redirect_count in range(_MAX_IMAGE_REDIRECTS + 1):
+            parsed = urlparse(current_url)
+            if (
+                parsed.scheme != "https"
+                or not parsed.hostname
+                or parsed.username
+                or parsed.password
+                or parsed.fragment
+                or parsed.port not in (None, 443)
+            ):
+                return None
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return None
+            addresses = await asyncio.wait_for(
+                resolve_and_check_egress(parsed.hostname, 443),
+                timeout=min(3.0, remaining),
             )
-            if data:
-                break
-        if not data:
+            path = parsed.path or "/"
+            if parsed.query:
+                path += "?" + parsed.query
+            result = None
+            for address in addresses[:2]:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return None
+                result = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        _fetch_image, parsed.hostname, str(address), path
+                    ),
+                    timeout=min(4.5, remaining),
+                )
+                if result is not None:
+                    break
+            if result is None:
+                return None
+            status, location, data = result
+            if status in {301, 302, 303, 307, 308}:
+                if (
+                    redirect_count >= _MAX_IMAGE_REDIRECTS
+                    or not location
+                    or len(location) > 2048
+                ):
+                    return None
+                current_url = urljoin(current_url, location)
+                continue
+            if status != 200 or not data:
+                return None
+            break
+        else:
             return None
         with Image.open(io.BytesIO(data)) as source:
             if (
