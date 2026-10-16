@@ -13,8 +13,8 @@ Requirements for v1.1. Each maps to one roadmap phase after owner approval.
 - [ ] **MEDIA-01**: Merchant can upload an image to this LNbits instance without configuring or accessing a Blossom server; if no Blossom server is configured, local LNbits storage is selected by default.
 - [ ] **MEDIA-02**: Merchant can explicitly choose Blossom for an upload; the backend targets only the primary/first configured `Media (Blossom)` server, preserves configured order, and does not dual-write or silently retry another remote server.
 - [ ] **MEDIA-03**: If a chosen Blossom upload fails, the merchant sees a plain-language error and may explicitly retry the same image to LNbits-local storage.
-- [ ] **MEDIA-04**: Blossom upload authorization is signed server-side with the merchant's stored Nostr key; no nsec or reusable signing key is exposed to browser code.
-- [ ] **MEDIA-05**: Uploads use bounded multipart parsing (at most 16 files/request and 25 MB/file), avoid unbounded in-memory buffering, enforce a 400 MB per-merchant LNbits-local quota, accept only signature-verified PNG/JPEG/WebP, reject SVG/GIF, compute SHA-256, and validate any returned Blossom descriptor before exposing its URL.
+- [x] **MEDIA-04**: Blossom upload authorization is signed server-side with the merchant's stored Nostr key; no nsec or reusable signing key is exposed to browser code.
+- [x] **MEDIA-05**: Uploads use bounded multipart parsing (at most 16 files/request and 25 MB/file), avoid unbounded in-memory buffering, enforce a 400 MB per-merchant LNbits-local quota, accept only signature-verified PNG/JPEG/WebP, reject SVG/GIF, compute SHA-256, and validate any returned Blossom descriptor before exposing its URL.
 - [ ] **MEDIA-06**: LNbits-managed images use a merchant-scoped opaque storage namespace outside the reinstallable extension package and are served through the host image mount.
 - [ ] **MEDIA-07**: A locally stored image used in Nostr profile picture/banner metadata is emitted as a publicly reachable absolute HTTPS URL; Appearance fields may use a safe same-origin path where supported.
 
@@ -30,8 +30,8 @@ Requirements for v1.1. Each maps to one roadmap phase after owner approval.
 
 ### Protocol and Release Safety
 
-- [ ] **MEDIA-15**: Blossom uploads use BUD-02 raw `PUT /upload` and BUD-11 kind-24242 authorization with a short expiration, `t=upload`, matching SHA-256 `x` tag and `X-SHA-256` header, a target-scoped `server` tag, and URL-safe base64 JSON without padding.
-- [ ] **MEDIA-16**: Backend requests to configured Blossom servers use HTTPS with request-time public-egress validation, pinned-IP TLS connections, strict time/size bounds, and reject upload redirects.
+- [x] **MEDIA-15**: Blossom uploads use BUD-02 raw `PUT /upload` and BUD-11 kind-24242 authorization with a short expiration, `t=upload`, matching SHA-256 `x` tag and `X-SHA-256` header, a target-scoped `server` tag, and URL-safe base64 JSON without padding.
+- [x] **MEDIA-16**: Backend requests to configured Blossom servers use HTTPS with request-time public-egress validation, pinned-IP TLS connections, strict time/size bounds, and reject upload redirects.
 - [ ] **MEDIA-17**: Blossom share-card image GETs follow only bounded, revalidated HTTPS redirects; upload PUTs do not inherit GET redirect behavior. PR #28 must be merged and verified before release.
 - [ ] **MEDIA-18**: Any new API route is registered in both `docs/technical-specification.md` §5 and `harness/registry.py::HTTP_ROUTES`; contract parity and fake-Blossom tests pass.
 - [ ] **MEDIA-19**: Automated tests exercise local storage, Blossom success, BUD auth/hash/descriptor checks, the first-configured-server rule, failure with explicit local retry, size/type rejection, URL round-trips, and share-card redirects without writing to public Blossom servers.
@@ -70,8 +70,8 @@ Proposed mapping from the v1.1 roadmap; owner approval is pending.
 | MEDIA-01 | Phase 6 | Pending |
 | MEDIA-02 | Phase 7 | Pending |
 | MEDIA-03 | Phase 7 | Pending |
-| MEDIA-04 | Phase 6 | Pending |
-| MEDIA-05 | Phase 6 | Pending |
+| MEDIA-04 | Phase 6 | Complete |
+| MEDIA-05 | Phase 6 | Complete |
 | MEDIA-06 | Phase 6 | Pending |
 | MEDIA-07 | Phase 6 | Pending |
 | MEDIA-08 | Phase 7 | Pending |
@@ -81,13 +81,14 @@ Proposed mapping from the v1.1 roadmap; owner approval is pending.
 | MEDIA-12 | Phase 7 | Pending |
 | MEDIA-13 | Phase 7 | Pending |
 | MEDIA-14 | Phase 7 | Pending |
-| MEDIA-15 | Phase 6 | Pending |
-| MEDIA-16 | Phase 6 | Pending |
+| MEDIA-15 | Phase 6 | Complete |
+| MEDIA-16 | Phase 6 | Complete |
 | MEDIA-17 | Phase 8 | Pending |
 | MEDIA-18 | Phase 6 | Pending |
 | MEDIA-19 | Phase 8 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 19 total
 - Mapped to phases: 19
 - Unmapped: 0

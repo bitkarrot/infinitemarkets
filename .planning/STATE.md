@@ -5,16 +5,16 @@ milestone_name: Media uploads and Blossom support
 current_phase: 6
 current_phase_name: Secure Media Storage
 status: planning
-stopped_at: Phase 6 planned — 3 plans, checker PASS
-last_updated: "2026-10-16T06:51:58.249Z"
+stopped_at: Completed 06-02-PLAN.md
+last_updated: "2026-10-16T07:05:58.936Z"
 last_activity: 2026-10-16
 last_activity_desc: v1.1 roadmap and requirement traceability drafted
-state_head: 739d1dd3e1c47522279819b8d46f6a3ef724147b
+state_head: e8f5f9d24367420a35c7e3d89e78f518fdec8757
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 3
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -67,6 +67,7 @@ Last activity: 2026-10-16 — v1.1 roadmap and requirement traceability drafted
 | Phase 01 P02 | 21 min | 3 tasks | 15 files |
 | Phase 01 P03 | ~50 min | 3 tasks | 25 files |
 | Phase 02 P01 | multi-session | 3 tasks | 18 created + 4 modified |
+| Phase 06 P02 | 10min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -103,6 +104,7 @@ Decisions are logged in PROJECT.md and the normative specification.
 - [Phase 2]: Host `rewrite_values` HTML-strips raw execute/fetch params — markdown/JSON payloads only persist via `insert`/`update` or DomainTransaction raw statements (02-01)
 - [Phase 2]: Cookie auth wins when a request carries both cookie and bearer headers — prevents bearer bypass of Origin/CSRF (02-01)
 - [Phase 2]: Kind-5 tombstone intents carry the bumped aggregate revision so supersession retires stale pending publishes; product intents enqueue AFTER collection republishes so dependency edges bind to live rows (02-01)
+- [Phase 6]: 06-02: Blossom upload uses canonical MIME map (jpg->image/jpeg); set_blossom_servers persists submission order (first=primary), pre-existing rows stay alphabetical; per-merchant upload semaphore is process-local (D-13)
 
 ### Pending Todos
 
@@ -158,6 +160,6 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 ## Session Continuity
 
-Last session: 2026-10-16T06:51:58.233Z
-Stopped at: Phase 6 planned — 3 plans, checker PASS
-Resume file: .planning/phases/06-secure-media-storage/06-01-PLAN.md
+Last session: 2026-10-16T07:05:55.562Z
+Stopped at: Completed 06-02-PLAN.md
+Resume file: None
