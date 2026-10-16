@@ -108,6 +108,49 @@
     "This is a soft delete. A deletion tombstone is published, but" +
     " removal from every relay and client cannot be guaranteed.";
   var IMAGE_DISCLOSURE = "Remote image hosts can learn viewer IP and time";
+  var IMAGES_MAX = 20;
+  /* Owned relative prefixes the catalog accepts (mirrors
+     catalog._valid_image_url — the live /library/ mount plus the legacy
+     /images/ form, MEDIA-11). Anything else must be absolute https. */
+  var OWNED_IMAGE_PREFIXES = [
+    "/library/infinitemarkets/",
+    "/images/infinitemarkets/"
+  ];
+  var UNSAVED_UPLOADS_COPY =
+    "Images you uploaded are still stored — they weren't attached" +
+    " to a product. You can remove them in Settings → Media.";
+
+  function gmOwnedImagePath(url) {
+    /* True when url is an extension-owned path — relative, or an
+       absolute https URL whose pathname is an owned prefix (catalog
+       uploads store result.url, the absolute form, per D-26). */
+    var path = String(url || "");
+    if (path.indexOf("https://") === 0) {
+      try {
+        path = new URL(path).pathname;
+      } catch (e) {
+        return false;
+      }
+    }
+    return OWNED_IMAGE_PREFIXES.some(function (prefix) {
+      return path.indexOf(prefix) === 0;
+    });
+  }
+
+  function gmImageKind(url) {
+    return gmOwnedImagePath(url) ? "local" : "remote";
+  }
+
+  /* Unified gallery entry (D-14): url is the authoritative save value,
+     thumb the (never-proxied) img src, kind drives badge/disclosure
+     copy, pending/progress/error carry per-file upload state. */
+  function gmImageEntry(url, kind) {
+    return {
+      url: url, thumb: url,
+      kind: kind || gmImageKind(url),
+      pending: false, progress: 0, error: null
+    };
+  }
 
   window.app.mixin({
     data: function () {
@@ -347,10 +390,12 @@
 
       /* --- products ---------------------------------------------------- */
       gmNewProduct: function () {
+        this.gmDiscloseUnsavedUploads();
         this.gmCatalog.tab = "products";
         this.gmCatalog.bulkEditor.show = false;
         this.gmCatalog.editor = {
           show: true, saving: false, error: null, isNew: true,
+          uploadsUnsaved: false,
           previewErrors: {}, ogBust: Date.now(),
           form: {
             category_id: this.gmCatalog.categories.length
@@ -364,17 +409,20 @@
             stock_on_hand: null,
             parent_product_id: "",
             collection_ids: [], shipping_option_ids: [],
-            shipping_option_extras: {}, images_text: "", delivery_content: ""
+            shipping_option_extras: {},
+            images: [], imageUrlInput: "", delivery_content: ""
           }
         };
       },
       gmEditProduct: async function (row) {
         var self = this;
+        self.gmDiscloseUnsavedUploads();
         self.gmCatalog.tab = "products";
         self.gmCatalog.bulkEditor.show = false;
         var d = await self.gmApi("GET", "/products/" + row.id);
         self.gmCatalog.editor = {
           show: true, saving: false, error: null, isNew: false,
+          uploadsUnsaved: false,
           previewErrors: {}, ogBust: Date.now(),
           form: {
             id: d.id,
@@ -405,9 +453,10 @@
               extras[option.shipping_option_id] = option.extra_cost_minor;
               return extras;
             }, {}),
-            images_text: (d.images || [])
-              .map(function (i) { return i.url; })
-              .join("\n"),
+            images: (d.images || []).map(function (img) {
+              return gmImageEntry(img.url);
+            }),
+            imageUrlInput: "",
             delivery_content: d.delivery_content || ""
           }
         };
@@ -458,18 +507,21 @@
         if (f.product_type === "variation" && f.parent_product_id) {
           body.parent_product_id = f.parent_product_id;
         }
-        var images = (f.images_text || "")
-          .split("\n")
-          .map(function (s) { return s.trim(); })
-          .filter(function (s) { return s.length; })
-          .map(function (u) { return { url: u }; });
-        if (images.length) body.images = images;
+        /* D-21/D-27: images key PRESENCE triggers the server's
+           delete+reinsert in list order — always send it. Omitted was
+           preserve, [] is clear-all, populated is ordered replace;
+           sort_order defaults to list index server-side. Pending or
+           failed upload entries are never sent as URLs. */
+        body.images = (f.images || [])
+          .filter(function (img) { return img && !img.pending && !img.error; })
+          .map(function (img) { return { url: img.url }; });
         try {
           if (ed.isNew) {
             await self.gmApi("POST", "/products", body);
           } else {
             await self.gmApi("PATCH", "/products/" + f.id, body);
           }
+          ed.uploadsUnsaved = false;
           ed.show = false;
           self.gmCatalog.notice = ed.isNew ? "Product created." : "Product saved.";
           await self.gmLoadCatalog();
@@ -477,6 +529,118 @@
           ed.error = self.gmProblemCopy(e.problem);
         }
         ed.saving = false;
+      },
+      /* --- product gallery (D-14…D-16, MEDIA-09/12/14) --------------- */
+      /* Picker files-chosen → sequential per-file upload. A pending
+         placeholder tile per file carries progress; success swaps in
+         the stored result.url (absolute https per D-26), rejection
+         marks the entry without touching siblings (MEDIA-12). */
+      gmGalleryFiles: async function (payload) {
+        var self = this;
+        var ed = self.gmCatalog.editor;
+        var f = ed.form;
+        var list = f.images || (f.images = []);
+        var files = (payload && payload.files) || [];
+        if (!files.length) return;
+        if (list.length + files.length > IMAGES_MAX) {
+          ed.error = "You can add up to 20 images per product.";
+          return;
+        }
+        ed.error = null;
+        for (var i = 0; i < files.length; i++) {
+          var file = files[i];
+          var entry = {
+            url: "", thumb: "",
+            kind: payload.backend === "blossom" ? "blossom" : "local",
+            pending: true, progress: 0, error: null,
+            name: file && file.name
+          };
+          list.push(entry);
+          try {
+            var res = await self.gmMediaUpload(
+              file, "catalog", payload.backend,
+              function (frac) { entry.progress = frac; }
+            );
+            var result = (res.results || [])[0] || {};
+            if (result.state === "stored") {
+              entry.url = result.url || "";
+              entry.thumb = result.url || "";
+              entry.kind =
+                result.backend === "blossom" ? "blossom" : "local";
+              entry.pending = false;
+              entry.progress = 1;
+              /* MEDIA-12: stored-but-unsaved files get disclosed if the
+                 editor closes without a save — never auto-deleted. */
+              ed.uploadsUnsaved = true;
+            } else {
+              entry.pending = false;
+              entry.error =
+                "The image could not be stored (" +
+                (result.reason || "unknown reason") +
+                ") — try a different file.";
+            }
+          } catch (e) {
+            entry.pending = false;
+            entry.error = self.gmProblemCopy(e.problem);
+          }
+        }
+      },
+      /* In-control pasted-URL add (D-16). Client-side mirror of
+         _valid_image_url: https:// or an owned /library/ or /images/
+         prefix — anything else errors plainly and never reaches the
+         API (T-07-03-01). */
+      gmGalleryAddUrl: function () {
+        var ed = this.gmCatalog.editor;
+        var f = ed.form;
+        var url = (f.imageUrlInput || "").trim();
+        if (!url) return;
+        if (url.indexOf("https://") !== 0 && !gmOwnedImagePath(url)) {
+          ed.error =
+            "Use an https:// image URL or an image from your media" +
+            " library (/library/infinitemarkets/…).";
+          return;
+        }
+        var list = f.images || (f.images = []);
+        if (list.length >= IMAGES_MAX) {
+          ed.error = "You can add up to 20 images per product.";
+          return;
+        }
+        list.push(gmImageEntry(url));
+        f.imageUrlInput = "";
+        ed.error = null;
+      },
+      gmGalleryMove: function (i, dir) {
+        var list = this.gmCatalog.editor.form.images || [];
+        var j = i + dir;
+        if (i < 0 || i >= list.length || j < 0 || j >= list.length) {
+          return;
+        }
+        list.splice(j, 0, list.splice(i, 1)[0]);
+      },
+      gmGalleryRemove: function (i) {
+        var list = this.gmCatalog.editor.form.images || [];
+        if (i < 0 || i >= list.length) return;
+        list.splice(i, 1);
+      },
+      /* Empties the list — the save then sends [] which is what
+         actually clears rows server-side (D-21). */
+      gmGalleryClearAll: function () {
+        this.gmCatalog.editor.form.images = [];
+      },
+      /* MEDIA-12: every path that closes or replaces the editor —
+         Cancel, bulk editor, new/edit product — discloses stored-but-
+         unreferenced uploads. Never auto-deletes (locked decision;
+         remote blobs can't be deleted anyway). */
+      gmDiscloseUnsavedUploads: function () {
+        var ed = this.gmCatalog.editor;
+        if (ed && ed.uploadsUnsaved) {
+          ed.uploadsUnsaved = false;
+          this.gmCatalog.notice = UNSAVED_UPLOADS_COPY;
+        }
+      },
+      gmCloseProductEditor: function () {
+        this.gmDiscloseUnsavedUploads();
+        this.gmCatalog.editor.show = false;
       },
       gmToggleVariants: function (id) {
         var list = this.gmCatalog.expandedProducts;
@@ -500,6 +664,7 @@
       },
       gmOpenBulkEditor: function () {
         if (!this.gmCatalog.selectedProducts.length) return;
+        this.gmDiscloseUnsavedUploads();
         this.gmCatalog.editor.show = false;
         this.gmCatalog.bulkEditor = {
           show: true, saving: false, error: null, action: null,
@@ -671,12 +836,14 @@
       gmSeoImage: function () {
         /* First image URL — the same source the public page's JSON-LD
            `image` uses, which is what Google renders as a thumbnail on
-           product results. */
-        var lines = (this.gmCatalog.editor.form.images_text || "")
-          .split("\n");
-        for (var i = 0; i < lines.length; i++) {
-          var u = lines[i].trim();
-          if (u) return u;
+           product results. Index 0 IS the Primary entry (D-15);
+           pending/failed upload placeholders are skipped. */
+        var images = this.gmCatalog.editor.form.images || [];
+        for (var i = 0; i < images.length; i++) {
+          var img = images[i];
+          if (img && !img.pending && !img.error && img.url) {
+            return img.url;
+          }
         }
         return "";
       },
