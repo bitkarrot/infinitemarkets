@@ -251,16 +251,69 @@ async def test_media_upload_profile_usage_requires_public_origin(
     assert ok.json()["uploaded"] == 1
 
 
+async def test_media_upload_backend_dispatch(runtime_env):
+    """06-03 dispatch: explicit ``local`` mirrors the absent-field default
+    and the response discloses which backend received the bytes;
+    ``blossom`` with no configured server -> 422 ``media-backend`` in
+    plain language with zero local bytes written (no silent failover to
+    local); a ``backend`` outside {local, blossom} -> 422."""
+    env = runtime_env
+    mid, csrf = await _merchant_id(env)
+
+    resp = await _upload(
+        env, csrf,
+        [("file", ("loc.png", _PNG + b"backend-local", "image/png"))],
+        data={"backend": "local"},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["backend"] == "local"
+    result = body["results"][0]
+    assert result["state"] == "stored"
+    assert result["backend"] == "local"
+    assert "server" not in result
+    sha = hashlib.sha256(_PNG + b"backend-local").hexdigest()
+    assert (_media_dir(mid) / f"{sha}.png").is_file()
+
+    before = _dir_names(mid)
+    resp = await _upload(
+        env, csrf,
+        [("file", ("rem.png", _PNG + b"backend-blossom", "image/png"))],
+        data={"backend": "blossom"},
+    )
+    assert resp.status_code == 422, resp.text
+    problem = resp.json()
+    assert "media-backend" in problem["type"]
+    assert "Blossom" in (problem["title"] + problem["detail"])
+    assert "local" in problem["detail"]
+    assert _dir_names(mid) == before
+
+    resp = await _upload(
+        env, csrf,
+        [("file", ("bad.png", _PNG + b"backend-bad", "image/png"))],
+        data={"backend": "s3"},
+    )
+    assert resp.status_code == 422, resp.text
+
+
 async def test_media_upload_rejects_unknown_fields_and_usage(runtime_env):
-    """Only file parts + ``usage`` are accepted: a ``backend`` field is
-    06-03's expansion and any other non-file part is a 422."""
+    """Only file parts + ``usage``/``backend`` are accepted: a ``backend``
+    value outside the allowlist and any other non-file part is a 422."""
     env = runtime_env
     mid, csrf = await _merchant_id(env)
 
     resp = await _upload(
         env, csrf,
         [("file", ("x.png", _PNG + b"x", "image/png"))],
-        data={"backend": "blossom"},
+        data={"backend": "bogus"},
+    )
+    assert resp.status_code == 422, resp.text
+
+    # any other non-file field is rejected
+    resp = await _upload(
+        env, csrf,
+        [("file", ("x.png", _PNG + b"x", "image/png"))],
+        data={"note": "hello"},
     )
     assert resp.status_code == 422, resp.text
 

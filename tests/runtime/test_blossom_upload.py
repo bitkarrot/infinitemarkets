@@ -27,7 +27,10 @@ import uuid
 
 import pytest
 
-pytestmark = [pytest.mark.runtime, pytest.mark.fast]
+# ``fast`` lives on the service-level tests individually: the route-level
+# dispatch tests at the bottom boot the real host (runtime_env) and can
+# never belong to the seconds-scale quick gate.
+pytestmark = pytest.mark.runtime
 
 SERVER_URL = "https://media.example.com"
 SERVER_HOST = "media.example.com"
@@ -236,6 +239,7 @@ def _tag_map(event) -> dict:
 # --- wire format + BUD-11 auth event (MEDIA-15) -------------------------------
 
 
+@pytest.mark.fast
 async def test_upload_put_wire_format_and_bud11_auth_event(
     keystore_env, monkeypatch, fake_blossom
 ):
@@ -276,6 +280,7 @@ async def test_upload_put_wire_format_and_bud11_auth_event(
     }
 
 
+@pytest.mark.fast
 async def test_upload_signs_fresh_event_per_call(
     keystore_env, monkeypatch, fake_blossom
 ):
@@ -317,6 +322,7 @@ async def test_upload_signs_fresh_event_per_call(
     assert xs == set(shas)
 
 
+@pytest.mark.fast
 async def test_upload_rejects_non_https_and_bad_ext(
     keystore_env, monkeypatch, fake_blossom
 ):
@@ -351,6 +357,7 @@ async def test_upload_rejects_non_https_and_bad_ext(
         "not-object",
     ],
 )
+@pytest.mark.fast
 async def test_descriptor_poison_rejected(
     keystore_env, monkeypatch, fake_blossom, mutate
 ):
@@ -388,6 +395,7 @@ async def test_descriptor_poison_rejected(
     assert len(fake_blossom.records) == 1
 
 
+@pytest.mark.fast
 async def test_descriptor_201_accepted(
     keystore_env, monkeypatch, fake_blossom
 ):
@@ -406,6 +414,7 @@ async def test_descriptor_201_accepted(
     assert result["url"] == f"{SERVER_URL}/{sha}.png"
 
 
+@pytest.mark.fast
 async def test_descriptor_body_bound_rejected(
     keystore_env, monkeypatch, fake_blossom
 ):
@@ -437,6 +446,7 @@ async def test_descriptor_body_bound_rejected(
 # --- egress + redirect discipline (MEDIA-16) ----------------------------------
 
 
+@pytest.mark.fast
 @pytest.mark.parametrize("status", [307, 308, 302])
 async def test_redirect_rejected_single_request(
     keystore_env, monkeypatch, fake_blossom, status
@@ -462,6 +472,7 @@ async def test_redirect_rejected_single_request(
     assert len(fake_blossom.records) == 1
 
 
+@pytest.mark.fast
 async def test_egress_resolver_consulted_every_call(
     keystore_env, monkeypatch, fake_blossom
 ):
@@ -484,6 +495,7 @@ async def test_egress_resolver_consulted_every_call(
     assert calls == [(SERVER_HOST, 443), (SERVER_HOST, 443)]
 
 
+@pytest.mark.fast
 async def test_egress_rejection_precedes_any_connection(
     keystore_env, monkeypatch, fake_blossom
 ):
@@ -518,6 +530,7 @@ async def test_egress_rejection_precedes_any_connection(
 # --- D-13 concurrency cap + result shape (MEDIA-04) ---------------------------
 
 
+@pytest.mark.fast
 async def test_in_flight_put_cap_per_merchant(
     keystore_env, monkeypatch, fake_blossom
 ):
@@ -556,6 +569,7 @@ async def test_in_flight_put_cap_per_merchant(
     assert fake_blossom.max_in_flight >= 2
 
 
+@pytest.mark.fast
 async def test_result_dict_carries_no_key_or_token(
     keystore_env, monkeypatch, fake_blossom
 ):
@@ -575,3 +589,249 @@ async def test_result_dict_carries_no_key_or_token(
     assert token not in blob
     assert "Nostr " not in blob
     assert "nsec" not in blob
+
+
+# --- route-level dispatch: POST /media/upload backend=blossom (06-03) --------
+# These tests exercise the real HTTP route inside a host boot (runtime_env)
+# and therefore deliberately carry NO fast mark — the module's keystore-level
+# tests above remain the fast-gate coverage.
+#
+# Locked dispatch contract under test:
+#   - backend=blossom PUTs each file ONLY to get_blossom_servers()[0]
+#   - a remote failure is a typed problem naming the server — zero local
+#     bytes, and servers[1] is never contacted (no failover, no dual-write)
+#   - blossom bytes never count toward the 400 MB local quota (D-06)
+#   - the response discloses backend+server and carries no signing
+#     material or token (MEDIA-04)
+
+ROUTE_API = "/infinitemarkets/api/v1"
+SECOND_URL = "https://second.example.com"
+SECOND_HOST = "second.example.com"
+
+
+@pytest.fixture
+def fake_blossom_factory():
+    made: list[_FakeBlossom] = []
+
+    def _make() -> _FakeBlossom:
+        fake = _FakeBlossom()
+        made.append(fake)
+        return fake
+
+    try:
+        yield _make
+    finally:
+        for fake in made:
+            fake.close()
+
+
+def _route_headers(env: dict, csrf: str | None = None) -> dict:
+    cookie = f"cookie_access_token={env['token']}"
+    if csrf:
+        cookie += f"; gm_csrf={csrf}"
+    h = {"Cookie": cookie, "Origin": "https://shop.example"}
+    if csrf:
+        h["X-CSRF-Token"] = csrf
+    return h
+
+
+async def _route_merchant(env: dict) -> tuple[str, str]:
+    client = env["client"]
+    existing = await client.get(
+        f"{ROUTE_API}/merchants/current", headers=_route_headers(env)
+    )
+    if existing.status_code == 200:
+        return existing.json()["id"], client.cookies.get("gm_csrf") or ""
+    resp = await client.post(
+        f"{ROUTE_API}/merchants",
+        json={"wallet_id": env["wallet"].id},
+        headers=_route_headers(env, client.cookies.get("gm_csrf") or ""),
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()["id"], client.cookies.get("gm_csrf") or ""
+
+
+async def _set_route_servers(env: dict, mid: str, csrf: str,
+                             servers: list[str]):
+    resp = await env["client"].patch(
+        f"{ROUTE_API}/merchants/{mid}",
+        json={"blossom_servers": servers},
+        headers=_route_headers(env, csrf),
+    )
+    assert resp.status_code == 200, resp.text
+
+
+def _route_media_names(merchant_id: str) -> set:
+    from infinitemarkets.services import migration_media
+
+    media_dir = migration_media._media_dir(merchant_id)
+    if not media_dir.is_dir():
+        return set()
+    return {p.name for p in media_dir.iterdir() if p.is_file()}
+
+
+def _wire_route_fakes(blossom_mod, monkeypatch, fakes_by_host: dict):
+    """Point the egress/connection seams at per-host loopback fakes —
+    recording which configured host the upload actually dialed."""
+
+    async def resolver(host, port=443):
+        assert host in fakes_by_host, f"unexpected egress target {host}"
+        return [ipaddress.ip_address("127.0.0.1")]
+
+    monkeypatch.setattr(
+        blossom_mod, "resolve_and_check_egress", resolver
+    )
+    monkeypatch.setattr(
+        blossom_mod,
+        "_open_connection",
+        lambda host, address, port=443: http.client.HTTPConnection(
+            "127.0.0.1", fakes_by_host[host].port
+        ),
+    )
+
+
+async def _route_upload(env: dict, csrf: str, data: dict | None = None):
+    return await env["client"].post(
+        f"{ROUTE_API}/media/upload",
+        files=[("file", ("hero.png", PNG, "image/png"))],
+        data=data or {},
+        headers=_route_headers(env, csrf),
+    )
+
+
+async def test_route_upload_blossom_targets_first_configured_server(
+    runtime_env, monkeypatch, fake_blossom, fake_blossom_factory
+):
+    """backend=blossom PUTs each file ONLY to get_blossom_servers()[0]:
+    bytes + a verifiable BUD-11 event arrive at the first server, the
+    second configured server records zero requests, nothing lands in the
+    local namespace, and the response names the backend/server plus the
+    validated descriptor url."""
+    blossom = _blossom()
+    env = runtime_env
+    mid, csrf = await _route_merchant(env)
+    second = fake_blossom_factory()
+    await _set_route_servers(env, mid, csrf, [SERVER_URL, SECOND_URL])
+
+    sha = hashlib.sha256(PNG).hexdigest()
+    fake_blossom.script = _ok(_descriptor(sha, len(PNG)))
+    _wire_route_fakes(
+        blossom, monkeypatch,
+        {SERVER_HOST: fake_blossom, SECOND_HOST: second},
+    )
+
+    before = _route_media_names(mid)
+    resp = await _route_upload(env, csrf, data={"backend": "blossom"})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["backend"] == "blossom"
+    assert body["server"] == SERVER_URL
+    assert body["uploaded"] == 1
+    result = body["results"][0]
+    assert result["state"] == "stored"
+    assert result["backend"] == "blossom"
+    assert result["server"] == SERVER_URL
+    assert result["url"] == f"{SERVER_URL}/{sha}.png"
+    assert result["sha256"] == sha
+    assert "path" not in result
+
+    # servers[0] saw exactly one PUT with the real wire format; the second
+    # configured server was never contacted (no failover, no dual-write)
+    assert len(fake_blossom.records) == 1
+    method, path, headers, sent = fake_blossom.records[0]
+    assert (method, path, sent) == ("PUT", "/upload", PNG)
+    assert headers.get("X-SHA-256") == sha
+    event = _decode_auth(fake_blossom.records[0])
+    assert event.kind().as_u16() == 24242
+    assert _tag_map(event)["server"] == SERVER_HOST
+    assert second.records == []
+    assert _route_media_names(mid) == before
+
+
+@pytest.mark.parametrize("failure", ["http-500", "bad-descriptor"])
+async def test_route_upload_blossom_failure_is_explicit(
+    runtime_env, monkeypatch, fake_blossom, fake_blossom_factory, failure
+):
+    """A remote failure returns a typed problem NAMING the failed server,
+    writes zero bytes to the local namespace, and never touches
+    servers[1] — the merchant retries to local explicitly (locked)."""
+    blossom = _blossom()
+    env = runtime_env
+    mid, csrf = await _route_merchant(env)
+    second = fake_blossom_factory()
+    await _set_route_servers(env, mid, csrf, [SERVER_URL, SECOND_URL])
+
+    if failure == "http-500":
+        fake_blossom.script = lambda record: (500, {}, b"boom")
+    else:
+        fake_blossom.script = _ok(
+            _descriptor(hashlib.sha256(b"other").hexdigest(), len(PNG))
+        )
+    _wire_route_fakes(
+        blossom, monkeypatch,
+        {SERVER_HOST: fake_blossom, SECOND_HOST: second},
+    )
+
+    before = _route_media_names(mid)
+    resp = await _route_upload(env, csrf, data={"backend": "blossom"})
+    assert resp.status_code == 422, resp.text
+    problem = resp.json()
+    assert "media-remote" in problem["type"]
+    assert SERVER_URL in problem["detail"]  # names the failed server
+    assert _route_media_names(mid) == before
+    assert second.records == []
+
+
+async def test_route_upload_blossom_response_carries_no_signing_material(
+    runtime_env, monkeypatch, fake_blossom
+):
+    """MEDIA-04 at the route boundary: the response discloses backend +
+    server for editor copy but carries no BUD-11 token, no event JSON,
+    and no key material."""
+    blossom = _blossom()
+    env = runtime_env
+    mid, csrf = await _route_merchant(env)
+    await _set_route_servers(env, mid, csrf, [SERVER_URL])
+    sha = hashlib.sha256(PNG).hexdigest()
+    fake_blossom.script = _ok(_descriptor(sha, len(PNG)))
+    _wire_route_fakes(blossom, monkeypatch, {SERVER_HOST: fake_blossom})
+
+    resp = await _route_upload(env, csrf, data={"backend": "blossom"})
+    assert resp.status_code == 200, resp.text
+    result = resp.json()["results"][0]
+    assert set(result) <= {
+        "file", "state", "backend", "server",
+        "url", "sha256", "bytes", "type",
+    }
+    blob = resp.text
+    token = fake_blossom.records[0][2]["Authorization"]
+    assert token not in blob
+    assert "Nostr " not in blob
+    assert "nsec" not in blob
+
+
+async def test_route_upload_blossom_bytes_never_count_toward_local_quota(
+    runtime_env, monkeypatch, fake_blossom
+):
+    """D-06: the 400 MB quota gates the local branch only — a merchant
+    over quota still uploads via blossom; remote storage limits are the
+    Blossom operator's concern."""
+    from infinitemarkets.services import migration_media
+
+    blossom = _blossom()
+    env = runtime_env
+    mid, csrf = await _route_merchant(env)
+    await _set_route_servers(env, mid, csrf, [SERVER_URL])
+    sha = hashlib.sha256(PNG).hexdigest()
+    fake_blossom.script = _ok(_descriptor(sha, len(PNG)))
+    _wire_route_fakes(blossom, monkeypatch, {SERVER_HOST: fake_blossom})
+    monkeypatch.setattr(migration_media, "MAX_MERCHANT_BYTES", 1)
+
+    # the same bytes over the local branch hit the quota
+    local = await _route_upload(env, csrf)
+    assert local.status_code == 409, local.text
+    assert "media-quota" in local.json()["type"]
+
+    resp = await _route_upload(env, csrf, data={"backend": "blossom"})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["backend"] == "blossom"
