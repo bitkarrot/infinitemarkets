@@ -455,6 +455,67 @@ async def test_unused_listing_and_delete_lifecycle(runtime_env):
     assert resp.json()["deleted"] is False
 
 
+async def test_unused_listing_reports_mtime_and_quota(runtime_env):
+    """D-23: every ``files[]`` entry carries ``mtime`` (epoch seconds from
+    ``stat().st_mtime``) and the top-level response carries
+    ``used_bytes``/``quota_bytes`` so the Settings -> Media block can
+    render a date column plus a quota bar. ``quota_bytes`` is the 400 MB
+    namespace cap; ``used_bytes`` counts every byte under the namespace —
+    REFERENCED files included (D-01 ``_dir_bytes`` semantics), so an
+    orphan-only number would be the wrong answer."""
+    from infinitemarkets.services import migration_media
+
+    env = runtime_env
+    mid, csrf = await _merchant_id(env)
+
+    orphan_payload = _PNG + b"mtime-orphan"
+    kept_payload = _PNG + b"mtime-kept"
+    resp = await _upload(env, csrf, [
+        ("file", ("mtime-orphan.png", orphan_payload, "image/png")),
+        ("file", ("mtime-kept.png", kept_payload, "image/png")),
+    ])
+    assert resp.status_code == 200, resp.text
+    results = {r["file"]: r for r in resp.json()["results"]}
+    orphan_name = results["mtime-orphan.png"]["path"].rsplit("/", 1)[1]
+    kept_url = results["mtime-kept.png"]["url"]
+
+    # referencing kept.png leaves the orphan as the only listing entry
+    # while its bytes still sit inside the namespace
+    product = await _product(env, csrf, "media-quota")
+    patched = await env["client"].patch(
+        f"{API}/products/{product['id']}",
+        json={"images": [{"url": kept_url}]},
+        headers=_headers(env, csrf),
+    )
+    assert patched.status_code == 200, patched.text
+
+    resp = await env["client"].get(
+        f"{API}/media/unused", headers=_headers(env)
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+
+    # quota summary: the 400 MB cap plus the full namespace total — the
+    # referenced kept file still counts toward used_bytes
+    assert body["quota_bytes"] == migration_media.MAX_MERCHANT_BYTES
+    on_disk = sum(
+        p.stat().st_size
+        for p in _media_dir(mid).glob("*")
+        if p.is_file()
+    )
+    assert body["used_bytes"] == on_disk
+    assert body["used_bytes"] >= len(orphan_payload) + len(kept_payload)
+
+    # every entry carries a renderable mtime (epoch seconds > 0)
+    for f in body["files"]:
+        assert isinstance(f["mtime"], (int, float))
+        assert f["mtime"] > 0
+    entry = next(f for f in body["files"] if f["name"] == orphan_name)
+    assert entry["mtime"] == (
+        _media_dir(mid) / orphan_name
+    ).stat().st_mtime
+
+
 async def test_unused_delete_rejects_traversal_and_bad_names(runtime_env):
     """Names failing [0-9a-f]{64}.(png|jpg|webp) -> 422 before any
     filesystem touch — traversal is impossible by construction."""
