@@ -75,9 +75,35 @@ MEDIA-12, MEDIA-13, MEDIA-14.
   with a plain-language prompt when `public_base_url` is loopback/private
   (D-05/D-08 — Phase 6 backend gate; the UI must surface it cleanly).
 
+### Post-Research Decision Locks (owner-delegated defaults, confirmed 2026-10-16)
+- **D-23:** Extend `GET /media/unused`'s response with `mtime` (date) and
+  `used_bytes`/`quota_bytes` rather than adding routes — required by
+  D-18's date + quota display; response-shape extension avoids MEDIA-18
+  route-parity churn.
+- **D-24:** Reusable control = a `gm-media-picker` Vue component registered
+  via `window.app.component({template})` in a new `admin_media.js` module
+  (pinned host ships `vue.global.prod.js` with the runtime compiler —
+  verified). Identical shape at all 7 field sites.
+- **D-25:** Uploads use XHR (not fetch) — MEDIA-12 needs upload-progress
+  events fetch can't report. Dedicated `gmMediaUpload` helper modeled on
+  `admin_migration.js`; FormData fields exactly `usage`, `backend`, `file`;
+  CSRF via `X-CSRF-Token` echo of the `gm_csrf` cookie.
+- **D-26:** Field-value matrix: profile avatar/banner + product gallery
+  store `result.url` (absolute https — validators + NIP-99 verbatim emit);
+  Appearance fields store `result.path` (same-origin `/library/...`,
+  always passes theme media validation). Blossom results have no `path` —
+  branch on `result.backend`.
+- **D-27:** Gallery save always sends `body.images` — omitted=preserve,
+  `[]=clear, populated=ordered replace` (D-21); remove the
+  `if (images.length)` guard.
+- **D-28:** No Idempotency-Key header (matches migration precedent; the
+  backend accepts but doesn't require it).
+- **D-29:** Keep existing URL q-inputs for pasted URLs; pickers render
+  adjacent. `test_admin_ui.py` greps served markup verbatim and
+  `test_settings_buttons_are_solid` forbids `outline` q-btn in settings —
+  assertion updates land in the same commit as markup changes.
+
 ### Claude's Discretion
-- Component organization (shared Vue component vs mixin-style factory —
-  codebase is vanilla-JS + Quasar templates, no build step).
 - Thumbnail generation for pasted URLs (load the remote image directly —
   do NOT proxy through backend; SSRF rule stands).
 - "Primary" representation — purely visual badge on item 0, no separate
