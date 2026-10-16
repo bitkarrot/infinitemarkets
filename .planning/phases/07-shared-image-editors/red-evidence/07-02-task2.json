@@ -1,0 +1,9 @@
+{
+  "command": "uv run pytest tests/runtime/test_admin_ui.py -q -k \"media_picker or single_image_ux or shell_document or settings_buttons\"",
+  "exitCode": 1,
+  "targetTest": "test_admin_media_single_image_ux",
+  "targetFile": "tests/runtime/test_admin_ui.py",
+  "expected": "hero editor carries a thumbnail + label=\"Remove image\" clear control, a 'Save to LNbits instead' retry bound to gmMedia.retryLocal, admin_settings.js exposes gmMediaClearField/gmMediaRetryLocal, and admin_app.js ERROR_COPY covers media-quota/media-backend/media-origin/media-remote",
+  "actual": "test_admin_media_single_image_ux: assert 'label=\"Remove image\"' in hero — hero editor has no thumbnail/remove/retry controls yet (feature absent)",
+  "output": "_______________________ test_admin_media_single_image_ux _______________________\n\n        hero = html.split('data-gm=\"hero-editor\"', 1)[1]\n        hero = hero.split(\"</q-expansion-item>\", 1)[0]\n        # Populated value -> fixed thumbnail + labeled remove control.\n        assert \"gmSettings.theme.hero.image_url\" in hero\n>       assert 'label=\"Remove image\"' in hero\nE       assert 'label=\"Remove image\"' in '>\\n                  <div class=\"q-pa-sm\">\\n                    <div class=\"text-caption q-mb-sm\">\\n                 ...link\"></q-input>\\n                      </div>\\n                    </div>\\n                  </div>\\n                '\n\ntests/runtime/test_admin_ui.py:127: AssertionError\n=========================== short test summary info ============================\nFAILED tests/runtime/test_admin_ui.py::test_admin_media_single_image_ux\n1 failed, 3 passed, 26 deselected in 2.40s\n\n# faithful TAP transcription of pytest FAILED lines:\n# tests 4\n# pass 3\n# fail 1\nnot ok 1 - test_admin_media_single_image_ux\n"
+}

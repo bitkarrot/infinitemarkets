@@ -115,6 +115,32 @@ async def test_admin_media_picker(runtime_env):
     assert "Save to Blossom · " in js
 
 
+async def test_admin_media_single_image_ux(runtime_env):
+    """MEDIA-03/10 — the hero single-image UX is the reference pattern:
+    thumbnail + text-labeled Remove image on a populated value, and an
+    explicit 'Save to LNbits instead' retry after a Blossom failure."""
+    html = (await runtime_env["client"].get("/infinitemarkets/")).text
+    hero = html.split('data-gm="hero-editor"', 1)[1]
+    hero = hero.split("</q-expansion-item>", 1)[0]
+    # Populated value -> fixed thumbnail + labeled remove control.
+    assert "gmSettings.theme.hero.image_url" in hero
+    assert 'label="Remove image"' in hero
+    assert "gmMediaClearField" in hero
+    # Blossom failure -> explicit local-retry control (no silent failover).
+    assert "Save to LNbits instead" in hero
+    assert "gmMedia.retryLocal" in hero
+    js = (
+        await runtime_env["client"].get(f"{JS}/admin_settings.js")
+    ).text
+    assert "gmMediaClearField" in js
+    assert "gmMediaRetryLocal" in js
+    assert 'backend: "local"' in js or 'backend:"local"' in js
+    app_js = (await runtime_env["client"].get(f"{JS}/admin_app.js")).text
+    for code in ("media-quota", "media-backend", "media-origin",
+                 "media-remote"):
+        assert f'"{code}"' in app_js, code
+
+
 async def test_product_editor_shipping_options(runtime_env):
     html = (await runtime_env["client"].get("/infinitemarkets/")).text
     assert 'v-model="gmCatalog.editor.form.shipping_option_ids"' in html
