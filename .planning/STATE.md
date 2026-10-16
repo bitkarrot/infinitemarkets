@@ -5,16 +5,16 @@ milestone_name: Media uploads and Blossom support
 current_phase: 6
 current_phase_name: Secure Media Storage
 status: planning
-stopped_at: Completed 06-01-PLAN.md
-last_updated: "2026-10-16T07:15:23.102Z"
+stopped_at: Completed 06-03-PLAN.md
+last_updated: "2026-10-16T07:26:27.843Z"
 last_activity: 2026-10-16
 last_activity_desc: v1.1 roadmap and requirement traceability drafted
-state_head: c975e4f7d4fc86ebfee2bd7aad0cba62175c00d9
+state_head: cb6db61c1ce0dd2d0bf1f849583d15c2290ae919
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 3
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -69,6 +69,7 @@ Last activity: 2026-10-16 — v1.1 roadmap and requirement traceability drafted
 | Phase 02 P01 | multi-session | 3 tasks | 18 created + 4 modified |
 | Phase 06 P02 | 10min | 3 tasks | 4 files |
 | Phase 06 P01 | 12min | 3 tasks | 8 files |
+| Phase 06 P03 | 10min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -108,6 +109,8 @@ Decisions are logged in PROJECT.md and the normative specification.
 - [Phase 6]: 06-02: Blossom upload uses canonical MIME map (jpg->image/jpeg); set_blossom_servers persists submission order (first=primary), pre-existing rows stay alphabetical; per-merchant upload semaphore is process-local (D-13)
 - [Phase 6]: 06-01: media.py reuses migration_media internals (one namespace/quota); general uploads never write the sidecar; absolute public_base_url URLs (D-07)
 - [Phase 6]: 06-01: spec 5.6 Admin-media added; error model renumbered 5.7; spec image cap corrected to 20
+- [Phase 6]: 06-03: profile-origin gate is local-branch-only — usage=profile+backend=blossom allowed on private public_base_url (remote https descriptor is the recommended alternative)
+- [Phase 6]: 06-03: remote blossom failure is request-level typed problem naming the server; earlier PUT blobs are honest orphans per D-01
 
 ### Pending Todos
 
@@ -163,6 +166,6 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 ## Session Continuity
 
-Last session: 2026-10-16T07:15:23.088Z
-Stopped at: Completed 06-01-PLAN.md
+Last session: 2026-10-16T07:26:27.828Z
+Stopped at: Completed 06-03-PLAN.md
 Resume file: None
