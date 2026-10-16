@@ -228,21 +228,25 @@ async def test_identity_and_handler_events_have_no_labels():
 
 
 async def test_merchant_profile_absolutizes_local_image_paths():
-    """MEDIA-07 emit side (D-04/D-07): a stored relative
-    ``/images/infinitemarkets/`` picture/banner publishes as
-    ``public_base_url`` + path in kind-0 content; absolute https values
-    pass through byte-identical; unrelated keys are untouched; an empty
-    base never concatenates."""
+    """MEDIA-07 emit side (D-04/D-07, 06-04 dual-prefix): a stored
+    ``/library/infinitemarkets/`` picture/banner publishes as
+    ``public_base_url`` + path in kind-0 content, and a legacy
+    ``/images/infinitemarkets/`` value is normalized to ``/library/``
+    first — nothing dead reaches relays even if m019 is bypassed.
+    Absolute https values pass through byte-identical; unrelated keys
+    are untouched; an empty base never concatenates (the normalized
+    relative form is emitted)."""
     events = _events()
     ns = "ab" * 12
-    pic_rel = f"/images/infinitemarkets/{ns}/{'cd' * 32}.png"
-    ban_rel = f"/images/infinitemarkets/{ns}/{'ef' * 32}.webp"
+    pic_legacy = f"/images/infinitemarkets/{ns}/{'cd' * 32}.png"
+    pic_lib = f"/library/infinitemarkets/{ns}/{'cd' * 32}.png"
+    ban_lib = f"/library/infinitemarkets/{ns}/{'ef' * 32}.webp"
     merchant = {
         "display_name": "shop",
         "profile_json": json.dumps({
             "about": "Handmade goods",
-            "picture": pic_rel,
-            "banner": ban_rel,
+            "picture": pic_legacy,
+            "banner": ban_lib,
         }),
         "recommended_app_d": "infinitemarkets",
     }
@@ -252,8 +256,8 @@ async def test_merchant_profile_absolutizes_local_image_paths():
     )
     assert ev["kind"] == 0
     content = json.loads(ev["content"])
-    assert content["picture"] == f"https://shop.example{pic_rel}"
-    assert content["banner"] == f"https://shop.example{ban_rel}"
+    assert content["picture"] == f"https://shop.example{pic_lib}"
+    assert content["banner"] == f"https://shop.example{ban_lib}"
     assert content["about"] == "Handmade goods"
     assert not any(t[0] in ("L", "l") for t in ev["tags"])
 
@@ -273,13 +277,13 @@ async def test_merchant_profile_absolutizes_local_image_paths():
     assert content["banner"] == "https://cdn.example/header.png"
     assert content["website"] == f"/images/infinitemarkets/{ns}/x.png"
 
-    # empty base: the relative value is emitted unchanged — the builder
-    # must never produce a broken concatenation
-    merchant["profile_json"] = json.dumps({"picture": pic_rel})
+    # empty base: never a broken concatenation — the legacy value is
+    # normalized onto the live mount and emitted relative
+    merchant["profile_json"] = json.dumps({"picture": pic_legacy})
     content = json.loads(
         _profile_event(events, merchant, public_base_url="")["content"]
     )
-    assert content["picture"] == pic_rel
+    assert content["picture"] == pic_lib
 
 
 async def test_tombstone_descriptor():

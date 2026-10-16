@@ -273,12 +273,16 @@ def merchant_profile_event(
     """kind 0 — section 6.4. `manual` payment preference only; no
     ecash/lud16 advertising in v1. No NIP-32 labels on identity.
 
-    MEDIA-07 emit side (D-04/D-07): a stored relative
-    ``/images/infinitemarkets/`` picture/banner is absolutized with the
+    MEDIA-07 emit side (D-04/D-07, 06-04 dual-prefix): a stored relative
+    ``/library/infinitemarkets/`` picture/banner is absolutized with the
     operator-configured ``public_base_url`` at publish time so relays
-    receive a fetchable https URL. Already-absolute values pass through
+    receive a fetchable https URL; a legacy ``/images/infinitemarkets/``
+    value is normalized onto the live mount first — nothing dead reaches
+    relays even if m019 is bypassed. Already-absolute values pass through
     byte-identical; an empty base never concatenates (defensive —
     ``_validate_profile`` requires https anyway)."""
+    from . import migration_media
+
     profile = json.loads(merchant["profile_json"]) if merchant.get(
         "profile_json"
     ) else {}
@@ -286,9 +290,16 @@ def merchant_profile_event(
     content.update(profile)
     for key in ("picture", "banner"):
         value = content.get(key)
+        if not isinstance(value, str):
+            continue
+        if value.startswith(migration_media.LEGACY_MEDIA_URL_PREFIX):
+            value = (
+                migration_media.MEDIA_URL_PREFIX
+                + value[len(migration_media.LEGACY_MEDIA_URL_PREFIX):]
+            )
+            content[key] = value
         if (
-            isinstance(value, str)
-            and value.startswith("/images/infinitemarkets/")
+            value.startswith(migration_media.MEDIA_URL_PREFIX)
             and public_base_url
         ):
             content[key] = public_base_url + value

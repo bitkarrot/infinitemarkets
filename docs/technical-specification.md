@@ -814,7 +814,8 @@ DELETE /media/unused/{name}             explicit local deletion of an unreferenc
 400 MB per-merchant local quota that counts every byte already stored under the
 merchant namespace (including uploaded-but-unsaved leftovers). Stored names are
 `<sha256>.<ext>` — retries and duplicates are idempotent. Each result carries a
-relative `path` (`/images/infinitemarkets/<ns>/<name>`) and an absolute `url`
+relative `path` (`/library/infinitemarkets/<ns>/<name>` — the host mounts the
+data-folder `images` directory at `/library`) and an absolute `url`
 built from `INFINITEMARKETS_PUBLIC_BASE_URL` (never request Host headers). The
 optional `usage` field is `catalog|profile|appearance` (default `catalog`);
 `usage=profile` on a non-public base URL host (loopback/private/`.local`)
@@ -1802,7 +1803,7 @@ matches a manifest entry whose URL already belongs to one of the merchant's
 products, and the bytes sniff as JPEG/PNG/WebP. Verified files are stored
 content-addressed under the host data folder `images/infinitemarkets/<hmac merchant
 namespace>/<sha256>.<ext>` (outside the reinstallable extension package, served via
-the host's `/images` mount) with a sidecar `manifest.json` mapping. Per-file limit
+the host's `/library` mount) with a sidecar `manifest.json` mapping. Per-file limit
 25 MB, merchant aggregate 400 MB. `POST /api/v1/migration/media/relink` swaps owned
 `product_images.url` values to the verified local paths in one transaction;
 unverified URLs keep their original reference.
@@ -1863,7 +1864,7 @@ light presets emit the dark variant for `data-scheme="dark"` and
 | items per order | ≤ 64; qty per item ≤ 10,000 and merchant-configurable lower cap |
 | computed amount | checked signed 64-bit; > LNbits incoming-payment maximum rejected |
 | title/summary/description | ≤ 200 / 500 / 64 KB |
-| images per product | ≤ 20; URL scheme `https` only; no server-side fetch |
+| images per product | ≤ 20; `https` URLs or an owned `/library/infinitemarkets/` (legacy `/images/infinitemarkets/`) local path; no server-side fetch |
 | media upload | ≤ 16 files per request, ≤ 25 MB per file, 400 MB/merchant local quota; png/jpg/webp only |
 | checkout POST | 10/min/IP + 100/hour/IP |
 | open (unpaid) web orders per IP | ≤ 10 concurrent |
