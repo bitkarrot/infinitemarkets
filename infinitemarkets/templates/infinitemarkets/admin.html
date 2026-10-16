@@ -573,32 +573,6 @@
                 <q-input v-model="gmCatalog.editor.form.description_md" dense
                          outlined type="textarea" class="gm-editor-wide"
                          label="Description (markdown)"></q-input>
-                <q-separator class="gm-editor-wide"></q-separator>
-                <div class="gm-editor-wide text-subtitle2">Search engine listing</div>
-                <q-input v-model="gmCatalog.editor.form.meta_title" dense outlined
-                         class="gm-editor-wide" label="SEO title (optional)"
-                         hint="Defaults to product title. Max 70 characters."
-                         counter :maxlength="70"></q-input>
-                <q-input v-model="gmCatalog.editor.form.meta_description" dense
-                         outlined type="textarea" class="gm-editor-wide"
-                         label="SEO description (optional)" autogrow
-                         hint="Defaults to summary or description. Max 160 characters."
-                         counter :maxlength="160"></q-input>
-                <div class="gm-editor-wide gm-seo-preview">
-                  <div class="text-caption text-grey-7">Search preview</div>
-                  <div class="text-primary text-body2" style="font-weight: 500;">
-                    {{ gmBrandName() ? gmBrandName() + ' · ' : '' }}{{ gmCatalog.editor.form.meta_title || gmCatalog.editor.form.title }}
-                  </div>
-                  <div class="text-caption" style="color: #006621;">
-                    {{ gmOrigin() }}/infinitemarkets/p/{{ gm.merchant.pubkey }}/{{ gmCatalog.editor.form.d_tag }}
-                  </div>
-                  <div class="text-body2 text-grey-8">
-                    {{ gmSerpText(gmCatalog.editor.form.meta_description || gmCatalog.editor.form.summary || gmCatalog.editor.form.description_md) }}
-                  </div>
-                  <div class="text-caption text-grey-8">
-                    {{ gmSerpPrice(gmCatalog.editor.form.price_major, gmCatalog.editor.form.currency, gmCatalog.editor.form.currency_decimals) }}
-                  </div>
-                </div>
                 <q-select v-model="gmCatalog.editor.form.product_type" dense
                           outlined label="Type"
                           :options="gmCatalog.productTypes"></q-select>
@@ -646,6 +620,53 @@
                          type="textarea" class="gm-editor-wide"
                          label="Image URLs (one per line)"
                          :hint="gmCatalog.imageDisclosure"></q-input>
+                <q-separator class="gm-editor-wide"></q-separator>
+                <div class="gm-editor-wide text-subtitle2">Search engine listing</div>
+                <q-input v-model="gmCatalog.editor.form.meta_title" dense outlined
+                         class="gm-editor-wide" label="SEO title (optional)"
+                         hint="Defaults to product title. Max 70 characters."
+                         counter :maxlength="70"></q-input>
+                <q-input v-model="gmCatalog.editor.form.meta_description" dense
+                         outlined type="textarea" class="gm-editor-wide"
+                         label="SEO description (optional)" autogrow
+                         hint="Defaults to summary or description. Max 160 characters."
+                         counter :maxlength="160"></q-input>
+                <div class="gm-editor-wide gm-seo-preview">
+                  <div class="gm-seo-row">
+                    <div class="gm-seo-text">
+                      <div class="gm-seo-label">Search preview</div>
+                      <div class="gm-seo-title">
+                        {{ gmBrandName() ? gmBrandName() + ' · ' : '' }}{{ gmCatalog.editor.form.meta_title || gmCatalog.editor.form.title }}
+                      </div>
+                      <div class="gm-seo-url">
+                        {{ gmOrigin() }}/infinitemarkets/p/{{ gm.merchant.pubkey }}/{{ gmCatalog.editor.form.d_tag }}
+                      </div>
+                      <div class="gm-seo-desc">
+                        {{ gmSerpText(gmCatalog.editor.form.meta_description || gmCatalog.editor.form.summary || gmCatalog.editor.form.description_md) }}
+                      </div>
+                      <div class="gm-seo-price">
+                        {{ gmSerpPrice(gmCatalog.editor.form.price_major, gmCatalog.editor.form.currency, gmCatalog.editor.form.currency_decimals) }}
+                      </div>
+                    </div>
+                    <img v-if="gmSeoImage() && !gmPreviewFailed(gmSeoImage())"
+                         class="gm-seo-thumb" :src="gmSeoImage()"
+                         @error="gmNotePreviewError(gmSeoImage())" alt="">
+                  </div>
+                </div>
+                <div class="gm-editor-wide">
+                  <div class="gm-share-label text-caption">
+                    Share preview — generated og:image card, 1200&times;630
+                  </div>
+                  <div class="gm-share-preview">
+                    <img v-if="gmProductOgUrl() && !gmPreviewFailed(gmProductOgUrl())"
+                         :src="gmProductOgUrl()"
+                         @error="gmNotePreviewError(gmProductOgUrl())"
+                         alt="Branded share card preview">
+                    <div v-else class="gm-share-empty">
+                      Generated once the product is published.
+                    </div>
+                  </div>
+                </div>
                 <q-banner v-if="gmCatalog.editor.error"
                           class="bg-negative text-white gm-editor-wide">
                   {{ gmCatalog.editor.error }}
@@ -844,6 +865,11 @@
                   <template v-slot:body="props">
                     <q-tr :props="props">
                       <q-td key="name" :props="props" data-col="name">
+                        <q-btn flat dense round size="sm"
+                               :icon="gmCategoryExpanded(props.row.id) ? 'expand_less' : 'expand_more'"
+                               :aria-label="(gmCategoryExpanded(props.row.id) ? 'Hide' : 'Show') + ' products in ' + (props.row.name || props.row.id)"
+                               @click="gmToggleCategoryExpand(props.row)">
+                        </q-btn>
                         {{ props.row.name }}
                       </q-td>
                       <q-td key="products" :props="props" data-col="products">
@@ -862,6 +888,27 @@
                                @click="gmAskDelete('category', props.row)">
                           <q-tooltip>Delete</q-tooltip>
                         </q-btn>
+                      </q-td>
+                    </q-tr>
+                    <q-tr v-if="gmCategoryExpanded(props.row.id)" :props="props"
+                          class="gm-collection-members">
+                      <q-td colspan="100%">
+                        <div v-if="!gmCategoryProducts(props.row.id).length"
+                             class="text-grey-7">
+                          No products in this category.
+                        </div>
+                        <ul v-else class="gm-collection-member-list">
+                          <li v-for="m in gmCategoryProducts(props.row.id)"
+                              :key="m.id">
+                            <a href="#" @click.prevent="gmEditProduct(m)">
+                              {{ m.title || m.d_tag }}
+                            </a>
+                            <span v-if="m.product_type === 'variation'"
+                                  class="text-caption text-grey-7"> (variant)</span>
+                            <span v-if="m.draft"
+                                  class="text-caption text-grey-7"> (draft)</span>
+                          </li>
+                        </ul>
                       </q-td>
                     </q-tr>
                   </template>
@@ -910,14 +957,14 @@
                          hint="Defaults to collection description. Max 160 characters."
                          counter :maxlength="160"></q-input>
                 <div class="gm-editor-wide gm-seo-preview">
-                  <div class="text-caption text-grey-7">Search preview</div>
-                  <div class="text-primary text-body2" style="font-weight: 500;">
+                  <div class="gm-seo-label">Search preview</div>
+                  <div class="gm-seo-title">
                     {{ gmBrandName() ? gmBrandName() + ' · ' : '' }}{{ gmCatalog.collectionEditor.form.meta_title || gmCatalog.collectionEditor.form.title }}
                   </div>
-                  <div class="text-caption" style="color: #006621;">
+                  <div class="gm-seo-url">
                     {{ gmOrigin() }}/infinitemarkets/public/collections/{{ gm.merchant.pubkey }}/{{ gmCatalog.collectionEditor.form.d_tag }}
                   </div>
-                  <div class="text-body2 text-grey-8">
+                  <div class="gm-seo-desc">
                     {{ gmSerpText(gmCatalog.collectionEditor.form.meta_description || gmCatalog.collectionEditor.form.description) }}
                   </div>
                 </div>
@@ -943,7 +990,15 @@
                   <template v-slot:body="props">
                     <q-tr :props="props">
                       <q-td key="title" :props="props" data-col="title">
+                        <q-btn flat dense round size="sm"
+                               :icon="gmCollectionExpanded(props.row.id) ? 'expand_less' : 'expand_more'"
+                               :aria-label="(gmCollectionExpanded(props.row.id) ? 'Hide' : 'Show') + ' products in ' + (props.row.title || props.row.d_tag)"
+                               @click="gmToggleCollectionExpand(props.row)">
+                        </q-btn>
                         {{ props.row.title || props.row.d_tag }}
+                      </q-td>
+                      <q-td key="products" :props="props" data-col="products">
+                        {{ props.row.product_count || 0 }}
                       </q-td>
                       <q-td key="id" :props="props" data-col="id">
                         {{ gmTrunc(props.row.d_tag, 8, 4) }}
@@ -958,6 +1013,29 @@
                                @click="gmAskDelete('collection', props.row)">
                           <q-tooltip>Delete</q-tooltip>
                         </q-btn>
+                      </q-td>
+                    </q-tr>
+                    <q-tr v-if="gmCollectionExpanded(props.row.id)" :props="props"
+                          class="gm-collection-members">
+                      <q-td colspan="100%">
+                        <div v-if="gmCollectionMembersLoading(props.row.id)"
+                             class="text-grey-7">
+                          Loading products…
+                        </div>
+                        <div v-else-if="!gmCollectionMembers(props.row.id).length"
+                             class="text-grey-7">
+                          No products in this collection.
+                        </div>
+                        <ul v-else class="gm-collection-member-list">
+                          <li v-for="m in gmCollectionMembers(props.row.id)"
+                              :key="m.id">
+                            <a href="#" @click.prevent="gmEditProduct(m)">
+                              {{ m.title || m.d_tag }}
+                            </a>
+                            <span v-if="m.draft"
+                                  class="text-caption text-grey-7"> (draft)</span>
+                          </li>
+                        </ul>
                       </q-td>
                     </q-tr>
                   </template>
@@ -1033,9 +1111,18 @@
                     </div>
                   </q-expansion-item>
                 </div>
-                <q-input v-model="gmCatalog.shippingEditor.form.regions_text" dense
-                         outlined class="gm-editor-wide"
-                         label="Regions (comma-separated, optional)"></q-input>
+                <q-select v-model="gmCatalog.shippingEditor.form.regions" dense
+                          outlined multiple use-chips use-input input-debounce="0"
+                          class="gm-editor-wide" label="Regions (optional)"
+                          :options="gmCatalog.regionOptions"
+                          option-value="value" option-label="label"
+                          emit-value map-options @filter="gmFilterShippingRegions"
+                          new-value-mode="add-unique"
+                          @new-value="gmAddShippingRegion"
+                          hint="ISO 3166-2 subdivisions of the destination countries (e.g. US-CA), or type a custom code. Empty = the option covers the whole country."></q-select>
+                <div class="gm-editor-wide text-caption text-grey-7">
+                  Estimated delivery window shown to buyers — e.g. min 2, max 5, Days — and published to the Nostr shipping zone. Leave blank if unknown.
+                </div>
                 <q-input v-model.number="gmCatalog.shippingEditor.form.duration_min"
                          dense outlined type="number" min="0"
                          label="Duration min"></q-input>
@@ -1044,7 +1131,8 @@
                          label="Duration max"></q-input>
                 <q-select v-model="gmCatalog.shippingEditor.form.duration_unit"
                           dense outlined label="Duration unit"
-                          :options="gmCatalog.durationUnits"></q-select>
+                          :options="gmCatalog.durationUnits"
+                          emit-value map-options></q-select>
                 <q-input v-model="gmCatalog.shippingEditor.form.location" dense
                          outlined label="Location (required for pickup)"></q-input>
                 <q-checkbox v-model="gmCatalog.shippingEditor.form.active"
@@ -3264,6 +3352,7 @@
 {% block scripts %}
 <script src="/infinitemarkets/static/infinitemarkets/js/admin_app.js?v={{ asset_revision }}"></script>
 <script src="/infinitemarkets/static/infinitemarkets/js/admin_orders.js?v={{ asset_revision }}"></script>
+<script src="/infinitemarkets/static/infinitemarkets/js/regions.js?v={{ asset_revision }}"></script>
 <script src="/infinitemarkets/static/infinitemarkets/js/admin_catalog.js?v={{ asset_revision }}"></script>
 <script src="/infinitemarkets/static/infinitemarkets/js/admin_migration.js?v={{ asset_revision }}"></script>
 <script src="/infinitemarkets/static/infinitemarkets/js/admin_publications.js?v={{ asset_revision }}"></script>
@@ -3368,6 +3457,63 @@
   gap: 16px;
 }
 .gm-editor-wide { grid-column: 1 / -1; }
+/* SERP preview always renders as a light bounded card, even in dark mode. */
+.gm-seo-preview {
+  max-width: 600px;
+  padding: 10px 16px 14px;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  background: #fff;
+}
+.gm-seo-label { font-size: 12px; color: #70757a; margin-bottom: 4px; }
+.gm-seo-title {
+  color: #1a0dab;
+  font-size: 18px;
+  line-height: 1.3;
+}
+.gm-seo-url {
+  color: #006621;
+  font-size: 12px;
+  word-break: break-all;
+}
+.gm-seo-desc { color: #4d5156; font-size: 13px; }
+.gm-seo-price { color: #4d5156; font-size: 12px; }
+.gm-seo-row { display: flex; gap: 12px; align-items: flex-start; }
+.gm-seo-text { flex: 1 1 auto; min-width: 0; }
+.gm-seo-thumb {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex: 0 0 auto;
+}
+/* Share preview is a fixed light frame: it shows the generated og.png
+   card which is theme-branded, not page-themed. */
+.gm-share-label { margin: 10px 0 4px; color: #70757a; }
+.gm-share-preview {
+  max-width: 600px;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  aspect-ratio: 1200 / 630;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gm-share-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.gm-share-empty { padding: 24px; text-align: center; color: #70757a; }
+.gm-collection-member-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0 4px 44px;
+}
+.gm-collection-member-list li { padding: 2px 0; }
 .gm-bulk-bar {
   display: flex;
   align-items: center;
