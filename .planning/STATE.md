@@ -5,16 +5,16 @@ milestone_name: Media uploads and Blossom support
 current_phase: 6
 current_phase_name: Secure Media Storage
 status: planning
-stopped_at: Completed 06-03-PLAN.md
-last_updated: "2026-10-16T07:26:27.843Z"
+stopped_at: Completed 06-04-PLAN.md
+last_updated: "2026-10-16T16:56:11.238Z"
 last_activity: 2026-10-16
 last_activity_desc: v1.1 roadmap and requirement traceability drafted
-state_head: cb6db61c1ce0dd2d0bf1f849583d15c2290ae919
+state_head: b4ffd78a8922ed88e7d95b9bbded6a1bceb3e6c9
 progress:
   total_phases: 3
   completed_phases: 0
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 4
+  completed_plans: 4
   percent: 0
 ---
 
@@ -70,6 +70,7 @@ Last activity: 2026-10-16 — v1.1 roadmap and requirement traceability drafted
 | Phase 06 P02 | 10min | 3 tasks | 4 files |
 | Phase 06 P01 | 12min | 3 tasks | 8 files |
 | Phase 06 P03 | 10min | 2 tasks | 8 files |
+| Phase 06-secure-media-storage P04 | 15min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -111,6 +112,7 @@ Decisions are logged in PROJECT.md and the normative specification.
 - [Phase 6]: 06-01: spec 5.6 Admin-media added; error model renumbered 5.7; spec image cap corrected to 20
 - [Phase 6]: 06-03: profile-origin gate is local-branch-only — usage=profile+backend=blossom allowed on private public_base_url (remote https descriptor is the recommended alternative)
 - [Phase 6]: 06-03: remote blossom failure is request-level typed problem naming the server; earlier PUT blobs are honest orphans per D-01
+- [Phase 6]: 06-04: emit /library/infinitemarkets/ (real host mount) and rewrite legacy /images/ references via m019 — owner-locked gap closure
 
 ### Pending Todos
 
@@ -166,6 +168,6 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 ## Session Continuity
 
-Last session: 2026-10-16T07:26:27.828Z
-Stopped at: Completed 06-03-PLAN.md
+Last session: 2026-10-16T16:56:11.219Z
+Stopped at: Completed 06-04-PLAN.md
 Resume file: None

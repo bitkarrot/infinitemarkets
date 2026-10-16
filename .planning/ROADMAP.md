@@ -43,7 +43,9 @@ Each upload uses exactly one backend. Blossom uploads target only the first serv
   3. A locally stored image used for Nostr profile picture/banner metadata resolves to a publicly reachable absolute HTTPS URL, while supported Appearance references can use a safe same-origin path.
   4. Uploads go through an authenticated route present in both technical-specification §5 and `harness/registry.py::HTTP_ROUTES`; Blossom requests use HTTPS, request-time public-egress checks, pinned-IP TLS, strict time/size bounds, and never follow upload redirects.
 
-**Plans**: 3/3 plans executed
+**Plans**: 4/4 plans executed
+
+- [x] 06-04-PLAN.md
 
 - [x] 06-01-PLAN.md — Local media storage adapter + bounded upload/unused API with contract registration
 - [x] 06-02-PLAN.md — Blossom server-order preservation + BUD-02/BUD-11 server-side-signed upload client
@@ -81,6 +83,6 @@ Each upload uses exactly one backend. Blossom uploads target only the first serv
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 6. Secure Media Storage | 3/3 | Not started | - |
+| 6. Secure Media Storage | 4/4 | Not started | - |
 | 7. Shared Image Editors | 0/TBD | Not started | - |
 | 8. Media Release Qualification | 0/TBD | Not started | - |
