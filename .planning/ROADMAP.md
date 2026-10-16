@@ -25,7 +25,7 @@ Each upload uses exactly one backend. Blossom uploads target only the first serv
 
 ### Phases
 
-- [ ] **Phase 6: Secure Media Storage** - Merchants can store uploads locally or use a secure server-side Blossom upload service.
+- [x] **Phase 6: Secure Media Storage** - Merchants can store uploads locally or use a secure server-side Blossom upload service.
 - [ ] **Phase 7: Shared Image Editors** - Merchants can manage product, profile, and Appearance images through reusable upload controls.
 - [ ] **Phase 8: Media Release Qualification** - Merchants' uploads and share-card images meet the documented protocol and release safety contract.
 
@@ -83,6 +83,6 @@ Each upload uses exactly one backend. Blossom uploads target only the first serv
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 6. Secure Media Storage | 4/4 | Not started | - |
+| 6. Secure Media Storage | 4/4 | Complete | 2026-10-16 |
 | 7. Shared Image Editors | 0/TBD | Not started | - |
 | 8. Media Release Qualification | 0/TBD | Not started | - |
