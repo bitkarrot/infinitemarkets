@@ -835,7 +835,12 @@ failover or dual-write, and Blossom bytes never count toward the local quota.
 `GET /media/unused` lists stored local files whose `infinitemarkets/<ns>/<name>`
 substring appears in no owned `product_images.url`, `profile_json`, or theme
 value (absolute and relative forms both count as referenced); filenames recorded
-in the migration sidecar are migration-owned and never listed.
+in the migration sidecar are migration-owned and never listed. Each `files[]`
+entry carries `name`, `bytes`, `sha256`, and `mtime` (epoch seconds, from the
+file's `stat().st_mtime`), and the top-level response adds `used_bytes` — the
+total bytes stored under the merchant namespace, referenced files included —
+plus `quota_bytes`, the 400 MB per-merchant local quota, so a settings surface
+can render per-file dates and quota usage without extra requests.
 `DELETE /media/unused/{name}` removes such a file — `{name}` must fullmatch
 `[0-9a-f]{64}\.(png|jpg|webp)`, referenced or migration-owned names fail with
 `media-referenced`, and an absent name is a 200-idempotent no-op. Deletion is

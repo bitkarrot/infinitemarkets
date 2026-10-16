@@ -316,7 +316,11 @@ async def list_unused(merchant_id: str, user) -> dict:
     """D-02/D-12: local uploads no catalog/profile/theme value references.
 
     Filenames recorded in the migration sidecar are migration-owned and
-    are never listed (protects pending relinks).
+    are never listed (protects pending relinks). Each entry carries
+    ``mtime`` (epoch seconds) so the Settings -> Media block can render a
+    date column; the top-level ``used_bytes``/``quota_bytes`` pair powers
+    its quota bar — ``used_bytes`` is the full namespace total (D-01:
+    referenced and unreferenced bytes both count).
     """
     from . import catalog
 
@@ -335,15 +339,21 @@ async def list_unused(merchant_id: str, user) -> dict:
     )
     owned = set(migration_media._load_sidecar(merchant_id).values())
     referenced = await _referenced_names(merchant_id, names - owned)
-    return {
-        "files": [
+    files = []
+    for n in sorted(names - owned - referenced):
+        st = (media_dir / n).stat()
+        files.append(
             {
                 "name": n,
-                "bytes": (media_dir / n).stat().st_size,
+                "bytes": st.st_size,
                 "sha256": n.split(".", 1)[0],
+                "mtime": st.st_mtime,
             }
-            for n in sorted(names - owned - referenced)
-        ]
+        )
+    return {
+        "files": files,
+        "used_bytes": _dir_bytes(media_dir),
+        "quota_bytes": migration_media.MAX_MERCHANT_BYTES,
     }
 
 
