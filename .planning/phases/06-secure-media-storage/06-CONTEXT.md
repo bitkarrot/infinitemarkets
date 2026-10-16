@@ -73,6 +73,32 @@ MEDIA-16, MEDIA-18.
   are not tracked or enforced — remote storage limits are the Blossom
   operator's concern.
 
+### Post-Research Decision Locks (owner-delegated defaults, confirmed 2026-10-16)
+- **D-07:** New uploads store ABSOLUTE URLs (`public_base_url` +
+  `/images/infinitemarkets/<ns>/<sha>.<ext>`) — preserves the `https://`
+  invariant enforced at `catalog.py` image validation and satisfies
+  MEDIA-07 in one representation. Separately (Phase 7, MEDIA-11), the
+  catalog image validator must be extended to accept legacy
+  migration-managed relative `/images/...` references.
+- **D-08:** D-05's "block with prompt" fires when `public_base_url`'s host
+  is loopback/private (localhost, RFC-1918, .local) — scheme is https so
+  `ext_settings()` succeeds, but the URL is unreachable to relays. Nostr-
+  field uploads blocked with prompt; storefront/Appearance relative-path
+  uses still allowed.
+- **D-09:** BUD-11 authorization expiration window: 300 s.
+- **D-10:** New authenticated routes: `POST /media/upload`,
+  `GET /media/unused`, `DELETE /media/unused/{name}` — all added to
+  `docs/technical-specification.md` §5 fenced blocks AND
+  `harness/registry.py::HTTP_ROUTES` in the same commit.
+- **D-11:** Blossom descriptor `url` must be an https URL on the same host
+  as the upload endpoint; relax to a host-suffix rule only if a real
+  server returns CDN URLs (tests use a fake Blossom server).
+- **D-12:** "Unreferenced" = a `/images/...` filename absent from every
+  `product_images.url`, `profile_json`, and Appearance/theme settings
+  JSON for that merchant.
+- **D-13:** Concurrency cap: at most 4 simultaneous in-flight Blossom
+  PUTs per merchant.
+
 ### Claude's Discretion
 - Shared-service shape: extract/generalize `migration_media` internals into
   a reusable local-storage adapter vs parallel implementation — engineering
