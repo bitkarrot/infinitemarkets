@@ -11,10 +11,10 @@ Requirements for v1.1. Each maps to one roadmap phase after owner approval.
 ### Media Storage
 
 - [ ] **MEDIA-01**: Merchant can upload an image to this LNbits instance without configuring or accessing a Blossom server; if no Blossom server is configured, local LNbits storage is selected by default.
-- [ ] **MEDIA-02**: Merchant can explicitly choose Blossom for an upload; the backend targets only the primary/first configured `Media (Blossom)` server and does not dual-write or silently retry another remote server.
+- [ ] **MEDIA-02**: Merchant can explicitly choose Blossom for an upload; the backend targets only the primary/first configured `Media (Blossom)` server, preserves configured order, and does not dual-write or silently retry another remote server.
 - [ ] **MEDIA-03**: If a chosen Blossom upload fails, the merchant sees a plain-language error and may explicitly retry the same image to LNbits-local storage.
 - [ ] **MEDIA-04**: Blossom upload authorization is signed server-side with the merchant's stored Nostr key; no nsec or reusable signing key is exposed to browser code.
-- [ ] **MEDIA-05**: Uploads use bounded multipart parsing (at most 16 files/request and 25 MB/file), avoid unbounded in-memory buffering, enforce a 400 MB per-merchant LNbits-local quota, validate PNG/JPEG/WebP bytes by signature, compute SHA-256, and validate any returned Blossom descriptor before exposing its URL.
+- [ ] **MEDIA-05**: Uploads use bounded multipart parsing (at most 16 files/request and 25 MB/file), avoid unbounded in-memory buffering, enforce a 400 MB per-merchant LNbits-local quota, accept only signature-verified PNG/JPEG/WebP, reject SVG/GIF, compute SHA-256, and validate any returned Blossom descriptor before exposing its URL.
 - [ ] **MEDIA-06**: LNbits-managed images use a merchant-scoped opaque storage namespace outside the reinstallable extension package and are served through the host image mount.
 - [ ] **MEDIA-07**: A locally stored image used in Nostr profile picture/banner metadata is emitted as a publicly reachable absolute HTTPS URL; Appearance fields may use a safe same-origin path where supported.
 
