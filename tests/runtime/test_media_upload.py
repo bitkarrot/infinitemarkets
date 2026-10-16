@@ -596,6 +596,45 @@ async def test_uploaded_absolute_url_round_trips_through_catalog(runtime_env):
     assert row["url"] == result["url"]
 
 
+async def test_catalog_accepts_owned_relative_image_prefixes(runtime_env):
+    """MEDIA-11 service-side slice (06-04): the catalog image validator
+    accepts the two extension-owned relative prefixes — the live
+    ``/library/infinitemarkets/`` mount and the legacy
+    ``/images/infinitemarkets/`` form (still editable on rows predating
+    m019) — while non-owned relative paths and ``http://`` stay 422."""
+    from infinitemarkets.services import migration_media
+
+    env = runtime_env
+    mid, csrf = await _merchant_id(env)
+    ns = migration_media._namespace(mid)
+    product = await _product(env, csrf, "prefix-validation")
+
+    for good in (
+        f"/library/infinitemarkets/{ns}/{'ab' * 32}.png",
+        f"/images/infinitemarkets/{ns}/{'cd' * 32}.png",
+    ):
+        patched = await env["client"].patch(
+            f"{API}/products/{product['id']}",
+            json={"images": [{"url": good}]},
+            headers=_headers(env, csrf),
+        )
+        assert patched.status_code == 200, (good, patched.text)
+
+    for bad in (
+        "/library/other/file.png",
+        "/images/other/file.png",
+        "/infinitemarkets/x.png",
+        "http://insecure.example/x.png",
+        "//protocol-relative.example/x.png",
+    ):
+        patched = await env["client"].patch(
+            f"{API}/products/{product['id']}",
+            json={"images": [{"url": bad}]},
+            headers=_headers(env, csrf),
+        )
+        assert patched.status_code == 422, (bad, patched.status_code)
+
+
 async def test_media_and_migration_share_namespace(runtime_env):
     """D-01: one namespace, one quota — the general media flow resolves the
     same directory and local path the migration flow uses."""

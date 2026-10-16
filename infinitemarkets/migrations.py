@@ -1516,3 +1516,37 @@ async def m018_seo_fields(db: Connection):
     await db.execute(
         f"ALTER TABLE {s}collections ADD COLUMN meta_description TEXT"
     )
+
+
+async def m019_media_library_mount(db: Connection):
+    """Rewrite dead ``/images/infinitemarkets/`` references to the live
+    ``/library/infinitemarkets/`` mount (06-04 gap closure).
+
+    Owner decision (06-VERIFICATION): v1.0's media relink emitted
+    ``/images/infinitemarkets/<ns>/<name>``, but the pinned host mounts
+    the data-folder ``images`` directory at ``/library`` — every stored
+    reference 404s. Data-only, idempotent, dialect-portable (REPLACE +
+    LIKE only). ``product_images.url`` qualifies on column-start; JSON
+    columns qualify on a JSON-string-start ``"/images/infinitemarkets/``
+    and the REPLACE needle keeps the leading quote so an absolute URL on
+    a foreign host sharing a row is never corrupted (T-06-04-01)."""
+    s = db.references_schema
+    await db.execute(
+        f"UPDATE {s}product_images SET url = "
+        "REPLACE(url, '/images/infinitemarkets/', "
+        "'/library/infinitemarkets/') "
+        "WHERE url LIKE '/images/infinitemarkets/%'"
+    )
+    for col in ("profile_json", "theme"):
+        await db.execute(
+            f"UPDATE {s}merchants SET {col} = "
+            f"REPLACE({col}, '\"/images/infinitemarkets/', "
+            "'\"/library/infinitemarkets/') "
+            f"WHERE {col} LIKE '%\"/images/infinitemarkets/%'"
+        )
+    await db.execute(
+        f"UPDATE {s}settings SET value = "
+        "REPLACE(value, '\"/images/infinitemarkets/', "
+        "'\"/library/infinitemarkets/') "
+        "WHERE value LIKE '%\"/images/infinitemarkets/%'"
+    )

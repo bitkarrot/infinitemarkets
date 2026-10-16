@@ -19,7 +19,7 @@ from ..db import DomainTransaction
 from ..keystore import MerchantKeyStore
 from ..security import conflict
 from ..settings import ext_settings
-from . import catalog
+from . import catalog, migration_media
 from .fx import default_currency_decimals
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -353,12 +353,23 @@ _NATIVE_HEADER = [
 
 
 def _native_image_url(value: str) -> str:
-    """Native export image refs: https URLs or host-local /images/ paths."""
+    """Native export image refs: https URLs or host-local media paths.
+
+    Owned ``/library/infinitemarkets/`` refs (the mount the host actually
+    serves) round-trip verbatim; owned legacy
+    ``/images/infinitemarkets/`` input normalizes onto the live mount at
+    ingest so imported rows are fetchable; non-owned ``/images/`` values
+    stay accepted unchanged."""
     if len(value) > 2048 or any(ord(c) < 32 for c in value):
         raise ValueError("invalid product image URL")
-    if value.startswith("/images/"):
+    if value.startswith("/images/") or value.startswith("/library/"):
         if ".." in value or value.startswith("//"):
             raise ValueError("invalid product image URL")
+        if value.startswith(migration_media.LEGACY_MEDIA_URL_PREFIX):
+            return (
+                migration_media.MEDIA_URL_PREFIX
+                + value[len(migration_media.LEGACY_MEDIA_URL_PREFIX):]
+            )
         return value
     try:
         url = urlsplit(value)

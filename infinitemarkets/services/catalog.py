@@ -30,6 +30,7 @@ from ..security import (
     unprocessable,
 )
 from ..settings import ExtSettings, ext_settings
+from . import migration_media
 from .outbox import enqueue_intent
 
 # --- section 15 bounds ----------------------------------------------------------
@@ -55,6 +56,19 @@ FREQ_UNITS = ("D", "W", "Y")  # pinned Gamma units (§6.1)
 
 _HTML_TAG_RE = re.compile(r"<[^>]*>")
 _BAD_URL_RE = re.compile(r"(?:javascript|data|vbscript)\s*:", re.IGNORECASE)
+
+
+def _valid_image_url(url) -> bool:
+    """Image URL contract (MEDIA-11 service slice, 06-04): external
+    ``https://`` or an extension-owned relative prefix — the live
+    ``/library/infinitemarkets/`` mount or the legacy ``/images/...``
+    form, so rows predating m019 stay editable. Any other relative path,
+    ``http://``, or non-str is rejected."""
+    return isinstance(url, str) and url.startswith((
+        "https://",
+        migration_media.MEDIA_URL_PREFIX,
+        migration_media.LEGACY_MEDIA_URL_PREFIX,
+    ))
 
 
 def _now() -> int:
@@ -693,9 +707,11 @@ def _validate_product_payload(p: dict, partial: bool = False) -> None:
             )
         for img in images:
             url = img.get("url") if isinstance(img, dict) else img
-            if not isinstance(url, str) or not url.startswith("https://"):
+            if not _valid_image_url(url):
                 raise unprocessable(
-                    "invalid-content", "image URLs must be https://"
+                    "invalid-content",
+                    "image URLs must be https:// or an owned "
+                    "/library/infinitemarkets/ path",
                 )
 
 
@@ -1676,9 +1692,11 @@ async def add_product_image(merchant_id: str, user, product_id: str,
     if row["deleted_at"] is not None:
         raise not_found("product not found")
     url = payload.get("url")
-    if not isinstance(url, str) or not url.startswith("https://"):
+    if not _valid_image_url(url):
         raise unprocessable(
-            "invalid-content", "image URL must be https://"
+            "invalid-content",
+            "image URL must be https:// or an owned "
+            "/library/infinitemarkets/ path",
         )
     async with DomainTransaction() as tx:
         count = await tx.fetch_one(
@@ -1815,9 +1833,11 @@ async def create_collection(merchant_id: str, user, payload: dict) -> dict:
     meta_title = _check_meta_title(payload.get("meta_title"))
     meta_description = _check_meta_description(payload.get("meta_description"))
     image = payload.get("image")
-    if image is not None and not image.startswith("https://"):
+    if image is not None and not _valid_image_url(image):
         raise unprocessable(
-            "invalid-content", "collection image must be https://"
+            "invalid-content",
+            "collection image must be https:// or an owned "
+            "/library/infinitemarkets/ path",
         )
     collection_id = uuid.uuid4().hex
     d_tag = payload.get("d_tag") or _gen_d_tag()
@@ -1938,11 +1958,15 @@ async def patch_collection(merchant_id: str, user, collection_id: str,
                     v = _check_meta_title(v)
                 elif col == "meta_description":
                     v = _check_meta_description(v)
-                elif col == "image" and v is not None and not v.startswith(
-                    "https://"
+                elif (
+                    col == "image"
+                    and v is not None
+                    and not _valid_image_url(v)
                 ):
                     raise unprocessable(
-                        "invalid-content", "image must be https://"
+                        "invalid-content",
+                        "image must be https:// or an owned "
+                        "/library/infinitemarkets/ path",
                     )
                 await tx.execute(
                     f"UPDATE {tx.table('collections')} SET {col} = :v"

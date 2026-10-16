@@ -261,6 +261,162 @@ async def test_media_upload_and_relink(runtime_env):
     assert row["url"].startswith("/library/infinitemarkets/")
 
 
+async def test_m019_rewrites_legacy_media_urls(runtime_env):
+    """m019 data migration (06-04): stored ``/images/infinitemarkets/``
+    references rewrite to ``/library/infinitemarkets/`` — the mount the
+    pinned host actually serves. Covers product_images.url (column-start),
+    merchants.profile_json/theme and settings.value (JSON-string-start);
+    a foreign-host URL containing the substring is untouched even when it
+    shares a row with a rewritten value; re-running rewrites nothing."""
+    import uuid as uuid_mod
+
+    from infinitemarkets import migrations
+    from infinitemarkets.db import db, table
+
+    client = runtime_env["client"]
+    merchant = await _merchant(runtime_env)
+    mid = merchant["id"]
+    headers = _headers(client)
+
+    cat = await client.post(
+        f"{API}/categories",
+        json={"name": "m019-test", "default_currency": "USD"},
+        headers=headers,
+    )
+    assert cat.status_code == 201, cat.text
+    product = await client.post(
+        f"{API}/products",
+        json={
+            "category_id": cat.json()["id"], "title": "m019 item",
+            "amount_minor": 100, "currency": "USD", "currency_decimals": 2,
+            "visibility": "hidden", "format": "digital", "draft": True,
+            "images": ["https://cdn.example.com/legacy.png"],
+        },
+        headers=headers,
+    )
+    assert product.status_code == 201, product.text
+    pid = product.json()["id"]
+
+    legacy_pic = f"/images/infinitemarkets/{'ab' * 12}/{'cd' * 32}.png"
+    live_pic = f"/library/infinitemarkets/{'ab' * 12}/{'cd' * 32}.png"
+    foreign = "https://other.example/images/infinitemarkets/x.png"
+    async with db.connect() as conn:
+        # column-start legacy reference (v1.0 relink output)
+        await conn.execute(
+            f"UPDATE {table('product_images')} SET url = :u "
+            "WHERE product_id = :p",
+            {"u": legacy_pic, "p": pid},
+        )
+        # foreign-host URL carrying the same substring — control row
+        await conn.execute(
+            f"INSERT INTO {table('product_images')} "
+            "(id, product_id, url, sort_order) VALUES (:i, :p, :u, 1)",
+            {"i": uuid_mod.uuid4().hex, "p": pid, "u": foreign},
+        )
+        # JSON-embedded legacy refs sharing a row with a foreign URL
+        await conn.execute(
+            f"UPDATE {table('merchants')} SET profile_json = :pj, "
+            "theme = :th WHERE id = :m",
+            {
+                "pj": json.dumps({
+                    "picture": legacy_pic,
+                    "website": foreign,
+                }),
+                "th": json.dumps({
+                    "footer": {"logo_url": legacy_pic},
+                }),
+                "m": mid,
+            },
+        )
+        await conn.execute(
+            f"INSERT INTO {table('settings')} (merchant_id, key, value) "
+            "VALUES (:m, :k, :v)",
+            {
+                "m": mid, "k": "m019-probe",
+                "v": json.dumps({"img": legacy_pic, "remote": foreign}),
+            },
+        )
+
+        migrate = getattr(migrations, "m019_media_library_mount", None)
+        assert migrate is not None, "m019_media_library_mount missing"
+        await migrate(conn)
+
+        imgs = await conn.fetchall(
+            f"SELECT url FROM {table('product_images')} "
+            "WHERE product_id = :p ORDER BY url",
+            {"p": pid},
+        )
+        urls = sorted(r["url"] for r in imgs)
+        assert urls == sorted([foreign, live_pic])
+        mrow = await conn.fetchone(
+            f"SELECT profile_json, theme FROM {table('merchants')} "
+            "WHERE id = :m",
+            {"m": mid},
+        )
+        profile = json.loads(mrow["profile_json"])
+        assert profile["picture"] == live_pic
+        assert profile["website"] == foreign
+        theme = json.loads(mrow["theme"])
+        assert theme["footer"]["logo_url"] == live_pic
+        srow = await conn.fetchone(
+            f"SELECT value FROM {table('settings')} "
+            "WHERE merchant_id = :m AND key = 'm019-probe'",
+            {"m": mid},
+        )
+        setting = json.loads(srow["value"])
+        assert setting["img"] == live_pic
+        assert setting["remote"] == foreign
+
+        # idempotent: a second run leaves every row byte-identical
+        await migrate(conn)
+        imgs = await conn.fetchall(
+            f"SELECT url FROM {table('product_images')} "
+            "WHERE product_id = :p ORDER BY url",
+            {"p": pid},
+        )
+        assert sorted(r["url"] for r in imgs) == sorted(
+            [foreign, live_pic]
+        )
+        mrow = await conn.fetchone(
+            f"SELECT profile_json, theme FROM {table('merchants')} "
+            "WHERE id = :m",
+            {"m": mid},
+        )
+        assert json.loads(mrow["profile_json"]) == profile
+        assert json.loads(mrow["theme"]) == theme
+
+
+async def test_native_image_url_library_round_trip(runtime_env):
+    """06-04 import side: ``_native_image_url`` round-trips owned
+    ``/library/infinitemarkets/`` refs verbatim, normalizes owned legacy
+    ``/images/infinitemarkets/`` input onto the live mount at ingest, and
+    keeps accepting non-owned ``/images/`` values — ``..``/``//`` guards
+    unchanged."""
+    import pytest as _pytest
+
+    from infinitemarkets.services import migration_import
+
+    live = "/library/infinitemarkets/abc123/def.png"
+    assert migration_import._native_image_url(live) == live
+    assert migration_import._native_image_url(
+        "/images/infinitemarkets/abc123/def.png"
+    ) == live
+    assert migration_import._native_image_url(
+        "/images/other-site/pic.png"
+    ) == "/images/other-site/pic.png"
+    assert migration_import._native_image_url(
+        "https://cdn.example/x.png"
+    ) == "https://cdn.example/x.png"
+    for bad in (
+        "/images/../x.png",
+        "/library/../x.png",
+        "//evil.example/x.png",
+        "http://insecure.example/x.png",
+    ):
+        with _pytest.raises(ValueError, match="image URL"):
+            migration_import._native_image_url(bad)
+
+
 async def test_media_upload_rejects_foreign_and_mismatched(runtime_env):
     """Manifest URLs must belong to the merchant's own products and the
     sha256 must match the uploaded bytes."""
