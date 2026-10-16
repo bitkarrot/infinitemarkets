@@ -1089,6 +1089,57 @@
         }
         self.gmSettings.saving = false;
       },
+      /* Hero background upload (gm-media-picker @files-chosen). D-26:
+         appearance fields store result.path for local uploads (the
+         same-origin /library/ path always passes theme validation even
+         when public_base_url is an IP literal) and result.url for
+         Blossom results, which carry no path. One failed file never
+         discards its siblings (MEDIA-12). */
+      gmMediaHeroUpload: async function (payload) {
+        var self = this;
+        var files = (payload && payload.files) || [];
+        if (!files.length) return;
+        self.gmSettings.themeError = null;
+        self.gmMedia.retryFile = null;
+        self.gmMedia.retryLocal = false;
+        self.gmMedia.uploading = true;
+        try {
+          for (var i = 0; i < files.length; i++) {
+            var file = files[i];
+            try {
+              var res = await self.gmMediaUpload(
+                file, "appearance", payload.backend,
+                function (frac) { self.gmMedia.progress = frac; }
+              );
+              var result = (res.results || [])[0] || {};
+              if (result.state === "stored") {
+                self.gmSettings.theme.hero.image_url =
+                  result.backend === "local"
+                    ? (result.path || "")
+                    : (result.url || "");
+                self.gmSettings.themeNotice =
+                  "Image uploaded — save appearance to keep it.";
+              } else {
+                self.gmSettings.themeError =
+                  "The image could not be stored (" +
+                  (result.reason || "unknown reason") +
+                  ") — try a different file.";
+              }
+            } catch (e) {
+              self.gmSettings.themeError = self.gmProblemCopy(e.problem);
+              /* MEDIA-03: a Blossom failure keeps the file for an
+                 explicit retry to LNbits — never a silent failover. */
+              if (payload.backend === "blossom") {
+                self.gmMedia.retryFile = file;
+                self.gmMedia.retryLocal = true;
+              }
+            }
+          }
+        } finally {
+          self.gmMedia.uploading = false;
+          self.gmMedia.progress = 0;
+        }
+      },
       /* Embed shop — copy/paste snippets for the WebPages extension or
          any static page. The component script renders real DOM (no
          iframe); checkout always happens on the hosted shop pages. */

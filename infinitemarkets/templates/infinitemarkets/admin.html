@@ -2469,6 +2469,14 @@
                              dense outlined class="q-mb-sm"
                              label="Background image URL (https)">
                     </q-input>
+                    <gm-media-picker usage="appearance"
+                                     :blossom-servers="gmMedia.servers"
+                                     @servers-needed="gmMediaLoadServers"
+                                     @files-chosen="gmMediaHeroUpload">
+                    </gm-media-picker>
+                    <q-linear-progress v-if="gmMedia.uploading" dense
+                                       :value="gmMedia.progress"
+                                       class="q-mt-xs"></q-linear-progress>
                     <div class="row q-col-gutter-sm q-mb-sm">
                       <div class="col-12 col-sm-6">
                         <q-input v-model="gmSettings.theme.hero.primary.label"
@@ -3351,6 +3359,7 @@
 
 {% block scripts %}
 <script src="/infinitemarkets/static/infinitemarkets/js/admin_app.js?v={{ asset_revision }}"></script>
+<script src="/infinitemarkets/static/infinitemarkets/js/admin_media.js?v={{ asset_revision }}"></script>
 <script src="/infinitemarkets/static/infinitemarkets/js/admin_orders.js?v={{ asset_revision }}"></script>
 <script src="/infinitemarkets/static/infinitemarkets/js/regions.js?v={{ asset_revision }}"></script>
 <script src="/infinitemarkets/static/infinitemarkets/js/admin_catalog.js?v={{ asset_revision }}"></script>
@@ -3524,6 +3533,38 @@
   border: 1px solid rgba(128, 128, 128, 0.3);
   border-radius: 10px;
   background: rgba(128, 128, 128, 0.08);
+}
+/* Shared media picker — dashed drop-zone doubles as the Choose-files
+   button (identical shape at every image field site). */
+.gm-drop {
+  display: flex;
+  align-items: center;
+  min-height: 64px;
+  padding: 10px 14px;
+  border: 2px dashed rgba(128, 128, 128, 0.45);
+  border-radius: 10px;
+  background: rgba(128, 128, 128, 0.06);
+  cursor: pointer;
+}
+.gm-drop.drag {
+  border-color: var(--q-primary);
+  background: rgba(128, 128, 128, 0.14);
+}
+.gm-drop:focus-visible {
+  outline: 2px solid var(--q-primary);
+  outline-offset: 2px;
+}
+.gm-drop[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: default;
+}
+.gm-drop-label { font-size: 13px; opacity: 0.85; }
+.gm-media-thumb {
+  width: 100%;
+  max-width: 320px;
+  height: 120px;
+  border-radius: 8px;
+  flex: 0 0 auto;
 }
 /* LNbits redefines --q-dark as a 30%-opacity grey inside cards, which turns
    Quasar's text-dark into faint text on warning/info fills. Keep it solid. */
