@@ -1,0 +1,9 @@
+{
+  "command": "uv run pytest tests/runtime/test_admin_ui.py -q -k \"media_picker or shell_document\"",
+  "exitCode": 1,
+  "targetTest": "test_admin_media_picker",
+  "targetFile": "tests/runtime/test_admin_ui.py",
+  "expected": "served admin HTML carries admin_media.js?v= script tag and a gm-media-picker element at the hero field; fetched admin_media.js registers the component/XHR helper (feature absent)",
+  "actual": "test_admin_media_picker: assert 'admin_media.js?v=' in html (script tag absent); test_admin_shell_document: assert match, mod -> AssertionError: admin_media (module not in script manifest)",
+  "output": "________________________________ test_admin_shell_document ________________________________\n\n        revisions = set()\n        for mod in (\"admin_app\", \"admin_orders\", \"admin_catalog\",\n                    \"admin_publications\", \"admin_messages\", \"admin_settings\",\n                    \"admin_notifications\", \"admin_media\"):\n            match = re.search(rf\"{mod}\\.js\\?v=([0-9a-f]{{12}})\", html)\n>           assert match, mod\nE           AssertionError: admin_media\nE           assert None\n\ntests/runtime/test_admin_ui.py:77: AssertionError\n________________________________ test_admin_media_picker ________________________________\n\n        html = (await runtime_env[\"client\"].get(\"/infinitemarkets/\")).text\n>       assert \"admin_media.js?v=\" in html\nE       assert 'admin_media.js?v=' in '<!doctype html>...'\n\ntests/runtime/test_admin_ui.py:96: AssertionError\n=========================== short test summary info ============================\nFAILED tests/runtime/test_admin_ui.py::test_admin_shell_document\nFAILED tests/runtime/test_admin_ui.py::test_admin_media_picker\n2 failed, 27 deselected in 2.30s\n\n# faithful TAP transcription of pytest FAILED lines:\n# tests 2\n# pass 0\n# fail 2\nnot ok 1 - test_admin_shell_document\nnot ok 2 - test_admin_media_picker\n"
+}

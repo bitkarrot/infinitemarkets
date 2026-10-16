@@ -72,7 +72,7 @@ async def test_admin_shell_document(runtime_env):
     revisions = set()
     for mod in ("admin_app", "admin_orders", "admin_catalog",
                 "admin_publications", "admin_messages", "admin_settings",
-                "admin_notifications"):
+                "admin_notifications", "admin_media"):
         match = re.search(rf"{mod}\.js\?v=([0-9a-f]{{12}})", html)
         assert match, mod
         revisions.add(match.group(1))
@@ -85,6 +85,34 @@ async def test_admin_shell_document(runtime_env):
     assert about.status_code == 200
     assert 'admin-categories.jpg' in about.text
     assert 'title: "Catalog"' in about.text
+
+
+async def test_admin_media_picker(runtime_env):
+    """MEDIA-02/03/08/12 — the shared gm-media-picker control loads as a
+    module, registers a real Vue component, and is wired at the hero
+    appearance field with the XHR upload contract (usage/backend/file +
+    CSRF + per-file progress) and the in-control destination selector."""
+    html = (await runtime_env["client"].get("/infinitemarkets/")).text
+    assert "admin_media.js?v=" in html
+    # The hero editor renders the picker bound to the shared gmMedia slice.
+    hero = html.split('data-gm="hero-editor"', 1)[1]
+    hero = hero.split("</q-expansion-item>", 1)[0]
+    assert "<gm-media-picker" in hero
+    assert 'usage="appearance"' in hero
+    assert ':blossom-servers="gmMedia.servers"' in hero
+    assert '@servers-needed="gmMediaLoadServers"' in hero
+    assert '@files-chosen="gmMediaHeroUpload"' in hero
+    js = (
+        await runtime_env["client"].get(f"{JS}/admin_media.js")
+    ).text
+    assert 'window.app.component("gm-media-picker"' in js
+    assert "XMLHttpRequest" in js
+    assert "upload.onprogress" in js
+    assert "X-CSRF-Token" in js
+    assert "files-chosen" in js
+    # In-control destination selector copy (D-17).
+    assert "Save to LNbits" in js
+    assert "Save to Blossom · " in js
 
 
 async def test_product_editor_shipping_options(runtime_env):
