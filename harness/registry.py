@@ -269,9 +269,11 @@ HTTP_ROUTES: tuple[str, ...] = (
     "GET /migration/imports",
     "GET /migration/imports/{import_id}",
     "GET /migration/products/export",
+    # 5.6 admin — media
+    "POST /media/upload",
 )
 
-# --- Section 5.6 error codes ----------------------------------------------------
+# --- Section 5.7 error codes ----------------------------------------------------
 
 ERROR_CODES = frozenset(
     {

@@ -1,4 +1,4 @@
-"""Route-boundary security — spec section 5.1/5.6/9.5/14.
+"""Route-boundary security — spec section 5.1/5.7/9.5/14.
 
 The host has no CSRF middleware and ships permissive CORS, so the extension
 owns origin enforcement at the route boundary:

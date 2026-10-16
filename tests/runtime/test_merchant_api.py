@@ -1,4 +1,4 @@
-"""Section 5.1 merchant API + section 5.1/5.6 security probes, through the
+"""Section 5.1 merchant API + section 5.1/5.7 security probes, through the
 real host loader (runtime_env).
 
 Covers: merchant lifecycle (create/get/patch/publish/deactivate), wallet

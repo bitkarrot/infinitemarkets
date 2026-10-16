@@ -4,7 +4,7 @@ Reads docs/technical-specification.md at test time and diffs it BOTH
 directions against harness/registry.py, harness/schema.py, and
 harness/state.py:
 
-- spec <-> registry: §5 routes, §7 state machines, §5.6 error codes,
+- spec <-> registry: §5 routes, §7 state machines, §5.7 error codes,
   §10 task names, §12 settings, §21.25 identifiers, §6.8 NIP-32 namespace;
 - registry <-> implementation: every registered field/state/transition is
   what the executable models actually declare, and neither schema.py nor
@@ -231,7 +231,7 @@ def test_state_machines_match_spec_bidirectional():
 
 def test_registered_literals_appear_in_spec():
     for code in registry.ERROR_CODES:
-        assert code in SEC5, f"error code {code!r} not declared in §5.6"
+        assert code in SEC5, f"error code {code!r} not declared in §5.7"
     for task in registry.TASK_NAMES:
         if task == f"{registry.PACKAGE_NAME}_invoice_listener":
             # The host names registered invoice listeners

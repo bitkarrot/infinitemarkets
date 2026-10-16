@@ -1,4 +1,4 @@
-"""Admin JSON API — /infinitemarkets/api/v1 (spec section 5.1/5.6).
+"""Admin JSON API — /infinitemarkets/api/v1 (spec section 5.1/5.6/5.7).
 
 Every route depends on the section-5.1 guard: ``check_user_exists`` for
 identity, plus mutation rules (user-id-only rejected; cookie auth requires
@@ -894,6 +894,80 @@ async def relink_media(request: Request, user: User = Depends(check_user_exists)
     from .services import migration_media
 
     return await migration_media.relink_media(await _mid(user), user)
+
+
+# --- section 5.6 media routes --------------------------------------------------
+
+
+@infinitemarkets_api_router.post("/media/upload")
+@problem_boundary
+async def media_upload(request: Request, user: User = Depends(check_user_exists)):
+    """Bounded general media upload — sniff-verified png/jpg/webp stored
+    content-addressed under the merchant namespace (MEDIA-01/05/06).
+
+    The optional ``usage`` field (catalog|profile|appearance) declares
+    where the image is bound; ``profile`` requires a public
+    ``public_base_url`` so the emitted absolute URL is relay-reachable
+    (D-05/D-08). ``backend`` is plan 06-03's expansion — not accepted.
+    """
+    from .services import media, migration_media
+    from .settings import ext_settings
+
+    merchant_id = await _mid(user)
+    if not request.headers.get("content-type", "").startswith(
+            "multipart/form-data;"):
+        raise unprocessable("invalid-content", "multipart upload required")
+
+    async def bounded_stream():
+        received = 0
+        limit = migration_media.MAX_FILES_PER_REQUEST * (
+            migration_media.MAX_FILE_BYTES + 8192
+        )
+        async for chunk in request.stream():
+            received += len(chunk)
+            if received > limit:
+                raise unprocessable("invalid-content", "upload exceeds limit")
+            yield chunk
+
+    try:
+        form = await MultiPartParser(
+            request.headers, bounded_stream(),
+            max_files=migration_media.MAX_FILES_PER_REQUEST + 1,
+            max_fields=4,
+        ).parse()
+    except MultiPartException as exc:
+        raise unprocessable("invalid-content", "invalid upload form") from exc
+    try:
+        usage = form.get("usage") or "catalog"
+        if not isinstance(usage, str) or usage not in media.MEDIA_USAGES:
+            raise unprocessable(
+                "invalid-content",
+                "usage must be one of catalog|profile|appearance",
+            )
+        if usage == "profile" and not media.origin_is_public(
+                ext_settings().public_base_url):
+            raise unprocessable(
+                "media-origin",
+                "Profile image origin is not publicly reachable",
+                "Images bound for your Nostr profile must resolve to a "
+                "public https URL that relays can fetch. Set "
+                "INFINITEMARKETS_PUBLIC_BASE_URL to your shop's public "
+                "https origin, or use an external https/Blossom image "
+                "instead.",
+            )
+        files = []
+        for key, item in form.multi_items():
+            if key == "usage":
+                continue
+            if not isinstance(item, UploadFile):
+                raise unprocessable("invalid-content", "invalid file field")
+            content = await item.read(migration_media.MAX_FILE_BYTES + 1)
+            files.append((item.filename or "image", content))
+        if not files:
+            raise unprocessable("invalid-content", "image files required")
+        return await media.store_local(merchant_id, user, files)
+    finally:
+        await form.close()
 
 
 @infinitemarkets_api_router.post("/migration/legacy/{source_kind}/execute")

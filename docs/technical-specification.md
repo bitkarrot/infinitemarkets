@@ -802,7 +802,25 @@ controls. Imported products start as hidden drafts. The merchant reviews
 and publishes them through ordinary Catalog actions; no cutover,
 invoice-status audit, or stock-count step is available.
 
-### 5.6 Error model
+### 5.6 Admin — media
+
+```text
+POST  /media/upload                     bounded multipart image upload — magic-byte verified png/jpg/webp only, content-addressed local storage under the merchant namespace
+```
+
+`POST /media/upload` accepts ≤16 file parts per request, each ≤25 MB, with a
+400 MB per-merchant local quota that counts every byte already stored under the
+merchant namespace (including uploaded-but-unsaved leftovers). Stored names are
+`<sha256>.<ext>` — retries and duplicates are idempotent. Each result carries a
+relative `path` (`/images/infinitemarkets/<ns>/<name>`) and an absolute `url`
+built from `INFINITEMARKETS_PUBLIC_BASE_URL` (never request Host headers). The
+optional `usage` field is `catalog|profile|appearance` (default `catalog`);
+`usage=profile` on a non-public base URL host (loopback/private/`.local`)
+fails with a `media-origin` problem telling the merchant to set
+`INFINITEMARKETS_PUBLIC_BASE_URL` to a public https origin or use an external
+https/Blossom image. Over-quota uploads fail with `media-quota`.
+
+### 5.7 Error model
 
 All errors return RFC 9457 problem details:
 `{"type": "urn:infinitemarkets:<code>", "title": …, "status": …, "detail": …}`.
@@ -1825,7 +1843,8 @@ light presets emit the dark variant for `data-scheme="dark"` and
 | items per order | ≤ 64; qty per item ≤ 10,000 and merchant-configurable lower cap |
 | computed amount | checked signed 64-bit; > LNbits incoming-payment maximum rejected |
 | title/summary/description | ≤ 200 / 500 / 64 KB |
-| images per product | ≤ 16; URL scheme `https` only; no server-side fetch |
+| images per product | ≤ 20; URL scheme `https` only; no server-side fetch |
+| media upload | ≤ 16 files per request, ≤ 25 MB per file, 400 MB/merchant local quota; png/jpg/webp only |
 | checkout POST | 10/min/IP + 100/hour/IP |
 | open (unpaid) web orders per IP | ≤ 10 concurrent |
 | open orders per buyer_pubkey per merchant | ≤ 10 concurrent |
