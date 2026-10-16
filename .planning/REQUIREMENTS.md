@@ -22,7 +22,7 @@ Requirements for v1.1. Each maps to one roadmap phase after owner approval.
 
 - [x] **MEDIA-08**: One reusable upload control is available for the product gallery, Merchant Nostr profile avatar/banner, and Appearance brand logo, hero background, footer logo, and custom share image.
 - [x] **MEDIA-09**: Product images support multiple files, thumbnails, a visible primary image, ordering, per-image removal, and an explicit clear-all operation.
-- [ ] **MEDIA-10**: Single-image settings fields support replacing and clearing their image without changing unrelated profile/theme fields.
+- [x] **MEDIA-10**: Single-image settings fields support replacing and clearing their image without changing unrelated profile/theme fields.
 - [x] **MEDIA-11**: The merchant can continue to paste existing HTTPS image URLs, and editing/saving preserves supported migration-managed local `/images/...` URLs.
 - [x] **MEDIA-12**: Upload UI reports per-file progress and errors, preserves other selected images on failure, and explains that cancelling before saving a setting/product can leave an unreferenced uploaded file.
 - [x] **MEDIA-13**: Product image ordering, removal, and clear-all persist through the existing catalog API and are reflected in public pages and Nostr projections.
@@ -76,7 +76,7 @@ Proposed mapping from the v1.1 roadmap; owner approval is pending.
 | MEDIA-07 | Phase 6 | Complete |
 | MEDIA-08 | Phase 7 | Complete |
 | MEDIA-09 | Phase 7 | Complete |
-| MEDIA-10 | Phase 7 | Pending |
+| MEDIA-10 | Phase 7 | Complete |
 | MEDIA-11 | Phase 7 | Complete |
 | MEDIA-12 | Phase 7 | Complete |
 | MEDIA-13 | Phase 7 | Complete |
