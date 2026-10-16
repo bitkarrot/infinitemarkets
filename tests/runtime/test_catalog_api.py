@@ -232,6 +232,82 @@ async def test_product_image_incremental_limit(runtime_env):
     assert rejected.status_code == 422
 
 
+async def test_product_images_clear_all_via_empty_array(runtime_env):
+    """D-21/D-27 (MEDIA-13) — `images` key PRESENCE drives delete+reinsert:
+    an explicit empty array clears every product_images row. This is the
+    semantics the unified gallery's Clear all relies on; the admin client
+    now always sends the key (the old length-guard made [] unreachable)."""
+    cid = await _category(runtime_env)
+    client = runtime_env["client"]
+    headers = await _cookie(runtime_env)
+    created = await client.post(
+        f"{API}/products",
+        json={"category_id": cid, "title": "gallery", "format": "digital",
+              "amount_minor": 1, "currency": "SAT", "draft": True,
+              "images": [{"url": "https://img.example/a.png"},
+                         {"url": "https://img.example/b.png"}]},
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    product_id = created.json()["id"]
+    assert [i["url"] for i in created.json()["images"]] == [
+        "https://img.example/a.png", "https://img.example/b.png",
+    ]
+
+    resp = await client.patch(
+        f"{API}/products/{product_id}",
+        json={"images": []},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["images"] == []
+    got = await client.get(f"{API}/products/{product_id}")
+    assert got.json()["images"] == []
+
+
+async def test_product_images_ordered_replace_and_omit_preserves(runtime_env):
+    """A populated `images` list replaces rows in sent order (sort_order
+    defaults to list index); a PATCH omitting `images` preserves the
+    stored list untouched — the three D-21 arms."""
+    cid = await _category(runtime_env)
+    client = runtime_env["client"]
+    headers = await _cookie(runtime_env)
+    created = await client.post(
+        f"{API}/products",
+        json={"category_id": cid, "title": "reorder", "format": "digital",
+              "amount_minor": 1, "currency": "SAT", "draft": True,
+              "images": [{"url": "https://img.example/one.png"}]},
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    product_id = created.json()["id"]
+
+    ordered = [
+        "https://img.example/three.png",
+        "/library/infinitemarkets/" + "a" * 64 + ".png",
+        "https://img.example/two.png",
+    ]
+    resp = await client.patch(
+        f"{API}/products/{product_id}",
+        json={"images": [{"url": u} for u in ordered]},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    assert [i["url"] for i in resp.json()["images"]] == ordered
+    got = await client.get(f"{API}/products/{product_id}")
+    assert [i["url"] for i in got.json()["images"]] == ordered
+    assert [i["sort_order"] for i in got.json()["images"]] == [0, 1, 2]
+
+    # omitted = preserve — an unrelated PATCH must not touch the rows
+    resp = await client.patch(
+        f"{API}/products/{product_id}",
+        json={"title": "reorder v2"},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    assert [i["url"] for i in resp.json()["images"]] == ordered
+
+
 async def test_product_crud_and_outbox_intent(runtime_env):
     cid = await _category(runtime_env)
     client = runtime_env["client"]

@@ -162,6 +162,42 @@ async def test_product_editor_shipping_options(runtime_env):
     assert "EU" not in codes
 
 
+async def test_product_editor_gallery(runtime_env):
+    """MEDIA-09/11/12/13/14 (D-14…D-16, D-21) — the product editor's
+    unified gallery replaces the images_text textarea: one thumbnail
+    list, Primary badge at index 0, text-labeled Move up/Move
+    down/Remove/Clear all controls, in-control Add-by-URL, the shared
+    picker with multiple, per-file progress, and JS identifiers for the
+    mutators + close-path disclosure."""
+    html = (await runtime_env["client"].get("/infinitemarkets/")).text
+    editor = html.split('data-gm-catalog-editor="product"', 1)[1]
+    editor = editor.split("</q-card>", 1)[0]
+    assert "images_text" not in editor
+    assert "gmCatalog.editor.form.images" in editor
+    assert '<gm-media-picker usage="catalog" multiple' in editor
+    assert '@files-chosen="gmGalleryFiles"' in editor
+    for label in ("Primary", "Move up", "Move down", "Remove",
+                  "Clear all", "Add image by URL"):
+        assert label in editor, label
+    assert "gmGalleryMove" in editor
+    assert "gmGalleryAddUrl" in editor
+    assert "gmGalleryClearAll" in editor
+    assert "q-linear-progress" in editor
+    assert "gmCatalog.imageDisclosure" in editor
+    # Cancel routes through the disclosure helper.
+    assert 'label="Cancel" @click="gmCloseProductEditor"' in editor
+
+    js = (await runtime_env["client"].get(f"{JS}/admin_catalog.js")).text
+    assert "images_text" not in js
+    for ident in ("gmGalleryFiles", "gmGalleryAddUrl", "gmGalleryMove",
+                  "gmGalleryRemove", "gmGalleryClearAll",
+                  "gmDiscloseUnsavedUploads", "gmCloseProductEditor",
+                  "uploadsUnsaved", "body.images"):
+        assert ident in js, ident
+    assert "You can add up to 20 images per product." in js
+    assert "You can remove them in Settings → Media." in js
+
+
 async def test_product_actions_precede_title(runtime_env):
     html = (await runtime_env["client"].get("/infinitemarkets/")).text
     assert html.index('data-col="actions"') < html.index('data-col="title"')
