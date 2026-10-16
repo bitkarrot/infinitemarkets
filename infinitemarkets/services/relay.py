@@ -209,7 +209,12 @@ async def get_blossom_servers(merchant_id: str) -> list[str]:
 
 
 async def set_blossom_servers(merchant_id: str, urls: list[str]) -> list[str]:
-    validated = sorted({validate_blossom_url(u) for u in urls})
+    # Persisted-contract change (Phase 6): the FIRST configured server is
+    # the primary upload target, so submission order must survive — dedup
+    # first-seen, never sort. Pre-existing rows keep their alphabetical
+    # order (original order is unrecoverable; owner-accepted, no data
+    # migration possible — merchants re-save to reorder).
+    validated = list(dict.fromkeys(validate_blossom_url(u) for u in urls))
     async with DomainTransaction() as tx:
         await tx.execute(
             f"DELETE FROM {tx.table('settings')} "

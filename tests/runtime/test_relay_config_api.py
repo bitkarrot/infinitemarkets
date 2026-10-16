@@ -198,6 +198,36 @@ async def test_blossom_servers_configurable_with_https_only(runtime_env):
         assert resp.status_code in (400, 422), (bad, resp.status_code)
 
 
+async def test_blossom_servers_preserve_submission_order(runtime_env):
+    """Phase 6 locked decision: the FIRST configured server is the primary
+    every upload consumer trusts. Submission order must round-trip
+    untouched — first-seen wins on duplicates, never re-sorted."""
+    client, env = runtime_env["client"], runtime_env
+    mid, csrf = await _merchant_id(env)
+    resp = await client.patch(
+        f"/infinitemarkets/api/v1/merchants/{mid}",
+        json={
+            "blossom_servers": [
+                "https://zzz.example.com",
+                "https://aaa.example.com",
+                "https://zzz.example.com",
+            ]
+        },
+        headers=_headers(env, csrf),
+    )
+    assert resp.status_code == 200, resp.text
+
+    health = await client.get(
+        f"/infinitemarkets/api/v1/merchants/{mid}/relay-health",
+        headers=_headers(env),
+    )
+    assert health.status_code == 200, health.text
+    assert health.json()["blossom_servers"] == [
+        "https://zzz.example.com",
+        "https://aaa.example.com",
+    ]
+
+
 async def test_outbox_listing_and_retry_routes(runtime_env):
     """W-NEW-1 spec-delta routes: owner-scoped listing + retry."""
     client, env = runtime_env["client"], runtime_env
