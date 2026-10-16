@@ -17,7 +17,7 @@ Authoring conventions
 - Status tags in bullets render as chips: [shipped] [tested] [spec-aligned] [todo] [roadmap].
 -->
 
-<!-- slide: layout=title accent=yellow bg=night logo=../img/logo-512.png kicker="infinitemarkets · v1.0.13 · LNbits extension" -->
+<!-- slide: layout=title accent=yellow bg=night logo=../img/logo-512.png kicker="infinitemarkets · v1.0.14 · LNbits extension" -->
 # Infinite Markets
 
 ## One inventory. Every storefront. Your rails.
@@ -171,7 +171,7 @@ paid/shipped booleans.
 <!-- slide: layout=split accent=mint kicker="part 3 · infinite markets" -->
 # Infinite Markets - What it is
 
-- A **standard Python LNbits extension**, MIT, v1.0.13, LNbits ≥ 1.6.0
+- A **standard Python LNbits extension**, MIT, v1.0.14, LNbits ≥ 1.6.0
 - **Commerce authority**: catalog, inventory, shipping, orders, messages, publication
 - **LNbits core stays settlement authority**: invoices, payment records, funding source
 - Two rails, **one pipeline**: a web storefront and a native Nostr/Gamma channel share pricing, reservation, invoicing & settlement
@@ -517,7 +517,7 @@ rule when deciding which extension owns stock.
 # Where it stands
 
 - **Releases A, B, 03.1 and C implemented**: web commerce, Gamma NIP-17 orders, buyer accounts, catalog import/export
-- Published **v1.0.13** via LNbits extension manifest (sha256-verified)
+- Published **v1.0.14** via LNbits extension manifest (sha256-verified)
 - Conformance: gated `nostrrelay` env, egress / NIP-42 / paid-relay drills, **Plebeian matrix**, plus a live `plebeian.market` checkout verified end-to-end (2026-10-13)
 - Pinned host (LNbits `v1.6.2-rc1`), pinned Gamma spec & NIPs, recorded decisions
 - Out of scope for v1: escrow, fiat custody, automated refunds, subscriptions, reviews
@@ -527,7 +527,7 @@ rule when deciding which extension owns stock.
 <!-- slide: layout=bullets accent=pink kicker="risks" -->
 # Risks
 
-1. **This is experimental software**: v1.0.13, built on a draft marketplace spec; start with small amounts
+1. **This is experimental software**: v1.0.14, built on a draft marketplace spec; start with small amounts
 2. **Contingent on community support and feedback**: interop depends on marketplace clients, the spec working group, and real merchants using it
 3. **Maintenance has a cost**: tracking LNbits releases, spec revisions, marketplace client changes, and security updates takes ongoing time and resources
 

@@ -186,7 +186,10 @@ consistent. The save gate checks both schemes.
 creator credit, screenshot gallery, link cards), the Embed snippets tab,
 Messages redesigned as conversation list + chat thread, Publications rows
 carrying timestamps and clickable detail, and single-column merchant
-settings.
+settings. Catalog includes searchable product/category/collection tables,
+expandable category and collection membership lists, and product search/share
+preview cards. Shipping destinations use searchable country and ISO
+3166-2 region pickers with labeled delivery-duration units.
 
 **v0.3–v0.4 merchant operations.** Settings → Merchant Nostr Profile manages
 `name`, bio, avatar, header image, NIP-05, and Lightning address, links to the
