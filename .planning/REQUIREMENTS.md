@@ -63,16 +63,34 @@ Deferred unless the owner promotes them into v1.1 scope.
 
 ## Traceability
 
-Populated by the v1.1 roadmap after approval.
+Proposed mapping from the v1.1 roadmap; owner approval is pending.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MEDIA-01–MEDIA-19 | Pending roadmap | Pending |
+| MEDIA-01 | Phase 6 | Pending |
+| MEDIA-02 | Phase 7 | Pending |
+| MEDIA-03 | Phase 7 | Pending |
+| MEDIA-04 | Phase 6 | Pending |
+| MEDIA-05 | Phase 6 | Pending |
+| MEDIA-06 | Phase 6 | Pending |
+| MEDIA-07 | Phase 6 | Pending |
+| MEDIA-08 | Phase 7 | Pending |
+| MEDIA-09 | Phase 7 | Pending |
+| MEDIA-10 | Phase 7 | Pending |
+| MEDIA-11 | Phase 7 | Pending |
+| MEDIA-12 | Phase 7 | Pending |
+| MEDIA-13 | Phase 7 | Pending |
+| MEDIA-14 | Phase 7 | Pending |
+| MEDIA-15 | Phase 6 | Pending |
+| MEDIA-16 | Phase 6 | Pending |
+| MEDIA-17 | Phase 8 | Pending |
+| MEDIA-18 | Phase 6 | Pending |
+| MEDIA-19 | Phase 8 | Pending |
 
 **Coverage:**
 - v1 requirements: 19 total
-- Mapped to phases: 0
-- Unmapped: 19
+- Mapped to phases: 19
+- Unmapped: 0
 
 ---
 *Requirements drafted: 2026-10-16*

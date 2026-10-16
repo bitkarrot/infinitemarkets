@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 milestone: v1.1
 milestone_name: Media uploads and Blossom support
 status: planning
-last_updated: "2026-10-16T04:40:51.909Z"
-last_activity: 2026-10-15
+last_updated: "2026-10-16T05:49:35Z"
+last_activity: 2026-10-16
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -17,28 +17,27 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-10-11)
+See: .planning/PROJECT.md (updated 2026-10-16)
 
 **Core value:** A merchant can sell one authoritative inventory safely through LNbits-backed web and Nostr flows without duplicate invoices, double allocation, or relay delivery being mistaken for payment truth.
-**Current focus:** Phase 5 correctness/recovery/security hardening; milestone acceptance remains open.
+**Current focus:** v1.1 media uploads and Blossom support, starting at Phase 6 after owner approval of the roadmap.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 6 of 8 — Secure Media Storage (roadmap drafted; awaiting owner approval)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-10-15 — Milestone v1.1 started
+Status: Planning complete; implementation not started
+Last activity: 2026-10-16 — v1.1 roadmap and requirement traceability drafted
 
 ## Performance Metrics
 
-**Velocity:**
+**Current milestone (v1.1) velocity:**
 
-- Executed plans with original summaries: 15
-- Phase 4 historical plans dispositioned: 4 (not 4 original plans executed)
+- Executed plans: 0
 - Average duration: -
 - Total execution time: 0 hours
 
-**By Phase:**
+**v1.0 historical plans by phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
@@ -47,7 +46,7 @@ Last activity: 2026-10-15 — Milestone v1.1 started
 | 3 | 4 | - | - |
 | 03.1 | 3 | - | - |
 | 4 | 4 historical disposition records | - | - |
-| 5 | 6 reviewed; 3 plans complete (05-02/04/05), 2 partial (05-01 host browser, 05-03 chronology), 05-06 pending | - | - |
+| 5 | 6/6 plans complete; closeout gates closed 2026-10-13 | - | - |
 
 **Recent Trend:**
 
@@ -69,6 +68,18 @@ Last activity: 2026-10-15 — Milestone v1.1 started
 ### Decisions
 
 Decisions are logged in PROJECT.md and the normative specification.
+
+#### v1.1 Locked Owner Decisions
+
+- Every upload selects exactly one backend: LNbits-local by default or Blossom only when explicitly selected; there is no dual-write.
+- Blossom uses only the first server configured in Settings → Merchant, preserving the saved order. Do not auto-fail over; show a clear failure and let the merchant explicitly retry to local storage.
+- Blossom authorization is signed server-side with the merchant's stored key. Never expose nsec or reusable signing material to browser code.
+- Product galleries support up to 20 images; align the technical specification with the current service implementation.
+- Upload bounds are at most 16 files per request, 25 MB per file, and 400 MB per merchant for local storage. Multipart parsing must be bounded and must not buffer unbounded request bodies in memory.
+- Accept only signature-verified PNG/JPEG/WebP; reject SVG and GIF in v1.1.
+- If a remote upload is not saved with its product or setting, disclose that the blob may remain unreferenced; never automatically delete remote Blossom blobs.
+- Keep PR #28's bounded, revalidated HTTPS redirects scoped to share-card image GETs. Merge and verify PR #28 before release; never follow upload PUT redirects.
+- BUD-04 mirroring, kind-10063 publication, remote deletion, GIF support, and image transforms remain deferred.
 
 - Runtime identity is `infinitemarkets`.
 - Direct qualified `nostr-sdk` is the baseline; other relay extensions are unqualified adapter candidates.
@@ -92,19 +103,23 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 - No loose files in `.planning/todos/pending/`; the shipping picker is already completed.
 - HARD-01–08 all verified (archived requirements at `.planning/milestones/v1.0-REQUIREMENTS.md`); Phase 3 UAT item 17 passed 2026-10-13 (live plebeian.market smoke).
+- v1.1 implementation plans begin only after owner approval of the roadmap.
 
 ### Release Closeout Gates
 
 - [x] Current pre-fix CI observed: run 38194415581 on `a7082c7`, all four Linux SQLite/PostgreSQL profiles plus lint passed. This does not test all F1–F6 regressions.
 - [x] Existing account/catalog delivery checked: 70 passed, 1 optional private-Shopify-sample skip, process exit 0; lint passed.
 - [x] Historical Phase 4 cutover plans explicitly dispositioned; no removed feature is reinstated.
-- [x] F1–F6 fixed and permanently regression-tested on both DB profiles; reopened security threats mitigated per local review — threat closure still gated on 05-06 qualification.
+- [x] F1–F6 fixed and permanently regression-tested on both DB profiles; independent review and 05-06 qualification closed 2026-10-13, with accepted residuals recorded.
 - [x] CI-01 paired-test lifecycle fixed: root cause (cancelled engine checkout orphaning aiosqlite worker thread) demonstrated; bounded subprocess regression + both orders + full suites exit0.
-- [x] Fresh repaired-revision database/platform evidence recorded (SQLite 982/8s, PG 987/3s exit0; evidence bundle regenerated). Browser/conformance items tracked separately under open gates.
+- [x] Fresh repaired-revision database/platform evidence recorded (SQLite 982/8s, PG 987/3s exit0; evidence bundle regenerated); remaining browser/conformance gates are reconciled in the v1.0 closeout record.
 - [x] Operator read-only historical paid-order audit performed 2026-10-13 on the deployed instance: 14 orders, all demo-product test activity; zero real-customer paid orders; PII envelope-encrypted; disposition recorded in 05-VERIFICATION.md.
 - [x] Phase 3 live Plebeian checkout/payment UAT executed 2026-10-13 — Playwright-driven live plebeian.market order, wrap processed on nos.lol, gamma order confirmed after internal invoice settlement; evidence in 03-VERIFICATION.md + conformance run log.
 
 ### Blockers/Concerns
+
+- PR #28 (`fix/og-image-redirects`) is open and all CI checks have passed; merge and verification remain a v1.1 release prerequisite. Its redirect handling is GET-only, never upload PUT behavior.
+- The 400 MB quota applies to LNbits-local storage; Blossom requests still require strict per-request/file bounds and safe request-time egress validation.
 
 - F1–F6 source corrections pass local runtime + independent review (05-REVIEW.md); CI-01 root cause fixed with process-exit regression; full make verify green both profiles; pushed to origin/main (eaf7d64) for the four-profile CI matrix. 05-06 gates reconciled 2026-10-13: live Plebeian passed, paid-order audit performed, F1 + WR-01 operator-accepted in writing; milestone closeout authorized.
 - WR-04 token revocation boundary RESOLVED (locked presented-token recheck on status/opt-out/claim; regressions both DBs).
@@ -119,6 +134,7 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 ### Roadmap Evolution
 
+- 2026-10-16: v1.1 roadmap created as Phases 6–8: secure media storage, shared image editors for all merchant image fields, and media release qualification. MEDIA-01–MEDIA-19 are each assigned to exactly one phase.
 - 2026-10-11: user chose hardening first. Phase 5 added for F1–F6, CI-01 and release/security evidence; optional integrations and shipping-import expansion deferred.
 
 - Phase 03.1 inserted after Phase 3: Buyer accounts — email magic-link sign-in and Nostr identity linking
@@ -137,6 +153,6 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 ## Session Continuity
 
-Last session: 2026-10-12
-Stopped at: F4–F6/CI-01 tranche committed locally; pause before 05-06 qualification work
-Resume file: .planning/phases/05-correctness-recovery-and-security-hardening/05-REVIEW.md
+Last session: 2026-10-16
+Stopped at: v1.1 roadmap and traceability drafted; no implementation started pending owner approval
+Resume file: .planning/ROADMAP.md
