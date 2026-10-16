@@ -267,14 +267,31 @@ def shipping_event(
     }
 
 
-def merchant_profile_event(merchant: dict, *, pubkey: str) -> dict:
+def merchant_profile_event(
+    merchant: dict, *, pubkey: str, public_base_url: str = ""
+) -> dict:
     """kind 0 — section 6.4. `manual` payment preference only; no
-    ecash/lud16 advertising in v1. No NIP-32 labels on identity."""
+    ecash/lud16 advertising in v1. No NIP-32 labels on identity.
+
+    MEDIA-07 emit side (D-04/D-07): a stored relative
+    ``/images/infinitemarkets/`` picture/banner is absolutized with the
+    operator-configured ``public_base_url`` at publish time so relays
+    receive a fetchable https URL. Already-absolute values pass through
+    byte-identical; an empty base never concatenates (defensive —
+    ``_validate_profile`` requires https anyway)."""
     profile = json.loads(merchant["profile_json"]) if merchant.get(
         "profile_json"
     ) else {}
     content = {"name": merchant.get("display_name") or ""}
     content.update(profile)
+    for key in ("picture", "banner"):
+        value = content.get(key)
+        if (
+            isinstance(value, str)
+            and value.startswith("/images/infinitemarkets/")
+            and public_base_url
+        ):
+            content[key] = public_base_url + value
     return {
         "kind": GAMMA_KIND_PROFILE,
         "content": json.dumps(content, sort_keys=True, separators=(",", ":")),

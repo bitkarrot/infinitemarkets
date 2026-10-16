@@ -571,7 +571,8 @@ async def render_intent(row: dict, database=None) -> dict | None:
             merchant = dict(merchant)
             if kind == 0:
                 return events.merchant_profile_event(
-                    merchant, pubkey=merchant["pubkey"])
+                    merchant, pubkey=merchant["pubkey"],
+                    public_base_url=_public_base_url())
             if kind == 31989:
                 return events.handler_recommendation_event(
                     merchant, pubkey=merchant["pubkey"])
