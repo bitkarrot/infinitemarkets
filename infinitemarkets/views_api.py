@@ -970,6 +970,31 @@ async def media_upload(request: Request, user: User = Depends(check_user_exists)
         await form.close()
 
 
+@infinitemarkets_api_router.get("/media/unused")
+@problem_boundary
+async def list_unused_media(
+    request: Request, user: User = Depends(check_user_exists)
+):
+    """D-02: local uploads no product/profile/theme value references —
+    migration-owned (sidecar) names are never listed (D-12)."""
+    from .services import media
+
+    return await media.list_unused(await _mid(user), user)
+
+
+@infinitemarkets_api_router.delete("/media/unused/{name}")
+@problem_boundary
+async def delete_unused_media(
+    request: Request, name: str, user: User = Depends(check_user_exists)
+):
+    """Explicit local-only deletion of an unreferenced upload (D-02) —
+    referenced/sidecar-owned names conflict; absent names are a
+    200-idempotent no-op. Local only: no remote/BUD DELETE (MEDIA-22)."""
+    from .services import media
+
+    return await media.delete_unused(await _mid(user), name, user)
+
+
 @infinitemarkets_api_router.post("/migration/legacy/{source_kind}/execute")
 @problem_boundary
 async def execute_legacy(

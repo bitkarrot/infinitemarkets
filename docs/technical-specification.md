@@ -805,7 +805,9 @@ invoice-status audit, or stock-count step is available.
 ### 5.6 Admin — media
 
 ```text
-POST  /media/upload                     bounded multipart image upload — magic-byte verified png/jpg/webp only, content-addressed local storage under the merchant namespace
+POST   /media/upload                    bounded multipart image upload — magic-byte verified png/jpg/webp only, content-addressed local storage under the merchant namespace
+GET    /media/unused                    list unreferenced local uploads — migration-owned (sidecar) files are never listed
+DELETE /media/unused/{name}             explicit local deletion of an unreferenced file — media-referenced conflict while in use, 200-idempotent when absent
 ```
 
 `POST /media/upload` accepts ≤16 file parts per request, each ≤25 MB, with a
@@ -819,6 +821,15 @@ optional `usage` field is `catalog|profile|appearance` (default `catalog`);
 fails with a `media-origin` problem telling the merchant to set
 `INFINITEMARKETS_PUBLIC_BASE_URL` to a public https origin or use an external
 https/Blossom image. Over-quota uploads fail with `media-quota`.
+
+`GET /media/unused` lists stored local files whose `infinitemarkets/<ns>/<name>`
+substring appears in no owned `product_images.url`, `profile_json`, or theme
+value (absolute and relative forms both count as referenced); filenames recorded
+in the migration sidecar are migration-owned and never listed.
+`DELETE /media/unused/{name}` removes such a file — `{name}` must fullmatch
+`[0-9a-f]{64}\.(png|jpg|webp)`, referenced or migration-owned names fail with
+`media-referenced`, and an absent name is a 200-idempotent no-op. Deletion is
+local-only; remote Blossom blobs are never deleted (MEDIA-22 deferred).
 
 ### 5.7 Error model
 

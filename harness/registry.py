@@ -271,6 +271,8 @@ HTTP_ROUTES: tuple[str, ...] = (
     "GET /migration/products/export",
     # 5.6 admin — media
     "POST /media/upload",
+    "GET /media/unused",
+    "DELETE /media/unused/{name}",
 )
 
 # --- Section 5.7 error codes ----------------------------------------------------
