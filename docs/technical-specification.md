@@ -805,7 +805,7 @@ invoice-status audit, or stock-count step is available.
 ### 5.6 Admin — media
 
 ```text
-POST   /media/upload                    bounded multipart image upload — magic-byte verified png/jpg/webp only, content-addressed local storage under the merchant namespace
+POST   /media/upload                    bounded multipart image upload — magic-byte verified png/jpg/webp only; `backend` selects storage: local (default) or blossom (first configured Blossom server only, no failover)
 GET    /media/unused                    list unreferenced local uploads — migration-owned (sidecar) files are never listed
 DELETE /media/unused/{name}             explicit local deletion of an unreferenced file — media-referenced conflict while in use, 200-idempotent when absent
 ```
@@ -821,6 +821,15 @@ optional `usage` field is `catalog|profile|appearance` (default `catalog`);
 fails with a `media-origin` problem telling the merchant to set
 `INFINITEMARKETS_PUBLIC_BASE_URL` to a public https origin or use an external
 https/Blossom image. Over-quota uploads fail with `media-quota`.
+
+The optional `backend` field is `local|blossom` (default `local`) — one upload
+selects exactly one storage backend. `local` stores bytes under the merchant
+namespace as above; `blossom` sends each file to the FIRST configured Blossom
+server only (Settings → Merchant order is preserved). `backend=blossom` with no
+configured server fails with a `media-backend` problem suggesting Blossom
+configuration or local storage; a remote failure fails with `media-remote`
+naming the failed server and writes nothing locally — there is no silent
+failover or dual-write, and Blossom bytes never count toward the local quota.
 
 `GET /media/unused` lists stored local files whose `infinitemarkets/<ns>/<name>`
 substring appears in no owned `product_images.url`, `profile_json`, or theme

@@ -19,16 +19,22 @@ import re
 from urllib.parse import urlparse
 
 from ..db import db, table
-from ..security import conflict, is_public_ip, unprocessable
+from ..security import ProblemError, conflict, is_public_ip, unprocessable
 from ..settings import ext_settings
 from . import migration_media
 
 _NAME_RE = re.compile(r"[0-9a-f]{64}\.(png|jpg|webp)")
 
 #: Multipart ``usage`` field vocabulary — the field the editor uses to say
-#: where an upload is bound. ``backend`` is plan 06-03's expansion and is
-#: not accepted here.
+#: where an upload is bound.
 MEDIA_USAGES = ("catalog", "profile", "appearance")
+
+#: Multipart ``backend`` field vocabulary — which storage receives the
+#: bytes. Locked owner decision: exactly one backend per upload; ``local``
+#: is the default (and the automatic selection when no Blossom server is
+#: configured); ``blossom`` targets the FIRST configured server only —
+#: never a dual-write, never a silent failover (06-03).
+MEDIA_BACKENDS = ("local", "blossom")
 
 
 def local_path(merchant_id: str, name: str) -> str:
@@ -117,6 +123,7 @@ async def store_local(
         stored_name = f"{digest}.{ext}"
         result.update(
             state="stored",
+            backend="local",
             sha256=digest,
             bytes=len(content),
             path=local_path(merchant_id, stored_name),
@@ -163,7 +170,116 @@ async def store_local(
             continue
         tmp.replace(dest)
         uploaded += 1
-    return {"uploaded": uploaded, "results": results, "namespace": namespace}
+    return {
+        "uploaded": uploaded,
+        "results": results,
+        "namespace": namespace,
+        "backend": "local",
+    }
+
+
+async def store_upload(
+    merchant_id: str, user, files: list[tuple[str, bytes]], *,
+    usage: str, backend: str,
+) -> dict:
+    """Single dispatch point behind ``POST /media/upload`` (06-03).
+
+    ``local`` -> ``store_local``, including the D-05/D-08 profile-origin
+    gate (it lives here rather than the route so a profile-bound upload
+    to a Blossom server is not blocked by a private ``public_base_url`` —
+    the remote descriptor URL is exactly the external-https alternative
+    the gate's message recommends). ``blossom`` -> the FIRST configured
+    server only.
+    """
+    if backend == "blossom":
+        return await _store_blossom(merchant_id, user, files)
+    if usage == "profile" and not origin_is_public(
+        ext_settings().public_base_url
+    ):
+        raise unprocessable(
+            "media-origin",
+            "Profile image origin is not publicly reachable",
+            "Images bound for your Nostr profile must resolve to a "
+            "public https URL that relays can fetch. Set "
+            "INFINITEMARKETS_PUBLIC_BASE_URL to your shop's public "
+            "https origin, or use an external https/Blossom image "
+            "instead.",
+        )
+    return await store_local(merchant_id, user, files)
+
+
+async def _store_blossom(merchant_id: str, user, files) -> dict:
+    """Remote branch of ``store_upload``: BUD-02 PUT to the FIRST
+    configured Blossom server (06-02's preserved ordering is the whole
+    contract — the loop below iterates FILES, never the server list).
+
+    A remote failure raises through ``problem_boundary`` as a typed
+    problem naming the server; NOTHING is written to the local namespace
+    and no second server is contacted — the merchant retries to local
+    explicitly (locked no-failover decision). Per-file sniff/size gates
+    (MEDIA-05) still apply; the 400 MB quota does not (D-06 — remote
+    bytes are never tracked)."""
+    from .. import keystore as keystore_mod
+    from . import blossom, catalog, relay
+
+    await catalog._merchant_owned(merchant_id, user)
+    if not files or len(files) > migration_media.MAX_FILES_PER_REQUEST:
+        raise unprocessable(
+            "invalid-content",
+            f"upload 1 to {migration_media.MAX_FILES_PER_REQUEST} "
+            "image files per request",
+        )
+    servers = await relay.get_blossom_servers(merchant_id)
+    if not servers:
+        raise unprocessable(
+            "media-backend",
+            "No Blossom media server configured",
+            "Uploading with backend=blossom requires a Blossom media "
+            "server. Configure one under Settings -> Merchant, or upload "
+            "with backend=local to store the image in LNbits instead.",
+        )
+    server = servers[0]
+    keystore = keystore_mod.key_store()
+    results: list[dict] = []
+    uploaded = 0
+    for name, content in files:
+        result = {"file": name}
+        results.append(result)
+        if not content or len(content) > migration_media.MAX_FILE_BYTES:
+            result.update(state="rejected", reason="size")
+            continue
+        ext = migration_media._sniff(content)
+        if not ext:
+            result.update(state="rejected", reason="not-an-image")
+            continue
+        try:
+            outcome = await blossom.upload_blob(
+                merchant_id, keystore, server, content, ext
+            )
+        except ProblemError as exc:
+            raise ProblemError(
+                exc.status,
+                exc.code,
+                exc.title,
+                f"Blossom server {server}: {exc.detail or exc.title} "
+                "Nothing was stored locally — retry the upload, or "
+                "upload with backend=local to use LNbits storage.",
+            ) from exc
+        result.update(
+            state="stored",
+            backend="blossom",
+            server=outcome["server"],
+            sha256=outcome["sha256"],
+            bytes=outcome["size"],
+            url=outcome["url"],
+        )
+        uploaded += 1
+    return {
+        "uploaded": uploaded,
+        "results": results,
+        "backend": "blossom",
+        "server": server,
+    }
 
 
 async def _referenced_names(

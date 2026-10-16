@@ -908,10 +908,12 @@ async def media_upload(request: Request, user: User = Depends(check_user_exists)
     The optional ``usage`` field (catalog|profile|appearance) declares
     where the image is bound; ``profile`` requires a public
     ``public_base_url`` so the emitted absolute URL is relay-reachable
-    (D-05/D-08). ``backend`` is plan 06-03's expansion — not accepted.
+    (D-05/D-08). The optional ``backend`` field (local|blossom, default
+    local) selects the storage target — ``blossom`` PUTs to the FIRST
+    configured Blossom server only, and a remote failure is a typed
+    problem, never a silent local write (06-03 locked decisions).
     """
     from .services import media, migration_media
-    from .settings import ext_settings
 
     merchant_id = await _mid(user)
     if not request.headers.get("content-type", "").startswith(
@@ -944,20 +946,15 @@ async def media_upload(request: Request, user: User = Depends(check_user_exists)
                 "invalid-content",
                 "usage must be one of catalog|profile|appearance",
             )
-        if usage == "profile" and not media.origin_is_public(
-                ext_settings().public_base_url):
+        backend = form.get("backend") or "local"
+        if not isinstance(backend, str) or backend not in media.MEDIA_BACKENDS:
             raise unprocessable(
-                "media-origin",
-                "Profile image origin is not publicly reachable",
-                "Images bound for your Nostr profile must resolve to a "
-                "public https URL that relays can fetch. Set "
-                "INFINITEMARKETS_PUBLIC_BASE_URL to your shop's public "
-                "https origin, or use an external https/Blossom image "
-                "instead.",
+                "invalid-content",
+                "backend must be one of local|blossom",
             )
         files = []
         for key, item in form.multi_items():
-            if key == "usage":
+            if key in ("usage", "backend"):
                 continue
             if not isinstance(item, UploadFile):
                 raise unprocessable("invalid-content", "invalid file field")
@@ -965,7 +962,9 @@ async def media_upload(request: Request, user: User = Depends(check_user_exists)
             files.append((item.filename or "image", content))
         if not files:
             raise unprocessable("invalid-content", "image files required")
-        return await media.store_local(merchant_id, user, files)
+        return await media.store_upload(
+            merchant_id, user, files, usage=usage, backend=backend
+        )
     finally:
         await form.close()
 
