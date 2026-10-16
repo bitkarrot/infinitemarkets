@@ -1,8 +1,8 @@
 # Architecture Research
 
-**Domain:** Product media upload and Blossom server integration in a Python LNbits extension
+**Domain:** Shared merchant image uploads across Catalog, Merchant profile, and Appearance settings
 **Researched:** 2026-10-16
-**Confidence:** HIGH for existing boundaries and Blossom protocol facts; MEDIUM for the owner-dependent endpoint and failover policy
+**Confidence:** HIGH for existing boundaries and Blossom protocol facts; MEDIUM for local public URL representation and endpoint shape
 
 > **Milestone scope:** This is v1.1-specific research. Prior v1.0 project research is preserved under `.planning/research/v1.0-core/`.
 
@@ -13,7 +13,7 @@
 ```text
 ┌────────────────────────────────────────────────────────────────────────────┐
 │                           Admin browser (Vue/Quasar)                       │
-│  File picker · thumbnails · order/primary · URL list · progress/errors    │
+│ Catalog gallery · profile/avatar · Appearance assets · URL list            │
 └──────────────────────────────┬─────────────────────────────────────────────┘
                                │ Authenticated + CSRF multipart upload
                                ▼
@@ -24,22 +24,26 @@
                                │ bytes + merchant context
                                ▼
 ┌────────────────────────────────────────────────────────────────────────────┐
-│                   Blossom upload service (new focused module)              │
-│  Sniff/hash · choose configured server · build BUD-11 auth · safe HTTPS PUT│
-└───────────────┬───────────────────────────────────┬────────────────────────┘
-                │                                   │
-                ▼                                   ▼
-┌───────────────────────────────┐      ┌────────────────────────────────────┐
-│ MerchantKeyStore / nostr-sdk  │      │ Blossom media server(s)            │
-│ kind 24242 signed per upload  │      │ BUD-02 raw bytes + descriptor       │
-│ nsec never leaves backend     │      │ BUD-04 mirror optional, later       │
-└───────────────────────────────┘      └────────────────────────────────────┘
+│                  Shared media upload service (new module)                  │
+│  Sniff/hash · choose one backend · bounded transfer · safe error mapping   │
+└───────────────┬────────────────────────────┬───────────────────────────────┘
+                │                            │
+                ▼                            ▼
+┌───────────────────────────────┐  ┌────────────────────────────────────────┐
+│ LNbits managed media (default)│  │ Blossom (explicit optional target)     │
+│ Merchant namespace + quota    │  │ First configured server, BUD-02 PUT   │
+│ Public /images URL            │  │ BUD-11 auth signed server-side         │
+└───────────────────────────────┘  └────────────────────────────────────────┘
+                ▲                            ▲
+                │                            │
+                └────────── MerchantKeyStore / nostr-sdk ────────────────────┘
+                            kind 24242 only for Blossom; nsec stays backend
                 │                                   │
                 └──────────────────┬────────────────┘
                                    ▼
 ┌────────────────────────────────────────────────────────────────────────────┐
 │ Existing catalog persistence and projections                              │
-│ product_images(url, dimensions, sort_order) → public pages / NIP-99 / OG   │
+│ product_images + profile/theme URL fields → public pages / NIP-99 / OG    │
 └──────────────────────────────┬─────────────────────────────────────────────┘
                                │ generated card image fetch (GET only)
                                ▼
@@ -50,9 +54,11 @@
 
 | Component | Responsibility | Typical Implementation |
 |-----------|----------------|------------------------|
-| Admin product editor | Pick multiple images, show thumbnails/status, edit ordering/primary, remove or clear, retain URL list and errors | Extend `infinitemarkets/templates/infinitemarkets/admin.html` and `infinitemarkets/static/infinitemarkets/js/admin_catalog.js`; native browser `File`/`FormData` APIs. |
-| Upload route | Authenticate the merchant, enforce CSRF, bound incoming multipart bytes/count, validate ownership if route is product-scoped, return stable descriptor/errors | Add route in `infinitemarkets/views_api.py` following bounded migration media parsing and RFC 9457 problem patterns. |
-| Blossom service | Validate endpoint and protocol response, sniff image bytes, hash, sign scoped authorization, make bounded HTTPS request | Focused `infinitemarkets/services/blossom.py`; use pinned `nostr-sdk==0.44.8`, stdlib HTTP client and existing egress controls. |
+| Shared admin uploader | Reusable file selection, preview, errors, destination choice; gallery mode for products and single-image mode for profile/theme fields | Extend the Vue/Quasar admin surfaces; native browser `File`/`FormData` APIs, local storage as default and Blossom as explicit target. |
+| Upload route | Authenticate the merchant, enforce CSRF, bound incoming multipart bytes/count, and return a safe public URL and plain-language error | Prefer a merchant-scoped generic media route so Catalog, Merchant profile, and Appearance can share it; follow bounded migration-media parsing and RFC 9457 problem patterns. |
+| Media upload service | Validate file bytes, hash and limits; route to one selected backend; return a safe URL | LNbits local storage is default. Blossom uses only the primary/first configured endpoint. Reuse migration-media validation primitives, not its migration manifest/relink semantics. |
+| Local media adapter | Store media outside the reinstallable extension package and produce a stable public URL | Reuse the host `/images` mount and an opaque merchant namespace/quota; produce an absolute HTTPS URL for Nostr profile picture/banner values. |
+| Blossom adapter | Validate endpoint and descriptor, sign scoped authorization, make bounded HTTPS request | Focused `infinitemarkets/services/blossom.py`; use pinned `nostr-sdk==0.44.8`, stdlib HTTP client and existing egress controls. |
 | Merchant key custody | Sign one kind-24242 event without disclosing nsec or persisting short-lived upload authorization | `MerchantKeyStore.sign_event(merchant_id, UnsignedEvent)` in `infinitemarkets/keystore.py`. |
 | Product image persistence | Store verified descriptor URL and ordered image list through existing product create/PATCH logic | Existing `product_images` table, `services/catalog.py`; no schema change by default. Ensure empty list means clear. |
 | Share-card fetcher | Fetch image URLs to render public 1200×630 cards with strict size and network checks | Existing `services/og_images.py`; preserve PR #28's safe GET redirect behavior without applying redirects to PUT. |
@@ -128,7 +134,7 @@ The exact BUD-11 auth value uses URL-safe base64 with **no padding**. The tag `x
 
 **What:** Treat remote blob upload and product save as separate effects. On successful upload, append the returned URL to the editor's ordered list; save the whole list through existing product create/PATCH logic. Explicitly send `images: []` to clear all images.
 
-**When to use:** Baseline product editor path, including existing URL and local import paths.
+**When to use:** Shared Catalog, Merchant profile, and Appearance upload path, including existing external URLs and local import paths.
 
 **Trade-offs:** A user who uploads and then cancels can leave an unreferenced remote blob. Explain this; do not pretend the blob and catalog update are an atomic transaction. A server-owned staging workflow would need additional complexity and is an owner decision.
 
@@ -144,46 +150,43 @@ Browser checks count/size and displays local previews
 CSRF-protected multipart route (bounded before accepting all bytes)
     ↓
 Owner-scope check → content sniff → SHA-256
+    ├── default: LNbits managed-media store → public /images URL
+    └── explicit Blossom choice: primary/first configured endpoint
+             ↓
+       egress-check + pin public IP → sign kind-24242 → raw BUD-02 PUT
+             ↓
+       Verify 200/201 + descriptor hash/type/size/url; reject redirects
     ↓
-Select explicitly configured server → public-egress DNS check/pin
+Return one safe URL → gallery or single-image field
     ↓
-MerchantKeyStore signs short-lived BUD-11 kind 24242 event
+Existing product/theme/profile save persists that URL in its canonical field
     ↓
-Raw-byte BUD-02 PUT /upload (no automatic redirect)
-    ↓
-Verify status 200/201 + descriptor hash/size/type/url consistency
-    ↓
-Return safe descriptor → editor updates ordered image list
-    ↓
-Product POST/PATCH persists URL, dimensions and sort order
-    ↓
-Existing product projections feed storefront, catalog event and OG card
+Public storefront, NIP-99/profile projections, and OG cards consume it
 ```
 
 ### State Management
 
 ```text
-Editor state: existing URLs + selected local files + upload status
-      │ upload success
-      ├── append descriptor URL / preserve user-selected order
-      │ save product
-      ├── POST or PATCH with complete `images` array (including [])
-      │ cancel after upload
-      └── disclose possible orphaned Blossom blob; no implied remote delete
+Shared uploader state: selected storage target + file preview + upload status
+      ├── default local / explicit Blossom → upload one backend only
+      ├── success → bind returned URL to gallery or single-image setting
+      ├── Blossom failure → visible error; merchant may explicitly retry local
+      └── cancel before saving field → disclose possible unreferenced stored file
 ```
 
 ### Key Data Flows
 
 1. **Blossom upload:** input bytes are supplied by the merchant, not fetched from an arbitrary image URL. Validate the content type from magic bytes, calculate SHA-256 from the same bounded bytes, and verify the returned descriptor matches the submitted content.
-2. **Catalog update:** keep `product_images` as the ordered canonical set. Product PATCH already replaces details when `images` is present; client must distinguish omitted (leave unchanged) from present-but-empty (clear).
+2. **Field update:** product gallery remains the ordered `product_images` set; avatar/banner and Appearance settings bind one URL to their existing profile/theme fields. Client must distinguish omitted from explicitly cleared.
 3. **OG card rendering:** remote image GET is a separate trust boundary. PR #28 handles bounded safe HTTPS GET redirects for the encountered `307`; do not reuse that redirect-following policy for upload PUT.
 4. **Migration local media:** its `/images/infinitemarkets/...` URLs are existing media and must remain editable. Resolve the current HTTPS-only validation mismatch before claiming full round-trip support.
+5. **Local profile media:** kind-0 profile picture/banner require absolute HTTPS URLs. Convert the managed `/images/...` path using the configured public base origin and ensure that origin is publicly reachable.
 
 ## Scaling Considerations
 
 | Scale | Architecture Adjustments |
 |-------|--------------------------|
-| 0–1k merchants | Single extension process is adequate. Use conservative file/total request limits, bounded workers/timeouts, first-success upload, and no durable job queue until evidence justifies it. |
+| 0–1k merchants | Single extension process is adequate. Use conservative file/total request limits, bounded workers/timeouts, one configured Blossom target per request, and no durable job queue until evidence justifies it. |
 | 1k–100k merchants | Measure host request occupancy, upload concurrency, and timeouts. Add bounded concurrency/backpressure or a durable task only if synchronous upload harms normal LNbits request capacity. |
 | 100k+ users | Outside current project assumptions. Reassess media proxy bandwidth, host egress, quotas, and upload jobs, but do not preemptively add distributed storage or queue architecture. |
 
@@ -241,7 +244,7 @@ Editor state: existing URLs + selected local files + upload status
 
 ## Sources
 
-- `infinitemarkets/services/relay.py` — configuration in `settings.blossom_servers`, current endpoint validation, alphabetical sorting.
+- `infinitemarkets/services/relay.py` — configuration in `settings.blossom_servers`, current endpoint validation, and alphabetical sorting that must be removed to preserve the chosen primary.
 - `infinitemarkets/services/catalog.py` and `views_api.py` — product image replacement and current `POST /products/{id}/images` URL attachment route.
 - `infinitemarkets/services/migration_media.py` — separate bounded local media ingest.
 - `infinitemarkets/keystore.py` — per-operation merchant event signing.

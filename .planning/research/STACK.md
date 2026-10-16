@@ -1,6 +1,6 @@
 # Stack Research
 
-**Domain:** Python LNbits extension — product-image uploads to Blossom media servers
+**Domain:** Python LNbits extension — merchant image uploads to local LNbits storage or Blossom media servers
 **Researched:** 2026-10-16
 **Confidence:** HIGH for the existing extension stack and Blossom wire contracts; MEDIUM for the not-yet-decided upload policy
 
@@ -12,7 +12,7 @@
 
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
-| Python | `>=3.12,<3.13` | Upload route, bounded parsing, hashing, Blossom HTTP client, validation | The extension and locked host/test environment target Python 3.12. Keep upload/auth logic in the existing backend rather than creating a second client-side protocol implementation. |
+| Python | `>=3.12,<3.13` | Upload route, bounded parsing, hashing, local media storage, Blossom HTTP client, validation | The extension and locked host/test environment target Python 3.12. Keep upload/auth logic in the existing backend rather than creating a second client-side protocol implementation. |
 | LNbits / FastAPI | Host baseline LNbits `v1.6.2-rc1` at `e336fe1`; FastAPI resolved by the pinned host | Authenticated, CSRF-protected admin upload endpoint and multipart parsing | Reuse the extension's established route, problem-detail, request-stream, and owner-scope patterns. The host is a project constraint, not a new dependency choice. |
 | `nostr-sdk` | `0.44.8` (already pinned) | Build/sign Blossom kind-24242 authorization events through merchant custody | `MerchantKeyStore.sign_event(merchant_id, UnsignedEvent)` loads and releases encrypted key material inside one operation. Keep the nsec out of browser code and avoid a new signing stack. |
 | Python standard library `http.client` | Python 3.12 stdlib | HTTPS PUT to Blossom and bounded HTTP response handling | Already used by `services/og_images.py`; supports the repository's pinned-IP/TLS-SNI connection pattern without introducing another dependency. Must be wrapped off the async event loop. |
@@ -75,9 +75,10 @@ make verify-fast
 - Backend may mint only short-lived, upload-scoped BUD-11 authorization; browser uses native APIs and receives no private key.
 - Treat server CORS, origin behavior, token leakage, retry/replay window, and user-visible server failures as explicit requirements and test them against a fake server before relying on public servers.
 
-**If the owner chooses multiple configured servers:**
-- Do not assume the current settings order is meaningful: `set_blossom_servers` de-duplicates and sorts URLs alphabetically.
-- Define primary/fallback or mirror policy and change persistence/UI behavior consistently. A pragmatic MVP is first-success on an explicitly ordered primary/fallback list; mirroring can use BUD-04 later.
+**Configured Blossom target (owner decision):**
+- Use only the primary/first `Media (Blossom)` server configured in Settings → Merchant.
+- Preserve the merchant's configured order; `set_blossom_servers` currently sorts URLs alphabetically and must change before the first item can reliably mean primary.
+- Do not automatically fail over to another Blossom server or mirror. If the primary fails, expose the error and let the merchant explicitly retry to local LNbits storage.
 
 ## Version Compatibility
 

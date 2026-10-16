@@ -1,6 +1,6 @@
 # Feature Research
 
-**Domain:** Merchant product-image editing and Blossom-hosted media upload
+**Domain:** Shared merchant image uploads across Catalog, Merchant profile, and Appearance settings
 **Researched:** 2026-10-16
 **Confidence:** HIGH for existing integration points and protocol expectations; MEDIUM for policy-sensitive scope
 
@@ -13,6 +13,7 @@
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
 | Multi-file image picker and thumbnail tiles | Product editors conventionally show selected images, not only raw URL strings | MEDIUM | Use browser-native file selection and previews. Confirm selected count and byte size before transfer; enforce real limits server-side. |
+| Single-image uploads for settings fields | Merchant avatar/banner and store logos/backgrounds are standard branding assets | LOW–MEDIUM | Reuse the uploader in Merchant profile picture/banner and Appearance brand logo, hero background, footer logo, and custom share-card fields. |
 | Explicit primary and ordering controls | First image is used by existing catalog projections and share-card behavior | MEDIUM | At minimum provide move-up/down and visibly identify the primary image. Preserve `sort_order` when saving. |
 | Per-image removal and “clear all” | Merchants must correct mistakes and remove prior images | LOW | PATCH supports replacing image details with `images: []`; current `gmSaveProduct` omits `images` when empty, so the UI currently cannot clear all images. |
 | Upload progress, retry, and per-file errors | Uploads are network operations and may fail independently | MEDIUM | Explain safe retry/hash behavior; distinguish local validation, authorization, server rejection, timeout, and transport errors without exposing signed tokens. |
@@ -27,7 +28,7 @@
 |---------|-------------------|------------|-------|
 | Blossom-native upload and hash identity | Produces portable content-addressed media rather than requiring a proprietary store | HIGH | BUD-02 descriptor returns URL, hash, size, type, and upload time. Verify descriptor against bytes sent. |
 | Server-side delegated signing | Merchants can upload with their Nostr identity without exporting keys to their browser | HIGH | Backend-proxy flow is the recommended default; a per-upload kind-24242 event is narrowly scoped and expires. |
-| Ordered primary/fallback servers | Merchant can express preference and retain an alternate upload destination | MEDIUM | Current setter sorts server URLs, so the feature requires a deliberate ordered-setting contract. BUD-03 server-list preference is an adjacent Nostr convention, not a current Infinite Markets behavior. |
+| Local default with explicit Blossom option | Merchants without Blossom access still need image uploads | MEDIUM | Save to this LNbits instance by default; when Blossom is selected, use only the primary/first configured server. On failure, offer an explicit local retry. No dual-write in v1.1. |
 | Resilience via BUD-04 mirroring | Optional redundancy without requiring duplicate browser uploads | HIGH | Defer until required; define partial success and durable retry behavior before shipping mirror-all. |
 | Share-card reliability for Blossom redirects | Public Open Graph cards can display remote images whose HTTPS retrieval URL redirects safely | MEDIUM | PR #28 `fix/og-image-redirects` is the fix-in-flight prerequisite. Its GET-only redirect handling is separate from upload transport policy. |
 | Image dimensions for layout stability | Catalog and preview layouts can reserve stable space before an image loads | LOW–MEDIUM | Existing `product_images` stores dimensions. Capture only when useful; browser-reported dimensions are hints, not proof of decoded image safety. |
@@ -37,7 +38,7 @@
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|----------------|-------------|
 | Put merchant private key in the browser for direct upload | Seems like the shortest path to Blossom auth | Exposes durable signing authority to frontend code and browser extensions | Backend signs per-upload authorization, or owner-approved short-lived delegated auth only. |
-| Upload every image to every configured server synchronously | Appears to guarantee availability | Multiplies upload time and failure modes; partial success and URL selection become ambiguous | First-success primary/fallback for MVP; add BUD-04 mirroring only with defined resilience and retry requirements. |
+| Upload every image to every configured server synchronously | Appears to guarantee availability | Multiplies upload time and failure modes; partial success and URL selection become ambiguous | Store each file in one selected backend. Defer BUD-04 mirroring until availability needs justify its retry and partial-success policy. |
 | Automatically delete remote blobs whenever an image is removed | Avoids apparent unused storage | Blossom blobs may be shared/content-addressed; deletion may affect other references and can fail independently from local save | Treat product-image removal as catalog detachment. Consider best-effort BUD DELETE only after owner confirms ownership, sharing, and failure semantics. |
 | Automatically upload images for unsaved product drafts | Smooth first-time editing | If the product is cancelled or save fails, the remote blob is orphaned; upload and catalog transaction cannot be atomic | Explain orphan behavior, allow save-and-upload staging, or require product creation before upload. Owner decision. |
 | Accept every image format, including arbitrary SVG | Broad format support | SVG can contain active content or remote references and may render inconsistently across consumers | Recommend sniffed PNG/JPEG/WebP; owner decides GIF. Reject SVG in the initial upload path. |
@@ -49,14 +50,14 @@
 PR #28 safe GET redirects for OG image retrieval
     └──required for──> Reliable share cards for Blossom image URLs
 
-Owner decisions (auth, primary/fallback, formats, limits, orphan policy)
+Remaining owner decisions (formats, limits, orphan policy, and cleanup)
     └──required for──> Blossom upload contract and endpoint
                            └──requires──> Bounded bytes + SHA-256 + BUD-11 signer
                                               └──requires──> Pinned-safe HTTPS PUT
 
 Blossom upload endpoint
-    └──enables──> Product editor picker, progress, retries, descriptors
-                      └──requires──> Ordered image state + full PATCH replacement
+    └──enables──> Shared Catalog / Merchant / Appearance uploader
+                      └──requires──> Single-image and ordered-gallery modes
                                          └──requires──> URL/local-path round-trip validation
 ```
 
@@ -66,7 +67,7 @@ Blossom upload endpoint
 - **Upload route requires resolved auth and transport policy:** BUD-11 details (kind 24242, `t=upload`, expiration, `x` hash, optional `server`) and the exact Authorization encoding need regression tests before UI integration.
 - **Editor integration requires state replacement to be fixed:** current frontend omits `images` from product PATCH if the text area is empty. The backend's present replacement path can clear with an explicit empty list, but the editor never sends that list.
 - **Local-path compatibility is required before round-trip claims:** the existing migration media flow creates local `/images/...` URLs, whereas catalog validation currently restricts image payloads to `https://`. Requirements must decide/describe supported local URLs and align code/spec.
-- **Ordered failover requires changing settings semantics:** current `set_blossom_servers` sorts/deduplicates values, so the configured sequence cannot currently encode a primary server.
+- **Primary selection requires changing settings semantics:** current `set_blossom_servers` sorts/deduplicates values, so the configured sequence cannot currently encode the primary/first server chosen by the merchant.
 - **No schema migration is inherently required:** `product_images` already stores URL, dimensions, and sort order. A new durable upload-job table would be a separate reliability decision, not an automatic requirement.
 
 ## MVP Definition
@@ -74,8 +75,10 @@ Blossom upload endpoint
 ### Launch With (v1.1)
 
 - [ ] Preserve/integrate PR #28 safe redirect following for GET-based OG image retrieval; keep it distinct from uploads.
-- [ ] Multi-file picker, thumbnail tiles, primary/order adjustment, per-image removal, and clear-all behavior.
-- [ ] Backend-proxied, authenticated upload to the resolved configured Blossom endpoint(s), with no nsec in the browser.
+- [ ] Reusable uploader for product galleries, Merchant profile picture/banner, and Appearance brand logo, hero, footer, and custom share-card image.
+- [ ] Multi-file product picker with thumbnails, primary/order adjustment, per-image removal, and clear-all; single-image mode for settings fields.
+- [ ] Local LNbits storage as the default, plus explicit Blossom selection using only the primary/first configured server; never dual-write.
+- [ ] Backend-proxied, authenticated Blossom upload with no nsec in the browser; Blossom failure remains visible and offers an explicit local-storage retry.
 - [ ] Bounded multipart requests, upload size/count feedback, PNG/JPEG/WebP sniffing, SHA-256, and BUD-11 authorization verified by a fake Blossom server.
 - [ ] Progress, retry, per-file errors, and preservation of editor state on failure.
 - [ ] Keep pasted HTTPS URLs and supported imported/local `/images/...` URLs round-trippable.
@@ -121,10 +124,10 @@ No comparative product UX audit is claimed in these four research passes. The di
 
 | Feature | Blossom protocol | Existing Infinite Markets | Our Approach |
 |---------|------------------|---------------------------|--------------|
-| Upload | BUD-02 raw-byte `PUT /upload`; descriptor includes content hash and media metadata | Existing admin editor accepts newline-separated HTTPS URLs; migration media has separate local multipart upload | Add Blossom upload beside—not instead of—the URL workflow; bind selected descriptor into ordered product images. |
+| Upload | BUD-02 raw-byte `PUT /upload`; descriptor includes content hash and media metadata | Existing admin surfaces accept image URLs; migration media has separate local multipart upload | One reusable uploader stores to local LNbits by default or to the first configured Blossom server when selected; retain existing URLs. |
 | Authorization | BUD-11 signed kind-24242 event and hash-bound request | Merchant keys are encrypted and signing is an operation on `MerchantKeyStore` | Sign in backend per upload and never expose nsec in browser. |
-| Server choice | BUD-03 ordered kind-10063 server tags, first preferred | Local Blossom configuration is in settings; setter sorts URLs; no kind-10063 publication | Keep local upload config distinct from Nostr publication; resolve ordered primary/fallback semantics with owner. |
-| Media fallback | BUD-04 server-side mirror exists | Existing migration flow stores verified images locally in LNbits data folder | Do not silently equate local migration storage to Blossom fallback; owner chooses policy. |
+| Server choice | BUD-03 ordered kind-10063 server tags, first preferred | Local Blossom configuration is in settings; setter sorts URLs; no kind-10063 publication | Use the first Settings → Merchant Blossom server as the only remote target; preserve list order; kind-10063 publication remains separate and deferred. |
+| Media fallback | BUD-04 server-side mirror exists | Existing migration flow stores verified images locally in LNbits data folder | Local LNbits is the default and explicit retry target; do not dual-write or silently switch backends. |
 
 ## Sources
 

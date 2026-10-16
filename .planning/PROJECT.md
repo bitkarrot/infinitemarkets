@@ -28,16 +28,18 @@ for reliable share cards using Blossom-hosted product images.
 
 ## Current Milestone: v1.1 Media uploads and Blossom support
 
-**Goal:** Let merchants upload product images through configured Blossom
-media servers and see those images consistently across the catalog,
-storefront, and generated share cards.
+**Goal:** Let merchants upload images for products, their Nostr profile, and
+Appearance settings, choosing local LNbits storage by default or optional
+Blossom storage when configured.
 
 **Target features:**
-- Product-editor image upload integrated with the merchant's configured
-  Blossom media servers.
-- Safe, usable upload/authentication behavior, including clear progress,
-  failures, and the existing image-URL workflow; exact protocol and server
-  selection policy are to be established by research and requirements.
+- One reusable uploader across the product gallery, Merchant profile
+  picture/banner, and Appearance logo, hero, footer, and custom share image.
+- Local LNbits storage is the default. Blossom is an explicit alternative;
+  use the primary/first configured media server, never silently dual-write,
+  and offer an explicit local retry if Blossom fails.
+- Safe server-side upload/authentication, clear progress/failures, and
+  preservation of existing external URLs and migration-owned local images.
 - Preserve the PR #28 redirect fix so Blossom-hosted images render in
   generated Open Graph share cards.
 

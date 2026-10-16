@@ -84,19 +84,19 @@ Phase 2 — catalog contract and editor-state integration.
 
 ---
 
-### Pitfall 5: Configured Server Ordering Does Not Match Primary/Fallback UI
+### Pitfall 5: Configured Server Ordering Does Not Match Primary Target
 
 **What goes wrong:**
-The user reorders servers in settings, but uploads still choose a different endpoint; fallback selection appears random or alphabetic.
+The user places one Blossom server first in Settings → Merchant, but uploads contact a different endpoint because the backend sorts the list.
 
 **Why it happens:**
-`set_blossom_servers` currently de-duplicates and sorts URLs. That behavior erases the user's configured order, despite BUD-03 describing the first server as preferred.
+`set_blossom_servers` currently de-duplicates and sorts URLs. That behavior erases the user's configured order; the approved v1.1 policy uses only the primary/first server.
 
 **How to avoid:**
-Before implementation, owner decides whether order means primary/fallback, sets are unordered, or policy is mirror-all. If order matters, preserve and validate order in storage and UI; include stable tests. For MVP, recommend first-success against an explicitly ordered list; add BUD-04 mirroring only if resilience is required.
+The owner chose the primary/first configured Blossom server as the only remote target for an upload. Preserve that order in storage and test that later configured servers are not contacted automatically. If the primary fails, surface the error and offer an explicit LNbits-local retry; BUD-04 mirroring is deferred.
 
 **Warning signs:**
-UI offers drag/order controls but backend canonicalization sorts; failover tests assert membership without checking attempt order.
+UI presents a first/primary server but backend canonicalization sorts; tests only assert upload success without asserting which configured server received it.
 
 **Phase to address:**
 Phase 0 owner decisions, then Phase 1 settings and selection policy.
@@ -147,7 +147,7 @@ Phase 0 owner decision and Phase 2 editor acceptance tests.
 |----------|-------------------|----------------|-----------------|
 | Use plain high-level HTTPS client without pinned IP | Less transport code | DNS rebinding can route credentials or content to private/internal targets | Never for server-side upload to merchant-configured hosts |
 | Follow all redirects for any HTTPS request | Makes one Blossom redirect work | Upload body/auth can be replayed to a new host | Never for PUT; GET redirect behavior only where separately bounded and tested |
-| Keep sorting Blossom server URLs while presenting ordered server controls | Reuses existing setter | User preference/failover order is lost | Only if owner explicitly chooses unordered server sets |
+| Keep sorting Blossom server URLs while treating the first as primary | Reuses existing setter | The upload may go to a different server than the merchant selected first | Only if the UI explicitly says server order is irrelevant |
 | Reuse migration-media local 25 MB limit without requirements review | Fast size bound | Wrong policy for external Blossom, aggregate quotas, and host memory model may be inherited accidentally | Candidate only; owner approves product upload size/count and implementation enforces it |
 | Omit `images` when list is empty | Avoids accidental patching | Makes clear-all impossible | Never when the user explicitly cleared images |
 | Add `images` only as URLs and discard returned descriptor hash/size/type | Minimal editor changes | Loses evidence for validation/debugging and makes retry/preview states weaker | MVP may store only URL in catalog, but validate descriptor before returning it |
@@ -160,7 +160,7 @@ Phase 0 owner decision and Phase 2 editor acceptance tests.
 | BUD-02 upload | Send multipart body directly to `/upload` or trust response without checking | Send raw bytes with `Content-Type`, `Content-Length`, and `X-SHA-256`; accept 200/201 only; validate descriptor fields. |
 | BUD-11 auth | Use standard padded base64, omit `x`, or accept mismatch between tag and header | URL-safe base64 without padding; kind 24242; `t=upload`, expiry, matching `x` and `X-SHA-256`; recommended `server` scope. |
 | BUD-06 preflight | Treat successful `HEAD` as guarantee of a successful PUT | Treat it as advisory only; handle upload result independently. |
-| BUD-04 mirror | Mirror all configured servers without failure semantics | Define primary success, partial mirror, retry, and resulting URL policy; defer from MVP. |
+| BUD-04 mirror | Mirror all configured servers without failure semantics | Defer. V1.1 writes to one selected target; add mirroring only after defining partial success, retry, and URL policy. |
 | Blossom settings | Assume local setting is the published kind-10063 list or an ordered list | Local settings are separate; setter currently sorts. Make kind-10063 and order explicit decisions. |
 | OG image retrieval | Let PR #28's GET redirect behavior apply to upload | Keep safe redirect handling limited to image GET; never blindly follow upload PUT redirect. |
 | Product PATCH | Use an empty list to mean “leave unchanged” | Omitted key means unchanged; present empty array means clear. Client must preserve this distinction. |
@@ -196,7 +196,7 @@ Phase 0 owner decision and Phase 2 editor acceptance tests.
 | Whole-form spinner only | User cannot tell which upload failed or retry one file | Per-file progress, status, error, and retry while preserving current order. |
 | Hide receiving server | Merchant cannot make an informed privacy/custody choice | Show server name/URL and explain it receives image bytes and request metadata. |
 | Pretend remote upload and save are atomic | User believes cancelled uploads are undone | Distinguish “uploaded” from “saved to product”; disclose possible orphan on cancel. |
-| Upload control silently unavailable with no server | Looks broken or encourages accidental external upload | Explain no server is configured; offer settings guidance or an explicitly approved local fallback. |
+| Upload control treats Blossom as mandatory | Merchants without an accessible Blossom account cannot add images | Keep local LNbits storage available by default; show Blossom as optional and explain how to configure it. |
 
 ## "Looks Done But Isn't" Checklist
 
@@ -206,8 +206,8 @@ Phase 0 owner decision and Phase 2 editor acceptance tests.
 - [ ] **Editor clear/reorder:** Verify omission preserves, empty array clears, and order/primary survives a reload.
 - [ ] **Existing URL workflows:** Verify pasted HTTPS and migration-created `/images/...` URL edit/save round trips.
 - [ ] **Image caps:** Resolve and test the 16-vs-20 mismatch; distinguish product count from per-request file count.
-- [ ] **Multi-server behavior:** Verify configured order remains meaningful if primary/fallback is promised; exercise first-server failure and next-server success.
-- [ ] **Local fallback:** Confirm actual no-server behavior matches owner decision and is visible to merchant.
+- [ ] **Blossom target:** Verify only the first configured server receives the upload; a failure offers an explicit LNbits retry and does not silently target another server.
+- [ ] **Local default:** Confirm uploads work with no Blossom servers configured and no silent remote upload occurs.
 - [ ] **OG fix:** Verify GET redirect card for the real Blossom redirect case; ensure upload PUT does not inherit GET redirect behavior.
 - [ ] **Contracts:** Route is present in both spec §5 and harness registry; parity test passes.
 - [ ] **No external writes in tests:** All upload, auth, redirect, and failure cases use fake Blossom servers.
