@@ -471,22 +471,29 @@ fields.picture = uploadedUrl;   // "" clears via delete profile[key]
 | A3 | Product gallery stores `result.url` (absolute) for local uploads per D-07's stored-representation lock | Code Examples | If `path` were preferred, NIP-99 would still emit it verbatim — relative URLs on relays are worse, so `url` is the safer default either way |
 | A4 | Idempotency-Key on upload requests is optional (shape-validated only, never uniqueness-checked for uploads) | Pattern 2 | Including it is harmless; omitting matches the migration-upload precedent — either satisfies `enforce_mutation_security` |
 
-## Open Questions
+## Open Questions — RESOLVED at planning (2026-10-16)
 
-1. **`GET /media/unused` response lacks `date` and quota fields for D-18**
+1. **`GET /media/unused` response lacks `date` and quota fields for D-18** →
+   **RESOLVED by D-23 / plan 07-01**: `list_unused` gains per-file `mtime`
+   and top-level `used_bytes`/`quota_bytes` (existing `_dir_bytes` +
+   `MAX_MERCHANT_BYTES`); response-shape extension, no new route, spec §5.6
+   prose updated in the same commit.
    - What we know: response is `{files:[{name,bytes,sha256}]}` only (media.py:338-347); `_dir_bytes` + `MAX_MERCHANT_BYTES` exist for a quota summary; `f.stat().st_mtime` is available for date.
-   - What's unclear: whether the planner may edit `media.py` (`list_unused`) + spec §5.6 prose, or must descope the date/quota columns.
-   - Recommendation: extend the response in the same plan — smallest change satisfying D-18 verbatim; no route parity work needed.
+   - Recommendation adopted: extend the response in the same plan — smallest change satisfying D-18 verbatim; no route parity work needed.
 
-2. **Where the Media block lands in Settings**
+2. **Where the Media block lands in Settings** → **RESOLVED by Claude's
+   discretion / plan 07-04 Task 2**: a "Media" `q-card` inside the Merchant
+   `q-tab-panel`, placed after the relay/Blossom configuration card — the
+   surface merchants already associate with media servers; follows the
+   existing card layout.
    - What we know: Settings tabs are Merchant / Notifications / Appearance / Embed (admin.html:1914-1918); the Merchant tab already hosts Blossom server config and is a `q-card` list.
-   - What's unclear: new card on Merchant tab vs new tab.
-   - Recommendation: a "Media" `q-card` in the Merchant tab — same surface merchants already associate with media servers; follows existing layout (discretion).
 
-3. **Avatar/banner q-inputs: replace or augment**
+3. **Avatar/banner q-inputs: replace or augment** → **RESOLVED by D-29 /
+   plan 07-04 Task 1**: keep the URL q-inputs verbatim (pasted-URL entry
+   preserved per MEDIA-11 + `test_admin_ui.py:138-139` label stability);
+   the picker + thumbnail + Remove-image control render adjacent. Same
+   pattern for the four appearance fields.
    - What we know: `test_admin_ui.py:138-139` asserts the exact `Avatar URL (https)`/`Header image URL (https)` labels; MEDIA-11 requires keeping URL entry.
-   - What's unclear: whether the picker replaces the input (test churn) or sits beside it.
-   - Recommendation: keep inputs (pasted-URL entry + test stability), add picker + thumbnail + Clear button adjacent. Same for the five appearance fields.
 
 ## Environment Availability
 
