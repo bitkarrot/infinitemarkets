@@ -40,7 +40,10 @@ Each upload uses exactly one backend. Blossom uploads target only the first serv
   2. A Blossom image is exposed only after a server-side BUD-02 raw `PUT /upload` has been authorized with the merchant's stored key using a short-lived BUD-11 kind-24242 event, URL-safe unpadded encoding, matching SHA-256 `x` tag and `X-SHA-256` header, upload scope, and a target-scoped server tag; the returned descriptor is validated and no signing key is sent to browser code.
   3. A locally stored image used for Nostr profile picture/banner metadata resolves to a publicly reachable absolute HTTPS URL, while supported Appearance references can use a safe same-origin path.
   4. Uploads go through an authenticated route present in both technical-specification §5 and `harness/registry.py::HTTP_ROUTES`; Blossom requests use HTTPS, request-time public-egress checks, pinned-IP TLS, strict time/size bounds, and never follow upload redirects.
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 06-01-PLAN.md — Local media storage adapter + bounded upload/unused API with contract registration
+- [ ] 06-02-PLAN.md — Blossom server-order preservation + BUD-02/BUD-11 server-side-signed upload client
+- [ ] 06-03-PLAN.md — Backend dispatch (local default / first-configured Blossom only) + absolute-URL profile emission
 
 ### Phase 7: Shared Image Editors
 **Goal**: Merchants can manage every in-scope image field with consistent upload, editing, and persistence behavior without losing existing references or unrelated settings.
@@ -68,6 +71,6 @@ Each upload uses exactly one backend. Blossom uploads target only the first serv
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 6. Secure Media Storage | 0/TBD | Not started | - |
+| 6. Secure Media Storage | 0/3 | Not started | - |
 | 7. Shared Image Editors | 0/TBD | Not started | - |
 | 8. Media Release Qualification | 0/TBD | Not started | - |
