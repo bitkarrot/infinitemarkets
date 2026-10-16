@@ -1140,6 +1140,31 @@
           self.gmMedia.progress = 0;
         }
       },
+      /* MEDIA-03 — explicit retry to LNbits after a Blossom failure:
+         re-uploads the kept File with backend local; never a silent
+         failover. */
+      gmMediaRetryLocal: function () {
+        var file = this.gmMedia.retryFile;
+        if (!file) return;
+        this.gmMedia.retryFile = null;
+        this.gmMedia.retryLocal = false;
+        this.gmMediaHeroUpload({files: [file], backend: "local"});
+      },
+      /* Single-image clear — a tiny dotted-path setter under
+         gmSettings.theme. Clearing mutates only that one theme key, so
+         unrelated appearance/profile fields are untouched (MEDIA-10);
+         reused by the other single-image fields. */
+      gmMediaClearField: function (path) {
+        var parts = String(path || "").split(".");
+        var target = this.gmSettings.theme;
+        for (var i = 0; i < parts.length - 1; i++) {
+          target = target ? target[parts[i]] : null;
+          if (!target || typeof target !== "object") return;
+        }
+        if (target && parts.length) {
+          target[parts[parts.length - 1]] = "";
+        }
+      },
       /* Embed shop — copy/paste snippets for the WebPages extension or
          any static page. The component script renders real DOM (no
          iframe); checkout always happens on the hosted shop pages. */

@@ -2477,6 +2477,21 @@
                     <q-linear-progress v-if="gmMedia.uploading" dense
                                        :value="gmMedia.progress"
                                        class="q-mt-xs"></q-linear-progress>
+                    <div v-if="gmMedia.retryLocal" class="q-mt-sm">
+                      <q-btn flat dense color="primary"
+                             label="Save to LNbits instead"
+                             @click="gmMediaRetryLocal"></q-btn>
+                    </div>
+                    <div v-if="gmSettings.theme.hero.image_url"
+                         class="row items-center q-col-gutter-sm q-mt-sm">
+                      <q-img :src="gmSettings.theme.hero.image_url"
+                             class="gm-media-thumb"
+                             alt="Hero background preview"></q-img>
+                      <q-btn flat dense color="primary"
+                             label="Remove image"
+                             @click="gmMediaClearField('hero.image_url')">
+                      </q-btn>
+                    </div>
                     <div class="row q-col-gutter-sm q-mb-sm">
                       <div class="col-12 col-sm-6">
                         <q-input v-model="gmSettings.theme.hero.primary.label"

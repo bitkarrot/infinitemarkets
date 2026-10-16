@@ -39,7 +39,11 @@
       " starting a new checkout.",
     "rate-limited": "Too many requests — wait a minute and try again.",
     "invalid-shipping-destination":
-      "This item cannot be shipped to the selected destination."
+      "This item cannot be shipped to the selected destination.",
+    "media-quota": "Local media storage is full — remove unused uploads, or save the image to a Blossom server instead.",
+    "media-backend": "No Blossom media server is configured — add one under Settings → Merchant, or save this image to LNbits instead.",
+    "media-origin": "Profile images need a public https storefront address — set a public base URL before uploading to LNbits, or use Blossom.",
+    "media-remote": "The Blossom media server could not store the file — nothing was stored locally; retry the upload or save to LNbits instead."
   };
 
   window.app.mixin({
