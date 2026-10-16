@@ -434,17 +434,25 @@ tmp.replace(dest)                                            # atomic promote
 
 ## Open Questions
 
+All three questions are RESOLVED by CONTEXT.md decisions and the phase
+plans (annotation added during planning revision):
+
 1. **Absolute vs relative URL stored in `product_images` for local uploads**
-   - What we know: catalog validation requires `https://` prefix; `_local_url` returns `/images/...`; `public_base_url` can produce the absolute form.
-   - What's unclear: whether the team prefers absolute URLs in DB (portable to relays/NIP-99) or relative (host-movable) with render-time absolutization.
-   - Recommendation: store absolute `public_base_url + /images/...` — keeps the existing https invariant and MEDIA-07 needs absolute anyway. Confirm in planning.
+   - RESOLVED by D-07: new uploads store absolute `public_base_url +
+     /images/...` URLs — preserves the `https://` catalog invariant and
+     satisfies MEDIA-07 in one representation. Implemented in 06-01 task 1;
+     legacy relative `/images/...` acceptance is Phase 7's MEDIA-11.
 2. **Should local uploads be permitted when `ext_settings()` raises `SettingsError`?**
-   - What we know: D-05 only blocks *Nostr-profile-bound* uploads; product gallery local uploads don't need a public origin.
-   - What's unclear: whether the upload route should degrade gracefully or rely on `config_problem`.
-   - Recommendation: let product-bound local uploads proceed; block only when `usage=nostr-profile` is requested.
+   - RESOLVED by D-08 + the A2 assumption: the D-05 block fires only when the
+     https-scheme `public_base_url` host is loopback/private/.local
+     (`usage=profile`); `http://` schemes still fail earlier via
+     `problem_boundary`→`config_problem`; catalog/appearance usages proceed.
+     Implemented in 06-01 task 1 (`origin_is_public` + `media-origin` problem).
 3. **Response shape for `GET /media/unused` and idempotency of DELETE**
-   - What's unclear: whether DELETE should 404 when file is referenced/absent, or always 200.
-   - Recommendation: return `{files: [{name, bytes, sha256}]}`; DELETE validates name regex `[0-9a-f]{64}\.(png|jpg|webp)`, 409 if referenced, 200 idempotent if absent.
+   - RESOLVED: recommendation adopted verbatim in 06-01 task 2 —
+     `{files: [{name, bytes, sha256}]}` listing; DELETE fullmatches
+     `[0-9a-f]{64}\.(png|jpg|webp)`, 409 if referenced/sidecar-owned, 200
+     idempotent if absent.
 
 ## Environment Availability
 
