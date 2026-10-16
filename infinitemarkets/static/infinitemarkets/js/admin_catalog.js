@@ -313,6 +313,10 @@
           self.gmCatalog.products = res[1];
           self.gmCatalog.collections = res[2];
           self.gmCatalog.shipping = res[3];
+          // Membership is lazily fetched; close expansions and discard
+          // their cache so edits/deletes cannot leave stale product links.
+          self.gmCatalog.expandedCollections = [];
+          self.gmCatalog.collectionMembers = {};
           self.gmCatalog.selectedProducts = [];
         } catch (e) {
           self.gmCatalog.error = self.gmProblemCopy(e.problem);
