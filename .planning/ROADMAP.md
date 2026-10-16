@@ -64,8 +64,14 @@ Each upload uses exactly one backend. Blossom uploads target only the first serv
   4. A merchant can replace or clear a single-image setting without changing other profile or theme fields, and can continue using pasted HTTPS URLs and supported migration-managed `/images/...` URLs.
   5. Upload progress and per-file errors are visible; a failed file does not discard other selected images, and cancelling before saving explains that an uploaded file may remain unreferenced. Remote Blossom blobs are not automatically deleted.
 
-**Plans**: TBD
+**Plans**: 4 plans
 **UI hint**: yes
+
+Plans:
+- [ ] 07-01-PLAN.md — Extend GET /media/unused with mtime + quota fields (D-23 response-shape change)
+- [ ] 07-02-PLAN.md — gm-media-picker component + XHR upload helper; tracer-wired to the hero field
+- [ ] 07-03-PLAN.md — Product gallery: unified thumbnail list, ordering, clear-all, always-send images
+- [ ] 07-04-PLAN.md — Settings field pickers (profile + appearance) + Settings → Merchant Media card
 
 ### Phase 8: Media Release Qualification
 
@@ -84,5 +90,5 @@ Each upload uses exactly one backend. Blossom uploads target only the first serv
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 6. Secure Media Storage | 4/4 | Complete | 2026-10-16 |
-| 7. Shared Image Editors | 0/TBD | Not started | - |
+| 7. Shared Image Editors | 0/4 | Not started | - |
 | 8. Media Release Qualification | 0/TBD | Not started | - |
