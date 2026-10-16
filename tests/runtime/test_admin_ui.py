@@ -141,6 +141,82 @@ async def test_admin_media_single_image_ux(runtime_env):
         assert f'"{code}"' in app_js, code
 
 
+async def test_admin_media_settings_sites(runtime_env):
+    """MEDIA-08/10/11 (D-19/D-26/D-29) — the shared picker renders at
+    every remaining settings image field: profile avatar/banner keep
+    their preserved URL inputs and bind result.url (https-only
+    validators); brand/footer-logo/share bind through the dotted
+    theme-path handler; the legacy /images/ label hints now name
+    /library/."""
+    html = (await runtime_env["client"].get("/infinitemarkets/")).text
+    merchant = html.split('<q-tab-panel name="merchant"', 1)[1]
+    merchant = merchant.split("</q-tab-panel>", 1)[0]
+    # Profile pickers adjacent to the preserved URL inputs (D-29).
+    assert 'label="Avatar URL (https)"' in merchant
+    assert 'label="Header image URL (https)"' in merchant
+    assert merchant.count('usage="profile"') == 2
+    assert '@files-chosen="gmMediaAvatarUpload"' in merchant
+    assert '@files-chosen="gmMediaBannerUpload"' in merchant
+    assert 'label="Remove image"' in merchant
+    # Appearance pickers at the three remaining single-image sites —
+    # dotted theme-path handlers (D-26); hero was wired in 07-02.
+    for path in ("brand.logo_url", "footer.logo_url",
+                 "share.custom_image_url"):
+        assert f"gmMediaThemeUpload('{path}', $event)" in html, path
+    assert html.count('usage="appearance"') >= 4
+    # Share picker lives inside the custom_image v-if (D-29 adjacency
+    # must not leak the control when another card image is selected).
+    share = html.split('data-gm="share-preview"', 1)[1]
+    share = share.split("</q-expansion-item>", 1)[0]
+    assert "gm-media-picker" in share
+    assert "custom_image" in share
+    # D-19 label copy — the legacy images-mount hint is gone from the
+    # two labels (the /images/ prefix legitimately survives in JS
+    # prefix-allowlist code, so the negative check stays scoped).
+    assert 'label="Footer logo image URL (https or /library/…)"' in html
+    assert 'label="Custom share image URL (https or /library/…)"' in html
+    assert "(https or /images/…)" not in html
+    # JS contract: profile binds result.url only (D-26 — a /library/
+    # path 422s invalid-profile); theme fields go through the shared
+    # dotted setter; profile_json merge preserves unrelated keys
+    # (MEDIA-10); the Blossom-failure retry dispatches per site.
+    js = (
+        await runtime_env["client"].get(f"{JS}/admin_settings.js")
+    ).text
+    for ident in ("gmMediaProfileUpload", "gmMediaAvatarUpload",
+                  "gmMediaBannerUpload", "gmMediaThemeUpload",
+                  "gmMediaSetTheme", "gmMediaClearProfile",
+                  "result.url", '"profile"',
+                  "Object.assign({}, self.gmSettings.profileJson",
+                  "retrySite"):
+        assert ident in js, ident
+
+
+async def test_admin_media_card(runtime_env):
+    """D-18/D-23 (MEDIA-12) — Settings → Merchant hosts a Media card
+    listing unreferenced local uploads with size + date, per-item
+    delete, delete-all, and a quota bar fed by the extended
+    GET /media/unused response."""
+    html = (await runtime_env["client"].get("/infinitemarkets/")).text
+    merchant = html.split('<q-tab-panel name="merchant"', 1)[1]
+    merchant = merchant.split("</q-tab-panel>", 1)[0]
+    assert 'data-gm="media-card"' in merchant
+    assert "gmSettings.media" in merchant
+    assert "q-linear-progress" in merchant
+    assert "gmBytes(gmSettings.media.usedBytes)" in merchant
+    assert "gmBytes(gmSettings.media.quotaBytes)" in merchant
+    assert "gmMediaUnusedDelete" in merchant
+    assert "Delete all unused" in merchant
+    assert "No unused uploads" in merchant
+    js = (
+        await runtime_env["client"].get(f"{JS}/admin_settings.js")
+    ).text
+    for ident in ("gmMediaUnusedLoad", "gmMediaUnusedDelete",
+                  "gmMediaUnusedDeleteAll", '"/media/unused"',
+                  "used_bytes", "quota_bytes", "gmBytes", "mtime"):
+        assert ident in js, ident
+
+
 async def test_product_editor_shipping_options(runtime_env):
     html = (await runtime_env["client"].get("/infinitemarkets/")).text
     assert 'v-model="gmCatalog.editor.form.shipping_option_ids"' in html
