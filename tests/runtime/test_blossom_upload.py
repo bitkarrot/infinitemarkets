@@ -404,3 +404,174 @@ async def test_descriptor_201_accepted(
     result = await blossom.upload_blob(mid, ks, SERVER_URL, PNG, "png")
     assert result["sha256"] == sha
     assert result["url"] == f"{SERVER_URL}/{sha}.png"
+
+
+async def test_descriptor_body_bound_rejected(
+    keystore_env, monkeypatch, fake_blossom
+):
+    """A valid-JSON descriptor larger than the read bound is refused —
+    the bound fires before parsing."""
+    from infinitemarkets.security import ProblemError
+
+    blossom = _blossom()
+    ks, mid, _ = await _merchant_keystore(keystore_env, monkeypatch)
+    sha = hashlib.sha256(PNG).hexdigest()
+    payload = json.dumps(
+        {
+            "url": f"{SERVER_URL}/{sha}.png",
+            "sha256": sha,
+            "size": len(PNG),
+            "type": "image/png",
+            "pad": "x" * (20 * 1024),
+        }
+    ).encode()
+    assert len(payload) > 16 * 1024
+    fake_blossom.script = _ok(payload)
+    _wire_egress(blossom, monkeypatch, fake_blossom)
+
+    with pytest.raises(ProblemError) as excinfo:
+        await blossom.upload_blob(mid, ks, SERVER_URL, PNG, "png")
+    assert excinfo.value.code == "media-remote"
+
+
+# --- egress + redirect discipline (MEDIA-16) ----------------------------------
+
+
+@pytest.mark.parametrize("status", [307, 308, 302])
+async def test_redirect_rejected_single_request(
+    keystore_env, monkeypatch, fake_blossom, status
+):
+    """Upload PUTs never follow redirects: exactly ONE request reaches
+    the fake, no bytes/auth are replayed to the Location target."""
+    from infinitemarkets.security import ProblemError
+
+    blossom = _blossom()
+    ks, mid, _ = await _merchant_keystore(keystore_env, monkeypatch)
+    fake_blossom.script = lambda record: (
+        status,
+        {"Location": "https://evil.example/upload"},
+        b"",
+    )
+    _wire_egress(blossom, monkeypatch, fake_blossom)
+
+    with pytest.raises(ProblemError) as excinfo:
+        await blossom.upload_blob(mid, ks, SERVER_URL, PNG, "png")
+    assert excinfo.value.status == 422
+    assert excinfo.value.code == "media-remote"
+    assert "redirect" in excinfo.value.title.lower()
+    assert len(fake_blossom.records) == 1
+
+
+async def test_egress_resolver_consulted_every_call(
+    keystore_env, monkeypatch, fake_blossom
+):
+    """The resolver runs at REQUEST time — a spy proves every call
+    re-resolves instead of trusting a cached config-time check."""
+    blossom = _blossom()
+    ks, mid, _ = await _merchant_keystore(keystore_env, monkeypatch)
+    sha = hashlib.sha256(PNG).hexdigest()
+    fake_blossom.script = _ok(_descriptor(sha, len(PNG)))
+    calls = []
+
+    async def _spy(host, port=443):
+        calls.append((host, port))
+        return [ipaddress.ip_address("127.0.0.1")]
+
+    _wire_egress(blossom, monkeypatch, fake_blossom, resolver=_spy)
+
+    await blossom.upload_blob(mid, ks, SERVER_URL, PNG, "png")
+    await blossom.upload_blob(mid, ks, SERVER_URL, PNG, "png")
+    assert calls == [(SERVER_HOST, 443), (SERVER_HOST, 443)]
+
+
+async def test_egress_rejection_precedes_any_connection(
+    keystore_env, monkeypatch, fake_blossom
+):
+    """A resolver that refuses non-public space (the real
+    resolve_and_check_egress contract) aborts the upload before a single
+    connection is opened or a request emitted."""
+    from infinitemarkets.security import ProblemError, unprocessable
+
+    blossom = _blossom()
+    ks, mid, _ = await _merchant_keystore(keystore_env, monkeypatch)
+    dialed = []
+
+    async def _private(host, port=443):
+        raise unprocessable(
+            "invalid-relay",
+            "Relay host does not resolve to public routable space",
+        )
+
+    def _conn_spy(host, address, port=443):
+        dialed.append(address)
+        return http.client.HTTPConnection("127.0.0.1", fake_blossom.port)
+
+    monkeypatch.setattr(blossom, "resolve_and_check_egress", _private)
+    monkeypatch.setattr(blossom, "_open_connection", _conn_spy)
+
+    with pytest.raises(ProblemError):
+        await blossom.upload_blob(mid, ks, SERVER_URL, PNG, "png")
+    assert dialed == []
+    assert fake_blossom.records == []
+
+
+# --- D-13 concurrency cap + result shape (MEDIA-04) ---------------------------
+
+
+async def test_in_flight_put_cap_per_merchant(
+    keystore_env, monkeypatch, fake_blossom
+):
+    """D-13: at most 4 simultaneous in-flight PUTs per merchant — five
+    parallel uploads through a slow handler never exceed the cap."""
+    import asyncio
+
+    blossom = _blossom()
+    ks, mid, _ = await _merchant_keystore(keystore_env, monkeypatch)
+    sha = hashlib.sha256(PNG).hexdigest()
+
+    def _slow(record):
+        time.sleep(0.4)
+        return (
+            200,
+            {"Content-Type": "application/json"},
+            _descriptor(sha, len(record[3])),
+        )
+
+    fake_blossom.script = _slow
+    _wire_egress(blossom, monkeypatch, fake_blossom)
+
+    results = await asyncio.gather(
+        *(
+            blossom.upload_blob(mid, ks, SERVER_URL, PNG, "png")
+            for _ in range(5)
+        )
+    )
+    assert len(results) == 5
+    assert all(r["sha256"] == sha for r in results)
+    assert fake_blossom.max_in_flight <= 4, (
+        f"observed {fake_blossom.max_in_flight} in-flight PUTs"
+    )
+    # the cap actually serialized something — 5 uploads could not all
+    # overlap through the 0.4s handler
+    assert fake_blossom.max_in_flight >= 2
+
+
+async def test_result_dict_carries_no_key_or_token(
+    keystore_env, monkeypatch, fake_blossom
+):
+    """MEDIA-04, structurally: the result exposes descriptor fields only
+    — no Authorization token, no event JSON, no key material."""
+    blossom = _blossom()
+    ks, mid, _ = await _merchant_keystore(keystore_env, monkeypatch)
+    sha = hashlib.sha256(PNG).hexdigest()
+    fake_blossom.script = _ok(_descriptor(sha, len(PNG)))
+    _wire_egress(blossom, monkeypatch, fake_blossom)
+
+    result = await blossom.upload_blob(mid, ks, SERVER_URL, PNG, "png")
+
+    assert set(result) == {"url", "sha256", "size", "type", "server"}
+    blob = json.dumps(result)
+    token = fake_blossom.records[0][2]["Authorization"]
+    assert token not in blob
+    assert "Nostr " not in blob
+    assert "nsec" not in blob
