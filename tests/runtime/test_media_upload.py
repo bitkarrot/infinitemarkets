@@ -109,9 +109,9 @@ async def test_media_upload_stores_verified_image(runtime_env):
     assert result["file"] == "hero.png"
     assert result["state"] == "stored"
     assert result["sha256"] == sha
-    assert result["path"] == f"/images/infinitemarkets/{ns}/{sha}.png"
+    assert result["path"] == f"/library/infinitemarkets/{ns}/{sha}.png"
     assert result["url"] == (
-        f"{ORIGIN}/images/infinitemarkets/{ns}/{sha}.png"
+        f"{ORIGIN}/library/infinitemarkets/{ns}/{sha}.png"
     )
     stored = (
         Path(host_settings.lnbits_data_folder)
@@ -119,6 +119,28 @@ async def test_media_upload_stores_verified_image(runtime_env):
     )
     assert stored.is_file()
     assert hashlib.sha256(stored.read_bytes()).hexdigest() == sha
+
+
+async def test_uploaded_path_is_served_over_http(runtime_env):
+    """Serveability (the 06-VERIFICATION gap): the emitted relative
+    ``path`` must be fetchable on the qualified host — the pinned host
+    mounts the data-folder ``images`` dir at ``/library``, so GET on the
+    emitted path returns 200 with byte-identical content. This is the
+    assertion whose absence let the dead ``/images/`` prefix ship."""
+    env = runtime_env
+    mid, csrf = await _merchant_id(env)
+    payload = _PNG + b"serveable"
+    resp = await _upload(
+        env, csrf, [("file", ("serve.png", payload, "image/png"))]
+    )
+    assert resp.status_code == 200, resp.text
+    result = resp.json()["results"][0]
+    assert result["state"] == "stored"
+    assert result["path"].startswith("/library/infinitemarkets/")
+
+    served = await env["client"].get(result["path"])
+    assert served.status_code == 200, (result["path"], served.status_code)
+    assert served.content == payload
 
 
 async def test_media_upload_accepts_webp_jpg_and_is_idempotent(runtime_env):
@@ -453,6 +475,54 @@ async def test_unused_delete_rejects_traversal_and_bad_names(runtime_env):
         )
         assert resp.status_code in (404, 422), (bad, resp.status_code)
     assert _dir_names(mid) == before
+
+
+async def test_dual_prefix_references_keep_file_off_unused(runtime_env):
+    """D-12 dual-prefix (06-04 gap closure): a ``product_images.url``
+    stored under EITHER the legacy ``/images/infinitemarkets/`` prefix or
+    the live ``/library/infinitemarkets/`` prefix marks the same on-disk
+    file referenced — absent from ``GET /media/unused`` and DELETE -> 409
+    for both forms. Rows are seeded via SQL because pre-m019 deployments
+    carry the legacy prefix verbatim."""
+    import uuid as uuid_mod
+
+    from infinitemarkets.db import db, table
+    from infinitemarkets.services import migration_media
+
+    env = runtime_env
+    mid, csrf = await _merchant_id(env)
+    media_dir = _media_dir(mid)
+    media_dir.mkdir(parents=True, exist_ok=True)
+    ns = migration_media._namespace(mid)
+
+    legacy_payload = _PNG + b"legacy-prefix-ref"
+    legacy_name = f"{hashlib.sha256(legacy_payload).hexdigest()}.png"
+    (media_dir / legacy_name).write_bytes(legacy_payload)
+    live_payload = _PNG + b"live-prefix-ref"
+    live_name = f"{hashlib.sha256(live_payload).hexdigest()}.png"
+    (media_dir / live_name).write_bytes(live_payload)
+
+    product = await _product(env, csrf, "dual-prefix-refs")
+    async with db.connect() as conn:
+        for url in (
+            f"/images/infinitemarkets/{ns}/{legacy_name}",
+            f"/library/infinitemarkets/{ns}/{live_name}",
+        ):
+            await conn.execute(
+                f"INSERT INTO {table('product_images')} "
+                "(id, product_id, url, sort_order) "
+                "VALUES (:i, :p, :u, 0)",
+                {"i": uuid_mod.uuid4().hex, "p": product["id"], "u": url},
+            )
+
+    unused = await _unused_names(env)
+    assert legacy_name not in unused and live_name not in unused
+    for name in (legacy_name, live_name):
+        resp = await env["client"].delete(
+            f"{API}/media/unused/{name}", headers=_headers(env, csrf)
+        )
+        assert resp.status_code == 409, (name, resp.text)
+        assert (media_dir / name).is_file()
 
 
 async def test_sidecar_owned_files_never_listed(runtime_env):

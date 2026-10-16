@@ -38,10 +38,10 @@ MEDIA_BACKENDS = ("local", "blossom")
 
 
 def local_path(merchant_id: str, name: str) -> str:
-    """Same-origin path the host ``/images`` mount serves (D-04)."""
+    """Same-origin path the host ``/library`` mount serves (D-04)."""
     return (
-        "/images/infinitemarkets/"
-        f"{migration_media._namespace(merchant_id)}/{name}"
+        migration_media.MEDIA_URL_PREFIX
+        + f"{migration_media._namespace(merchant_id)}/{name}"
     )
 
 

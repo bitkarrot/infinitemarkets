@@ -184,7 +184,7 @@ async def test_export_is_merchant_scoped(runtime_env):
 
 async def test_media_upload_and_relink(runtime_env):
     """Merchant-uploaded media: manifest+bytes → namespaced file → relink
-    swaps owned product image URLs to /images/ local paths."""
+    swaps owned product image URLs to /library/ local paths."""
     from lnbits.settings import settings as host_settings
 
     from infinitemarkets.db import db, table
@@ -244,7 +244,21 @@ async def test_media_upload_and_relink(runtime_env):
             f"SELECT url FROM {table('product_images')} WHERE product_id = :p",
             {"p": product.json()["id"]},
         )
-    assert row["url"].startswith("/images/infinitemarkets/")
+    assert row["url"].startswith("/library/infinitemarkets/")
+
+    # Already-local rows are skipped under BOTH prefixes — a second relink
+    # and a rewritten (m019-era) row are never re-relinked.
+    again = await client.post(
+        f"{API}/migration/media/relink", headers=headers,
+    )
+    assert again.status_code == 200, again.text
+    assert again.json()["relinked"] == 0
+    async with db.connect() as conn:
+        row = await conn.fetchone(
+            f"SELECT url FROM {table('product_images')} WHERE product_id = :p",
+            {"p": product.json()["id"]},
+        )
+    assert row["url"].startswith("/library/infinitemarkets/")
 
 
 async def test_media_upload_rejects_foreign_and_mismatched(runtime_env):

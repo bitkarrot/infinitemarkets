@@ -5,7 +5,9 @@ locally (no server-side URL fetching is ever performed), then uploads a
 JSON manifest mapping source URLs to expected sha256 digests plus the
 image bytes themselves. Verified bytes land under the host's data folder
 ``images/infinitemarkets/<merchant namespace>/`` — outside the
-reinstallable extension package — served by the host's ``/images`` mount.
+reinstallable extension package — served by the host's ``/library``
+mount (the pinned host mounts the data-folder ``images`` dir at
+``/library``; there is no ``/images`` mount).
 A sidecar ``manifest.json`` in that directory records the URL→file
 mapping; ``relink_media`` then swaps owned ``product_images.url``
 references to the local paths in one transaction. Anything unverified
@@ -31,6 +33,15 @@ MAX_MERCHANT_BYTES = 400 * 1024 * 1024
 _MAX_MANIFEST_BYTES = 512 * 1024
 
 _SIDECAR = "manifest.json"
+
+#: The ONE canonical URL path every module emits for a locally stored
+#: file — the pinned host mounts ``{lnbits_data_folder}/images`` at
+#: ``/library`` (lnbits/app.py), so ``/library/infinitemarkets/<ns>``
+#: is the only fetchable prefix. v1.0 emitted the dead
+#: ``LEGACY_MEDIA_URL_PREFIX`` form; m019 rewrites stored references and
+#: every consumer treats both prefixes as the same file (D-12).
+MEDIA_URL_PREFIX = "/library/infinitemarkets/"
+LEGACY_MEDIA_URL_PREFIX = "/images/infinitemarkets/"
 
 
 def _sniff(data: bytes) -> str | None:
@@ -209,7 +220,7 @@ async def upload_media(
 
 
 def _local_url(merchant_id: str, name: str) -> str:
-    return f"/images/infinitemarkets/{_namespace(merchant_id)}/{name}"
+    return f"{MEDIA_URL_PREFIX}{_namespace(merchant_id)}/{name}"
 
 
 async def relink_media(merchant_id: str, user) -> dict:
@@ -244,7 +255,9 @@ async def relink_media(merchant_id: str, user) -> dict:
             f"SELECT i.id, i.url FROM {tx.table('product_images')} i "
             f"JOIN {tx.table('products')} p ON p.id = i.product_id "
             "WHERE p.merchant_id = :m AND p.deleted_at IS NULL "
-            "AND i.url NOT LIKE '/images/infinitemarkets/%' LIMIT 5001",
+            "AND i.url NOT LIKE '/images/infinitemarkets/%' "
+            "AND i.url NOT LIKE '/library/infinitemarkets/%' "
+            "LIMIT 5001",
             {"m": merchant_id},
         )
         if len(rows) > 5000:
