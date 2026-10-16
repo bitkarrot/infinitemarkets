@@ -1,19 +1,16 @@
 ---
-gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: Core Commerce and Hardening
-current_phase: "05"
-current_phase_name: Correctness, Recovery, and Security Hardening
-status: milestone-closed
-stopped_at: product release v1.0.0 tagged and published 2026-10-13; v1.0 milestone archived
-last_updated: "2026-10-15T05:30:00+00:00"
+gsd_state_version: "1.0"
+milestone: v1.1
+milestone_name: Media uploads and Blossom support
+status: planning
+last_updated: "2026-10-16T04:40:51.909Z"
 last_activity: 2026-10-15
-last_activity_desc: product releases through v1.0.11 published (state-aware blocked-mode copy, solid Settings buttons, quick-gate fast tier)
 progress:
-  total_phases: 6
-  completed_phases: 3
-  total_plans: 24
-  completed_plans: 17
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -27,39 +24,10 @@ See: .planning/PROJECT.md (updated 2026-10-11)
 
 ## Current Position
 
-Phase: 5 of 6 (Correctness, Recovery, and Security Hardening)
-Plan: milestone v1.0 archived and tagged 2026-10-13 (commit 3c0ad9a); next milestone unplanned — deferred scope candidates noted in ROADMAP
-Status: milestone v1.0 shipped; product releases through v1.0.11 cut 2026-10-15 — all Phase 5 gates closed or operator-disposed
-Last activity: 2026-10-15 — v1.0.11 published: state-aware blocked-mode cards, solid Settings buttons, `make verify-fast` quick gate (290 tests, ~50s), route-registry parity restored
-
-Progress: 3 phase acceptance scopes closed, 2 reopened, 1 in progress. Phase 5 has six reviewed plans; all plan gates closed or operator-disposed as of 2026-10-13. No overall
-acceptance percentage is implied by plan/artifact counters. There are 17 executed plan
-summaries plus 4 explicitly superseded/re-scoped Phase 4 disposition records;
-21 summary files do not mean 21 original plans were executed. GSD may display
-100% for that artifact ratio; it is not milestone acceptance or Phase 5 progress.
-
-**Ad-hoc work since 03.1 (not phase-planned, committed + deployed, released as v0.1/v0.2/v0.3/v0.4/v0.5/v0.6/v0.6.1 and packaged for v0.6.2):** storefront filters + collection links; configurable index hero; dark/light shopper toggle; Messages list+thread redesign and counterparty kind-0 profiles; Publications timestamps/row detail, live relay catalog check, filters/sorting, and fresh kind-5 reissue; brand logo URL + footer copy; point-and-click Fine-tune + accent move; single-column merchant settings; primary-colored settings buttons; embeddable shop component (`gm-embed.js` + public products API + CORS), iframe embed with widened CSP, admin Embed snippets; About/More section + screenshots; outbox history prune control; Merchant Nostr Profile (avatar, bio, banner, NIP-05, Lightning address) and owner-only `nsec` reveal; redacted email previews + terminal-history cleanup; sortable Catalog columns and first-column quick actions; searchable country/EU shipping picker; LNbits-style Catalog tables and scrolling mobile section nav; Releases v0.1, v0.2, v0.3, v0.4, v0.5, v0.6, v0.6.1.
-
-**Ad-hoc work since v1.0.0 (released as v1.0.1–v1.0.9):** vendored
-nostr-sdk wheels + stdlib for frozen hosts; persistent auto-generated
-encryption keys + `LNBITS_BASEURL` fallback; same-origin cookie-mutation
-acceptance; starter relay seeding at merchant creation; plebeian +
-conduit market relays; code-scanning/Devin Review fixes (lock-inversion
-deadlock, origin trust, keyfile race, SDK pin, admin-origins
-strictness, public 503 page); sqlite `busy_timeout` on all connections;
-settings wallet selector shows the bound wallet (`wallet_id` in the
-owner-scoped merchant projection); counterpart-scheme background control
-+ derived light variant for dark presets; bulk-attach shipping options;
-catalog re-import after delete; `docs/` getting-started updates;
-dismissable auto-generated-keys warning (ack sidecar bound to keyfile
-bytes); product PATCH category reassignment + bulk move-category
-(variations follow their parent); Collections product counts;
-not-live catalog banner with direct publish; Nostr inbox enable/disable
-card gating showcase/nostr_only; reviews #19/#20 fix commits folded in;
-blocked-mode cards name the live inbox state; Settings actions use
-solid-filled buttons; pytest `fast` marker marks the ~50s quick-gate
-tier (all qualification + non-host runtime files); AGENTS.md records
-the pre-push verification contract.
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-10-15 — Milestone v1.1 started
 
 ## Performance Metrics
 

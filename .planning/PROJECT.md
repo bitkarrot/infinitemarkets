@@ -21,6 +21,26 @@ the admin surface (operator-accepted) and the WR-01 retrospective-RED
 chronology caveat. Archives: `milestones/v1.0-ROADMAP.md`,
 `milestones/v1.0-REQUIREMENTS.md`, `v1.0-MILESTONE-AUDIT.md`.
 
+**Current product release: v1.0.14 (2026-10-16).** Catalog usability,
+product search/share previews, and shipping-region selection were polished.
+The Blossom redirect fix is under review in PR #28; it is a prerequisite
+for reliable share cards using Blossom-hosted product images.
+
+## Current Milestone: v1.1 Media uploads and Blossom support
+
+**Goal:** Let merchants upload product images through configured Blossom
+media servers and see those images consistently across the catalog,
+storefront, and generated share cards.
+
+**Target features:**
+- Product-editor image upload integrated with the merchant's configured
+  Blossom media servers.
+- Safe, usable upload/authentication behavior, including clear progress,
+  failures, and the existing image-URL workflow; exact protocol and server
+  selection policy are to be established by research and requirements.
+- Preserve the PR #28 redirect fix so Blossom-hosted images render in
+  generated Open Graph share cards.
+
 ## Requirements
 
 ### Delivered and Validated
@@ -35,10 +55,10 @@ The records below describe delivered scope verified at v1.0 ship.
 - One canonical domain model and inventory/payment authority remain shared across web and Nostr adapters.
 - Key custody, privacy, authentication, transaction, recovery, and deployment gates are enforced by the implementation contract.
 
-### Next Milestone Goals
+### Future Milestone Goals
 
 - Preserve S1–S4 policy, contract, observability and cleanup follow-ups.
-- Optional feature expansion now unblocked: external inventory/shipping
+- Optional feature expansion: external inventory/shipping
   integrations, reviews, subscriptions/preorders, NIP-37, buyer
   unlink/notification-preference expansion — each gated on its own plan.
 - Track the conformance known-delta register (7 entries) — the
@@ -114,4 +134,4 @@ This document evolves at phase transitions and milestone boundaries.
 3. Update context, constraints, and decision outcomes.
 
 ---
-*Last updated: 2026-10-13 — v1.0 milestone shipped and archived*
+*Last updated: 2026-10-16 — v1.1 media-upload planning started*
