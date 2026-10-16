@@ -305,6 +305,12 @@
           directions: DIRECTIONS,
           publishing: false,
           inbox: { state: "off", busy: false },
+          /* D-18 — unused local-uploads card state (list, quota,
+             delete/delete-all); fed by GET /media/unused (07-01). */
+          media: {
+            files: [], usedBytes: 0, quotaBytes: 0,
+            loading: false, error: null
+          },
           deactivate: {
             show: false, step: 1, blockers: [], busy: false,
             retireKeys: false
@@ -517,6 +523,8 @@
               custom_image_url: (t.share || {}).custom_image_url || ""
             }
           };
+          /* D-18 Media card — populates whenever settings opens. */
+          await self.gmMediaUnusedLoad();
         } catch (e) {
           self.gmSettings.error = self.gmProblemCopy(e.problem);
         }
@@ -1089,19 +1097,24 @@
         }
         self.gmSettings.saving = false;
       },
-      /* Hero background upload (gm-media-picker @files-chosen). D-26:
-         appearance fields store result.path for local uploads (the
-         same-origin /library/ path always passes theme validation even
-         when public_base_url is an IP literal) and result.url for
-         Blossom results, which carry no path. One failed file never
-         discards its siblings (MEDIA-12). */
-      gmMediaHeroUpload: async function (payload) {
+      /* Shared single-image upload for appearance fields bound to a
+         dotted theme path (e.g. "brand.logo_url"). D-26: local results
+         store result.path (the same-origin /library/ path always
+         passes theme validation even when public_base_url is an IP
+         literal) and Blossom results — which carry no path — store
+         result.url; a remote result never gets a synthesized path
+         (T-07-04-01). The dotted setter touches only that key so the
+         whole-object theme save carries siblings through unchanged
+         (MEDIA-10); one failed file never discards its siblings
+         (MEDIA-12). */
+      gmMediaThemeUpload: async function (path, payload) {
         var self = this;
         var files = (payload && payload.files) || [];
         if (!files.length) return;
         self.gmSettings.themeError = null;
         self.gmMedia.retryFile = null;
         self.gmMedia.retryLocal = false;
+        self.gmMedia.retrySite = "";
         self.gmMedia.uploading = true;
         try {
           for (var i = 0; i < files.length; i++) {
@@ -1113,10 +1126,12 @@
               );
               var result = (res.results || [])[0] || {};
               if (result.state === "stored") {
-                self.gmSettings.theme.hero.image_url =
+                self.gmMediaSetTheme(
+                  path,
                   result.backend === "local"
                     ? (result.path || "")
-                    : (result.url || "");
+                    : (result.url || "")
+                );
                 self.gmSettings.themeNotice =
                   "Image uploaded — save appearance to keep it.";
               } else {
@@ -1132,6 +1147,7 @@
               if (payload.backend === "blossom") {
                 self.gmMedia.retryFile = file;
                 self.gmMedia.retryLocal = true;
+                self.gmMedia.retrySite = path;
               }
             }
           }
@@ -1140,21 +1156,89 @@
           self.gmMedia.progress = 0;
         }
       },
+      /* Back-compat wrapper — the hero site wired in 07-02 binds this
+         name; the shared theme-path body owns the logic. */
+      gmMediaHeroUpload: function (payload) {
+        return this.gmMediaThemeUpload("hero.image_url", payload);
+      },
+      /* Profile avatar/banner upload (usage="profile"). D-26: profile
+         fields are https-only in both validators (the gmSaveIdentity
+         client check AND the server profile validator), so the bound
+         value is ALWAYS result.url — a /library/ path would 422
+         invalid-profile (pitfall 1). On a loopback/private
+         public_base_url the server answers media-origin; the problem
+         copy names the fix — set INFINITEMARKETS_PUBLIC_BASE_URL or
+         use https/Blossom (D-22), so no client-side pre-check. */
+      gmMediaProfileUpload: async function (field, payload) {
+        var self = this;
+        var files = (payload && payload.files) || [];
+        if (!files.length) return;
+        self.gmSettings.error = null;
+        self.gmMedia.retryFile = null;
+        self.gmMedia.retryLocal = false;
+        self.gmMedia.retrySite = "";
+        self.gmMedia.uploading = true;
+        try {
+          for (var i = 0; i < files.length; i++) {
+            var file = files[i];
+            try {
+              var res = await self.gmMediaUpload(
+                file, "profile", payload.backend,
+                function (frac) { self.gmMedia.progress = frac; }
+              );
+              var result = (res.results || [])[0] || {};
+              if (result.state === "stored") {
+                self.gmSettings[field] = result.url || "";
+                self.gmSettings.notice =
+                  "Image uploaded — save identity to keep it.";
+              } else {
+                self.gmSettings.error =
+                  "The image could not be stored (" +
+                  (result.reason || "unknown reason") +
+                  ") — try a different file.";
+              }
+            } catch (e) {
+              self.gmSettings.error = self.gmProblemCopy(e.problem);
+              if (payload.backend === "blossom") {
+                self.gmMedia.retryFile = file;
+                self.gmMedia.retryLocal = true;
+                self.gmMedia.retrySite = field;
+              }
+            }
+          }
+        } finally {
+          self.gmMedia.uploading = false;
+          self.gmMedia.progress = 0;
+        }
+      },
+      gmMediaAvatarUpload: function (payload) {
+        return this.gmMediaProfileUpload("profileAvatar", payload);
+      },
+      gmMediaBannerUpload: function (payload) {
+        return this.gmMediaProfileUpload("profileBanner", payload);
+      },
       /* MEDIA-03 — explicit retry to LNbits after a Blossom failure:
          re-uploads the kept File with backend local; never a silent
-         failover. */
+         failover. retrySite scopes the retry to the field whose upload
+         failed (a theme path, or the profile input key). */
       gmMediaRetryLocal: function () {
         var file = this.gmMedia.retryFile;
+        var site = this.gmMedia.retrySite;
         if (!file) return;
         this.gmMedia.retryFile = null;
         this.gmMedia.retryLocal = false;
-        this.gmMediaHeroUpload({files: [file], backend: "local"});
+        this.gmMedia.retrySite = "";
+        var payload = {files: [file], backend: "local"};
+        if (site === "profileAvatar" || site === "profileBanner") {
+          this.gmMediaProfileUpload(site, payload);
+        } else {
+          this.gmMediaThemeUpload(site || "hero.image_url", payload);
+        }
       },
-      /* Single-image clear — a tiny dotted-path setter under
-         gmSettings.theme. Clearing mutates only that one theme key, so
-         unrelated appearance/profile fields are untouched (MEDIA-10);
-         reused by the other single-image fields. */
-      gmMediaClearField: function (path) {
+      /* Single-image set — a tiny dotted-path setter under
+         gmSettings.theme. Mutates only that one theme key, so
+         unrelated appearance fields are untouched (MEDIA-10). */
+      gmMediaSetTheme: function (path, value) {
         var parts = String(path || "").split(".");
         var target = this.gmSettings.theme;
         for (var i = 0; i < parts.length - 1; i++) {
@@ -1162,8 +1246,86 @@
           if (!target || typeof target !== "object") return;
         }
         if (target && parts.length) {
-          target[parts[parts.length - 1]] = "";
+          target[parts[parts.length - 1]] = value;
         }
+      },
+      gmMediaClearField: function (path) {
+        this.gmMediaSetTheme(path, "");
+      },
+      /* Single-field clear for the https-only profile inputs —
+         setting the value to "" makes gmSaveIdentity drop that one
+         key from the profile_json merge while siblings stay
+         (MEDIA-10). */
+      gmMediaClearProfile: function (field) {
+        if (field === "profileAvatar" || field === "profileBanner") {
+          this.gmSettings[field] = "";
+        }
+      },
+      /* Settings → Media card (D-18): unreferenced local uploads with
+         size + date, per-item delete, delete-all and a quota bar — fed
+         by GET /media/unused's extended response (files[].mtime +
+         used_bytes/quota_bytes, 07-01 / D-23). */
+      gmBytes: function (n) {
+        n = Number(n) || 0;
+        if (n >= 1048576) return (n / 1048576).toFixed(1) + " MB";
+        if (n >= 1024) return (n / 1024).toFixed(1) + " KB";
+        return n + " B";
+      },
+      gmMediaUnusedLoad: async function () {
+        var self = this;
+        self.gmSettings.media.loading = true;
+        self.gmSettings.media.error = null;
+        try {
+          var res = await self.gmApi("GET", "/media/unused");
+          var body = res || {};
+          self.gmSettings.media.files = (body.files || []).map(
+            function (f) {
+              return {
+                name: f.name,
+                bytes: f.bytes || 0,
+                mtime: f.mtime || 0
+              };
+            }
+          );
+          self.gmSettings.media.usedBytes = body.used_bytes || 0;
+          self.gmSettings.media.quotaBytes = body.quota_bytes || 0;
+        } catch (e) {
+          self.gmSettings.media.error = self.gmProblemCopy(e.problem);
+        }
+        self.gmSettings.media.loading = false;
+      },
+      gmMediaUnusedDelete: async function (name) {
+        /* A file can become referenced between list and delete — the
+           backend re-checks and answers media-referenced 409
+           (T-07-04-02); surface the copy and refresh either way. */
+        var self = this;
+        try {
+          await self.gmApi("DELETE", "/media/unused/" + name);
+        } catch (e) {
+          self.gmSettings.media.error = self.gmProblemCopy(e.problem);
+        }
+        await self.gmMediaUnusedLoad();
+      },
+      gmMediaUnusedDeleteAll: async function () {
+        /* Sequential per-file DELETEs; failures collect into the card
+           error rather than aborting — partial success is truthful. */
+        var self = this;
+        self.gmSettings.media.error = null;
+        var files = (self.gmSettings.media.files || []).slice();
+        var failed = 0;
+        for (var i = 0; i < files.length; i++) {
+          try {
+            await self.gmApi("DELETE", "/media/unused/" + files[i].name);
+          } catch (e) {
+            failed += 1;
+          }
+        }
+        if (failed) {
+          self.gmSettings.media.error =
+            failed + " file(s) could not be deleted — they may still " +
+            "be referenced. The list was refreshed.";
+        }
+        await self.gmMediaUnusedLoad();
       },
       /* Embed shop — copy/paste snippets for the WebPages extension or
          any static page. The component script renders real DOM (no

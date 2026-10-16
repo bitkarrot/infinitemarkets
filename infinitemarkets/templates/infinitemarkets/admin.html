@@ -1989,9 +1989,57 @@
                     <q-input v-model="gmSettings.profileAvatar" outlined dense
                              label="Avatar URL (https)" class="q-mb-sm"
                              autocomplete="off" spellcheck="false"></q-input>
+                    <gm-media-picker usage="profile"
+                                     :blossom-servers="gmMedia.servers"
+                                     @servers-needed="gmMediaLoadServers"
+                                     @files-chosen="gmMediaAvatarUpload">
+                    </gm-media-picker>
+                    <q-linear-progress v-if="gmMedia.uploading" dense
+                                       :value="gmMedia.progress"
+                                       class="q-mt-xs"></q-linear-progress>
+                    <div v-if="gmMedia.retryLocal && gmMedia.retrySite === 'profileAvatar'"
+                         class="q-mt-sm">
+                      <q-btn flat dense color="primary"
+                             label="Save to LNbits instead"
+                             @click="gmMediaRetryLocal"></q-btn>
+                    </div>
+                    <div v-if="gmSettings.profileAvatar"
+                         class="row items-center q-col-gutter-sm q-mt-sm q-mb-sm">
+                      <q-img :src="gmSettings.profileAvatar"
+                             class="gm-media-thumb"
+                             alt="Avatar preview"></q-img>
+                      <q-btn flat dense color="primary"
+                             label="Remove image"
+                             @click="gmMediaClearProfile('profileAvatar')">
+                      </q-btn>
+                    </div>
                     <q-input v-model="gmSettings.profileBanner" outlined dense
                              label="Header image URL (https)" class="q-mb-sm"
                              autocomplete="off" spellcheck="false"></q-input>
+                    <gm-media-picker usage="profile"
+                                     :blossom-servers="gmMedia.servers"
+                                     @servers-needed="gmMediaLoadServers"
+                                     @files-chosen="gmMediaBannerUpload">
+                    </gm-media-picker>
+                    <q-linear-progress v-if="gmMedia.uploading" dense
+                                       :value="gmMedia.progress"
+                                       class="q-mt-xs"></q-linear-progress>
+                    <div v-if="gmMedia.retryLocal && gmMedia.retrySite === 'profileBanner'"
+                         class="q-mt-sm">
+                      <q-btn flat dense color="primary"
+                             label="Save to LNbits instead"
+                             @click="gmMediaRetryLocal"></q-btn>
+                    </div>
+                    <div v-if="gmSettings.profileBanner"
+                         class="row items-center q-col-gutter-sm q-mt-sm q-mb-sm">
+                      <q-img :src="gmSettings.profileBanner"
+                             class="gm-media-thumb"
+                             alt="Header image preview"></q-img>
+                      <q-btn flat dense color="primary"
+                             label="Remove image"
+                             @click="gmMediaClearProfile('profileBanner')">
+                      </q-btn>
+                    </div>
                     <q-input v-model="gmSettings.profileNip05" outlined dense
                              label="Nostr address (NIP-05)" class="q-mb-sm"
                              placeholder="shop@example.com"
@@ -2173,6 +2221,61 @@
                     <q-btn unelevated color="primary" class="q-mt-md"
                            label="Save relay configuration"
                            @click="gmSaveRelays"></q-btn>
+                  </q-card-section>
+                </q-card>
+
+                <q-card flat bordered class="q-mt-md"
+                        data-gm="media-card">
+                  <q-card-section>
+                    <div class="text-subtitle2 q-mb-sm">Media</div>
+                    <div class="text-caption q-mb-sm">
+                      Uploaded files that no product, profile, or
+                      appearance setting references. Deleting frees your
+                      storage quota — files still in use are never
+                      listed here.
+                    </div>
+                    <div class="row items-center q-col-gutter-sm q-mb-sm">
+                      <q-linear-progress class="col" rounded
+                                         color="primary"
+                                         :value="gmSettings.media.quotaBytes ? gmSettings.media.usedBytes / gmSettings.media.quotaBytes : 0">
+                      </q-linear-progress>
+                      <div class="text-caption">
+                        {{ gmBytes(gmSettings.media.usedBytes) }} of
+                        {{ gmBytes(gmSettings.media.quotaBytes) }} stored
+                      </div>
+                    </div>
+                    <q-banner v-if="gmSettings.media.error"
+                              class="bg-negative text-white q-mb-sm">
+                      {{ gmSettings.media.error }}
+                    </q-banner>
+                    <q-list dense separator
+                            v-if="gmSettings.media.files.length">
+                      <q-item v-for="f in gmSettings.media.files"
+                              :key="f.name">
+                        <q-item-section>
+                          <q-item-label>
+                            <code>{{ gmTrunc(f.name, 12, 8) }}</code>
+                          </q-item-label>
+                          <q-item-label caption>
+                            {{ gmBytes(f.bytes) }} · uploaded
+                            {{ gmTime(f.mtime) }}
+                          </q-item-label>
+                        </q-item-section>
+                        <q-item-section side>
+                          <q-btn flat dense color="negative" label="Delete"
+                                 @click="gmMediaUnusedDelete(f.name)">
+                          </q-btn>
+                        </q-item-section>
+                      </q-item>
+                    </q-list>
+                    <div v-else class="text-caption q-mb-sm">
+                      No unused uploads — every stored image is
+                      referenced.
+                    </div>
+                    <q-btn v-if="gmSettings.media.files.length" flat dense
+                           color="negative" class="q-mt-sm"
+                           label="Delete all unused"
+                           @click="gmMediaUnusedDeleteAll"></q-btn>
                   </q-card-section>
                 </q-card>
 
@@ -2478,6 +2581,30 @@
                              outlined class="q-mb-sm"
                              label="Logo image URL (https or /path)">
                     </q-input>
+                    <gm-media-picker usage="appearance"
+                                     :blossom-servers="gmMedia.servers"
+                                     @servers-needed="gmMediaLoadServers"
+                                     @files-chosen="gmMediaThemeUpload('brand.logo_url', $event)">
+                    </gm-media-picker>
+                    <q-linear-progress v-if="gmMedia.uploading" dense
+                                       :value="gmMedia.progress"
+                                       class="q-mt-xs"></q-linear-progress>
+                    <div v-if="gmMedia.retryLocal && gmMedia.retrySite === 'brand.logo_url'"
+                         class="q-mt-sm">
+                      <q-btn flat dense color="primary"
+                             label="Save to LNbits instead"
+                             @click="gmMediaRetryLocal"></q-btn>
+                    </div>
+                    <div v-if="gmSettings.theme.brand.logo_url"
+                         class="row items-center q-col-gutter-sm q-mt-sm q-mb-sm">
+                      <q-img :src="gmSettings.theme.brand.logo_url"
+                             class="gm-media-thumb"
+                             alt="Logo preview"></q-img>
+                      <q-btn flat dense color="primary"
+                             label="Remove image"
+                             @click="gmMediaClearField('brand.logo_url')">
+                      </q-btn>
+                    </div>
                     <div class="text-caption text-grey-7 q-mb-sm">
                       A logo image replaces the initials tile in the store
                       header.
@@ -2528,7 +2655,8 @@
                     <q-linear-progress v-if="gmMedia.uploading" dense
                                        :value="gmMedia.progress"
                                        class="q-mt-xs"></q-linear-progress>
-                    <div v-if="gmMedia.retryLocal" class="q-mt-sm">
+                    <div v-if="gmMedia.retryLocal && gmMedia.retrySite === 'hero.image_url'"
+                         class="q-mt-sm">
                       <q-btn flat dense color="primary"
                              label="Save to LNbits instead"
                              @click="gmMediaRetryLocal"></q-btn>
@@ -2590,8 +2718,32 @@
                     </q-input>
                     <q-input v-model="gmSettings.theme.footer.logo_url" dense
                              outlined class="q-mt-sm"
-                             label="Footer logo image URL (https or /images/…)">
+                             label="Footer logo image URL (https or /library/…)">
                     </q-input>
+                    <gm-media-picker usage="appearance"
+                                     :blossom-servers="gmMedia.servers"
+                                     @servers-needed="gmMediaLoadServers"
+                                     @files-chosen="gmMediaThemeUpload('footer.logo_url', $event)">
+                    </gm-media-picker>
+                    <q-linear-progress v-if="gmMedia.uploading" dense
+                                       :value="gmMedia.progress"
+                                       class="q-mt-xs"></q-linear-progress>
+                    <div v-if="gmMedia.retryLocal && gmMedia.retrySite === 'footer.logo_url'"
+                         class="q-mt-sm">
+                      <q-btn flat dense color="primary"
+                             label="Save to LNbits instead"
+                             @click="gmMediaRetryLocal"></q-btn>
+                    </div>
+                    <div v-if="gmSettings.theme.footer.logo_url"
+                         class="row items-center q-col-gutter-sm q-mt-sm q-mb-sm">
+                      <q-img :src="gmSettings.theme.footer.logo_url"
+                             class="gm-media-thumb"
+                             alt="Footer logo preview"></q-img>
+                      <q-btn flat dense color="primary"
+                             label="Remove image"
+                             @click="gmMediaClearField('footer.logo_url')">
+                      </q-btn>
+                    </div>
                   </div>
                 </q-expansion-item>
 
@@ -2613,8 +2765,34 @@
                     <q-input v-if="gmSettings.theme.share.card_image === 'custom_image'"
                              v-model="gmSettings.theme.share.custom_image_url" dense
                              outlined class="q-mb-sm"
-                             label="Custom share image URL (https or /images/…)">
+                             label="Custom share image URL (https or /library/…)">
                     </q-input>
+                    <template v-if="gmSettings.theme.share.card_image === 'custom_image'">
+                      <gm-media-picker usage="appearance"
+                                       :blossom-servers="gmMedia.servers"
+                                       @servers-needed="gmMediaLoadServers"
+                                       @files-chosen="gmMediaThemeUpload('share.custom_image_url', $event)">
+                      </gm-media-picker>
+                      <q-linear-progress v-if="gmMedia.uploading" dense
+                                         :value="gmMedia.progress"
+                                         class="q-mt-xs"></q-linear-progress>
+                      <div v-if="gmMedia.retryLocal && gmMedia.retrySite === 'share.custom_image_url'"
+                           class="q-mt-sm">
+                        <q-btn flat dense color="primary"
+                               label="Save to LNbits instead"
+                               @click="gmMediaRetryLocal"></q-btn>
+                      </div>
+                      <div v-if="gmSettings.theme.share.custom_image_url"
+                           class="row items-center q-col-gutter-sm q-mt-sm q-mb-sm">
+                        <q-img :src="gmSettings.theme.share.custom_image_url"
+                               class="gm-media-thumb"
+                               alt="Share image preview"></q-img>
+                        <q-btn flat dense color="primary"
+                               label="Remove image"
+                               @click="gmMediaClearField('share.custom_image_url')">
+                        </q-btn>
+                      </div>
+                    </template>
                   </div>
                 </q-expansion-item>
 
