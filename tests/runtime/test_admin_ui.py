@@ -241,10 +241,10 @@ async def test_product_editor_shipping_options(runtime_env):
 async def test_product_editor_gallery(runtime_env):
     """MEDIA-09/11/12/13/14 (D-14…D-16, D-21) — the product editor's
     unified gallery replaces the images_text textarea: one thumbnail
-    list, Primary badge at index 0, text-labeled Move up/Move
-    down/Remove/Clear all controls, in-control Add-by-URL, the shared
-    picker with multiple, per-file progress, and JS identifiers for the
-    mutators + close-path disclosure."""
+    list, Primary badge at index 0, icon Move up/Move down/Remove
+    controls with aria-labels, Clear all, in-control Add-by-URL, the
+    shared picker with multiple, per-file progress, and JS identifiers
+    for the mutators + close-path disclosure."""
     html = (await runtime_env["client"].get("/infinitemarkets/")).text
     editor = html.split('data-gm-catalog-editor="product"', 1)[1]
     editor = editor.split("</q-card>", 1)[0]
@@ -252,9 +252,11 @@ async def test_product_editor_gallery(runtime_env):
     assert "gmCatalog.editor.form.images" in editor
     assert '<gm-media-picker usage="catalog" multiple' in editor
     assert '@files-chosen="gmGalleryFiles"' in editor
-    for label in ("Primary", "Move up", "Move down", "Remove",
-                  "Clear all", "Add image by URL"):
-        assert label in editor, label
+    for frag in ("Primary", 'icon="keyboard_arrow_up"',
+                 'aria-label="Move up"', 'icon="keyboard_arrow_down"',
+                 'aria-label="Move down"', 'icon="close"',
+                 'aria-label="Remove"', "Clear all", "Add image by URL"):
+        assert frag in editor, frag
     assert "gmGalleryMove" in editor
     assert "gmGalleryAddUrl" in editor
     assert "gmGalleryClearAll" in editor
