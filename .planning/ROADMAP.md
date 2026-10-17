@@ -84,7 +84,11 @@ Plans:
   1. A Blossom-hosted image that redirects over HTTPS is rendered in generated share cards after PR #28 is merged and verified using bounded, revalidated GET redirects; an upload PUT to a redirecting server fails without forwarding upload bytes or authorization.
   2. Automated tests against local storage and a fake Blossom server demonstrate successful uploads, BUD authorization/hash/descriptor validation, primary-server-only targeting, explicit local retry after remote failure, file size/type rejection, URL round-trips, and share-card redirect handling without writing to public Blossom servers.
 
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+
+- [ ] 08-01-PLAN.md — Media release qualification audit (PR #28 merge gate + MEDIA-19 test matrix + full-suite CI parity + verdict bookkeeping)
 
 ### Progress
 
@@ -92,4 +96,4 @@ Plans:
 |-------|----------------|--------|-----------|
 | 6. Secure Media Storage | 4/4 | Complete | 2026-10-16 |
 | 7. Shared Image Editors | 4/4 | Not started | - |
-| 8. Media Release Qualification | 0/TBD | Not started | - |
+| 8. Media Release Qualification | 0/1 | Planned | - |
