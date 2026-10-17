@@ -206,6 +206,15 @@ async def _seed(app, seed: dict, relay_url: str) -> None:
                     "t": int(time.time()),
                 },
             )
+            # Defaults seeded at merchant creation also publish — disable
+            # every non-local row so slow/unreachable public relays can't
+            # stall the outbox queue past the seed's poll budgets.
+            await tx.execute(
+                f"UPDATE {tx.table('relay_configs')} SET enabled = 0,"
+                " updated_at = :t"
+                " WHERE merchant_id = :m AND relay_url != :u",
+                {"m": mid, "u": relay_url, "t": int(time.time())},
+            )
         pubkey = E2E_PUBKEY
 
         resp = await client.post(
