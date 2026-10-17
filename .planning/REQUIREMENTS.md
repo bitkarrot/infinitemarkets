@@ -1,98 +1,83 @@
 # Requirements: infinitemarkets
 
-**Defined:** 2026-10-16
-**Milestone:** v1.1 — Media uploads and Blossom support
+**Defined:** 2026-10-17
+**Milestone:** v1.2 — Branded Order Emails
 **Core Value:** A merchant can sell one authoritative inventory safely through LNbits-backed web and Nostr flows without duplicate invoices, double allocation, or relay delivery being mistaken for payment truth.
+
+Spec input: `.planning/specs/order-email-templates-SPEC.md` (reviewed
+2026-10-15, updated for shipped v1.1 media library).
 
 ## v1 Requirements
 
-Requirements for v1.1. Each maps to one roadmap phase after owner approval.
+Requirements for v1.2. Each maps to one roadmap phase after owner approval.
 
-### Media Storage
+### Email Delivery & Template
 
-- [x] **MEDIA-01**: Merchant can upload an image to this LNbits instance without configuring or accessing a Blossom server; if no Blossom server is configured, local LNbits storage is selected by default.
-- [x] **MEDIA-02**: Merchant can explicitly choose Blossom for an upload; the backend targets only the primary/first configured `Media (Blossom)` server, preserves configured order, and does not dual-write or silently retry another remote server.
-- [x] **MEDIA-03**: If a chosen Blossom upload fails, the merchant sees a plain-language error and may explicitly retry the same image to LNbits-local storage.
-- [x] **MEDIA-04**: Blossom upload authorization is signed server-side with the merchant's stored Nostr key; no nsec or reusable signing key is exposed to browser code.
-- [x] **MEDIA-05**: Uploads use bounded multipart parsing (at most 16 files/request and 25 MB/file), avoid unbounded in-memory buffering, enforce a 400 MB per-merchant LNbits-local quota, accept only signature-verified PNG/JPEG/WebP, reject SVG/GIF, compute SHA-256, and validate any returned Blossom descriptor before exposing its URL.
-- [x] **MEDIA-06**: LNbits-managed images use a merchant-scoped opaque storage namespace outside the reinstallable extension package and are served through the host image mount.
-- [x] **MEDIA-07**: A locally stored image used in Nostr profile picture/banner metadata is emitted as a publicly reachable absolute HTTPS URL; Appearance fields may use a safe same-origin path where supported.
+- [ ] **EMAIL-01**: Order-event emails are delivered as `multipart/alternative` — the existing `text/plain` render plus a branded `text/html` part — through an extension-owned SMTP boundary (`_build_message`/`_smtp_send`) that reuses the host SMTP configuration and existing timeout/retry discipline.
+- [ ] **EMAIL-02**: The HTML part renders a merchant-branded template: logo or display-name header with accent color, event title + state label, item table (title, quantity, line totals), order totals (subtotal/shipping/total sats), status-link CTA while the token copy is live, and channel-appropriate footer copy.
+- [ ] **EMAIL-03**: Every interpolated value in the HTML part is escaped (item titles, display name, custom text, digital-delivery content); digital delivery appears only in the customer-channel `confirmed` email; subjects remain display name + event label with no PII or internal ids.
+- [ ] **EMAIL-04**: The owner email preview reflects what was actually sent — subject, redacted text, and redacted HTML — and renders the HTML in a sandboxed preview surface.
 
-### Image Editor
+### Merchant Branding
 
-- [x] **MEDIA-08**: One reusable upload control is available for the product gallery, Merchant Nostr profile avatar/banner, and Appearance brand logo, hero background, footer logo, and custom share image.
-- [x] **MEDIA-09**: Product images support multiple files, thumbnails, a visible primary image, ordering, per-image removal, and an explicit clear-all operation.
-- [x] **MEDIA-10**: Single-image settings fields support replacing and clearing their image without changing unrelated profile/theme fields.
-- [x] **MEDIA-11**: The merchant can continue to paste existing HTTPS image URLs, and editing/saving preserves supported migration-managed local `/images/...` URLs.
-- [x] **MEDIA-12**: Upload UI reports per-file progress and errors, preserves other selected images on failure, and explains that cancelling before saving a setting/product can leave an unreferenced uploaded file.
-- [x] **MEDIA-13**: Product image ordering, removal, and clear-all persist through the existing catalog API and are reflected in public pages and Nostr projections.
-- [x] **MEDIA-14**: Product image count remains at 20, matching current service behavior; update technical-specification, UI, and tests to agree.
+- [ ] **EMAIL-05**: Merchant can upload one email logo through a local-backend-only media picker (≤256 KB, PNG/JPEG/WebP accepted, Pillow-verified with a pixel cap, stored PNG/JPEG); the logo embeds as a CID attachment in the HTML part and is never a remote `<img>` fetch.
+- [ ] **EMAIL-06**: Merchant can set email header text (≤120 chars), footer text (≤240 chars), and accent color (#rrggbb, defaulting to the theme accent) via Notifications settings; the custom footer supplements — never replaces — the mandatory channel footer copy.
+- [ ] **EMAIL-07**: A logo referenced by `merchants.email_logo_path` is recognized by the media unused-scan and cannot be deleted through Settings → Media cleanup while configured.
 
-### Protocol and Release Safety
+### Notification Semantics
 
-- [x] **MEDIA-15**: Blossom uploads use BUD-02 raw `PUT /upload` and BUD-11 kind-24242 authorization with a short expiration, `t=upload`, matching SHA-256 `x` tag and `X-SHA-256` header, a target-scoped `server` tag, and URL-safe base64 JSON without padding.
-- [x] **MEDIA-16**: Backend requests to configured Blossom servers use HTTPS with request-time public-egress validation, pinned-IP TLS connections, strict time/size bounds, and reject upload redirects.
-- [x] **MEDIA-17**: Blossom share-card image GETs follow only bounded, revalidated HTTPS redirects; upload PUTs do not inherit GET redirect behavior. PR #28 must be merged and verified before release.
-- [x] **MEDIA-18**: Any new API route is registered in both `docs/technical-specification.md` §5 and `harness/registry.py::HTTP_ROUTES`; contract parity and fake-Blossom tests pass.
-- [x] **MEDIA-19**: Automated tests exercise local storage, Blossom success, BUD auth/hash/descriptor checks, the first-configured-server rule, failure with explicit local retry, size/type rejection, URL round-trips, and share-card redirects without writing to public Blossom servers.
+- [ ] **EMAIL-08**: `notify_events` flags gate merchant-channel emails only; customer-channel emails gate solely on the order's `email_opt_in` consent (suppression reason re-checked at send time).
+- [ ] **EMAIL-09**: The customer-channel footer carries the order-page opt-out link and opt-in notice; the account channel carries sign-in copy; merchant/test channels carry a neutral transactional notice — each in both parts.
+- [ ] **EMAIL-10**: Test sends render the branded template with representative sample content and are not suppressed by `notify_events` event flags.
+- [ ] **EMAIL-11**: Outbound headers gain an encoded `From` display name (CR/LF-stripped merchant display name on the host notifications address), `Date`, `Message-ID`, and `Auto-Submitted: auto-generated`.
+
+### Contract & Verification
+
+- [ ] **EMAIL-12**: Technical-spec §4 (new `merchants` columns), §5 (logo upload/delete routes), §8.8 (multipart send, CID, preview shape), and §15 (no-remote-`img` rationale) are updated together with `harness/registry.py`, `harness/schema.py`, and migration `m020`.
+- [ ] **EMAIL-13**: `harness/email.py` models the multipart send path so PII/log-exposure assertions cover both parts; qualification tests cover MIME structure, escaping, channel gating, preview redaction, and validation rejections; `make verify-fast` passes.
 
 ## v2 Requirements
 
-Deferred unless the owner promotes them into v1.1 scope.
+Deferred unless the owner promotes them into v1.2 scope.
 
-### Media Resilience
-
-- **MEDIA-20**: Merchant can mirror Blossom blobs to additional configured servers through BUD-04 with visible partial-success and retry status.
-- **MEDIA-21**: Merchant can publish the configured media-server list as a Nostr kind-10063 event.
-- **MEDIA-22**: Merchant can view and clean unused Blossom uploads, with best-effort BUD DELETE and explicit shared-blob consequences.
-- **MEDIA-23**: Uploads support GIF animation or server-side image transformation.
+- **EMAIL-14**: `List-Unsubscribe` header / RFC 8058 one-click unsubscribe — requires a non-fragment unsubscribe credential that does not violate the §5.4 fragment-token posture.
+- **EMAIL-15**: Per-channel `customer_events` toggles — separate customer-facing event switches, only if merchants request control beyond merchant alerts.
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Uploading each file to LNbits and Blossom simultaneously | Creates duplicate storage and partial-success/canonical-URL ambiguity; one selected backend per file is simpler. |
-| Sending merchant nsec to the browser | Violates existing key-custody boundary; BUD-11 signing stays server-side. |
-| Server-side fetching of arbitrary pasted image URLs | Creates an SSRF surface and is unnecessary for file uploads; pasted URLs remain references. |
-| Automatic remote deletion on image removal or editor cancel | Blossom blobs are content-addressed and may be shared; local form changes and remote deletion cannot be atomic. |
-
-## Deferred Scope
-
-- Blossom mirroring to other servers, kind-10063 server-list publication, automatic remote deletion/cleanup, GIF support, and server-side image transforms remain deferred.
-- When a remote upload succeeds but the merchant cancels before saving the product/setting, disclose that the remote file may remain unreferenced; do not attempt automatic deletion in v1.1.
+| Merchant-authored HTML / free-form templates | Arbitrary markup in emails is an unbounded injection surface; structured fields only |
+| Remote `<img>` logos (Blossom or hosted URL) | Mail-client fetch leaks buyer open-time + IP — a tracking vector outside the consent model |
+| `List-Unsubscribe` one-click (RFC 8058) | Requires the bearer token in URL path/query — forbidden by §5.4 fragment-only posture |
+| Marketing/bulk email | Transactional order notifications only |
+| LNbits host `send_email` changes | Host is pinned (e336fe1); the extension owns the SMTP boundary |
+| Upstream/conformance delta work | Revisited after this milestone per owner direction |
 
 ## Traceability
 
-Proposed mapping from the v1.1 roadmap; owner approval is pending.
+Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MEDIA-01 | Phase 6 | Complete |
-| MEDIA-02 | Phase 7 | Complete |
-| MEDIA-03 | Phase 7 | Complete |
-| MEDIA-04 | Phase 6 | Complete |
-| MEDIA-05 | Phase 6 | Complete |
-| MEDIA-06 | Phase 6 | Complete |
-| MEDIA-07 | Phase 6 | Complete |
-| MEDIA-08 | Phase 7 | Complete |
-| MEDIA-09 | Phase 7 | Complete |
-| MEDIA-10 | Phase 7 | Complete |
-| MEDIA-11 | Phase 7 | Complete |
-| MEDIA-12 | Phase 7 | Complete |
-| MEDIA-13 | Phase 7 | Complete |
-| MEDIA-14 | Phase 7 | Complete |
-| MEDIA-15 | Phase 6 | Complete |
-| MEDIA-16 | Phase 6 | Complete |
-| MEDIA-17 | Phase 8 | Complete |
-| MEDIA-18 | Phase 6 | Complete |
-| MEDIA-19 | Phase 8 | Complete |
+| EMAIL-01 | — | Pending |
+| EMAIL-02 | — | Pending |
+| EMAIL-03 | — | Pending |
+| EMAIL-04 | — | Pending |
+| EMAIL-05 | — | Pending |
+| EMAIL-06 | — | Pending |
+| EMAIL-07 | — | Pending |
+| EMAIL-08 | — | Pending |
+| EMAIL-09 | — | Pending |
+| EMAIL-10 | — | Pending |
+| EMAIL-11 | — | Pending |
+| EMAIL-12 | — | Pending |
+| EMAIL-13 | — | Pending |
 
 **Coverage:**
-
-- v1 requirements: 19 total
-- Mapped to phases: 19
-- Unmapped: 0
+- v1 requirements: 13 total
+- Mapped to phases: 0
+- Unmapped: 13 ⚠️
 
 ---
-*Requirements drafted: 2026-10-16*
-*Last updated: 2026-10-17 — MEDIA-17/19 verified complete by the Phase 8 qualification audit (08-VERIFICATION.md)*
+*Requirements defined: 2026-10-17*
