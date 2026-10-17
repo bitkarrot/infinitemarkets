@@ -21,13 +21,13 @@ One authoritative commerce system in an LNbits extension: one inventory sold saf
 
 Each upload uses exactly one backend. Blossom uploads target only the first server configured in Settings → Merchant, in its saved order; a remote failure is reported and local storage is available only as an explicit retry. Blossom authorization is signed on the server with the merchant's stored key. v1.1 supports signature-verified PNG/JPEG/WebP only; it does not mirror, publish kind 10063, remotely delete blobs, or add GIF/transformation support. If a remote upload is not saved with its product or setting, the editor discloses that the blob may remain unreferenced and does not delete it automatically.
 
-**Release dependency:** PR #28 (`fix/og-image-redirects`) is open with all CI checks passed. It must be merged and verified before v1.1 release; its bounded, revalidated HTTPS redirects apply only to share-card image GETs. Authenticated upload PUTs must reject redirects.
+**Release dependency:** PR #28 (`fix/og-image-redirects`) is merged (99df6e8, ancestor of main) and verified by the Phase 8 qualification audit; v1.1.0 is tagged and published. Its bounded, revalidated HTTPS redirects apply only to share-card image GETs; authenticated upload PUTs reject redirects.
 
 ### Phases
 
 - [x] **Phase 6: Secure Media Storage** - Merchants can store uploads locally or use a secure server-side Blossom upload service.
-- [ ] **Phase 7: Shared Image Editors** - Merchants can manage product, profile, and Appearance images through reusable upload controls.
-- [ ] **Phase 8: Media Release Qualification** - Merchants' uploads and share-card images meet the documented protocol and release safety contract.
+- [x] **Phase 7: Shared Image Editors** - Merchants can manage product, profile, and Appearance images through reusable upload controls.
+- [x] **Phase 8: Media Release Qualification** - Merchants' uploads and share-card images meet the documented protocol and release safety contract.
 
 ### Phase Details
 
@@ -84,16 +84,16 @@ Plans:
   1. A Blossom-hosted image that redirects over HTTPS is rendered in generated share cards after PR #28 is merged and verified using bounded, revalidated GET redirects; an upload PUT to a redirecting server fails without forwarding upload bytes or authorization.
   2. Automated tests against local storage and a fake Blossom server demonstrate successful uploads, BUD authorization/hash/descriptor validation, primary-server-only targeting, explicit local retry after remote failure, file size/type rejection, URL round-trips, and share-card redirect handling without writing to public Blossom servers.
 
-**Plans**: 1 plan
+**Plans**: 1/1 plans executed
 
 Plans:
 
-- [ ] 08-01-PLAN.md — Media release qualification audit (PR #28 merge gate + MEDIA-19 test matrix + full-suite CI parity + verdict bookkeeping)
+- [x] 08-01-PLAN.md — Media release qualification audit (PR #28 gate + MEDIA-19 matrix + full-suite parity)
 
 ### Progress
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 6. Secure Media Storage | 4/4 | Complete | 2026-10-16 |
-| 7. Shared Image Editors | 4/4 | Not started | - |
-| 8. Media Release Qualification | 0/1 | Planned | - |
+| 7. Shared Image Editors | 4/4 | Complete | 2026-10-16 |
+| 8. Media Release Qualification | 1/1 | Complete | 2026-10-17 |

@@ -2,21 +2,21 @@
 gsd_state_version: "1.0"
 milestone: v1.1
 milestone_name: Media uploads and Blossom support
-current_phase: 7
-current_phase_name: Shared Image Editors
-current_plan: 4
-status: executing
-stopped_at: Completed 07-04-PLAN.md
-last_updated: "2026-10-16T22:09:00.229Z"
-last_activity: 2026-10-16
-last_activity_desc: v1.1 roadmap and requirement traceability drafted
-state_head: 2a52d60f5493f30224fc03789c5ea7f970ba8bd7
+current_phase: 8
+current_phase_name: Media Release Qualification
+current_plan: 1
+status: complete
+stopped_at: Completed 08-01-PLAN.md — Phase 8 qualification passed; v1.1 requirements closed
+last_updated: "2026-10-17T05:26:00.000Z"
+last_activity: 2026-10-17
+last_activity_desc: Phase 8 release-qualification audit passed (1100-test suite, MEDIA-17/19 complete)
+state_head: d40c0566b659e1b215c2f5a347a0615bf7c64a0d
 progress:
   total_phases: 3
-  completed_phases: 1
-  total_plans: 8
-  completed_plans: 8
-  percent: 33
+  completed_phases: 3
+  total_plans: 9
+  completed_plans: 9
+  percent: 100
 ---
 
 # Project State
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-10-16)
 
 ## Current Position
 
-Phase: 7 of 8 — Shared Image Editors
-Current Plan: 4
-Total Plans in Phase: 4
-Status: Executing — 2 of 4 plans summarized (07-01 unused-listing fields, 07-02 shared picker + hero tracer)
-Last activity: 2026-10-16 — 07-02 gm-media-picker component + hero upload path
+Phase: 8 of 8 — Media Release Qualification (v1.1 closeout)
+Current Plan: 1
+Total Plans in Phase: 1
+Status: Complete — 08-01 qualification audit passed; PR #28 merge ancestry proven, MEDIA-19 matrix green, full `make verify` suite 1100 passed / 8 skipped; MEDIA-17 and MEDIA-19 marked complete. All v1.1 requirements are closed and v1.1.0 is tagged and published.
+Last activity: 2026-10-17 — Phase 8 qualification verdict recorded (08-VERIFICATION.md, status passed)
 
 ## Performance Metrics
 
@@ -77,6 +77,7 @@ Last activity: 2026-10-16 — 07-02 gm-media-picker component + hero upload path
 | Phase 07-shared-image-editors P02 | 8min | 2 tasks | 7 files |
 | Phase 07-shared-image-editors P03 | 9min | 2 tasks | 5 files |
 | Phase 07 P04 | 12min | 3 tasks | 4 files |
+| Phase 08-media-release-qualification P01 | ~10min (incl. ~6min full suite) | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -143,7 +144,7 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 ### Blockers/Concerns
 
-- PR #28 (`fix/og-image-redirects`) is open and all CI checks have passed; merge and verification remain a v1.1 release prerequisite. Its redirect handling is GET-only, never upload PUT behavior.
+- PR #28 (`fix/og-image-redirects`) RESOLVED 2026-10-17: merged (99df6e8, ancestor of main) and verified by the Phase 8 audit; v1.1.0 tagged and published. Its redirect handling is GET-only, never upload PUT behavior.
 - The 400 MB quota applies to LNbits-local storage; Blossom requests still require strict per-request/file bounds and safe request-time egress validation.
 
 - F1–F6 source corrections pass local runtime + independent review (05-REVIEW.md); CI-01 root cause fixed with process-exit regression; full make verify green both profiles; pushed to origin/main (eaf7d64) for the four-profile CI matrix. 05-06 gates reconciled 2026-10-13: live Plebeian passed, paid-order audit performed, F1 + WR-01 operator-accepted in writing; milestone closeout authorized.
@@ -160,6 +161,7 @@ Decisions are logged in PROJECT.md and the normative specification.
 ### Roadmap Evolution
 
 - 2026-10-16: v1.1 roadmap created as Phases 6–8: secure media storage, shared image editors for all merchant image fields, and media release qualification. MEDIA-01–MEDIA-19 are each assigned to exactly one phase.
+- 2026-10-17: Phase 8 qualification audit closed MEDIA-17/MEDIA-19 and cleared the PR #28 release gate — merge ancestry proven on main, bounded share-card redirects + single-request PUT refusal green, full `make verify` 1100 passed; v1.1 requirement set fully closed (v1.1.0 tagged and published).
 - 2026-10-11: user chose hardening first. Phase 5 added for F1–F6, CI-01 and release/security evidence; optional integrations and shipping-import expansion deferred.
 
 - Phase 03.1 inserted after Phase 3: Buyer accounts — email magic-link sign-in and Nostr identity linking

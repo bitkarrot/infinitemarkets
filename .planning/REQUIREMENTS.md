@@ -32,9 +32,9 @@ Requirements for v1.1. Each maps to one roadmap phase after owner approval.
 
 - [x] **MEDIA-15**: Blossom uploads use BUD-02 raw `PUT /upload` and BUD-11 kind-24242 authorization with a short expiration, `t=upload`, matching SHA-256 `x` tag and `X-SHA-256` header, a target-scoped `server` tag, and URL-safe base64 JSON without padding.
 - [x] **MEDIA-16**: Backend requests to configured Blossom servers use HTTPS with request-time public-egress validation, pinned-IP TLS connections, strict time/size bounds, and reject upload redirects.
-- [ ] **MEDIA-17**: Blossom share-card image GETs follow only bounded, revalidated HTTPS redirects; upload PUTs do not inherit GET redirect behavior. PR #28 must be merged and verified before release.
+- [x] **MEDIA-17**: Blossom share-card image GETs follow only bounded, revalidated HTTPS redirects; upload PUTs do not inherit GET redirect behavior. PR #28 must be merged and verified before release.
 - [x] **MEDIA-18**: Any new API route is registered in both `docs/technical-specification.md` §5 and `harness/registry.py::HTTP_ROUTES`; contract parity and fake-Blossom tests pass.
-- [ ] **MEDIA-19**: Automated tests exercise local storage, Blossom success, BUD auth/hash/descriptor checks, the first-configured-server rule, failure with explicit local retry, size/type rejection, URL round-trips, and share-card redirects without writing to public Blossom servers.
+- [x] **MEDIA-19**: Automated tests exercise local storage, Blossom success, BUD auth/hash/descriptor checks, the first-configured-server rule, failure with explicit local retry, size/type rejection, URL round-trips, and share-card redirects without writing to public Blossom servers.
 
 ## v2 Requirements
 
@@ -83,9 +83,9 @@ Proposed mapping from the v1.1 roadmap; owner approval is pending.
 | MEDIA-14 | Phase 7 | Complete |
 | MEDIA-15 | Phase 6 | Complete |
 | MEDIA-16 | Phase 6 | Complete |
-| MEDIA-17 | Phase 8 | Pending |
+| MEDIA-17 | Phase 8 | Complete |
 | MEDIA-18 | Phase 6 | Complete |
-| MEDIA-19 | Phase 8 | Pending |
+| MEDIA-19 | Phase 8 | Complete |
 
 **Coverage:**
 
@@ -95,4 +95,4 @@ Proposed mapping from the v1.1 roadmap; owner approval is pending.
 
 ---
 *Requirements drafted: 2026-10-16*
-*Last updated: 2026-10-16 after GSD research and storage-policy decisions*
+*Last updated: 2026-10-17 — MEDIA-17/19 verified complete by the Phase 8 qualification audit (08-VERIFICATION.md)*
