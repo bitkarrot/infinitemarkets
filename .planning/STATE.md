@@ -1,22 +1,16 @@
 ---
 gsd_state_version: "1.0"
-milestone: v1.1
-milestone_name: Media uploads and Blossom support
-current_phase: 8
-current_phase_name: Media Release Qualification
-current_plan: 1
-status: complete
-stopped_at: v1.1 milestone complete — all 3 phases verified, v1.1.0 released
-last_updated: "2026-10-17T05:33:14.241Z"
+milestone: v1.2
+milestone_name: Branded Order Emails
+status: planning
+last_updated: "2026-10-17T19:51:24.963Z"
 last_activity: 2026-10-17
-last_activity_desc: Phase 8 release-qualification audit passed (1100-test suite, MEDIA-17/19 complete)
-state_head: a08d7814e148597bb7e241c403367385f075e534
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 9
-  completed_plans: 9
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -30,11 +24,10 @@ See: .planning/PROJECT.md (updated 2026-10-16)
 
 ## Current Position
 
-Phase: 8 of 8 — Media Release Qualification (v1.1 closeout)
-Current Plan: 1
-Total Plans in Phase: 1
-Status: Complete — 08-01 qualification audit passed; PR #28 merge ancestry proven, MEDIA-19 matrix green, full `make verify` suite 1100 passed / 8 skipped; MEDIA-17 and MEDIA-19 marked complete. All v1.1 requirements are closed and v1.1.0 is tagged and published.
-Last activity: 2026-10-17 — Phase 8 qualification verdict recorded (08-VERIFICATION.md, status passed)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-10-17 — Milestone v1.2 started
 
 ## Performance Metrics
 
