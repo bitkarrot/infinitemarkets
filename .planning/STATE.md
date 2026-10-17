@@ -7,10 +7,10 @@ current_phase_name: Media Release Qualification
 current_plan: 1
 status: complete
 stopped_at: Completed 08-01-PLAN.md — Phase 8 qualification passed; v1.1 requirements closed
-last_updated: "2026-10-17T05:26:00.000Z"
+last_updated: "2026-10-17T05:31:42.485Z"
 last_activity: 2026-10-17
 last_activity_desc: Phase 8 release-qualification audit passed (1100-test suite, MEDIA-17/19 complete)
-state_head: d40c0566b659e1b215c2f5a347a0615bf7c64a0d
+state_head: 4730133a1e6a19285a7a4841429b96c86d49afe2
 progress:
   total_phases: 3
   completed_phases: 3
@@ -77,7 +77,7 @@ Last activity: 2026-10-17 — Phase 8 qualification verdict recorded (08-VERIFIC
 | Phase 07-shared-image-editors P02 | 8min | 2 tasks | 7 files |
 | Phase 07-shared-image-editors P03 | 9min | 2 tasks | 5 files |
 | Phase 07 P04 | 12min | 3 tasks | 4 files |
-| Phase 08-media-release-qualification P01 | ~10min (incl. ~6min full suite) | 3 tasks | 4 files |
+| Phase 08-media-release-qualification P01 | ~14min (incl. ~6min full suite) | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -124,6 +124,8 @@ Decisions are logged in PROJECT.md and the normative specification.
 - [Phase 7]: 07-02: first registered Vue component (gm-media-picker via window.app.component + template string) replaces mixin-only idiom for the shared upload control — host-vendored vue.global.prod.js carries the compiler (D-24)
 - [Phase 7]: 07-02: gmMediaUpload uses XHR not fetch (upload.onprogress required by MEDIA-12); FormData exactly usage/backend/file; no Idempotency-Key per D-28; appearance fields bind result.path locally else result.url (D-26)
 - [Phase 7]: 07-03: cancel-disclosure via shared gmDiscloseUnsavedUploads on every product-editor close path; save always sends images (D-21/D-27)
+- [Phase 8]: 08-01: qualification audit only — no code/test changes; requirements ticked in the same commit carrying green-run outputs (T-08-02); regenerated evidence bundle committed as durable artifact
+- [Phase 8]: 08-01: ROADMAP release-dependency paragraph updated to merged/verified/released — stale 'PR #28 is open' text would contradict the recorded verdict
 
 ### Pending Todos
 
@@ -180,6 +182,6 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 ## Session Continuity
 
-Last session: 2026-10-16T22:09:00.208Z
-Stopped at: Completed 07-04-PLAN.md
+Last session: 2026-10-17T05:31:08.464Z
+Stopped at: Completed 08-01-PLAN.md — Phase 8 qualification passed; v1.1 requirements closed
 Resume file: None
