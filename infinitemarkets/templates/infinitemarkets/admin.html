@@ -626,13 +626,22 @@
                       <q-img :src="img.thumb" :ratio="1"
                              class="gm-gallery-thumb"
                              :alt="'Product image ' + (i + 1)">
-                        <q-badge v-if="i === 0" color="primary" floating>
+                        <q-badge v-if="i === 0 && !img.pending"
+                                 color="primary" floating>
                           Primary
                         </q-badge>
+                        <div v-if="img.pending" class="gm-upload-overlay">
+                          <q-spinner color="white" size="1.6em"></q-spinner>
+                          <div class="gm-upload-pct">
+                            {{ Math.round((img.progress || 0) * 100) }}%
+                          </div>
+                        </div>
                       </q-img>
-                      <q-linear-progress v-if="img.pending" dense
-                                         :value="img.progress"
-                                         class="q-mt-xs"></q-linear-progress>
+                      <div v-if="img.pending"
+                           class="text-caption text-grey-7 ellipsis q-mt-xs"
+                           :title="img.name">
+                        Uploading {{ img.name }}…
+                      </div>
                       <div v-if="img.error"
                            class="text-caption text-negative q-mt-xs">
                         {{ img.error }}
@@ -1997,9 +2006,14 @@
                                      @servers-needed="gmMediaLoadServers"
                                      @files-chosen="gmMediaAvatarUpload">
                     </gm-media-picker>
-                    <q-linear-progress v-if="gmMedia.uploading" dense
-                                       :value="gmMedia.progress"
-                                       class="q-mt-xs"></q-linear-progress>
+                    <div v-if="gmMedia.uploading" class="row items-center q-gutter-sm q-mt-xs">
+                      <q-spinner size="1.2em"></q-spinner>
+                      <span class="text-caption">Uploading…
+                        {{ Math.round((gmMedia.progress || 0) * 100) }}%
+                      </span>
+                      <q-linear-progress dense :value="gmMedia.progress"
+                                         class="col"></q-linear-progress>
+                    </div>
                     <div v-if="gmMedia.retryLocal && gmMedia.retrySite === 'profileAvatar'"
                          class="q-mt-sm">
                       <q-btn flat dense color="primary"
@@ -2024,9 +2038,14 @@
                                      @servers-needed="gmMediaLoadServers"
                                      @files-chosen="gmMediaBannerUpload">
                     </gm-media-picker>
-                    <q-linear-progress v-if="gmMedia.uploading" dense
-                                       :value="gmMedia.progress"
-                                       class="q-mt-xs"></q-linear-progress>
+                    <div v-if="gmMedia.uploading" class="row items-center q-gutter-sm q-mt-xs">
+                      <q-spinner size="1.2em"></q-spinner>
+                      <span class="text-caption">Uploading…
+                        {{ Math.round((gmMedia.progress || 0) * 100) }}%
+                      </span>
+                      <q-linear-progress dense :value="gmMedia.progress"
+                                         class="col"></q-linear-progress>
+                    </div>
                     <div v-if="gmMedia.retryLocal && gmMedia.retrySite === 'profileBanner'"
                          class="q-mt-sm">
                       <q-btn flat dense color="primary"
@@ -2589,9 +2608,14 @@
                                      @servers-needed="gmMediaLoadServers"
                                      @files-chosen="gmMediaThemeUpload('brand.logo_url', $event)">
                     </gm-media-picker>
-                    <q-linear-progress v-if="gmMedia.uploading" dense
-                                       :value="gmMedia.progress"
-                                       class="q-mt-xs"></q-linear-progress>
+                    <div v-if="gmMedia.uploading" class="row items-center q-gutter-sm q-mt-xs">
+                      <q-spinner size="1.2em"></q-spinner>
+                      <span class="text-caption">Uploading…
+                        {{ Math.round((gmMedia.progress || 0) * 100) }}%
+                      </span>
+                      <q-linear-progress dense :value="gmMedia.progress"
+                                         class="col"></q-linear-progress>
+                    </div>
                     <div v-if="gmMedia.retryLocal && gmMedia.retrySite === 'brand.logo_url'"
                          class="q-mt-sm">
                       <q-btn flat dense color="primary"
@@ -2655,9 +2679,14 @@
                                      @servers-needed="gmMediaLoadServers"
                                      @files-chosen="gmMediaHeroUpload">
                     </gm-media-picker>
-                    <q-linear-progress v-if="gmMedia.uploading" dense
-                                       :value="gmMedia.progress"
-                                       class="q-mt-xs"></q-linear-progress>
+                    <div v-if="gmMedia.uploading" class="row items-center q-gutter-sm q-mt-xs">
+                      <q-spinner size="1.2em"></q-spinner>
+                      <span class="text-caption">Uploading…
+                        {{ Math.round((gmMedia.progress || 0) * 100) }}%
+                      </span>
+                      <q-linear-progress dense :value="gmMedia.progress"
+                                         class="col"></q-linear-progress>
+                    </div>
                     <div v-if="gmMedia.retryLocal && gmMedia.retrySite === 'hero.image_url'"
                          class="q-mt-sm">
                       <q-btn flat dense color="primary"
@@ -2728,9 +2757,14 @@
                                      @servers-needed="gmMediaLoadServers"
                                      @files-chosen="gmMediaThemeUpload('footer.logo_url', $event)">
                     </gm-media-picker>
-                    <q-linear-progress v-if="gmMedia.uploading" dense
-                                       :value="gmMedia.progress"
-                                       class="q-mt-xs"></q-linear-progress>
+                    <div v-if="gmMedia.uploading" class="row items-center q-gutter-sm q-mt-xs">
+                      <q-spinner size="1.2em"></q-spinner>
+                      <span class="text-caption">Uploading…
+                        {{ Math.round((gmMedia.progress || 0) * 100) }}%
+                      </span>
+                      <q-linear-progress dense :value="gmMedia.progress"
+                                         class="col"></q-linear-progress>
+                    </div>
                     <div v-if="gmMedia.retryLocal && gmMedia.retrySite === 'footer.logo_url'"
                          class="q-mt-sm">
                       <q-btn flat dense color="primary"
@@ -2776,9 +2810,14 @@
                                        @servers-needed="gmMediaLoadServers"
                                        @files-chosen="gmMediaThemeUpload('share.custom_image_url', $event)">
                       </gm-media-picker>
-                      <q-linear-progress v-if="gmMedia.uploading" dense
-                                         :value="gmMedia.progress"
-                                         class="q-mt-xs"></q-linear-progress>
+                      <div v-if="gmMedia.uploading" class="row items-center q-gutter-sm q-mt-xs">
+                      <q-spinner size="1.2em"></q-spinner>
+                      <span class="text-caption">Uploading…
+                        {{ Math.round((gmMedia.progress || 0) * 100) }}%
+                      </span>
+                      <q-linear-progress dense :value="gmMedia.progress"
+                                         class="col"></q-linear-progress>
+                    </div>
                       <div v-if="gmMedia.retryLocal && gmMedia.retrySite === 'share.custom_image_url'"
                            class="q-mt-sm">
                         <q-btn flat dense color="primary"
@@ -3823,6 +3862,20 @@
   border-radius: 8px;
   background: rgba(128, 128, 128, 0.12);
 }
+/* Pending uploads: dimmed local preview + spinner + %, so an in-flight
+   file reads unmistakably as "not stored yet" (MEDIA-12). */
+.gm-upload-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 8px;
+}
+.gm-upload-pct { color: #fff; font-size: 11px; font-weight: 600; }
 /* LNbits redefines --q-dark as a 30%-opacity grey inside cards, which turns
    Quasar's text-dark into faint text on warning/info fills. Keep it solid. */
 #gm-admin-root .text-dark { color: #1d1d1d !important; }

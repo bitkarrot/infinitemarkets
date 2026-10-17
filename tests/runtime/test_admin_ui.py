@@ -260,7 +260,7 @@ async def test_product_editor_gallery(runtime_env):
     assert "gmGalleryMove" in editor
     assert "gmGalleryAddUrl" in editor
     assert "gmGalleryClearAll" in editor
-    assert "q-linear-progress" in editor
+    assert "gm-upload-overlay" in editor
     assert "gmCatalog.imageDisclosure" in editor
     # Cancel routes through the disclosure helper.
     assert 'label="Cancel" @click="gmCloseProductEditor"' in editor

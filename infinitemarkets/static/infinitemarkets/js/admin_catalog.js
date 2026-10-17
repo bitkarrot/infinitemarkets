@@ -549,8 +549,14 @@
         ed.error = null;
         for (var i = 0; i < files.length; i++) {
           var file = files[i];
+          /* Instant local preview so the tile shows the image while the
+             upload is still in flight; revoked once the stored URL is
+             swapped in (error tiles keep it so the failed file is
+             identifiable). */
+          var previewUrl = "";
+          try { previewUrl = URL.createObjectURL(file); } catch (e) {}
           var entry = {
-            url: "", thumb: "",
+            url: "", thumb: previewUrl,
             kind: payload.backend === "blossom" ? "blossom" : "local",
             pending: true, progress: 0, error: null,
             name: file && file.name
@@ -564,7 +570,11 @@
             var result = (res.results || [])[0] || {};
             if (result.state === "stored") {
               entry.url = result.url || "";
-              entry.thumb = result.url || "";
+              if (previewUrl) {
+                URL.revokeObjectURL(previewUrl);
+                previewUrl = "";
+              }
+              entry.thumb = result.url || entry.thumb;
               entry.kind =
                 result.backend === "blossom" ? "blossom" : "local";
               entry.pending = false;
