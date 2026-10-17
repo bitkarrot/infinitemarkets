@@ -1,8 +1,10 @@
 # SPEC: Branded Order Email Templates
 
-**Status:** Draft — unassigned to a milestone (candidate: v1.1 or v1.2)
-**Authored:** 2026-10-15, branch `spec/order-email-templates`
-**Depends on / interacts with:** v1.1 media milestone (Blossom uploads) — see §4.3
+**Status:** Draft — unassigned to a milestone (candidate: v1.2)
+**Authored:** 2026-10-15, branch `spec/order-email-templates`;
+updated 2026-10-17 against shipped v1.1.0
+**Depends on / interacts with:** v1.1 media library (`services/media.py`,
+`gm-media-picker`, Settings → Media cleanup) — see §4.3
 
 ---
 
@@ -144,22 +146,37 @@ New nullable columns on `merchants` (new migration, next `m0xx`):
 | `email_accent` | TEXT | `#[0-9a-fA-F]{6}` or NULL → falls back to `theme` accent |
 
 **Logo storage — single-slot semantics** (resolves open question 3):
-one logo per merchant, `logo-<sha256>.<ext>` in the existing
-merchant-namespaced media dir, bounded multipart upload, magic-byte
-sniff (PNG/JPEG/WebP only), cap ≤256 KB. Re-upload atomically replaces
-and deletes the previous file; clearing the field deletes it too. No
-accounting path needed — the file nominally shares the media dir's
-400 MB budget, which is immaterial at 256 KB. Logo uploads are *not*
-gated on URLs already in the catalog (unlike migration media) — it's a
-dedicated kind.
+one logo per merchant, stored via the shipped v1.1 local adapter
+(`media.py::store_local`) — `<sha256>.<ext>` in the shared
+merchant-namespaced media dir under the same 400 MB quota (D-01).
+Upload goes through the media multipart path with a tighter per-file
+cap (≤256 KB). Sequence: store+verify the new file → update the DB
+pointer → best-effort delete the previous file; a cleanup miss leaves
+an orphan, never a broken pointer.
 
-**v1.1 interaction:** the in-flight media milestone adds Blossom-hosted
-product media. Email logos stay **local-bytes-only** for CID embedding:
-remote `<img src>` (Blossom or `/images` URL) is rejected because the
-buyer's mail client fetch leaks open-time + IP — a tracking vector the
-consent model doesn't cover. If v1.1 lands a general local-media
-library first, the logo picker may reuse it; the contract is "bytes
-available locally at send time," not a storage location.
+**v1.1 landed — two integration points, one new gap:**
+
+- Reuse `media.py::store_local` (shared namespace/quota) — **not**
+  Blossom: CID embedding needs bytes on local disk at send time, and
+  remote `<img src>` is rejected anyway (buyer mail-client fetch leaks
+  open-time + IP — a tracking vector the consent model doesn't cover).
+- Reuse `gm-media-picker` in the admin UI, constrained to the local
+  backend — the Blossom option must not be offered for email logos.
+- **New gap:** `media.py::_referenced_names` scans only
+  `product_images.url`, `merchants.profile_json`, and `merchants.theme`
+  for `infinitemarkets/<ns>/<name>` — a logo referenced solely by
+  `merchants.email_logo_path` would surface in Settings → Media as
+  *unused* and be deletable. Store the column in the same
+  `infinitemarkets/<ns>/<name>` path form the scanner matches AND add
+  `email_logo_path` to the scan's haystack columns; then a
+  `delete_unused` can't orphan the configured logo.
+
+**Image validation tightening:** `store_local` accepts on magic-byte
+sniff only. For the email path add Pillow verify + a pixel cap
+(precedent: `og_images._MAX_SOURCE_PIXELS`), and emit PNG/JPEG only —
+WebP in email clients is inconsistent. Sniff alone admits malformed
+files; for product media that's a broken `<img>`, in email it's a
+corrupt attachment on every send.
 
 **Send-time fallback:** unreadable/missing logo → render without the
 `related` wrapper; never fail the send over branding.
@@ -215,19 +232,20 @@ available locally at send time," not a storage location.
   fields notifications-scoped only — do **not** add them to
   `PatchMerchantBody` (which also carries `notify_*` today; leaving
   them off keeps one canonical settings surface).
-- `POST .../notifications/logo` — bounded multipart upload (reuse
-  `MultiPartParser` + bounded-stream pattern from `_catalog_upload`),
-  single file, sniffs to png/jpeg/webp, writes to media dir, updates
-  `email_logo_path`. `DELETE` on the same route clears it and removes
-  the file.
+- `POST .../notifications/logo` — bounded multipart upload through the
+  media service (`store_local`), single file, ≤256 KB, PNG/JPEG/WebP in
+  → stored as PNG or JPEG (see §4.3 validation tightening), updates
+  `email_logo_path` to the namespaced path form. `DELETE` on the same
+  route clears the field and removes the file.
 - **`harness/registry.py::HTTP_ROUTES` + technical-spec §5 must be
   updated in the same change** (bidirectional parity test).
 
 ## 8. Admin UI
 
 Notifications section (`admin.html` ~2218+, `admin_settings.js`):
-logo picker w/ preview + remove, header/footer text inputs, accent
-swatch (default = theme accent), and the existing "send test" button
+reuse `gm-media-picker` (`admin_media.js`) in local-backend-only mode
+for the logo, plus preview + remove, header/footer text inputs, accent
+swatch (default = theme accent). The existing "send test" button
 already exercises the branded render end-to-end.
 
 ## 9. Test plan
@@ -288,11 +306,14 @@ New — discovered during review:
   it grows)
 - `services/orders.py` — none (render is at send time)
 - `services/merchant.py` — patch/validate new fields, `get_notifications`
-- `services/migration_media.py` — extract sniff/save helper or reuse
-- `migrations.py` — new `m0xx` for the four columns
+- `services/media.py` — logo via `store_local`; `email_logo_path` added
+  to `_referenced_names` haystack (unused-cleanup protection)
+- `migrations.py` — new `m020` for the four columns (m019 is taken)
 - `models.py` — new `Merchant` fields
 - `views_api.py` — `PatchNotificationsBody` + logo upload/delete route
-- `templates/admin.html`, `js/admin_settings.js` — settings UI
+- `templates/admin.html`, `js/admin_settings.js`,
+  `js/admin_media.js` — settings UI; `gm-media-picker` needs a
+  local-backend-only mode for the logo field
 - `harness/email.py` — multipart modeling (see §9)
 - `harness/registry.py`, `docs/technical-specification.md` §4/§5/§8.8 +
   §15 note recording the CID-only / no-remote-`img` rationale
