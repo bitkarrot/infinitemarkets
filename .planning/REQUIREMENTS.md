@@ -60,24 +60,24 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| EMAIL-01 | — | Pending |
-| EMAIL-02 | — | Pending |
-| EMAIL-03 | — | Pending |
-| EMAIL-04 | — | Pending |
-| EMAIL-05 | — | Pending |
-| EMAIL-06 | — | Pending |
-| EMAIL-07 | — | Pending |
-| EMAIL-08 | — | Pending |
-| EMAIL-09 | — | Pending |
-| EMAIL-10 | — | Pending |
-| EMAIL-11 | — | Pending |
-| EMAIL-12 | — | Pending |
-| EMAIL-13 | — | Pending |
+| EMAIL-01 | 9 | Pending |
+| EMAIL-02 | 9 | Pending |
+| EMAIL-03 | 9 | Pending |
+| EMAIL-04 | 10 | Pending |
+| EMAIL-05 | 10 | Pending |
+| EMAIL-06 | 10 | Pending |
+| EMAIL-07 | 10 | Pending |
+| EMAIL-08 | 9 | Pending |
+| EMAIL-09 | 9 | Pending |
+| EMAIL-10 | 9 | Pending |
+| EMAIL-11 | 9 | Pending |
+| EMAIL-12 | 11 | Pending |
+| EMAIL-13 | 11 | Pending |
 
 **Coverage:**
 - v1 requirements: 13 total
-- Mapped to phases: 0
-- Unmapped: 13 ⚠️
+- Mapped to phases: 13
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-10-17*

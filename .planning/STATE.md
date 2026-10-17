@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 milestone: v1.2
 milestone_name: Branded Order Emails
 status: planning
-last_updated: "2026-10-17T19:51:24.963Z"
+last_updated: "2026-10-17T21:30:00.000Z"
 last_activity: 2026-10-17
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -17,21 +17,21 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-10-16)
+See: .planning/PROJECT.md (updated 2026-10-17)
 
 **Core value:** A merchant can sell one authoritative inventory safely through LNbits-backed web and Nostr flows without duplicate invoices, double allocation, or relay delivery being mistaken for payment truth.
-**Current focus:** v1.1 media uploads and Blossom support, starting at Phase 6 after owner approval of the roadmap.
+**Current focus:** v1.2 branded order emails — roadmap defined (Phases 9–11); next: plan Phase 9.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 9 of 11 (Branded Multipart Send Path)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-10-17 — Milestone v1.2 started
+Status: Roadmap defined — ready to plan Phase 9
+Last activity: 2026-10-17 — v1.2 roadmap created; EMAIL-01..13 mapped to Phases 9–11
 
 ## Performance Metrics
 
-**Current milestone (v1.1) velocity:**
+**Current milestone (v1.2) velocity:**
 
 - Executed plans: 0
 - Average duration: -
@@ -155,6 +155,7 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 ### Roadmap Evolution
 
+- 2026-10-17: v1.2 roadmap created as Phases 9–11: branded multipart send path (extension-owned `_build_message`/`_smtp_send` + consent-gating fix), merchant email branding controls (logo picker, header/footer/accent, sandboxed preview), and email contract & release qualification. EMAIL-01–EMAIL-13 each assigned to exactly one phase.
 - 2026-10-16: v1.1 roadmap created as Phases 6–8: secure media storage, shared image editors for all merchant image fields, and media release qualification. MEDIA-01–MEDIA-19 are each assigned to exactly one phase.
 - 2026-10-17: Phase 8 qualification audit closed MEDIA-17/MEDIA-19 and cleared the PR #28 release gate — merge ancestry proven on main, bounded share-card redirects + single-request PUT refusal green, full `make verify` 1100 passed; v1.1 requirement set fully closed (v1.1.0 tagged and published).
 - 2026-10-11: user chose hardening first. Phase 5 added for F1–F6, CI-01 and release/security evidence; optional integrations and shipping-import expansion deferred.
