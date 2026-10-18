@@ -428,12 +428,11 @@ def _render_html(view: dict, *, has_logo: bool = False) -> str:
             ("Shipping", shipping_sat),
             ("Total", total_sat),
         ):
-            if amount is not None or test_send:
-                content_rows.append(
-                    '<tr><td style="padding:3px 0;">'
-                    f"{label}</td><td align=\"right\">"
-                    f"{_html_escape(_sats_label(amount))}</td></tr>"
-                )
+            content_rows.append(
+                '<tr><td style="padding:3px 0;">'
+                f"{label}</td><td align=\"right\">"
+                f"{_html_escape(_sats_label(amount))}</td></tr>"
+            )
         content_rows.append("</table></td></tr>")
 
     if delivery:

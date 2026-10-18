@@ -294,7 +294,7 @@ def test_sections_keep_adjacent_equal_items_and_render_zero_item_order_totals():
     adjacent = _build(_view(items=[first, second], delivery=[]))
     _text, adjacent_html = _parts(adjacent)
     assert adjacent_html.count("Equal-priced item") == 2
-    assert adjacent_html.count("1,000 sats") >= 4
+    assert adjacent_html.count("1,000 sats") == 2
 
     empty_order = _build(_view(
         items=[],
