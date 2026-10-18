@@ -460,6 +460,7 @@ async def test_customer_preview_redacts_order_and_footer_links(
     assert body["redacted"] is True
     assert "You opted in to order emails." in body["body"]
     assert "To opt out: [order-status link omitted]" in body["body"]
+    assert body["body"].count("[order-status link omitted]") == 2
     assert "/infinitemarkets/order#" not in body["body"]
     assert "preview@example.com" not in body["body"]
 
@@ -620,12 +621,80 @@ async def test_orderless_test_send(runtime_env, monkeypatch, smtp_capture):
         assert "Sample item" in call["text"] and "Sample item" in call["html"]
         assert "1,000 sats" in call["text"] and "1,000 sats" in call["html"]
         assert "sample-token" not in call["text"] + call["html"]
+        assert "<a " not in call["html"]
+        assert "thing" not in call["text"] + call["html"]
+        assert "buyer@example.com" not in call["text"] + call["html"]
 
     body = (
         await client.get(f"{API}/merchants/{mid}/notifications")
     ).json()
     orderless = [q for q in body["queue"] if not q["order_bound"]]
     assert orderless and orderless[0]["state"] == "sent"
+
+
+async def test_orderless_test_send_rate_limit_remains_five_per_hour(
+    runtime_env, smtp_capture
+):
+    client = runtime_env["client"]
+    svcs = _svc()
+    merchant_id = runtime_env["merchant_id"]
+    recipient = f"{uuid.uuid4().hex}@example.com"
+
+    async def cookie() -> dict:
+        if not client.cookies.get("gm_csrf"):
+            await client.get(f"{API}/merchants/current")
+        return {
+            "Origin": ORIGIN,
+            "X-CSRF-Token": client.cookies.get("gm_csrf"),
+        }
+
+    from infinitemarkets.db import DomainTransaction
+
+    async with DomainTransaction() as tx:
+        merchant = await tx.fetch_one(
+            "SELECT notify_emails FROM merchants WHERE id = :m",
+            {"m": merchant_id},
+        )
+        original_notify_emails = merchant["notify_emails"]
+        await tx.execute(
+            "UPDATE merchants SET notify_emails = :emails WHERE id = :m",
+            {"emails": json.dumps([recipient]), "m": merchant_id},
+        )
+    responses = []
+    try:
+        try:
+            for _ in range(6):
+                responses.append(await client.post(
+                    f"{API}/merchants/{merchant_id}/notifications/test",
+                    json={"recipient": recipient},
+                    headers=await cookie(),
+                ))
+        finally:
+            await svcs["email"].worker_tick("test-send-rate-limit")
+
+        assert [response.status_code for response in responses] == [
+            200, 200, 200, 200, 200, 429,
+        ]
+        queue_ids = [
+            response.json()["queue_id"]
+            for response in responses[:5]
+        ]
+        assert len(set(queue_ids)) == 5
+        delivered = [
+            call for call in smtp_capture if call["to"] == recipient
+        ]
+        assert len(delivered) == 5
+        for call in delivered:
+            assert "Sample email preview — not a real order." in call["text"]
+            assert "Sample item" in call["html"]
+            assert "<a " not in call["html"]
+            assert recipient not in call["text"] + call["html"]
+    finally:
+        async with DomainTransaction() as tx:
+            await tx.execute(
+                "UPDATE merchants SET notify_emails = :emails WHERE id = :m",
+                {"emails": original_notify_emails, "m": merchant_id},
+            )
 
 
 async def test_subject_has_no_pii(runtime_env):

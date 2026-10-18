@@ -555,3 +555,75 @@ def test_footers_cover_customer_account_merchant_and_test_in_both_parts():
         assert "Sample item" in content
         assert "1,000 sats" in content
         assert "This is a transactional order notification." in content
+
+
+def test_footer_optional_copy_is_escaped_and_never_replaces_channel_notice():
+    render = _email()._render_html
+    parameters = inspect.signature(render).parameters
+    assert "header_text" in parameters
+    assert "footer_text" in parameters
+    hostile = '<script>alert("x")</script> "footer" & more'
+    cases = (
+        (
+            _view(channel="customer", status_link=None, delivery=[]),
+            "You opted in to order emails.",
+        ),
+        (
+            _view(
+                channel="account",
+                event_type="signin_link",
+                items=[],
+                subtotal_sat=None,
+                shipping_sat=None,
+                total_sat=None,
+                delivery=[],
+            ),
+            "You requested a sign-in link.",
+        ),
+        (
+            _view(channel="merchant", delivery=[]),
+            "This is a transactional order notification.",
+        ),
+        (
+            _view(
+                channel="merchant",
+                event_type="order_received",
+                test_send=True,
+                delivery=[],
+            ),
+            "This is a transactional order notification.",
+        ),
+    )
+    escaped = (
+        "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; "
+        "&#x27;footer&#x27; &amp; more"
+    )
+    for view, required_notice in cases:
+        rendered = render(
+            view,
+            header_text=hostile,
+            footer_text=hostile,
+        )
+        assert "<script" not in rendered
+        assert rendered.count("&lt;script&gt;") == 2
+        assert rendered.count(escaped) == 2
+        assert required_notice in rendered
+        assert rendered.index(escaped) < rendered.rindex(required_notice)
+        assert "href=" not in rendered or view.get("status_link") is not None
+
+
+def test_customer_footer_escapes_live_fragment_and_has_no_dead_href():
+    hostile_link = (
+        'https://shop.example/order?shop=pub&name="<script>"#bearer&next=1'
+    )
+    live = _parts(_build(_view(status_link=hostile_link)))[1]
+    escaped_href = (
+        'href="https://shop.example/order?shop=pub&amp;'
+        'name=&quot;&lt;script&gt;&quot;#bearer&amp;next=1"'
+    )
+    assert escaped_href in live
+    assert "<script>" not in live
+
+    dead = _parts(_build(_view(status_link=None)))[1]
+    assert "To opt out: use the order page from your order." in dead
+    assert "href=" not in dead

@@ -492,6 +492,34 @@ async def test_magic_link_send_renders_fragment_and_wipes(
     assert escaped_href in account_markup
     assert "buyer@example.com" not in str(account_message)
 
+    hostile_link = (
+        'https://shop.example/auth/email?shop=pub&return="'
+        '<script>alert(1)</script>"#fragment"&next=1'
+    )
+    hostile_account = svcs["email"]._build_message(
+        subject="Email Shop: your sign-in link",
+        text=f"Sign in: {hostile_link}",
+        view={
+            "channel": "account",
+            "event_type": "signin_link",
+            "display_name": safe_name,
+            "items": [],
+            "status_link": hostile_link,
+            "theme": None,
+        },
+        from_addr="shop@example.com",
+        to_addr="buyer@example.com",
+    )
+    hostile_markup = hostile_account.get_body(
+        preferencelist=("html",)
+    ).get_content()
+    assert "<script" not in hostile_markup
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in hostile_markup
+    assert 'href="https://shop.example/auth/email?shop=pub&amp;return=&quot;' in (
+        hostile_markup
+    )
+    assert '#fragment&quot;&amp;next=1"' in hostile_markup
+
     preview = await env["client"].get(
         f"{API}/merchants/{env['merchant_id']}"
         f"/notifications/email-queue/{row_id}"
