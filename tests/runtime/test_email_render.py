@@ -432,6 +432,16 @@ async def test_sections_hide_dead_status_links_and_gate_delivery_exactly():
         for order in dead_orders:
             link = await service._status_link(order, settings)
             assert link is None
+            dead_text = service._render_body(
+                {"event_type": "confirmed", "channel": "customer"},
+                {"state": "confirmed", "total_sat": 1200},
+                [],
+                {},
+                link,
+                [],
+            )
+            assert "To opt out, use the order page from your order." in dead_text
+            assert "/infinitemarkets/order#" not in dead_text
             dead_html = service._render_html(_view(
                 status_link=link,
                 delivery=[{"title": "Digital edition", "content": "delivery-secret"}],
