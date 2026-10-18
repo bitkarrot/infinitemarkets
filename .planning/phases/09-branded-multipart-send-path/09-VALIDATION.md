@@ -3,17 +3,17 @@ phase: "9"
 slug: "branded-multipart-send-path"
 # status lifecycle: draft (seeded by plan-phase) → validated (set by validate-phase §6)
 # audit-milestone §5.5 distinguishes NOT-VALIDATED (draft) from PARTIAL (validated + nyquist_compliant: false) (#2117)
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: validated
+nyquist_compliant: true
+wave_0_complete: true
 created: "2026-10-17"
 ---
 
 # Phase 9 — Validation Strategy
 
 > Per-phase validation contract for feedback sampling during execution.
-> Seeded from `09-RESEARCH.md` → "Validation Architecture". Task IDs are
-> assigned when the PLAN.md files land.
+> Seeded from `09-RESEARCH.md` → "Validation Architecture", then reconciled
+> against the completed Phase 9 plans and summaries.
 
 ---
 
@@ -42,22 +42,21 @@ created: "2026-10-17"
 
 ## Per-Task Verification Map
 
-Requirement-level map from research. The planner binds task IDs (`09-NN-MM`)
-and threat refs (`T-09-NN`) to these rows. The executor flips Status.
+Requirement-level verification map from research and completed execution.
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| TBD | TBD | TBD | EMAIL-01 | — | Tree = alternative{plain, html}; synthetic logo → alternative{plain, related{html, image}} with `Content-ID: <logo@infinitemarkets>`; unusable logo → no related part, no `cid:` | unit (fast) | `uv run pytest tests/runtime/test_email_render.py -k tree -q` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | EMAIL-01 | log/credential exposure | `_smtp_send`: SMTP(server, port, timeout) → starttls → login(username or from) → sendmail(from, [to], ASCII wire); exceptions propagate; never logs; no `set_debuglevel` | unit (fast, fake SMTP) | `uv run pytest tests/runtime/test_email_render.py -k smtp_send -q` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | EMAIL-01 | — | Worker: fake `_smtp_send` True → `sent` + wipe; False/raise → `pending` + backoff; exhaustion → `failed`; expired claim never calls `_smtp_send` | runtime (host boot) | `uv run pytest tests/runtime/test_email_queue.py -q` | ✅ migrate | ⬜ pending |
-| TBD | TBD | TBD | EMAIL-02 | CSS injection / remote fetch | Wordmark/logo, accent (hex `fullmatch` else default), title + state, item rows with line totals + backordered badge, subtotal/shipping/total, CTA iff live link | unit (fast) | `uv run pytest tests/runtime/test_email_render.py -k sections -q` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | EMAIL-03 | stored XSS in email | `<script>"'&` in name/title/delivery/labels/header/footer args → escaped; template has no `\|safe`/`Markup`/`autoescape`; no `src="http`, `url(`, `<link`, `<script` | unit (fast) | `uv run pytest tests/runtime/test_email_render.py -k escap -q` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | EMAIL-03 | bearer/PII leakage | Delivery only in customer `confirmed` (both parts); merchant `confirmed` lacks it; subject unchanged | runtime | `uv run pytest tests/runtime/test_email_queue.py -k "hard01 or delivery" -q` | ✅ migrate + add | ⬜ pending |
-| TBD | TBD | TBD | EMAIL-08 | consent bypass | `notify_events {"shipped": false}`: customer shipped row **sent**; merchant shipped row `event-disabled`; consent revocation still `consent-revoked` | runtime | `uv run pytest tests/runtime/test_email_queue.py -k "notify_events or consent" -q` | ❌ add (consent ✅) | ⬜ pending |
-| TBD | TBD | TBD | EMAIL-08 | — | Model parity: harness event gate merchant-only; customer row not gated | qualification (fast) | `uv run pytest tests/qualification/test_p0_10_smtp_boundary.py -q` | ✅ update case (2) | ⬜ pending |
-| TBD | TBD | TBD | EMAIL-09 | bearer leakage into preview | Footers in BOTH parts (customer opt-in + opt-out link, no-link variant when token dead; account sign-in; merchant/test neutral); preview carries the redacted footer link | unit (fast) + runtime | `uv run pytest tests/runtime/test_email_render.py -k footer -q` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | EMAIL-10 | — | `notify_events {"order_received": false}` + POST `/notifications/test` → `sent`; HTML has sample marker + sample items; no real order data | runtime | `uv run pytest tests/runtime/test_email_queue.py -k orderless -q` | ✅ extend | ⬜ pending |
-| TBD | TBD | TBD | EMAIL-11 | header injection / hostname leak | Date parses; Message-ID `@<sender domain>>`, no hostname; `Auto-Submitted: auto-generated`; From display == sanitized name (CR/LF/NUL/ESC/U+2028/bidi stripped); empty → bare address; no Reply-To / List-Unsubscribe | unit (fast) | `uv run pytest tests/runtime/test_email_render.py -k header -q` | ❌ W0 | ⬜ pending |
+| 09-01-01 | 09-01 | 1 | EMAIL-01 | — | `multipart/alternative` order, UTF-8 text/HTML, optional CID-related logo, bare HTML fallback | unit (fast) | `uv run pytest tests/runtime/test_email_render.py -k "mime_tree or unicode_parts" -q` | ✅ | ✅ green |
+| 09-01-01 | 09-01 | 1 | EMAIL-01 | SMTP boundary | Fake transport proves settings, timeout, STARTTLS/login/sendmail order, ASCII wire and propagated errors; no network | unit (fast) | `uv run pytest tests/runtime/test_email_render.py -k smtp_send -q` | ✅ | ✅ green |
+| 09-01-01 | 09-01 | 1 | EMAIL-01 | queue integrity | Success enters `sent` and wipes ciphertext; false/raise retries or fails; expired claims never send; builder errors retry | runtime (host boot) | `uv run pytest tests/runtime/test_email_queue.py -q` | ✅ | ✅ green |
+| 09-01-01, 09-02-01 | 09-01, 09-02 | 1, 2 | EMAIL-02 | CSS injection / remote fetch | Real item lines/totals, backorder state, event/state, live-only CTA, validated accent and readable contrast; nullable amounts never fabricated | unit (fast) | `uv run pytest tests/runtime/test_email_render.py -k sections -q` | ✅ | ✅ green |
+| 09-01-01, 09-02-01 | 09-01, 09-02 | 1, 2 | EMAIL-03 | stored XSS | Hostile text/attributes/delivery/custom copy stay escaped; CSS cannot inject remote content | unit (fast) | `uv run pytest tests/runtime/test_email_render.py -k escaping -q` | ✅ | ✅ green |
+| 09-01-01, 09-01-02, 09-02-01 | 09-01, 09-02 | 1, 2 | EMAIL-03 | bearer/PII leakage | Delivery only for customer `confirmed`; other channels/events omit it; subjects and headers omit private data | runtime + unit | `uv run pytest tests/runtime/test_email_queue.py -k "hard01 or delivery" -q` | ✅ | ✅ green |
+| 09-01-03 | 09-01 | 1 | EMAIL-08 | consent bypass | Merchant `notify_events` gates merchant alerts only; customer consent is rechecked at send time | runtime | `uv run pytest tests/runtime/test_email_queue.py -k "notify_events or consent" -q` | ✅ | ✅ green |
+| 09-01-03 | 09-01 | 1 | EMAIL-08 | — | Harness model matches merchant-only event gate | qualification (fast) | `uv run pytest tests/qualification/test_p0_10_smtp_boundary.py -q` | ✅ | ✅ green |
+| 09-01-01, 09-02-02 | 09-01, 09-02 | 1, 2 | EMAIL-09 | bearer leakage into preview | Channel footers in both parts; live opt-out/sign-in links stay fragment-only; preview redacts links | unit (fast) + runtime | `uv run pytest tests/runtime/test_email_render.py -k footer -q` | ✅ | ✅ green |
+| 09-01-01, 09-02-02 | 09-01, 09-02 | 1, 2 | EMAIL-10 | — | Test send uses conspicuous synthetic items despite disabled event flag; global gates and rate limit remain | runtime | `uv run pytest tests/runtime/test_email_queue.py -k orderless -q` | ✅ | ✅ green |
+| 09-01-01, 09-02-02 | 09-01, 09-02 | 1, 2 | EMAIL-11 | header injection / hostname leak | Date, sender-domain Message-ID, Auto-Submitted and sanitized From; no Reply-To/List-Unsubscribe | unit (fast) | `uv run pytest tests/runtime/test_email_render.py -k header -q` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -65,11 +64,11 @@ and threat refs (`T-09-NN`) to these rows. The executor flips Status.
 
 ## Wave 0 Requirements
 
-- [ ] `tests/runtime/test_email_render.py` — new, `pytestmark = [pytest.mark.runtime, pytest.mark.fast]`, no host boot; covers EMAIL-01/02/03/09/11 unit behavior
-- [ ] `tests/runtime/conftest.py` — fail-closed autouse `smtplib.SMTP` guard; optional shared `smtp_capture` fixture
-- [ ] Migrate the 8 host-`send_email` patch sites (`test_email_queue.py` ×5, `test_email_signin.py` ×2, `test_financial_review.py` ×1) plus the `test_worker_errors_do_not_log_private_exception_text` hermeticity fix — same plan as the transport swap
-- [ ] `harness/email.py` event gate merchant-only + `test_p0_10` case (2) update (D-23)
-- [ ] New runtime cases: EMAIL-08 scenario, EMAIL-10 scenario, customer-preview redaction, merchant-`confirmed` no-delivery
+- [x] `tests/runtime/test_email_render.py` — host-free `pytest.mark.fast` MIME, rendering, escaping, header, and footer coverage
+- [x] `tests/runtime/conftest.py` — session-lifetime fail-closed SMTP guard and `smtp_capture`
+- [x] Migrate the eight host-`send_email` patch functions and preserve the render-error hermeticity case
+- [x] `harness/email.py` merchant-only event gate and `test_p0_10` case (2) update
+- [x] Runtime coverage for EMAIL-08/10, preview redaction, and merchant delivery exclusion
 
 ---
 
@@ -86,11 +85,24 @@ and threat refs (`T-09-NN`) to these rows. The executor flips Status.
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 60s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have automated verification
+- [x] Sampling continuity: every task has focused automated verification
+- [x] Wave 0 covers all previously missing references
+- [x] No watch-mode flags
+- [x] Feedback latency < 60s for fast validation; full suite completed separately
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** validated 2026-10-18
+
+## Validation Audit 2026-10-18
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 0 |
+| Resolved | 0 |
+| Escalated | 0 |
+
+Automated coverage is confirmed by the focused plan checks and the full suite
+(`uv run python -m pytest -x -q`: 1122 passed, 8 skipped). PostgreSQL-only
+concurrency tests and real-mail-client/relay checks remain in the explicit
+manual/CI verification rows above.
