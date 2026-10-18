@@ -56,7 +56,10 @@ Spec: [.planning/specs/order-email-templates-SPEC.md](specs/order-email-template
   4. With the merchant's `notify_events` "shipped" toggle off, the merchant stops receiving shipped alerts while an opted-in customer still receives theirs; customer-channel suppression keys solely on `email_opt_in` re-checked at send time.
   5. Received emails carry an encoded `From` display name (CR/LF-stripped), `Date`, `Message-ID`, and `Auto-Submitted: auto-generated` headers; the existing send-test button delivers the full branded shell with representative sample content regardless of `notify_events` flags.
 
-**Plans**: TBD
+**Plans**: 2 plans in 2 sequential waves
+
+- **Wave 1** — `09-01-PLAN.md`: a safe, complete cross-channel multipart send tracer, durable queue outcomes, SMTP test containment, and consent gating.
+- **Wave 2** *(blocked on Wave 1 completion)* — `09-02-PLAN.md`: adversarial rendering, contrast, channel-footers, and preview-redaction coverage.
 
 ### Phase 10: Merchant Email Branding Controls
 
