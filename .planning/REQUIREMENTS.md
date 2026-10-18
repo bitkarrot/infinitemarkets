@@ -13,9 +13,9 @@ Requirements for v1.2. Each maps to one roadmap phase after owner approval.
 
 ### Email Delivery & Template
 
-- [ ] **EMAIL-01**: Order-event emails are delivered as `multipart/alternative` — the existing `text/plain` render plus a branded `text/html` part — through an extension-owned SMTP boundary (`_build_message`/`_smtp_send`) that reuses the host SMTP configuration and existing timeout/retry discipline.
-- [ ] **EMAIL-02**: The HTML part renders a merchant-branded template: logo or display-name header with accent color, event title + state label, item table (title, quantity, line totals), order totals (subtotal/shipping/total sats), status-link CTA while the token copy is live, and channel-appropriate footer copy.
-- [ ] **EMAIL-03**: Every interpolated value in the HTML part is escaped (item titles, display name, custom text, digital-delivery content); digital delivery appears only in the customer-channel `confirmed` email; subjects remain display name + event label with no PII or internal ids.
+- [x] **EMAIL-01**: Order-event emails are delivered as `multipart/alternative` — the existing `text/plain` render plus a branded `text/html` part — through an extension-owned SMTP boundary (`_build_message`/`_smtp_send`) that reuses the host SMTP configuration and existing timeout/retry discipline.
+- [x] **EMAIL-02**: The HTML part renders a merchant-branded template: logo or display-name header with accent color, event title + state label, item table (title, quantity, line totals), order totals (subtotal/shipping/total sats), status-link CTA while the token copy is live, and channel-appropriate footer copy.
+- [x] **EMAIL-03**: Every interpolated value in the HTML part is escaped (item titles, display name, custom text, digital-delivery content); digital delivery appears only in the customer-channel `confirmed` email; subjects remain display name + event label with no PII or internal ids.
 - [ ] **EMAIL-04**: The owner email preview reflects what was actually sent — subject, redacted text, and redacted HTML — and renders the HTML in a sandboxed preview surface.
 
 ### Merchant Branding
@@ -26,10 +26,10 @@ Requirements for v1.2. Each maps to one roadmap phase after owner approval.
 
 ### Notification Semantics
 
-- [ ] **EMAIL-08**: `notify_events` flags gate merchant-channel emails only; customer-channel emails gate solely on the order's `email_opt_in` consent (suppression reason re-checked at send time).
-- [ ] **EMAIL-09**: The customer-channel footer carries the order-page opt-out link and opt-in notice; the account channel carries sign-in copy; merchant/test channels carry a neutral transactional notice — each in both parts.
-- [ ] **EMAIL-10**: Test sends render the branded template with representative sample content and are not suppressed by `notify_events` event flags.
-- [ ] **EMAIL-11**: Outbound headers gain an encoded `From` display name (CR/LF-stripped merchant display name on the host notifications address), `Date`, `Message-ID`, and `Auto-Submitted: auto-generated`.
+- [x] **EMAIL-08**: `notify_events` flags gate merchant-channel emails only; customer-channel emails gate solely on the order's `email_opt_in` consent (suppression reason re-checked at send time).
+- [x] **EMAIL-09**: The customer-channel footer carries the order-page opt-out link and opt-in notice; the account channel carries sign-in copy; merchant/test channels carry a neutral transactional notice — each in both parts.
+- [x] **EMAIL-10**: Test sends render the branded template with representative sample content and are not suppressed by `notify_events` event flags.
+- [x] **EMAIL-11**: Outbound headers gain an encoded `From` display name (CR/LF-stripped merchant display name on the host notifications address), `Date`, `Message-ID`, and `Auto-Submitted: auto-generated`.
 
 ### Contract & Verification
 
@@ -60,21 +60,22 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| EMAIL-01 | 9 | Pending |
-| EMAIL-02 | 9 | Pending |
-| EMAIL-03 | 9 | Pending |
+| EMAIL-01 | 9 | Complete |
+| EMAIL-02 | 9 | Complete |
+| EMAIL-03 | 9 | Complete |
 | EMAIL-04 | 10 | Pending |
 | EMAIL-05 | 10 | Pending |
 | EMAIL-06 | 10 | Pending |
 | EMAIL-07 | 10 | Pending |
-| EMAIL-08 | 9 | Pending |
-| EMAIL-09 | 9 | Pending |
-| EMAIL-10 | 9 | Pending |
-| EMAIL-11 | 9 | Pending |
+| EMAIL-08 | 9 | Complete |
+| EMAIL-09 | 9 | Complete |
+| EMAIL-10 | 9 | Complete |
+| EMAIL-11 | 9 | Complete |
 | EMAIL-12 | 11 | Pending |
 | EMAIL-13 | 11 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 13 total
 - Mapped to phases: 13
 - Unmapped: 0 ✓

@@ -4,17 +4,17 @@ milestone: v1.2
 milestone_name: Branded Order Emails
 current_phase: 09
 current_phase_name: Branded Multipart Send Path
-status: executing
-stopped_at: Completed 09-01-PLAN.md
-last_updated: "2026-10-18T18:20:49.711Z"
+status: verifying
+stopped_at: Completed 09-02-PLAN.md
+last_updated: "2026-10-18T19:16:17.606Z"
 last_activity: 2026-10-18
 last_activity_desc: Phase 09 execution started
-state_head: cdeac3cd654d7c3c95d8b49282f65f007d3a0e1a
+state_head: 3d05f76cba1a68a5a4b0cf86a9eb118254e9892a
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 2
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-10-17)
 
 Phase: 09 (Branded Multipart Send Path) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-10-18 — Phase 09 execution started
 
 ## Performance Metrics
@@ -77,6 +77,7 @@ Last activity: 2026-10-18 — Phase 09 execution started
 | Phase 07 P04 | 12min | 3 tasks | 4 files |
 | Phase 08-media-release-qualification P01 | ~14min (incl. ~6min full suite) | 3 tasks | 6 files |
 | Phase 09 P01 | 23 min | 3 tasks | 8 files |
+| Phase 09 P02 | 14 min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -128,6 +129,8 @@ Decisions are logged in PROJECT.md and the normative specification.
 - [Phase 09]: Phase 09 Plan 01: extension-owned EmailMessage construction and SMTP transport keep network I/O outside queue transactions.
 - [Phase 09]: Phase 09 Plan 01: message recipient addresses remain in the SMTP envelope rather than MIME headers; the From address stays host-owned.
 - [Phase 09]: Phase 09 Plan 01: notify_events gates merchant order alerts only; customer sends remain send-time email_opt_in gated.
+- [Phase 09]: Phase 09-02: render nullable order totals as em dashes instead of hiding them.
+- [Phase 09]: Phase 09-02: optional HTML header/footer copy is escaped plain text and cannot replace the mandatory channel footer.
 
 ### Pending Todos
 
@@ -187,6 +190,6 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 ## Session Continuity
 
-Last session: 2026-10-18T18:20:49.697Z
-Stopped at: Completed 09-01-PLAN.md
+Last session: 2026-10-18T19:16:17.591Z
+Stopped at: Completed 09-02-PLAN.md
 Resume file: None
