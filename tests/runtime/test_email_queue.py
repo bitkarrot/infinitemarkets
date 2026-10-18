@@ -491,6 +491,68 @@ async def test_consent_revocation_suppresses(runtime_env, monkeypatch, smtp_capt
     assert customer[0]["last_error"] == "consent-revoked"
 
 
+async def test_notify_events_gate_merchant_only(runtime_env, smtp_capture):
+    """A changed merchant alert flag does not revoke the customer's consent."""
+    svcs = _svc()
+    customer_address = f"{uuid.uuid4().hex}@example.com"
+    merchant_address = f"{uuid.uuid4().hex}@example.com"
+    order = await _order(
+        runtime_env,
+        email=customer_address,
+        opt_in=True,
+        scope=uuid.uuid4().hex,
+    )
+    from infinitemarkets.db import DomainTransaction
+
+    async with DomainTransaction() as tx:
+        merchant = await tx.fetch_one(
+            "SELECT notify_events FROM merchants WHERE id = :m",
+            {"m": runtime_env["merchant_id"]},
+        )
+        original_events = merchant["notify_events"]
+        await svcs["orders"].enqueue_email_intents(
+            tx,
+            order=order,
+            event_type="shipped",
+            merchant_notify_emails=[merchant_address],
+            merchant_notify_events={},
+            customer_email=customer_address,
+            now=int(time.time()),
+        )
+        await tx.execute(
+            "UPDATE merchants SET notify_events = :events WHERE id = :m",
+            {
+                "events": json.dumps({"shipped": False}),
+                "m": runtime_env["merchant_id"],
+            },
+        )
+    try:
+        await svcs["email"].worker_tick("notify-events-worker")
+    finally:
+        async with DomainTransaction() as tx:
+            await tx.execute(
+                "UPDATE merchants SET notify_events = :events WHERE id = :m",
+                {
+                    "events": original_events,
+                    "m": runtime_env["merchant_id"],
+                },
+            )
+
+    rows = await _queue_rows(order["id"])
+    customer = next(row for row in rows if row["channel"] == "customer")
+    merchant = next(row for row in rows if row["channel"] == "merchant")
+    assert customer["state"] == "sent"
+    assert customer["last_error"] is None
+    assert merchant["state"] == "suppressed"
+    assert merchant["last_error"] == "event-disabled"
+    captured = [
+        call for call in smtp_capture
+        if call["to"] == customer_address
+    ]
+    assert len(captured) == 1
+    assert not any(call["to"] == merchant_address for call in smtp_capture)
+
+
 async def test_orderless_test_send(runtime_env, monkeypatch, smtp_capture):
     """POST /notifications/test enqueues an orderless row; the worker
     decrypts the recipient bound to merchant_id and sends — and the row
