@@ -280,6 +280,182 @@ def test_sections_show_real_order_values_and_live_only_cta():
     assert "code-123" not in _merchant_text
 
 
+def test_sections_keep_adjacent_equal_items_and_render_zero_item_order_totals():
+    first = {
+        "title": "Equal-priced item",
+        "quantity": 2,
+        "unit_price_minor": 500,
+        "currency": "SAT",
+        "currency_decimals": 0,
+        "line_total_sat": 1000,
+        "backordered_qty": 0,
+    }
+    second = {**first}
+    adjacent = _build(_view(items=[first, second], delivery=[]))
+    _text, adjacent_html = _parts(adjacent)
+    assert adjacent_html.count("Equal-priced item") == 2
+    assert adjacent_html.count("1,000 sats") >= 4
+
+    empty_order = _build(_view(
+        items=[],
+        subtotal_sat=0,
+        shipping_sat=0,
+        total_sat=1250,
+        delivery=[],
+        status_link=None,
+    ))
+    _text, empty_html = _parts(empty_order)
+    assert "No items in this order." in empty_html
+    assert "Subtotal" in empty_html and "0 sats" in empty_html
+    assert "Shipping" in empty_html and "0 sats" in empty_html
+    assert "Total" in empty_html and "1,250 sats" in empty_html
+    assert "<a " not in empty_html
+
+
+def test_sections_show_em_dash_for_nullable_line_and_order_money():
+    nullable_item = {
+        "title": "Unpriced item",
+        "quantity": 1,
+        "unit_price_minor": None,
+        "currency": "SAT",
+        "currency_decimals": 0,
+        "line_total_sat": None,
+        "backordered_qty": 0,
+    }
+    message = _build(_view(
+        items=[nullable_item],
+        subtotal_sat=None,
+        shipping_sat=None,
+        total_sat=None,
+        delivery=[],
+        status_link=None,
+    ))
+    _text, rendered = _parts(message)
+    assert "Unpriced item" in rendered
+    assert "Subtotal" in rendered
+    assert "Shipping" in rendered
+    assert "Total" in rendered
+    assert rendered.count("—") >= 5
+
+
+async def test_sections_hide_dead_status_links_and_gate_delivery_exactly():
+    from infinitemarkets import crypto
+    from infinitemarkets import settings as extension_settings
+
+    service = _email()
+    now = 1_800_000_000
+    key = bytes([7]) * 32
+    settings = extension_settings.ExtSettings(
+        master_keys={"v1": key},
+        active_key_version="v1",
+        privacy_key=bytes([9]) * 32,
+        public_base_url="https://shop.example",
+    )
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(service, "_now", lambda: now)
+    try:
+        live_token = "live-fragment-token"
+        live_copy = crypto.encrypt(
+            live_token.encode(),
+            key,
+            record_id="order-1",
+            table="orders",
+            column="public_token_enc",
+            key_version="v1",
+        )
+        live_order = {
+            "id": "order-1",
+            "public_token_enc": live_copy,
+            "public_token_expires_at": now + 60,
+        }
+        live_link = await service._status_link(live_order, settings)
+        assert live_link == (
+            "https://shop.example/infinitemarkets/order#live-fragment-token"
+        )
+        live_html = service._render_html(_view(
+            status_link=live_link,
+            delivery=[{"title": "Digital edition", "content": "delivery-secret"}],
+        ))
+        assert 'href="https://shop.example/infinitemarkets/order#live-fragment-token"' in (
+            live_html
+        )
+        assert "delivery-secret" in live_html
+
+        expired_order = {
+            **live_order,
+            "public_token_expires_at": now,
+        }
+        corrupt_copy = crypto.encrypt(
+            b"wrong-associated-data",
+            key,
+            record_id="another-order",
+            table="orders",
+            column="public_token_enc",
+            key_version="v1",
+        )
+        dead_orders = (
+            expired_order,
+            {**live_order, "public_token_enc": corrupt_copy},
+            {**live_order, "public_token_enc": None},
+        )
+        for order in dead_orders:
+            link = await service._status_link(order, settings)
+            assert link is None
+            dead_html = service._render_html(_view(
+                status_link=link,
+                delivery=[{"title": "Digital edition", "content": "delivery-secret"}],
+            ))
+            assert "<a " not in dead_html
+            assert "To opt out:" in dead_html
+            assert "delivery-secret" in dead_html
+
+        for channel, event_type in (
+            ("merchant", "confirmed"),
+            ("customer", "processing"),
+        ):
+            gated_html = service._render_html(_view(
+                channel=channel,
+                event_type=event_type,
+                status_link=None,
+                delivery=[{"title": "Digital edition", "content": "delivery-secret"}],
+            ))
+            assert "delivery-secret" not in gated_html
+    finally:
+        monkeypatch.undo()
+
+
+def test_sections_use_fullmatch_accent_and_readable_cta_contrast():
+    service = _email()
+    from infinitemarkets.services.themes import contrast_ratio
+
+    accepted = ("#777777", "#d69a3a", "#63d2ff", "#fce477", "#000000")
+    for accent in accepted:
+        resolved_accent, foreground = service._email_colors(
+            json.dumps({"preset": "warm-market", "brand": {"accent": accent}})
+        )
+        assert resolved_accent == accent
+        assert contrast_ratio(foreground, accent) >= 4.5
+    assert service._email_colors(
+        json.dumps({
+            "preset": "warm-market",
+            "brand": {"accent": "#777777"},
+        })
+    ) == ("#777777", "#000000")
+    assert contrast_ratio("#ffffff", "#777777") < 4.5
+    assert contrast_ratio("#111111", "#777777") < 4.5
+    assert contrast_ratio("#000000", "#777777") >= 4.5
+
+    for invalid in ("#123456\n", '#fff";background:url(https://evil.invalid)'):
+        view = _view(theme=json.dumps({
+            "preset": "warm-market",
+            "brand": {"accent": invalid},
+        }))
+        rendered = _parts(_build(view))[1]
+        assert "border-top:3px solid #d69a3a" in rendered
+        assert "evil.invalid" not in rendered
+        assert "background:url" not in rendered
+
+
 def test_escaping_covers_text_attributes_delivery_and_css():
     hostile = "<script>alert(\"x\")</script> \"'&"
     view = _view(
