@@ -539,8 +539,14 @@ async def test_notify_events_gate_merchant_only(runtime_env, smtp_capture):
             )
 
     rows = await _queue_rows(order["id"])
-    customer = next(row for row in rows if row["channel"] == "customer")
-    merchant = next(row for row in rows if row["channel"] == "merchant")
+    customer = next(
+        row for row in rows
+        if row["channel"] == "customer" and row["event_type"] == "shipped"
+    )
+    merchant = next(
+        row for row in rows
+        if row["channel"] == "merchant" and row["event_type"] == "shipped"
+    )
     assert customer["state"] == "sent"
     assert customer["last_error"] is None
     assert merchant["state"] == "suppressed"

@@ -14,8 +14,8 @@ What the model proves (the PITFALLS this exists to make visible):
   unclassified failure with bounded retry ``min(2^attempts * 30s, 4h)`` and
   ``EMAIL_MAX_ATTEMPTS`` (5) -> ``failed``; v1 never invents
   transient-vs-5xx classification;
-- suppressed (not sent, no SMTP call) when email is not configured, the
-  event type is disabled, or consent was revoked;
+- suppressed (not sent, no SMTP call) when email is not configured, a
+  merchant order event is disabled, or customer consent was revoked;
 - rate limiting before delivery via ``rate_limit_buckets`` keyed on
   ``recipient_hash`` (customer, 8/hour) and merchant id (merchant alerts,
   60/hour) — never the raw address; excess waits rather than delivering;
@@ -416,8 +416,8 @@ class EmailModel:
     ) -> dict:
         """One send attempt for a claimed row (the section 8.8 send path).
 
-        Suppression first (no SMTP call): unconfigured, disabled event
-        type, or revoked customer consent. Rate limiting before delivery:
+        Suppression first (no SMTP call): unconfigured, disabled merchant
+        order event, or revoked customer consent. Rate limiting before delivery:
         excess waits rather than sending. The SMTP boundary returns a
         boolean: only ``True`` enters ``sent``; every failure (False,
         exception, recipient rejection) returns the row to pending with a
@@ -439,7 +439,11 @@ class EmailModel:
             )
             await self._suppressed_write(row, code="smtp-not-configured", now=now)
             return {"action": "suppressed", "reason": "smtp-not-configured"}
-        if row["event_type"] not in self.enabled_event_types:
+        if (
+            row["channel"] == "merchant"
+            and row["order_id"]
+            and row["event_type"] not in self.enabled_event_types
+        ):
             self._log(
                 order_id=row["order_id"],
                 event_type=row["event_type"],
