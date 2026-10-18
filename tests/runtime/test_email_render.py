@@ -53,21 +53,32 @@ def _build(view=None, *, text=None, **over):
         if view.get("channel") == "account":
             text = (
                 f"Use this link to sign in: {view['status_link']}\n"
-                "The link expires in 15 minutes and works once."
+                "The link expires in 15 minutes and works once.\n"
+                "You requested a sign-in link."
             )
         elif view.get("test_send"):
             text = (
                 "Sample email preview — not a real order.\n"
-                "Sample item x1\nTotal: 1,000 sats"
+                "Sample item x1\nTotal: 1,000 sats\n"
+                "This is a transactional order notification."
             )
+        elif view.get("channel") == "customer":
+            text = "Order confirmed.\nYou opted in to order emails."
+            if view.get("status_link"):
+                text += f"\nTo opt out: {view['status_link']}"
+            else:
+                text += "\nTo opt out, use the order page from your order."
         else:
-            text = "Order confirmed."
+            text = (
+                "Order confirmed.\n"
+                "This is a transactional order notification."
+            )
     builder = getattr(_email(), "_build_message", None)
     assert callable(builder), (
         "email_queue messages need a pure extension-owned _build_message builder"
     )
     return builder(
-        subject="Email Shop: order confirmed",
+        subject=f"{view.get('display_name') or 'Infinitemarkets'}: order confirmed",
         text=text,
         view=view,
         from_addr="shop@example.com",
@@ -110,10 +121,30 @@ def test_mime_tree_is_alternative_with_optional_related_logo():
     ]
     assert related.get_payload()[1]["Content-ID"] == "<logo@infinitemarkets>"
     assert "cid:logo@infinitemarkets" in related.get_payload()[0].get_content()
+    jpeg = _build(logo=(b"\xff\xd8\xffsynthetic-logo", "jpeg"))
+    assert jpeg.get_payload()[1].get_content_type() == "multipart/related"
+    assert jpeg.get_payload()[1].get_payload()[1].get_content_type() == "image/jpeg"
 
     unusable = _build(logo=(b"not-an-image", "svg"))
     assert unusable.get_payload()[1].get_content_type() == "text/html"
     assert "cid:logo@infinitemarkets" not in unusable.get_payload()[1].get_content()
+
+
+def test_unicode_parts_round_trip_as_ascii_quoted_printable():
+    body = (
+        "Order confirmed — café and 🥐.\n"
+        "You opted in to order emails.\n"
+        "To opt out, use the order page from your order."
+    )
+    message = _build(text=body)
+    assert message.as_string().isascii()
+    parsed = email.message_from_string(message.as_string(), policy=policy.default)
+    plain = parsed.get_body(preferencelist=("plain",))
+    html_part = parsed.get_body(preferencelist=("html",))
+    assert plain["Content-Transfer-Encoding"] == "quoted-printable"
+    assert html_part["Content-Transfer-Encoding"] == "quoted-printable"
+    assert plain.get_content().rstrip("\n") == body
+    assert "Email Shop" in html_part.get_content()
 
 
 async def test_smtp_send_mirrors_host_and_propagates_errors(monkeypatch):
@@ -181,13 +212,33 @@ def test_header_safety_and_deliverability_headers():
     assert "\r" not in str(message["From"])
     assert "\n" not in str(message["From"])
     assert "\u202e" not in str(message["From"])
-    assert message["From"].display_name == 'Märkét, "shop"'
+    assert message["From"].addresses[0].display_name == 'Märkét, "shop"'
     assert parsedate_to_datetime(message["Date"]) is not None
     assert message["Message-ID"].endswith("@example.com>")
     assert message["Auto-Submitted"] == "auto-generated"
     assert "Reply-To" not in message
     assert "List-Unsubscribe" not in message
+    assert "To" not in message
     assert message.as_string().isascii()
+    empty_name = _build(_view(display_name="\u202e\r\n"))
+    assert str(empty_name["From"]) == "shop@example.com"
+    assert _email()._subject({"display_name": "\u202e\r\n"}, "confirmed") == (
+        "Infinitemarkets: order confirmed"
+    )
+
+
+def test_plain_event_label_does_not_repeat_order():
+    email_service = _email()
+    body = email_service._render_body(
+        {"event_type": "confirmed"},
+        {"state": "confirmed", "total_sat": 1200},
+        [],
+        {},
+        None,
+        [],
+    )
+    assert body.startswith("Order confirmed.")
+    assert "Order order confirmed." not in body
 
 
 def test_sections_show_real_order_values_and_live_only_cta():
@@ -211,7 +262,12 @@ def test_sections_show_real_order_values_and_live_only_cta():
     assert "color:#000000" in rendered
     assert "<style" not in rendered.lower()
     assert "https://" not in rendered.replace("https://shop.example", "")
-    assert "This is a transactional order notification." in text
+    assert "You opted in to order emails." in text
+    from infinitemarkets.services.themes import contrast_ratio
+
+    assert contrast_ratio("#000000", "#777777") >= 4.5
+    default_html = _parts(_build(_view(theme=None)))[1]
+    assert "border-top:3px solid #d69a3a" in default_html
 
     dead = _build(_view(status_link=None))
     _text, dead_html = _parts(dead)
@@ -244,7 +300,13 @@ def test_escaping_covers_text_attributes_delivery_and_css():
             "brand": {"accent": '#ffffff";background:url(https://evil.invalid)'},
         }),
     )
-    message = _build(view)
+    message = _build(
+        view,
+        text=(
+            f"Order confirmed.\n{hostile}\nYou opted in to order emails.\n"
+            f"To opt out: {view['status_link']}"
+        ),
+    )
     text, rendered = _parts(message)
     assert hostile not in rendered
     assert "&lt;script&gt;" in rendered
@@ -290,6 +352,7 @@ def test_footers_cover_customer_account_merchant_and_test_in_both_parts():
     for content in (account_text, account_html):
         assert "You requested a sign-in link." in content
         assert "signin-token" in content
+    assert "Your sign-in link" in account_html
     assert "Printed zine" not in account_html
     assert "Subtotal" not in account_html
 

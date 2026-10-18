@@ -5,6 +5,7 @@ limits, lease recovery, render-at-send-time."""
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 import uuid
 
@@ -291,15 +292,42 @@ async def test_send_classification(runtime_env, monkeypatch, smtp_capture):
     exhaustion -> failed."""
     svcs = _svc()
 
-    order = await _order(runtime_env)
-    await svcs["email"].worker_tick("w1")
+    from infinitemarkets.db import DomainTransaction
+
+    target = f"{uuid.uuid4().hex}@example.com"
+    async with DomainTransaction() as tx:
+        merchant = await tx.fetch_one(
+            "SELECT notify_emails FROM merchants WHERE id = :m",
+            {"m": runtime_env["merchant_id"]},
+        )
+        original_notify_emails = merchant["notify_emails"]
+        await tx.execute(
+            "UPDATE merchants SET notify_emails = :emails WHERE id = :m",
+            {"emails": json.dumps([target]), "m": runtime_env["merchant_id"]},
+        )
+    try:
+        order = await _order(runtime_env)
+        await svcs["email"].worker_tick("w1")
+    finally:
+        async with DomainTransaction() as tx:
+            await tx.execute(
+                "UPDATE merchants SET notify_emails = :emails WHERE id = :m",
+                {
+                    "emails": original_notify_emails,
+                    "m": runtime_env["merchant_id"],
+                },
+            )
     rows = await _queue_rows(order["id"])
     assert rows[0]["state"] == "sent"
     assert rows[0]["sent_at"] is not None
     assert not rows[0]["recipient_enc"]
     assert not rows[0]["payload_enc"]
     assert rows[0]["preview_enc"]
-    assert smtp_capture  # the extension-owned transport seam was invoked
+    captured = [call for call in smtp_capture if call["to"] == target]
+    assert len(captured) == 1
+    assert captured[0]["msg"].get_content_type() == "multipart/alternative"
+    assert captured[0]["text"]
+    assert captured[0]["html"]
 
     client = runtime_env["client"]
     queue = await client.get(
@@ -347,8 +375,19 @@ async def test_send_classification(runtime_env, monkeypatch, smtp_capture):
     assert raise_rows[0]["attempts"] == 1
     assert raise_rows[0]["last_error"] == "send-failed"
 
+    # A builder error also takes the bounded retry path and never reaches SMTP.
+    def broken_builder(**_kwargs):
+        raise ValueError("private builder detail")
+
+    monkeypatch.setattr(svcs["email"], "_build_message", broken_builder)
+    order_build = await _order(runtime_env)
+    await svcs["email"].worker_tick("w1")
+    build_rows = await _queue_rows(order_build["id"])
+    assert build_rows[0]["state"] == "pending"
+    assert build_rows[0]["attempts"] == 1
+    assert build_rows[0]["last_error"] == "send-failed"
+
     # Exhaustion -> failed.
-    from infinitemarkets.db import DomainTransaction
     from infinitemarkets.settings import ext_settings
 
     async with DomainTransaction() as tx:
