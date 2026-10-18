@@ -2,19 +2,19 @@
 gsd_state_version: "1.0"
 milestone: v1.2
 milestone_name: Branded Order Emails
-current_phase: 9
+current_phase: 09
 current_phase_name: Branded Multipart Send Path
-status: planning
-stopped_at: v1.1 milestone complete — all 3 phases verified, v1.1.0 released
-last_updated: "2026-10-18T08:53:05.401Z"
-last_activity: 2026-10-17
-last_activity_desc: v1.2 roadmap created; EMAIL-01..13 mapped to Phases 9–11
-state_head: 6d66863079fec03391d91d7872cda6250a2b6b98
+status: executing
+stopped_at: Completed 09-01-PLAN.md
+last_updated: "2026-10-18T18:20:49.711Z"
+last_activity: 2026-10-18
+last_activity_desc: Phase 09 execution started
+state_head: cdeac3cd654d7c3c95d8b49282f65f007d3a0e1a
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 2
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -25,14 +25,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-17)
 
 **Core value:** A merchant can sell one authoritative inventory safely through LNbits-backed web and Nostr flows without duplicate invoices, double allocation, or relay delivery being mistaken for payment truth.
-**Current focus:** v1.2 branded order emails — Phase 9 plans checked and ready to execute.
+**Current focus:** Phase 09 — Branded Multipart Send Path
 
 ## Current Position
 
-Phase: 9 (Branded Multipart Send Path) — READY TO EXECUTE
-Plan: 0 of 2 complete (09-01, then 09-02)
-Status: Phase 9 planned — independent checker passed; ready to execute
-Last activity: 2026-10-18 — Phase 9 research, context, validation, pattern map and plans completed
+Phase: 09 (Branded Multipart Send Path) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-10-18 — Phase 09 execution started
 
 ## Performance Metrics
 
@@ -76,6 +76,7 @@ Last activity: 2026-10-18 — Phase 9 research, context, validation, pattern map
 | Phase 07-shared-image-editors P03 | 9min | 2 tasks | 5 files |
 | Phase 07 P04 | 12min | 3 tasks | 4 files |
 | Phase 08-media-release-qualification P01 | ~14min (incl. ~6min full suite) | 3 tasks | 6 files |
+| Phase 09 P01 | 23 min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -124,6 +125,9 @@ Decisions are logged in PROJECT.md and the normative specification.
 - [Phase 7]: 07-03: cancel-disclosure via shared gmDiscloseUnsavedUploads on every product-editor close path; save always sends images (D-21/D-27)
 - [Phase 8]: 08-01: qualification audit only — no code/test changes; requirements ticked in the same commit carrying green-run outputs (T-08-02); regenerated evidence bundle committed as durable artifact
 - [Phase 8]: 08-01: ROADMAP release-dependency paragraph updated to merged/verified/released — stale 'PR #28 is open' text would contradict the recorded verdict
+- [Phase 09]: Phase 09 Plan 01: extension-owned EmailMessage construction and SMTP transport keep network I/O outside queue transactions.
+- [Phase 09]: Phase 09 Plan 01: message recipient addresses remain in the SMTP envelope rather than MIME headers; the From address stays host-owned.
+- [Phase 09]: Phase 09 Plan 01: notify_events gates merchant order alerts only; customer sends remain send-time email_opt_in gated.
 
 ### Pending Todos
 
@@ -183,6 +187,6 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 ## Session Continuity
 
-Last session: 2026-10-17T05:33:14.201Z
-Stopped at: v1.1 milestone complete — all 3 phases verified, v1.1.0 released
-Resume file: .planning/ROADMAP.md
+Last session: 2026-10-18T18:20:49.697Z
+Stopped at: Completed 09-01-PLAN.md
+Resume file: None
