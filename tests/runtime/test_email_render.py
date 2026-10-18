@@ -47,15 +47,29 @@ def _view(**over):
     return base
 
 
-def _build(view=None, **over):
+def _build(view=None, *, text=None, **over):
+    view = view or _view()
+    if text is None:
+        if view.get("channel") == "account":
+            text = (
+                f"Use this link to sign in: {view['status_link']}\n"
+                "The link expires in 15 minutes and works once."
+            )
+        elif view.get("test_send"):
+            text = (
+                "Sample email preview — not a real order.\n"
+                "Sample item x1\nTotal: 1,000 sats"
+            )
+        else:
+            text = "Order confirmed."
     builder = getattr(_email(), "_build_message", None)
     assert callable(builder), (
         "email_queue messages need a pure extension-owned _build_message builder"
     )
     return builder(
         subject="Email Shop: order confirmed",
-        text="Order confirmed.",
-        view=view or _view(),
+        text=text,
+        view=view,
         from_addr="shop@example.com",
         to_addr="buyer@example.com",
         **over,

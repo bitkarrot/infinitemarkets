@@ -20,6 +20,7 @@ import asyncio
 import base64
 import json
 import os
+import smtplib
 import sys
 import time
 import uuid
@@ -34,6 +35,22 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 PKG_DIR = REPO_ROOT / "infinitemarkets"
 
 CANONICAL_ORIGIN = "https://shop.example"
+
+
+def _deny_smtp(*_args, **_kwargs):
+    """Fail closed if a runtime test reaches an unmocked SMTP transport."""
+    raise ConnectionRefusedError("Real SMTP connections are disabled in runtime tests")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _session_smtp_network_guard():
+    """Contain outbound SMTP from before host boot through background teardown."""
+    original = smtplib.SMTP
+    smtplib.SMTP = _deny_smtp
+    try:
+        yield
+    finally:
+        smtplib.SMTP = original
 
 
 def pytest_collection_modifyitems(items):
@@ -114,6 +131,8 @@ async def _runtime_app(data_folder: Path, ext_root: Path):
     package, and ``lnbits_extensions_deactivate_all = False`` so the real
     restore/registration path activates the extension.
     """
+    assert smtplib.SMTP is _deny_smtp, "session SMTP guard must precede host setup"
+
     from asgi_lifespan import LifespanManager
     from lnbits.app import create_app
     from lnbits.core.models.users import UpdateSuperuserPassword
@@ -237,6 +256,7 @@ async def _runtime_app(data_folder: Path, ext_root: Path):
         # extension stop hook — its untracked resources (inbox handler
         # task, relay transport) would leak onto the session loop and
         # keep connecting to the schema the next module just dropped.
+        assert smtplib.SMTP is _deny_smtp, "session SMTP guard must cover host teardown"
         ext_module = sys.modules.get("infinitemarkets")
         stop = getattr(ext_module, "infinitemarkets_stop", None)
         if stop is not None:
@@ -244,6 +264,7 @@ async def _runtime_app(data_folder: Path, ext_root: Path):
                 await asyncio.wait_for(stop(), timeout=15)
             except Exception:  # noqa: BLE001 — teardown is best-effort
                 pass
+        assert smtplib.SMTP is _deny_smtp, "session SMTP guard must outlive background workers"
         os.chdir(previous_cwd)
         for key, value in snapshot.items():
             setattr(settings, key, value)
@@ -439,3 +460,40 @@ def frozen_inbox_clock(monkeypatch):
     now = int(time.time())
     monkeypatch.setattr(inbox, "_now", lambda: now)
     return now
+
+
+@pytest.fixture
+def smtp_capture(monkeypatch):
+    """Capture the extension transport seam as decoded recipient-visible parts."""
+    import importlib
+
+    from lnbits.settings import settings as host_settings
+
+    email_service = importlib.import_module("infinitemarkets.services.email")
+    monkeypatch.setattr(
+        type(host_settings),
+        "is_email_notifications_configured",
+        lambda self: True,
+    )
+    monkeypatch.setattr(
+        host_settings,
+        "lnbits_email_notifications_email",
+        "shop@example.com",
+    )
+    sent = []
+
+    async def capture(message, *, to, timeout):
+        plain = message.get_body(preferencelist=("plain",))
+        html = message.get_body(preferencelist=("html",))
+        sent.append({
+            "to": to,
+            "msg": message,
+            "subject": str(message["Subject"]),
+            "text": plain.get_content() if plain else "",
+            "html": html.get_content() if html else "",
+            "timeout": timeout,
+        })
+        return True
+
+    monkeypatch.setattr(email_service, "_smtp_send", capture, raising=False)
+    return sent

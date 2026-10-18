@@ -11,6 +11,7 @@ prove-both link flows ending in representability-checked union merges.
 from __future__ import annotations
 
 import asyncio
+import html
 import json
 import time
 import uuid
@@ -394,27 +395,14 @@ async def test_magic_link_suppressed_when_host_unconfigured(runtime_env):
     assert mine[0]["last_error"] == "host-email-unconfigured"
 
 
-async def test_magic_link_send_renders_fragment_and_wipes(runtime_env, monkeypatch):
-    """Configured SMTP -> sent; body carries the fragment link, never the
+async def test_magic_link_send_renders_fragment_and_wipes(
+    runtime_env, monkeypatch, smtp_capture
+):
+    """Configured SMTP -> sent; both parts carry a fragment link, never the
     bare token; subject has no token/address; sent row wipes both enc
     columns."""
     svcs = _svc()
     env = runtime_env
-    from lnbits.settings import settings as host_settings
-
-    monkeypatch.setattr(
-        type(host_settings), "is_email_notifications_configured",
-        lambda self: True,
-    )
-    sent_calls = []
-
-    async def fake_send(*args, **kwargs):
-        sent_calls.append(args)
-        return True
-
-    import lnbits.core.services.notifications as notif
-
-    monkeypatch.setattr(notif, "send_email", fake_send)
 
     from infinitemarkets.db import DomainTransaction
 
@@ -433,10 +421,10 @@ async def test_magic_link_send_renders_fragment_and_wipes(runtime_env, monkeypat
     assert not mine[0]["recipient_enc"]
     assert not mine[0]["payload_enc"]
 
-    assert sent_calls, "host send_email was not invoked"
-    args = sent_calls[0]
-    recipients, subject, body = args[5], args[6], args[7]
-    assert recipients == ["buyer@example.com"]
+    sent_calls = [call for call in smtp_capture if call["to"] == "buyer@example.com"]
+    assert sent_calls, "extension _smtp_send was not invoked"
+    call = sent_calls[0]
+    subject, body, markup = call["subject"], call["text"], html.unescape(call["html"])
     merchant = await _merchant(env)
     assert "your sign-in link" in subject
     assert merchant["display_name"] in subject
@@ -445,7 +433,16 @@ async def test_magic_link_send_renders_fragment_and_wipes(runtime_env, monkeypat
     # The token appears EXACTLY once — inside the URL fragment.
     assert f"/infinitemarkets/auth/email?shop={merchant['pubkey']}#{token}" in body
     assert body.count(token) == 1
+    assert f"/infinitemarkets/auth/email?shop={merchant['pubkey']}#{token}" in markup
+    assert markup.count(token) == 1
     assert "expires in 15 minutes" in body
+    assert "You requested a sign-in link." in body
+    assert "You requested a sign-in link." in markup
+    assert "Printed zine" not in markup
+    assert "buyer@example.com" not in subject
+    for key, value in call["msg"].items():
+        assert token not in f"{key}: {value}"
+        assert "buyer@example.com" not in f"{key}: {value}"
 
 
 async def test_magic_link_suppressed_when_email_disabled(runtime_env, monkeypatch):
@@ -476,7 +473,7 @@ async def test_magic_link_suppressed_when_email_disabled(runtime_env, monkeypatc
 
 
 async def test_account_channel_uses_email_account_bucket(
-    runtime_env, monkeypatch, window_headroom
+    runtime_env, monkeypatch, smtp_capture, window_headroom
 ):
     """``channel='account'`` consumes the ``email-account`` bucket keyed
     on ``recipient_hash`` — never ``consent-revoked``, never the
@@ -485,19 +482,6 @@ async def test_account_channel_uses_email_account_bucket(
     env = runtime_env
     await _reset_buckets(env)
     await window_headroom(3600)  # hourly bucket: keep the burst in one hour
-    from lnbits.settings import settings as host_settings
-
-    monkeypatch.setattr(
-        type(host_settings), "is_email_notifications_configured",
-        lambda self: True,
-    )
-
-    async def fake_send(*args, **kwargs):
-        return True
-
-    import lnbits.core.services.notifications as notif
-
-    monkeypatch.setattr(notif, "send_email", fake_send)
     from infinitemarkets.db import DomainTransaction
 
     cap = svcs["email"].ACCOUNT_HOURLY_CAP

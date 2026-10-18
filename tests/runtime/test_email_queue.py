@@ -132,7 +132,9 @@ async def _queue_rows(order_id=None):
 
 @pytest.mark.parametrize("state", ["confirmed", "processing", "completed"])
 @pytest.mark.parametrize("damage", ["unpaid", "absent", "partial", "healthy", "hash", "snapshot"])
-async def test_hard01_settled_without_accounting_email(runtime_env, monkeypatch, state, damage):
+async def test_hard01_settled_without_accounting_email(
+    runtime_env, monkeypatch, smtp_capture, state, damage
+):
     from test_order_admin import _hard01_snapshot
     from test_order_saga import _settle_core_payment
 
@@ -184,21 +186,11 @@ async def test_hard01_settled_without_accounting_email(runtime_env, monkeypatch,
         delivery = await svcs["orders"].digital_delivery(tx, fresh)
         assert bool(delivery) is (damage == "healthy")
     assert await _hard01_snapshot(order["id"]) == before
-    import lnbits.core.services.notifications as notifications
-    from lnbits.settings import settings
-
-    monkeypatch.setattr(type(settings), "is_email_notifications_configured", lambda self: True)
-    sent = []
-
-    async def fake_send(*args):
-        if address in args[5]:
-            sent.append(args[7])
-        return True
-
-    monkeypatch.setattr(notifications, "send_email", fake_send)
     await svcs["email"].worker_tick("hard01-email")
+    sent = [call for call in smtp_capture if call["to"] == address]
     assert sent
-    assert any(secret in body for body in sent) is (damage == "healthy")
+    assert any(secret in call["text"] for call in sent) is (damage == "healthy")
+    assert any(secret in call["html"] for call in sent) is (damage == "healthy")
     after = await _hard01_snapshot(order["id"])
     before.pop("email_queue")
     after.pop("email_queue")
@@ -294,24 +286,10 @@ async def test_suppression_taxonomy(runtime_env):
     )
 
 
-async def test_send_classification(runtime_env, monkeypatch):
-    """send_email True -> sent; False/exception -> pending w/ backoff;
+async def test_send_classification(runtime_env, monkeypatch, smtp_capture):
+    """_smtp_send True -> sent; False/exception -> pending w/ backoff;
     exhaustion -> failed."""
     svcs = _svc()
-    from lnbits.settings import settings as host_settings
-
-    host_settings.lnbits_email_notifications_enabled = True
-    host_settings.lnbits_email_notifications_email = "shop@example.com"
-
-    sent_calls = []
-
-    async def fake_send(*args, **kwargs):
-        sent_calls.append(args)
-        return True
-
-    import lnbits.core.services.notifications as notif
-
-    monkeypatch.setattr(notif, "send_email", fake_send)
 
     order = await _order(runtime_env)
     await svcs["email"].worker_tick("w1")
@@ -319,8 +297,9 @@ async def test_send_classification(runtime_env, monkeypatch):
     assert rows[0]["state"] == "sent"
     assert rows[0]["sent_at"] is not None
     assert not rows[0]["recipient_enc"]
+    assert not rows[0]["payload_enc"]
     assert rows[0]["preview_enc"]
-    assert sent_calls  # the host send_email was invoked
+    assert smtp_capture  # the extension-owned transport seam was invoked
 
     client = runtime_env["client"]
     queue = await client.get(
@@ -340,10 +319,12 @@ async def test_send_classification(runtime_env, monkeypatch):
     assert "/infinitemarkets/order#" not in body["body"]
 
     # False return -> retry with backoff.
-    async def fail_send(*args, **kwargs):
+    async def fail_send(_message, *, to, timeout):
+        assert to.endswith("@example.com")
+        assert timeout > 0
         return False
 
-    monkeypatch.setattr(notif, "send_email", fail_send)
+    monkeypatch.setattr(svcs["email"], "_smtp_send", fail_send)
     order2 = await _order(runtime_env)
     await svcs["email"].worker_tick("w1")
     rows2 = await _queue_rows(order2["id"])
@@ -351,6 +332,20 @@ async def test_send_classification(runtime_env, monkeypatch):
     assert rows2[0]["attempts"] == 1
     assert rows2[0]["next_attempt_at"] > int(time.time())
     assert rows2[0]["last_error"] == "send-failed"
+
+    # A raised transport error has the same bounded, unclassified outcome.
+    async def raise_send(_message, *, to, timeout):
+        assert to.endswith("@example.com")
+        assert timeout > 0
+        raise RuntimeError("private SMTP detail")
+
+    monkeypatch.setattr(svcs["email"], "_smtp_send", raise_send)
+    order_raise = await _order(runtime_env)
+    await svcs["email"].worker_tick("w1")
+    raise_rows = await _queue_rows(order_raise["id"])
+    assert raise_rows[0]["state"] == "pending"
+    assert raise_rows[0]["attempts"] == 1
+    assert raise_rows[0]["last_error"] == "send-failed"
 
     # Exhaustion -> failed.
     from infinitemarkets.db import DomainTransaction
@@ -388,10 +383,48 @@ async def test_send_classification(runtime_env, monkeypatch):
     pending_after = await _queue_rows(pending_order["id"])
     assert pending_after[0]["state"] == "pending"
 
-    host_settings.lnbits_email_notifications_enabled = False
 
+async def test_customer_preview_redacts_order_and_footer_links(
+    runtime_env, smtp_capture
+):
+    svcs = _svc()
+    order = await _order(
+        runtime_env, email="preview@example.com", opt_in=True
+    )
+    from infinitemarkets.db import DomainTransaction
 
-async def test_consent_revocation_suppresses(runtime_env):
+    async with DomainTransaction() as tx:
+        await svcs["orders"].enqueue_email_intents(
+            tx,
+            order=order,
+            event_type="shipped",
+            merchant_notify_emails=[],
+            merchant_notify_events={},
+            customer_email="preview@example.com",
+            now=int(time.time()),
+        )
+    await svcs["email"].worker_tick("preview-redaction")
+    rows = await _queue_rows(order["id"])
+    customer = next(row for row in rows if row["channel"] == "customer")
+    assert customer["state"] == "sent"
+    sent = next(call for call in smtp_capture if call["to"] == "preview@example.com")
+    assert "You opted in to order emails." in sent["text"]
+    assert "To opt out:" in sent["text"]
+    assert "To opt out" in sent["html"]
+
+    preview = await runtime_env["client"].get(
+        f"{API}/merchants/{runtime_env['merchant_id']}"
+        f"/notifications/email-queue/{customer['id']}"
+    )
+    assert preview.status_code == 200, preview.text
+    body = preview.json()
+    assert body["redacted"] is True
+    assert "You opted in to order emails." in body["body"]
+    assert "To opt out: [order-status link omitted]" in body["body"]
+    assert "/infinitemarkets/order#" not in body["body"]
+    assert "preview@example.com" not in body["body"]
+
+async def test_consent_revocation_suppresses(runtime_env, monkeypatch, smtp_capture):
     """Opt-out between enqueue and send suppresses the customer row —
     consent is re-checked at send time."""
     svcs = _svc()
@@ -412,31 +445,14 @@ async def test_consent_revocation_suppresses(runtime_env):
             "UPDATE orders SET email_opt_in = FALSE WHERE id = :i",
             {"i": order["id"]},
         )
-    from lnbits.settings import settings as host_settings
-
-    host_settings.lnbits_email_notifications_enabled = True
-    host_settings.lnbits_email_notifications_email = "shop@example.com"
-
-    async def fake_send(*args, **kwargs):
-        return True
-
-    import lnbits.core.services.notifications as notif
-
-    monkeypatch_ctx = notif
-    orig = monkeypatch_ctx.send_email
-    monkeypatch_ctx.send_email = fake_send
-    try:
-        await svcs["email"].worker_tick("w1")
-    finally:
-        monkeypatch_ctx.send_email = orig
-        host_settings.lnbits_email_notifications_enabled = False
+    await svcs["email"].worker_tick("w1")
     rows = await _queue_rows(order["id"])
     customer = [r for r in rows if r["channel"] == "customer"]
     assert customer[0]["state"] == "suppressed"
     assert customer[0]["last_error"] == "consent-revoked"
 
 
-async def test_orderless_test_send(runtime_env, monkeypatch):
+async def test_orderless_test_send(runtime_env, monkeypatch, smtp_capture):
     """POST /notifications/test enqueues an orderless row; the worker
     decrypts the recipient bound to merchant_id and sends — and the row
     surfaces in GET /notifications.queue."""
@@ -460,23 +476,25 @@ async def test_orderless_test_send(runtime_env, monkeypatch):
     assert resp.status_code == 200, resp.text
     assert resp.json()["queued"] is True
 
-    from lnbits.settings import settings as host_settings
+    from infinitemarkets.db import DomainTransaction
 
-    host_settings.lnbits_email_notifications_enabled = True
-    host_settings.lnbits_email_notifications_email = "shop@example.com"
-    sent_to = []
-
-    async def fake_send(*args, **kwargs):
-        sent_to.append(args)
-        return True
-
-    import lnbits.core.services.notifications as notif
-
-    monkeypatch.setattr(notif, "send_email", fake_send)
+    async with DomainTransaction() as tx:
+        merchant = await tx.fetch_one(
+            "SELECT notify_events FROM merchants WHERE id = :m", {"m": mid}
+        )
+        original_events = merchant["notify_events"]
+        await tx.execute(
+            "UPDATE merchants SET notify_events = :events WHERE id = :m",
+            {"events": '{"order_received":false}', "m": mid},
+        )
     try:
         await svcs["email"].worker_tick("w1")
     finally:
-        host_settings.lnbits_email_notifications_enabled = False
+        async with DomainTransaction() as tx:
+            await tx.execute(
+                "UPDATE merchants SET notify_events = :events WHERE id = :m",
+                {"events": original_events, "m": mid},
+            )
 
     from infinitemarkets.db import db
 
@@ -487,7 +505,14 @@ async def test_orderless_test_send(runtime_env, monkeypatch):
             {"m": mid},
         ))
     assert row["state"] == "sent"
-    assert sent_to and "merchant@example.com" in sent_to[0][5]
+    sent_to = [call for call in smtp_capture if call["to"] == "merchant@example.com"]
+    assert sent_to
+    for call in sent_to:
+        assert "Sample email preview — not a real order." in call["text"]
+        assert "Sample email preview — not a real order." in call["html"]
+        assert "Sample item" in call["text"] and "Sample item" in call["html"]
+        assert "1,000 sats" in call["text"] and "1,000 sats" in call["html"]
+        assert "sample-token" not in call["text"] + call["html"]
 
     body = (
         await client.get(f"{API}/merchants/{mid}/notifications")
@@ -509,14 +534,12 @@ async def test_subject_has_no_pii(runtime_env):
         assert bad not in subject
 
 
-async def test_expired_claim_never_calls_smtp(runtime_env, monkeypatch):
-    import lnbits.core.services.notifications as notifications
-    from lnbits.settings import settings
-
+async def test_expired_claim_never_calls_smtp(
+    runtime_env, monkeypatch, smtp_capture
+):
     from infinitemarkets.db import DomainTransaction
 
     email = _svc()["email"]
-    monkeypatch.setattr(type(settings), "is_email_notifications_configured", lambda self: True)
     row_id = await email.enqueue_test_send(
         merchant_id=runtime_env["merchant_id"], recipient="stale@example.com",
     )
@@ -527,19 +550,21 @@ async def test_expired_claim_never_calls_smtp(runtime_env, monkeypatch):
             f"UPDATE {tx.table('email_queue')} SET claimed_until = 1 WHERE id = :i",
             {"i": row_id},
         )
-    sent = []
-
     async def stale_batch(*args, **kwargs):
         return [row]
 
-    async def fake_send(*args):
-        sent.append(args)
-        return True
-
     monkeypatch.setattr(email, "claim_batch", stale_batch)
-    monkeypatch.setattr(notifications, "send_email", fake_send)
     await email.worker_tick("old-worker")
-    assert sent == []
+    assert smtp_capture == []
+
+
+async def test_smtp_guard_active_outside_capture(runtime_env, smtp_capture):
+    """The session guard blocks transports outside a test's captured send seam."""
+    with pytest.raises(ConnectionRefusedError, match="Real SMTP connections"):
+        import smtplib
+
+        smtplib.SMTP("smtp.invalid", 25, timeout=1)
+    assert smtp_capture == []
 
 
 async def test_worker_errors_do_not_log_private_exception_text(runtime_env, monkeypatch):
