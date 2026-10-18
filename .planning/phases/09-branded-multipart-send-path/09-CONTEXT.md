@@ -69,8 +69,9 @@ EMAIL-11.
 
 ### MIME structure (EMAIL-01)
 - **D-05:** Every `email_queue` send is `multipart/alternative`. The
-  `text/plain` part comes first: the existing `_render_body` output, retained,
-  plus the mandatory footer lines of D-14. The HTML alternative comes last.
+  `text/plain` part comes first: the existing `_render_body` output, retained
+  apart from the D-26 label fix, plus the mandatory footer lines of D-14. The
+  HTML alternative comes last.
   Both parts are `utf-8`. When a logo is supplied, the HTML alternative is a
   `multipart/related` holding `text/html` + `image/png|jpeg` with
   `Content-ID: <logo@infinitemarkets>`. With no logo, it collapses to a bare
@@ -127,8 +128,9 @@ EMAIL-11.
   reusing `_status_link`'s expiry/AEAD checks (no new token logic). The link
   stays the fragment URL `{public_base_url}/infinitemarkets/order#token`;
   bearer tokens never move into the URL path or query (§5.4 posture).
-- **D-13:** Subjects are unchanged: merchant display name + event label only
-  (`_subject`), with no buyer PII, addresses, or internal ids. The same rule
+- **D-13:** Subjects keep their content rule: merchant display name + event
+  label only (`_subject`), with no buyer PII, addresses, or internal ids; the
+  display name is control-character-sanitized as in D-19. The same rule
   applies to every new header. Neither part ever carries decrypted
   addresses, keys, BOLT11, or preimages. Logs never carry recipients,
   rendered bodies, tokens, or SMTP credentials.
@@ -189,10 +191,13 @@ EMAIL-11.
 
 ### Phase boundary guards
 - **D-22 [informational]:** `preview_enc` keeps its current
-  `{"subject","text"}` shape in Phase 9; the redacted `html` key and the
+  `{"subject","body"}` shape in Phase 9. The SPEC's `"text"` key name is
+  stale: research verified `body` at `email.py:224-227` and
+  `merchant.py:867-871`, so do not rename it. The redacted `html` key and the
   sandboxed preview are EMAIL-04 (Phase 10). If the sent text part changes
-  (footer lines), the stored preview text should still represent the text
-  part as actually sent, redacted as today.
+  (footer lines), the stored preview body should still represent the text
+  part as actually sent, redacted as today, including the footer opt-out
+  link (`[order-status link omitted]`).
 - **D-23:** Phase 9 ships tests for what it builds. Tests that do not boot
   the host carry `pytest.mark.fast`. Coverage: `_build_message` unit tests
   with no network (MIME tree, header set, CID wiring, From encoding and
@@ -207,6 +212,27 @@ EMAIL-11.
   so the `harness/registry.py::HTTP_ROUTES` ↔ spec §5 and
   `harness/schema.py` ↔ spec §4 parity surfaces stay untouched. Those belong
   to Phase 10/11.
+
+### Owner decisions from research open questions (2026-10-17)
+- **D-25:** `_smtp_send` mirrors the host's TLS behaviour exactly:
+  `starttls()` with no SSL context, which on Python 3.12 does not verify the
+  relay certificate, and no new TLS setting. Its only addition is a socket
+  `timeout=` on `smtplib.SMTP`, needed because a cancelled `asyncio.wait_for`
+  leaves the worker thread running. A code comment at the `starttls()` call
+  records the residual (no certificate verification; ASVS 9.2.1 is Level 2,
+  the project runs Level 1) and points at the deferred hardening item in
+  `.planning/STATE.md` → Deferred Items.
+- **D-26:** Fix the existing text-render wart. `_render_body`'s first line
+  `f"Order {label}."` prints "Order order confirmed."; it changes to read
+  naturally, e.g. `f"{label.capitalize()}."`, which gives "Order
+  confirmed.", "New order received." and "Refund requested.". This is the
+  only intended change to the existing text render.
+- **D-27 [deferred]:** Frozen single-binary LNbits builds may lack
+  `email.policy`, `email.headerregistry` and `email.contentmanager`. Phase 9
+  does NOT vendor them. A frozen-binary send-test smoke belongs to Phase 11
+  release qualification, which vendors the modules via
+  `tools/package_release.py` only if the smoke fails. Tracked in
+  `.planning/todos/2026-10-17-frozen-binary-email-smoke.md`.
 
 ### Claude's Discretion
 - Kill switch (SPEC open question 5): an optional `email_html` ext_settings
@@ -327,6 +353,13 @@ EMAIL-11.
 - `harness/email.py` multipart model so PII/log-exposure assertions cover
   both parts; qualification tests for MIME structure, escaping, channel
   gating, preview redaction, and validation rejections.
+- Frozen-binary send-test smoke (D-27); vendor the `email.*` stdlib modules
+  in `tools/package_release.py` only if it fails.
+
+### Future hardening (owner-deferred)
+- Verified STARTTLS (`starttls(context=ssl.create_default_context())`) on
+  the extension SMTP hop — ASVS 9.2.1 (Level 2). v1.2 keeps host parity
+  (D-25).
 
 ### v2 (not in v1.2)
 - EMAIL-14: `List-Unsubscribe` header / RFC 8058 one-click (needs a

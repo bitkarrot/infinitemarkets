@@ -123,6 +123,7 @@ Decisions are logged in PROJECT.md and the normative specification.
 ### Pending Todos
 
 - No loose files in `.planning/todos/pending/`; the shipping picker is already completed.
+- Phase 11 release qualification: frozen-binary email send-test smoke — `.planning/todos/2026-10-17-frozen-binary-email-smoke.md` (Phase 9 CONTEXT D-27).
 - HARD-01–08 all verified (archived requirements at `.planning/milestones/v1.0-REQUIREMENTS.md`); Phase 3 UAT item 17 passed 2026-10-13 (live plebeian.market smoke).
 - v1.1 implementation plans begin only after owner approval of the roadmap.
 
@@ -173,6 +174,7 @@ Decisions are logged in PROJECT.md and the normative specification.
 | Protocol | NIP-37 draft synchronization | Deferred | Initialization | v2 |
 | Commerce | Subscriptions, preorder purchasing, automated refunds | Deferred | Initialization | v2 |
 | Transport | `nostrclient`/`nostrrelay` runtime adapters | Qualification required | Initialization | Future |
+| Security | Verified STARTTLS on the extension SMTP hop (`ssl.create_default_context()`; ASVS 9.2.1, L2) | Deferred — v1.2 mirrors the host's unverified STARTTLS (Phase 9 CONTEXT D-25) | 2026-10-17 | Future |
 
 ## Session Continuity
 
