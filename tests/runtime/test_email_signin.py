@@ -406,6 +406,15 @@ async def test_magic_link_send_renders_fragment_and_wipes(
 
     from infinitemarkets.db import DomainTransaction
 
+    merchant = await _merchant(env)
+    original_name = merchant["display_name"]
+    hostile_name = 'Café "Market" & Co\u202e'
+    safe_name = 'Café "Market" & Co'
+    async with DomainTransaction() as tx:
+        await tx.execute(
+            "UPDATE merchants SET display_name = :name WHERE id = :m",
+            {"name": hostile_name, "m": env["merchant_id"]},
+        )
     token = _crypto().generate_public_token()
     async with DomainTransaction() as tx:
         row_id = await svcs["email"].enqueue_magic_link(
@@ -413,7 +422,14 @@ async def test_magic_link_send_renders_fragment_and_wipes(
             recipient="buyer@example.com", token=token,
             now=int(time.time()),
         )
-    await svcs["email"].worker_tick("w-account")
+    try:
+        await svcs["email"].worker_tick("w-account")
+    finally:
+        async with DomainTransaction() as tx:
+            await tx.execute(
+                "UPDATE merchants SET display_name = :name WHERE id = :m",
+                {"name": original_name, "m": env["merchant_id"]},
+            )
     rows = await _account_rows(env)
     mine = [r for r in rows if r["id"] == row_id]
     assert mine and mine[0]["state"] == "sent"
@@ -427,7 +443,7 @@ async def test_magic_link_send_renders_fragment_and_wipes(
     subject, body, markup = call["subject"], call["text"], html.unescape(call["html"])
     merchant = await _merchant(env)
     assert "your sign-in link" in subject
-    assert merchant["display_name"] in subject
+    assert f"{safe_name}: your sign-in link" == subject
     assert token not in subject
     assert "buyer@example.com" not in subject
     # The token appears EXACTLY once — inside the URL fragment.
@@ -438,11 +454,55 @@ async def test_magic_link_send_renders_fragment_and_wipes(
     assert "expires in 15 minutes" in body
     assert "You requested a sign-in link." in body
     assert "You requested a sign-in link." in markup
+    assert safe_name in body
+    assert safe_name in markup
+    assert "&amp;" in call["html"]
+    assert "&quot;" in call["html"]
     assert "Printed zine" not in markup
     assert "buyer@example.com" not in subject
+    from_header = call["msg"]["From"].addresses[0]
+    assert from_header.display_name == safe_name
     for key, value in call["msg"].items():
         assert token not in f"{key}: {value}"
         assert "buyer@example.com" not in f"{key}: {value}"
+    assert "To" not in call["msg"]
+
+    escaped_link = 'https://shop.example/auth/email?shop=pub&name="Market"#fragment'
+    account_message = svcs["email"]._build_message(
+        subject="Email Shop: your sign-in link",
+        text=f"Sign in: {escaped_link}",
+        view={
+            "channel": "account",
+            "event_type": "signin_link",
+            "display_name": safe_name,
+            "items": [],
+            "status_link": escaped_link,
+            "theme": None,
+        },
+        from_addr="shop@example.com",
+        to_addr="buyer@example.com",
+    )
+    account_markup = account_message.get_body(
+        preferencelist=("html",)
+    ).get_content()
+    escaped_href = (
+        'href="https://shop.example/auth/email?shop=pub&amp;'
+        'name=&quot;Market&quot;#fragment"'
+    )
+    assert escaped_href in account_markup
+    assert "buyer@example.com" not in str(account_message)
+
+    preview = await env["client"].get(
+        f"{API}/merchants/{env['merchant_id']}"
+        f"/notifications/email-queue/{row_id}"
+    )
+    assert preview.status_code == 200, preview.text
+    redacted = preview.json()
+    assert {"subject", "body"} <= redacted.keys()
+    assert redacted["redacted"] is True
+    assert token not in redacted["subject"] + redacted["body"]
+    assert "[sign-in link omitted]" in redacted["body"]
+    assert "/infinitemarkets/auth/email#" not in redacted["body"]
 
 
 async def test_magic_link_suppressed_when_email_disabled(runtime_env, monkeypatch):
@@ -496,6 +556,13 @@ async def test_account_channel_uses_email_account_bucket(
                     now=int(time.time()),
                 )
             )
+        other_id = await svcs["email"].enqueue_magic_link(
+            tx,
+            merchant_id=env["merchant_id"],
+            recipient="other-cap@example.com",
+            token=_crypto().generate_public_token(),
+            now=int(time.time()),
+        )
     result = await svcs["email"].worker_tick("w-account")
     assert result["outcomes"].get("rate-deferred", 0) == 1
     rows = await _account_rows(env)
@@ -504,23 +571,70 @@ async def test_account_channel_uses_email_account_bucket(
     deferred = [r for r in mine.values() if r["state"] == "pending"]
     assert len(sent) == cap
     assert len(deferred) == 1
+    other = next(r for r in rows if r["id"] == other_id)
+    assert other["state"] == "sent"
     assert all(r["last_error"] != "consent-revoked" for r in mine.values())
 
-    # The bucket row is scoped on the recipient hash under email-account.
+    # Buckets are recipient-specific; another account recipient sends despite
+    # the first address reaching its independent hourly cap.
     recipient_hash = _crypto().hmac_index(
         _settings().privacy_key, _crypto().PURPOSE_EMAIL_RECIPIENT,
         env["merchant_id"], _crypto().normalize("cap@example.com"),
+    )
+    other_hash = _crypto().hmac_index(
+        _settings().privacy_key,
+        _crypto().PURPOSE_EMAIL_RECIPIENT,
+        env["merchant_id"],
+        _crypto().normalize("other-cap@example.com"),
     )
     async with env["ext_module"].db.connect() as conn:
         buckets = await conn.fetchall(
             "SELECT scope_hash, bucket, count"
             " FROM infinitemarkets.rate_limit_buckets"
-            " WHERE scope_hash = :s",
+            " WHERE scope_hash IN (:s, :o)",
+            {"s": recipient_hash, "o": other_hash},
+        )
+    bucket_rows = [dict(b) for b in buckets]
+    account_buckets = [b for b in bucket_rows if b["bucket"] == "email-account"]
+    assert {(b["scope_hash"], b["count"]) for b in account_buckets} == {
+        (recipient_hash, cap),
+        (other_hash, 1),
+    }
+    assert not [
+        b for b in bucket_rows
+        if b["bucket"] in {"email-merchant", "email-customer"}
+    ]
+    account_calls = [
+        call for call in smtp_capture
+        if call["to"] in {"cap@example.com", "other-cap@example.com"}
+    ]
+    assert len(account_calls) == cap + 1
+    for call in account_calls:
+        assert "You requested a sign-in link." in call["text"]
+        assert "You requested a sign-in link." in call["html"]
+        assert "Subtotal" not in call["html"]
+        assert "To" not in call["msg"]
+
+    deferred_row = deferred[0]
+    async with DomainTransaction() as tx:
+        await tx.execute(
+            "UPDATE email_queue SET next_attempt_at = :n WHERE id = :i",
+            {"n": int(time.time()), "i": deferred_row["id"]},
+        )
+        await tx.execute(
+            "DELETE FROM rate_limit_buckets"
+            " WHERE scope_hash = :s AND bucket = 'email-account'",
             {"s": recipient_hash},
         )
-    account_buckets = [dict(b) for b in buckets if b["bucket"] == "email-account"]
-    assert account_buckets and account_buckets[0]["count"] >= cap
-    assert not [b for b in buckets if b["bucket"] == "email-merchant"]
+    recovered = await svcs["email"].worker_tick("w-account")
+    assert recovered["outcomes"].get("sent", 0) == 1
+    recovered_row = next(
+        row for row in await _account_rows(env) if row["id"] == deferred_row["id"]
+    )
+    assert recovered_row["state"] == "sent"
+    assert len([
+        call for call in smtp_capture if call["to"] == "cap@example.com"
+    ]) == cap + 1
 
 
 # --- Task 2: request/verify vertical (D-05, D-06, D-08, D-09) -------------------

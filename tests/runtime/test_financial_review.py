@@ -349,7 +349,9 @@ async def test_review_public_delivery_snapshot_serializes_cancellation(
     svcs = _svcs()
     address = f"{uuid.uuid4().hex}@example.invalid"
     order, product, response = await _new_order(
-        runtime_env, scope=uuid.uuid4().hex,
+        runtime_env,
+        title="Review email order",
+        scope=uuid.uuid4().hex,
         payload_extra={"email": address, "email_opt_in": True},
     )
     update = await runtime_env["client"].patch(
@@ -393,11 +395,19 @@ async def test_review_public_delivery_snapshot_serializes_cancellation(
     async def read_surface():
         if surface == "email":
             await svcs["email"].worker_tick("review-email")
+            matching = [
+                call for call in smtp_capture
+                if call["to"] == address
+            ]
+            assert matching, "background or explicit worker tick must use the capture seam"
+            assert all("To" not in call["msg"] for call in matching)
             return any(
                 call["to"] == address
+                and "Review email order" in call["text"]
+                and "Review email order" in call["html"]
                 and "atomic entitlement" in call["text"]
                 and "atomic entitlement" in call["html"]
-                for call in smtp_capture
+                for call in matching
             )
         if surface == "history":
             import httpx
