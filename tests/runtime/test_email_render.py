@@ -124,6 +124,11 @@ def test_mime_tree_is_alternative_with_optional_related_logo():
     jpeg = _build(logo=(b"\xff\xd8\xffsynthetic-logo", "jpeg"))
     assert jpeg.get_payload()[1].get_content_type() == "multipart/related"
     assert jpeg.get_payload()[1].get_payload()[1].get_content_type() == "image/jpeg"
+    escaped_alt = _build(
+        _view(display_name='Shop "North" & Co'),
+        logo=(b"\x89PNG\r\n\x1a\nsynthetic-logo", "png"),
+    ).get_payload()[1].get_payload()[0].get_content()
+    assert 'alt="Shop &quot;North&quot; &amp; Co"' in escaped_alt
 
     unusable = _build(logo=(b"not-an-image", "svg"))
     assert unusable.get_payload()[1].get_content_type() == "text/html"
@@ -260,9 +265,18 @@ def test_sections_show_real_order_values_and_live_only_cta():
     assert "code-123" in rendered
     assert 'href="https://shop.example/infinitemarkets/order#sample-token"' in rendered
     assert "color:#000000" in rendered
+    assert "font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" in (
+        rendered
+    )
+    body_start = rendered.index("<body")
+    first_child = rendered[rendered.index(">", body_start) + 1:].lstrip()
+    assert first_child.startswith(
+        '<span style="display:none;max-height:0;overflow:hidden;mso-hide:all;">'
+    )
     assert "<style" not in rendered.lower()
     assert "https://" not in rendered.replace("https://shop.example", "")
     assert "You opted in to order emails." in text
+    assert "Backordered" in rendered
     from infinitemarkets.services.themes import contrast_ratio
 
     assert contrast_ratio("#000000", "#777777") >= 4.5
@@ -295,6 +309,7 @@ def test_sections_keep_adjacent_equal_items_and_render_zero_item_order_totals():
     _text, adjacent_html = _parts(adjacent)
     assert adjacent_html.count("Equal-priced item") == 2
     assert adjacent_html.count("1,000 sats") == 2
+    assert "Backordered" not in adjacent_html
 
     empty_order = _build(_view(
         items=[],
@@ -310,6 +325,22 @@ def test_sections_keep_adjacent_equal_items_and_render_zero_item_order_totals():
     assert "Shipping" in empty_html and "0 sats" in empty_html
     assert "Total" in empty_html and "1,250 sats" in empty_html
     assert "<a " not in empty_html
+    worker_source = inspect.getsource(_email().worker_tick)
+    assert "ORDER BY id" in worker_source
+
+    sequenced = _parts(_build(_view(
+        delivery=[{"title": "Delivery marker", "content": "delivery content"}],
+    )))[1]
+    section_positions = [
+        sequenced.index('style="padding:20px 24px;background:'),
+        sequenced.index("Order confirmed</td>"),
+        sequenced.index("Printed zine"),
+        sequenced.index("Subtotal"),
+        sequenced.index("Delivery marker"),
+        sequenced.index("View order status"),
+        sequenced.index("You opted in to order emails."),
+    ]
+    assert section_positions == sorted(section_positions)
 
 
 def test_sections_show_em_dash_for_nullable_line_and_order_money():
@@ -562,7 +593,7 @@ def test_footer_optional_copy_is_escaped_and_never_replaces_channel_notice():
     parameters = inspect.signature(render).parameters
     assert "header_text" in parameters
     assert "footer_text" in parameters
-    hostile = '<script>alert("x")</script> "footer" & more'
+    hostile = '<script>alert("x")</script> \'footer\' & more'
     cases = (
         (
             _view(channel="customer", status_link=None, delivery=[]),

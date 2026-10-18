@@ -560,6 +560,47 @@ async def test_notify_events_gate_merchant_only(runtime_env, smtp_capture):
     assert not any(call["to"] == merchant_address for call in smtp_capture)
 
 
+async def test_merchant_confirmed_delivery_is_not_included(runtime_env, smtp_capture):
+    """Digital delivery is exclusive to customer confirmed messages."""
+    svcs = _svc()
+    recipient = f"{uuid.uuid4().hex}@example.com"
+    secret = f"private-delivery-{uuid.uuid4().hex}"
+    response = await runtime_env["client"].patch(
+        f"{API}/products/{runtime_env['product']['id']}",
+        json={"delivery_content": secret},
+        headers={
+            "Origin": ORIGIN,
+            "X-CSRF-Token": runtime_env["client"].cookies.get("gm_csrf"),
+        },
+    )
+    assert response.status_code == 200, response.text
+    order = await _order(runtime_env, scope=uuid.uuid4().hex)
+    from infinitemarkets.db import DomainTransaction
+
+    async with DomainTransaction() as tx:
+        await tx.execute(
+            "UPDATE orders SET state = 'confirmed' WHERE id = :o",
+            {"o": order["id"]},
+        )
+        await svcs["orders"].enqueue_email_intents(
+            tx,
+            order=order,
+            event_type="confirmed",
+            merchant_notify_emails=[recipient],
+            merchant_notify_events={},
+            customer_email=None,
+            now=int(time.time()),
+        )
+    await svcs["email"].worker_tick("merchant-confirmed-delivery")
+    rows = await _queue_rows(order["id"])
+    merchant_row = next(row for row in rows if row["channel"] == "merchant")
+    assert merchant_row["state"] == "sent"
+    sent = [call for call in smtp_capture if call["to"] == recipient]
+    assert sent
+    assert all(secret not in call["text"] for call in sent)
+    assert all(secret not in call["html"] for call in sent)
+
+
 async def test_orderless_test_send(runtime_env, monkeypatch, smtp_capture):
     """POST /notifications/test enqueues an orderless row; the worker
     decrypts the recipient bound to merchant_id and sends — and the row
@@ -630,6 +671,63 @@ async def test_orderless_test_send(runtime_env, monkeypatch, smtp_capture):
     ).json()
     orderless = [q for q in body["queue"] if not q["order_bound"]]
     assert orderless and orderless[0]["state"] == "sent"
+
+
+@pytest.mark.parametrize(
+    ("gate", "reason"),
+    [
+        ("extension", "email-disabled"),
+        ("host", "host-email-unconfigured"),
+        ("inactive", "merchant-inactive"),
+    ],
+)
+async def test_orderless_test_send_respects_global_gates(
+    runtime_env, smtp_capture, monkeypatch, gate, reason
+):
+    email = _svc()["email"]
+    merchant_id = runtime_env["merchant_id"]
+    recipient = f"{uuid.uuid4().hex}@example.com"
+    if gate == "extension":
+        monkeypatch.setenv("INFINITEMARKETS_EMAIL_ENABLED", "0")
+    elif gate == "host":
+        from lnbits.settings import settings as host_settings
+
+        monkeypatch.setattr(
+            type(host_settings),
+            "is_email_notifications_configured",
+            lambda _self: False,
+        )
+    else:
+        from infinitemarkets.db import DomainTransaction
+
+        async with DomainTransaction() as tx:
+            await tx.execute(
+                "UPDATE merchants SET state = 'inactive' WHERE id = :m",
+                {"m": merchant_id},
+            )
+    row_id = await email.enqueue_test_send(
+        merchant_id=merchant_id,
+        recipient=recipient,
+    )
+    from infinitemarkets.db import DomainTransaction, db
+
+    try:
+        await email.worker_tick("inactive-test-send")
+    finally:
+        if gate == "inactive":
+            async with DomainTransaction() as tx:
+                await tx.execute(
+                    "UPDATE merchants SET state = 'active' WHERE id = :m",
+                    {"m": merchant_id},
+                )
+    async with db.connect() as conn:
+        row = dict(await conn.fetchone(
+            "SELECT state, last_error FROM infinitemarkets.email_queue"
+            " WHERE id = :i",
+            {"i": row_id},
+        ))
+    assert row == {"state": "suppressed", "last_error": reason}
+    assert not any(call["to"] == recipient for call in smtp_capture)
 
 
 async def test_orderless_test_send_rate_limit_remains_five_per_hour(

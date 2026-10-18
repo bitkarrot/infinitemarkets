@@ -315,7 +315,13 @@ def _sats_label(amount) -> str:
     return "—" if amount is None else f"{int(amount):,} sats"
 
 
-def _render_html(view: dict, *, has_logo: bool = False) -> str:
+def _render_html(
+    view: dict,
+    *,
+    has_logo: bool = False,
+    header_text: str | None = None,
+    footer_text: str | None = None,
+) -> str:
     """Render a complete branded HTML part without remote resources."""
     display_name = _html_escape(
         _header_safe(view.get("display_name"), limit=120) or "Infinitemarkets"
@@ -368,6 +374,11 @@ def _render_html(view: dict, *, has_logo: bool = False) -> str:
         header = (
             '<div style="font-size:20px;font-weight:600;">'
             f"{display_name}</div>"
+        )
+    if header_text:
+        header += (
+            '<div style="padding-top:4px;font-size:13px;">'
+            f"{_html_escape(header_text)}</div>"
         )
 
     content_rows = []
@@ -472,6 +483,12 @@ def _render_html(view: dict, *, has_logo: bool = False) -> str:
         footer = "<div>You requested a sign-in link.</div>"
     else:
         footer = "<div>This is a transactional order notification.</div>"
+    if footer_text:
+        footer = (
+            '<div style="white-space:pre-wrap;padding-bottom:6px;">'
+            f"{_html_escape(footer_text)}</div>"
+            f"{footer}"
+        )
 
     if test_send:
         preheader = "Sample email preview — not a real order."
