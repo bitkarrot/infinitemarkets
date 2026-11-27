@@ -340,7 +340,7 @@ async def _merchant_pubkey(runtime_env):
 
 @pytest.mark.parametrize("surface", ["public", "history", "email"])
 async def test_review_public_delivery_snapshot_serializes_cancellation(
-    runtime_env, monkeypatch, surface,
+    runtime_env, monkeypatch, smtp_capture, surface,
 ):
     from infinitemarkets.db import DomainTransaction, dialect
 
@@ -349,7 +349,9 @@ async def test_review_public_delivery_snapshot_serializes_cancellation(
     svcs = _svcs()
     address = f"{uuid.uuid4().hex}@example.invalid"
     order, product, response = await _new_order(
-        runtime_env, scope=uuid.uuid4().hex,
+        runtime_env,
+        title="Review email order",
+        scope=uuid.uuid4().hex,
         payload_extra={"email": address, "email_opt_in": True},
     )
     update = await runtime_env["client"].patch(
@@ -381,25 +383,32 @@ async def test_review_public_delivery_snapshot_serializes_cancellation(
 
     monkeypatch.setattr(svcs["orders"], "fulfillment_authorized", pause_authority)
     monkeypatch.setattr(DomainTransaction, "fetch_one", observe_cancel)
-    sent = []
+    if surface != "email":
+        from lnbits.settings import settings as host_settings
+
+        monkeypatch.setattr(
+            type(host_settings),
+            "is_email_notifications_configured",
+            lambda self: False,
+        )
 
     async def read_surface():
         if surface == "email":
-            import lnbits.core.services.notifications as notifications
-            from lnbits.settings import settings
-
-            monkeypatch.setattr(
-                type(settings), "is_email_notifications_configured", lambda self: True,
-            )
-
-            async def send(*args):
-                if address in args[5]:
-                    sent.append(args[7])
-                return True
-
-            monkeypatch.setattr(notifications, "send_email", send)
             await svcs["email"].worker_tick("review-email")
-            return any("atomic entitlement" in body for body in sent)
+            matching = [
+                call for call in smtp_capture
+                if call["to"] == address
+            ]
+            assert matching, "background or explicit worker tick must use the capture seam"
+            assert all("To" not in call["msg"] for call in matching)
+            return any(
+                call["to"] == address
+                and "Review email order" in call["text"]
+                and "Review email order" in call["html"]
+                and "atomic entitlement" in call["text"]
+                and "atomic entitlement" in call["html"]
+                for call in matching
+            )
         if surface == "history":
             import httpx
             from test_nostr_signin import _bind_buyer, _buyer_hex, _signin

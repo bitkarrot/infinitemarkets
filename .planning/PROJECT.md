@@ -21,27 +21,35 @@ the admin surface (operator-accepted) and the WR-01 retrospective-RED
 chronology caveat. Archives: `milestones/v1.0-ROADMAP.md`,
 `milestones/v1.0-REQUIREMENTS.md`, `v1.0-MILESTONE-AUDIT.md`.
 
-**Current product release: v1.0.14 (2026-10-16).** Catalog usability,
-product search/share previews, and shipping-region selection were polished.
-The Blossom redirect fix is under review in PR #28; it is a prerequisite
-for reliable share cards using Blossom-hosted product images.
+**v1.1 shipped 2026-10-16** — Media uploads and Blossom support
+(v1.1.0): LNbits-local + Blossom image uploads, shared media picker,
+Settings → Media cleanup, bounded share-card redirects (PR #28).
 
-## Current Milestone: v1.1 Media uploads and Blossom support
+## Current Milestone: v1.2 Branded Order Emails
 
-**Goal:** Let merchants upload images for products, their Nostr profile, and
-Appearance settings, choosing local LNbits storage by default or optional
-Blossom storage when configured.
+**Goal:** Merchants send branded multipart order emails (text + HTML)
+with logo/accent customization through the existing durable queue —
+without weakening consent or privacy invariants.
 
 **Target features:**
-- One reusable uploader across the product gallery, Merchant profile
-  picture/banner, and Appearance logo, hero, footer, and custom share image.
-- Local LNbits storage is the default. Blossom is an explicit alternative;
-  use the primary/first configured media server, never silently dual-write,
-  and offer an explicit local retry if Blossom fails.
-- Safe server-side upload/authentication, clear progress/failures, and
-  preservation of existing external URLs and migration-owned local images.
-- Preserve the PR #28 redirect fix so Blossom-hosted images render in
-  generated Open Graph share cards.
+- In-extension multipart/alternative SMTP send (`_build_message` /
+  `_smtp_send` seam) — the host `send_email` is plain-text only.
+- Branded HTML template: CID-embedded logo from the local media library
+  (never remote `<img>`), header/footer text, accent color, item table
+  with line totals, status-link CTA; existing text part retained.
+- Per-channel event gating fix: merchant `notify_events` toggles gate
+  merchant-channel emails only; customer emails gate solely on the
+  order's `email_opt_in` consent.
+- Admin Notifications UI: local-only `gm-media-picker` logo field,
+  header/footer inputs, accent swatch, sandboxed HTML preview.
+- Deliverability: `From` display name, `Date`/`Message-ID`/
+  `Auto-Submitted` headers, hidden preheader. `List-Unsubscribe`
+  deferred — fragment-token posture forbids RFC 8058 one-click.
+- Contract parity: technical-spec §4/§5/§8.8/§15, `harness/registry.py`,
+  `harness/email.py` model, qualification tests.
+
+Spec: `.planning/specs/order-email-templates-SPEC.md` (reviewed
+2026-10-15, updated for shipped v1.1 media library).
 
 ## Requirements
 
@@ -136,4 +144,4 @@ This document evolves at phase transitions and milestone boundaries.
 3. Update context, constraints, and decision outcomes.
 
 ---
-*Last updated: 2026-10-16 — v1.1 media-upload planning started*
+*Last updated: 2026-10-17 — v1.2 branded order emails milestone started*

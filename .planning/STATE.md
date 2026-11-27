@@ -1,44 +1,42 @@
 ---
 gsd_state_version: "1.0"
-milestone: v1.1
-milestone_name: Media uploads and Blossom support
-current_phase: 8
-current_phase_name: Media Release Qualification
-current_plan: 1
-status: complete
-stopped_at: v1.1 milestone complete — all 3 phases verified, v1.1.0 released
-last_updated: "2026-10-17T05:33:14.241Z"
-last_activity: 2026-10-17
-last_activity_desc: Phase 8 release-qualification audit passed (1100-test suite, MEDIA-17/19 complete)
-state_head: a08d7814e148597bb7e241c403367385f075e534
+milestone: v1.2
+milestone_name: Branded Order Emails
+current_phase: 09
+current_phase_name: Branded Multipart Send Path
+status: verifying
+stopped_at: Completed 09-02-PLAN.md
+last_updated: "2026-10-18T19:16:17.606Z"
+last_activity: 2026-10-18
+last_activity_desc: Phase 09 execution started
+state_head: 3d05f76cba1a68a5a4b0cf86a9eb118254e9892a
 progress:
   total_phases: 3
-  completed_phases: 3
-  total_plans: 9
-  completed_plans: 9
-  percent: 100
+  completed_phases: 0
+  total_plans: 2
+  completed_plans: 2
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-10-16)
+See: .planning/PROJECT.md (updated 2026-10-17)
 
 **Core value:** A merchant can sell one authoritative inventory safely through LNbits-backed web and Nostr flows without duplicate invoices, double allocation, or relay delivery being mistaken for payment truth.
-**Current focus:** v1.1 media uploads and Blossom support, starting at Phase 6 after owner approval of the roadmap.
+**Current focus:** Phase 09 — Branded Multipart Send Path
 
 ## Current Position
 
-Phase: 8 of 8 — Media Release Qualification (v1.1 closeout)
-Current Plan: 1
-Total Plans in Phase: 1
-Status: Complete — 08-01 qualification audit passed; PR #28 merge ancestry proven, MEDIA-19 matrix green, full `make verify` suite 1100 passed / 8 skipped; MEDIA-17 and MEDIA-19 marked complete. All v1.1 requirements are closed and v1.1.0 is tagged and published.
-Last activity: 2026-10-17 — Phase 8 qualification verdict recorded (08-VERIFICATION.md, status passed)
+Phase: 09 (Branded Multipart Send Path) — EXECUTING
+Plan: 2 of 2
+Status: Phase complete — ready for verification
+Last activity: 2026-10-18 — Phase 09 execution started
 
 ## Performance Metrics
 
-**Current milestone (v1.1) velocity:**
+**Current milestone (v1.2) velocity:**
 
 - Executed plans: 0
 - Average duration: -
@@ -78,6 +76,8 @@ Last activity: 2026-10-17 — Phase 8 qualification verdict recorded (08-VERIFIC
 | Phase 07-shared-image-editors P03 | 9min | 2 tasks | 5 files |
 | Phase 07 P04 | 12min | 3 tasks | 4 files |
 | Phase 08-media-release-qualification P01 | ~14min (incl. ~6min full suite) | 3 tasks | 6 files |
+| Phase 09 P01 | 23 min | 3 tasks | 8 files |
+| Phase 09 P02 | 14 min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -126,10 +126,16 @@ Decisions are logged in PROJECT.md and the normative specification.
 - [Phase 7]: 07-03: cancel-disclosure via shared gmDiscloseUnsavedUploads on every product-editor close path; save always sends images (D-21/D-27)
 - [Phase 8]: 08-01: qualification audit only — no code/test changes; requirements ticked in the same commit carrying green-run outputs (T-08-02); regenerated evidence bundle committed as durable artifact
 - [Phase 8]: 08-01: ROADMAP release-dependency paragraph updated to merged/verified/released — stale 'PR #28 is open' text would contradict the recorded verdict
+- [Phase 09]: Phase 09 Plan 01: extension-owned EmailMessage construction and SMTP transport keep network I/O outside queue transactions.
+- [Phase 09]: Phase 09 Plan 01: message recipient addresses remain in the SMTP envelope rather than MIME headers; the From address stays host-owned.
+- [Phase 09]: Phase 09 Plan 01: notify_events gates merchant order alerts only; customer sends remain send-time email_opt_in gated.
+- [Phase 09]: Phase 09-02: render nullable order totals as em dashes instead of hiding them.
+- [Phase 09]: Phase 09-02: optional HTML header/footer copy is escaped plain text and cannot replace the mandatory channel footer.
 
 ### Pending Todos
 
 - No loose files in `.planning/todos/pending/`; the shipping picker is already completed.
+- Phase 11 release qualification: frozen-binary email send-test smoke — `.planning/todos/2026-10-17-frozen-binary-email-smoke.md` (Phase 9 CONTEXT D-27).
 - HARD-01–08 all verified (archived requirements at `.planning/milestones/v1.0-REQUIREMENTS.md`); Phase 3 UAT item 17 passed 2026-10-13 (live plebeian.market smoke).
 - v1.1 implementation plans begin only after owner approval of the roadmap.
 
@@ -162,6 +168,7 @@ Decisions are logged in PROJECT.md and the normative specification.
 
 ### Roadmap Evolution
 
+- 2026-10-17: v1.2 roadmap created as Phases 9–11: branded multipart send path (extension-owned `_build_message`/`_smtp_send` + consent-gating fix), merchant email branding controls (logo picker, header/footer/accent, sandboxed preview), and email contract & release qualification. EMAIL-01–EMAIL-13 each assigned to exactly one phase.
 - 2026-10-16: v1.1 roadmap created as Phases 6–8: secure media storage, shared image editors for all merchant image fields, and media release qualification. MEDIA-01–MEDIA-19 are each assigned to exactly one phase.
 - 2026-10-17: Phase 8 qualification audit closed MEDIA-17/MEDIA-19 and cleared the PR #28 release gate — merge ancestry proven on main, bounded share-card redirects + single-request PUT refusal green, full `make verify` 1100 passed; v1.1 requirement set fully closed (v1.1.0 tagged and published).
 - 2026-10-11: user chose hardening first. Phase 5 added for F1–F6, CI-01 and release/security evidence; optional integrations and shipping-import expansion deferred.
@@ -179,9 +186,10 @@ Decisions are logged in PROJECT.md and the normative specification.
 | Protocol | NIP-37 draft synchronization | Deferred | Initialization | v2 |
 | Commerce | Subscriptions, preorder purchasing, automated refunds | Deferred | Initialization | v2 |
 | Transport | `nostrclient`/`nostrrelay` runtime adapters | Qualification required | Initialization | Future |
+| Security | Verified STARTTLS on the extension SMTP hop (`ssl.create_default_context()`; ASVS 9.2.1, L2) | Deferred — v1.2 mirrors the host's unverified STARTTLS (Phase 9 CONTEXT D-25) | 2026-10-17 | Future |
 
 ## Session Continuity
 
-Last session: 2026-10-17T05:33:14.201Z
-Stopped at: v1.1 milestone complete — all 3 phases verified, v1.1.0 released
-Resume file: .planning/ROADMAP.md
+Last session: 2026-10-18T19:16:17.591Z
+Stopped at: Completed 09-02-PLAN.md
+Resume file: None

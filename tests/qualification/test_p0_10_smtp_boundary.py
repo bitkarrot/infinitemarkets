@@ -206,16 +206,38 @@ async def test_suppressed_rows_never_touch_smtp(qual_db_factory):
 
     async with qual_db_factory() as qual_db:
         await _seed_order(qual_db)
-        # (2) the merchant disabled the event type.
+        # (2a) a disabled merchant order alert is suppressed.
+        model = email_module.EmailModel(
+            qual_db, enabled_event_types={"order_received"}
+        )
+        await model.enqueue(
+            merchant_id="merchant-1",
+            order_id="o1",
+            channel="merchant",
+            event_type="shipped",
+            recipient_address=MERCHANT,
+            now=T0,
+        )
+        row = await _claim_one(model, now=T0 + 10)
+        result = await model.send(row, now=T0 + 10)
+        assert result == {"action": "suppressed", "reason": "event-type-disabled"}
+        stored = await _queue_row(qual_db)
+        assert stored["state"] == "suppressed"
+
+    async with qual_db_factory() as qual_db:
+        await _seed_order(qual_db)
+        # (2b) the same disabled event remains customer-opt-in controlled.
         model = email_module.EmailModel(
             qual_db, enabled_event_types={"order_received"}
         )
         await _enqueue_customer(qual_db, model, event_type="shipped")
         row = await _claim_one(model, now=T0 + 10)
         result = await model.send(row, now=T0 + 10)
-        assert result == {"action": "suppressed", "reason": "event-type-disabled"}
+        assert result["action"] == "sent"
         stored = await _queue_row(qual_db)
-        assert stored["state"] == "suppressed"
+        assert stored["state"] == "sent"
+        assert stored["last_error"] is None
+        assert len(model.smtp.calls) == 1
 
     async with qual_db_factory() as qual_db:
         await _seed_order(qual_db)
