@@ -5,7 +5,7 @@ description = "Infinite Markets qualification harness (Phase 1 contract conforma
 requires-python = ">=3.12,<3.13"
 dependencies = [
     # LNbits pinned host, resolved via [tool.uv.sources] to the checkout
-    # created by tools/checkout_host.py (commit e336fe14b841d6f0c940e75b3d343e3ab5cf8433).
+    # created by tools/checkout_host.py (commit 4fa70f338d274e14fc82746a83fba5c2c658211f).
     "lnbits",
     # Nostr SDK candidate. Exact pin, stricter than the host's ~=0.44.0,
     # so the lock cannot drift to a newer 0.44.x (D-13).
@@ -27,9 +27,7 @@ dev = [
 # The harness is not an installable package; tests import it via pytest
 # pythonpath = ["."].
 package = false
-# GHSA-ffc3-869f-jxw9 / CVE-2026-102268 — the pinned LNbits host declares
-# pyjwt~=2.12.0 (vulnerable <=2.13.0); resolve the patched 2.14.x line.
-override-dependencies = ["pyjwt>=2.14.0,<3.0.0", "multidict>=6.9.1", "oauthlib>=4.0.1", "pillow>=13.0.0,<14"]
+override-dependencies = ["multidict>=6.9.1", "oauthlib>=4.0.1", "pillow>=13.0.0,<14"]
 
 [tool.uv.sources]
 lnbits = { path = ".cache/lnbits" }

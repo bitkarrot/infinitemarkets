@@ -171,7 +171,7 @@ paid/shipped booleans.
 <!-- slide: layout=split accent=mint kicker="part 3 · infinite markets" -->
 # Infinite Markets - What it is
 
-- A **standard Python LNbits extension**, MIT, v1.1.1, LNbits ≥ 1.6.0
+- A **standard Python LNbits extension**, MIT, v1.1.1, LNbits ≥ 1.7.1
 - **Commerce authority**: catalog, inventory, shipping, orders, messages, publication
 - **LNbits core stays settlement authority**: invoices, payment records, funding source
 - Two rails, **one pipeline**: a web storefront and a native Nostr/Gamma channel share pricing, reservation, invoicing & settlement
@@ -519,7 +519,7 @@ rule when deciding which extension owns stock.
 - **Releases A, B, 03.1 and C implemented**: web commerce, Gamma NIP-17 orders, buyer accounts, catalog import/export
 - Published **v1.1.1** via LNbits extension manifest (sha256-verified)
 - Conformance: gated `nostrrelay` env, egress / NIP-42 / paid-relay drills, **Plebeian matrix**, plus a live `plebeian.market` checkout verified end-to-end (2026-10-13)
-- Pinned host (LNbits `v1.6.2-rc1`), pinned Gamma spec & NIPs, recorded decisions
+- Pinned host (LNbits `v1.7.1`), pinned Gamma spec & NIPs, recorded decisions
 - Out of scope for v1: escrow, fiat custody, automated refunds, subscriptions, reviews
 
 ---

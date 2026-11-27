@@ -118,6 +118,9 @@ _RUNTIME_SETTINGS_KEYS = (
     "lnbits_audit_log_request_body",
     "lnbits_audit_log_query_params",
     "lnbits_audit_log_path_params",
+    "lnbits_autoupdate_extensions_on_startup",
+    "lnbits_autoupdate_extensions_interval_hours",
+    "lnbits_allow_new_accounts",
 )
 
 
@@ -162,6 +165,15 @@ async def _runtime_app(data_folder: Path, ext_root: Path):
     settings.lnbits_audit_log_request_body = False
     settings.lnbits_audit_log_query_params = False
     settings.lnbits_audit_log_path_params = False
+    # Hermetic boot: no extension autoupdate at startup (app.py:553 gates
+    # on lnbits_autoupdate_extensions_on_startup) and interval==0 skips the
+    # scheduled pass (core/tasks.py:49-51) — no manifest fetches, no risk
+    # of "updating" the symlinked dev extension.
+    settings.lnbits_autoupdate_extensions_on_startup = False
+    settings.lnbits_autoupdate_extensions_interval_hours = 0
+    # v1.7.1 defaults account creation off (settings.py:57); the host's own
+    # tests/conftest.py:397 enables it for fixtures the same way.
+    settings.lnbits_allow_new_accounts = True
 
     # The extension module must not be pre-imported: ``Database.__init__``
     # binds the SQLite path at construction, and the host's migration loader
@@ -210,7 +222,7 @@ async def _runtime_app(data_folder: Path, ext_root: Path):
     try:
         app = create_app()
         async with LifespanManager(app, startup_timeout=30):
-            superuser = f"gqadmin-{uuid.uuid4().hex[:8]}"
+            superuser = f"gqadmin_{uuid.uuid4().hex[:8]}"
             await first_install(
                 UpdateSuperuserPassword(
                     username=superuser,
@@ -237,6 +249,12 @@ async def _runtime_app(data_folder: Path, ext_root: Path):
                     lnbits_audit_log_request_body=False,
                     lnbits_audit_log_query_params=False,
                     lnbits_audit_log_path_params=False,
+                    # The shared core DB row overrides env/attrs at startup
+                    # (check_admin_settings, core/services/users.py:172-188)
+                    # — persist the hermetic/account posture.
+                    lnbits_autoupdate_extensions_on_startup=False,
+                    lnbits_autoupdate_extensions_interval_hours=0,
+                    lnbits_allow_new_accounts=True,
                 )
             )
             update_cached_settings(
@@ -245,6 +263,9 @@ async def _runtime_app(data_folder: Path, ext_root: Path):
                     "lnbits_audit_log_request_body": False,
                     "lnbits_audit_log_query_params": False,
                     "lnbits_audit_log_path_params": False,
+                    "lnbits_autoupdate_extensions_on_startup": False,
+                    "lnbits_autoupdate_extensions_interval_hours": 0,
+                    "lnbits_allow_new_accounts": True,
                 }
             )
             ext_module = importlib.import_module("infinitemarkets")

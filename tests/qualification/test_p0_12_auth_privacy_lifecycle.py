@@ -1,6 +1,6 @@
 """P0-12: host auth/privacy/lifecycle probes (QUAL-12).
 
-Probes against the real pinned host (e336fe1) plus the local relay fixture:
+Probes against the real pinned host (4fa70f3) plus the local relay fixture:
 
 - (a) mutation authorization: a state-changing probe route requires an
   authenticated session (real host JWT cookie minted by the host's own

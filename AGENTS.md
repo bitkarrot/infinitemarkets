@@ -34,7 +34,7 @@ Known fragile contract surfaces (touch them together, never alone):
 
 - Features/fixes land via PR (Devin Review may add fix commits); docs and
   `chore: release` commits go directly to main.
-- Runtime tests boot a real LNbits host (`.cache/lnbits`, pinned e336fe1);
+- Runtime tests boot a real LNbits host (`.cache/lnbits`, pinned 4fa70f3);
   `uv run` resolves it via `tools/checkout_host.py`.
 - `_public_merchant` projections must never leak `*_enc`/`*_hash` fields;
   owner-scoped additions are fine.

@@ -984,11 +984,11 @@ async def test_amount_and_wallet_mismatch_quarantine(runtime_env):
     paid_wallet = await _settle_core_payment(order_wal["id"], order_wal["total_sat"])
 
     # Wrong amount (500 vs the order's 1000 sat).
-    bad_amount = paid_amount.copy(update={"amount": 500_000})
+    bad_amount = paid_amount.model_copy(update={"amount": 500_000})
     await svcs["settlement"].invoice_listener(bad_amount)
 
     # Right amount (qty 2 x 500 = 1000 sat), foreign wallet.
-    bad_wallet = paid_wallet.copy(update={"wallet_id": "foreign-wallet"})
+    bad_wallet = paid_wallet.model_copy(update={"wallet_id": "foreign-wallet"})
     await svcs["settlement"].invoice_listener(bad_wallet)
 
     for order, reason in (
@@ -1088,7 +1088,7 @@ async def test_reconciliation_verifies_payment_amount(runtime_env, monkeypatch):
     order, product, _ = await _new_order(runtime_env, qty=1)
     lookup = settlement._core_payments_by_external_id
     payment = (await lookup(f"infinitemarkets:{order['id']}"))[0]
-    wrong = payment.copy(update={"amount": payment.amount + 1000, "status": "success"})
+    wrong = payment.model_copy(update={"amount": payment.amount + 1000, "status": "success"})
 
     async def mismatched(external_id):
         if external_id == f"infinitemarkets:{order['id']}":
@@ -1278,7 +1278,7 @@ async def test_unverified_lnbits_invoice_is_not_offered_to_buyer(
             kwargs["amount"] += 1
         payment = await create_invoice(**kwargs)
         if mismatch == "wallet":
-            payment = payment.copy(update={"wallet_id": uuid.uuid4().hex})
+            payment = payment.model_copy(update={"wallet_id": uuid.uuid4().hex})
         return payment
 
     monkeypatch.setattr(host_payments, "create_invoice", unexpected_invoice)

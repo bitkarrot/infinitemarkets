@@ -1,6 +1,6 @@
 """P0-03: LNbits host contract probes (QUAL-03).
 
-Probes against the real pinned host (e336fe1) with FakeWallet funding:
+Probes against the real pinned host (4fa70f3) with FakeWallet funding:
 
 - (a) invoice metadata: create_invoice with extension="infinitemarkets",
   external_id="infinitemarkets:<uuid>", sat amount, and the infinitemarkets extra

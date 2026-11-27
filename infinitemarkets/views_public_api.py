@@ -14,7 +14,7 @@ import re
 import time
 
 from fastapi import APIRouter, Request, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from . import crypto
 from .db import (
@@ -445,8 +445,7 @@ async def public_order_email_opt_out(request: Request, response: Response):
 
 
 class _Strict(BaseModel):
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class NostrVerifyBody(_Strict):

@@ -146,10 +146,10 @@ def test_evidence_pins_block_matches_recorded_values():
         ),
         ("v2 payload only", "NIP-44 v2-only pin"),
         (
-            "e336fe14b841d6f0c940e75b3d343e3ab5cf8433",
+            "4fa70f338d274e14fc82746a83fba5c2c658211f",
             "LNbits commit pin",
         ),
-        ("v1.6.2-rc1", "LNbits tag"),
+        ("v1.7.1", "LNbits tag"),
         (EXPECTED_NOSTR_SDK, "nostr-sdk candidate pin"),
         ("Linux x86_64", "blocking platform (x86_64)"),
         ("Linux ARM64", "blocking platform (ARM64)"),

@@ -1,6 +1,6 @@
 """Extension database handle + section-14 transaction adapter.
 
-Conventions (verified against the pinned host, e336fe1):
+Conventions (verified against the pinned host, 4fa70f3):
 
 - ``Database("ext_infinitemarkets")`` maps to the ``infinitemarkets`` schema on
   PostgreSQL and to ``<data>/ext_infinitemarkets.sqlite3`` on SQLite — where the
