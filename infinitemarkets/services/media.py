@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import hashlib
 import ipaddress
+import os
 import re
+from pathlib import Path
 from urllib.parse import urlparse
 
 from ..db import db, table
@@ -369,8 +371,11 @@ async def delete_unused(merchant_id: str, name: str, user) -> dict:
     await catalog._merchant_owned(merchant_id, user)
     if not _NAME_RE.fullmatch(name):
         raise unprocessable("invalid-content", "invalid media filename")
-    media_dir = migration_media._media_dir(merchant_id)
-    path = media_dir / name
+    media_dir = os.path.normpath(migration_media._media_dir(merchant_id))
+    target = os.path.normpath(os.path.join(media_dir, name))
+    if not target.startswith(media_dir + os.sep):
+        raise unprocessable("invalid-content", "invalid media filename")
+    path = Path(target)
     if not path.is_file() or path.is_symlink():
         return {"deleted": False}
     if (
