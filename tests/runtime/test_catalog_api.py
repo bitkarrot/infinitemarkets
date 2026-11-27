@@ -452,6 +452,7 @@ async def test_membership_enqueues_collection_and_product_dep(runtime_env):
     pid = runtime_env["product_id"]
 
     # attach product to collection
+    before = {i["id"] for i in await _outbox(runtime_env)}
     resp = await client.patch(
         f"{API}/products/{pid}",
         json={"collection_ids": [col_id]},
@@ -459,16 +460,17 @@ async def test_membership_enqueues_collection_and_product_dep(runtime_env):
     )
     assert resp.status_code == 200, resp.text
 
-    intents = await _outbox(runtime_env)
+    intents = [
+        i for i in await _outbox(runtime_env) if i["id"] not in before
+    ]
     col_intents = [
         i for i in intents
         if i["aggregate_type"] == "collections"
-        and i["aggregate_id"] == col_id and i["state"] == "pending"
+        and i["aggregate_id"] == col_id
     ]
     prod_intents = [
         i for i in intents
-        if i["aggregate_type"] == "products"
-        and i["aggregate_id"] == pid and i["state"] == "pending"
+        if i["aggregate_type"] == "products" and i["aggregate_id"] == pid
     ]
     assert col_intents and prod_intents
     # 30402 waits on its 30405 (dependency ordering)
@@ -1170,31 +1172,42 @@ async def test_category_move_reprojects_nip15_listing(runtime_env):
         return {
             i["event_kind"]: i for i in intents
             if i["aggregate_id"] == aggregate_id
-            and i["state"] == "pending"
         }
 
+    async def new_product_intents(before):
+        return [
+            i for i in await _outbox(runtime_env, "products")
+            if i["id"] not in before
+        ]
+
+    async def product_outbox_ids():
+        return {i["id"] for i in await _outbox(runtime_env, "products")}
+
+    before = await product_outbox_ids()
     resp = await client.patch(
         f"{API}/products/{pid}", json={"category_id": stall_id},
         headers=headers,
     )
     assert resp.status_code == 200, resp.text
-    intents = await _outbox(runtime_env, "products")
+    intents = await new_product_intents(before)
     for aid in (pid, vid):
         nip15 = kinds(intents, aid).get(30018)
         assert nip15 is not None, aid
         assert nip15["event_address"].startswith("30018:")
 
+    before = await product_outbox_ids()
     resp = await client.patch(
         f"{API}/products/{pid}", json={"category_id": cid},
         headers=headers,
     )
     assert resp.status_code == 200, resp.text
-    intents = await _outbox(runtime_env, "products")
+    intents = await new_product_intents(before)
     for aid in (pid, vid):
         live = kinds(intents, aid)
         assert 30018 not in live, aid
         assert live[5]["event_address"].startswith("30018:"), aid
 
+    before = await product_outbox_ids()
     resp = await client.post(
         f"{API}/products/bulk",
         json={"product_ids": [plain_id], "action": "move-category",
@@ -1202,5 +1215,5 @@ async def test_category_move_reprojects_nip15_listing(runtime_env):
         headers=headers,
     )
     assert resp.status_code == 200, resp.text
-    intents = await _outbox(runtime_env, "products")
+    intents = await new_product_intents(before)
     assert 30018 in kinds(intents, plain_id)
