@@ -6,6 +6,7 @@ import email
 import importlib
 import inspect
 import json
+import re
 import smtplib
 from email import policy
 from email.utils import parsedate_to_datetime
@@ -495,6 +496,26 @@ def test_sections_use_fullmatch_accent_and_readable_cta_contrast():
         assert "border-top:3px solid #d69a3a" in rendered
         assert "evil.invalid" not in rendered
         assert "background:url" not in rendered
+
+
+def test_header_band_uses_contrast_safe_foreground_for_every_accepted_accent():
+    service = _email()
+    from infinitemarkets.services.themes import contrast_ratio
+
+    pattern = re.compile(
+        r'<td style="padding:20px 24px;background:(#[0-9a-fA-F]{6});'
+        r'color:(#[0-9a-fA-F]{6});">(.*?)</td>'
+    )
+    for accent in ("#777777", "#d69a3a", "#63d2ff", "#fce477", "#000000"):
+        view = _view(
+            theme=json.dumps({"preset": "warm-market", "brand": {"accent": accent}})
+        )
+        rendered = _parts(_build(view))[1]
+        match = pattern.search(rendered)
+        assert match is not None
+        assert match.group(1) == accent
+        assert contrast_ratio(match.group(2), accent) >= 4.5
+        assert service._html_escape(view["display_name"]) in match.group(3)
 
 
 def test_escaping_covers_text_attributes_delivery_and_css():

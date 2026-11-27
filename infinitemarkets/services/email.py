@@ -512,7 +512,8 @@ def _render_html(
         f'style="width:100%;max-width:600px;background:#ffffff;border-top:3px solid {accent};'
         "font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;"
         'color:#1f2328;">'
-        f'<tr><td style="padding:20px 24px;background:{accent};">{header}</td></tr>'
+        f'<tr><td style="padding:20px 24px;background:{accent};'
+        f'color:{on_accent};">{header}</td></tr>'
         f"{rows}"
         '<tr><td style="padding:16px 24px;border-top:1px solid #dfcfbb;'
         'color:#75685c;font-size:13px;line-height:1.5;">'
