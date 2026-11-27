@@ -205,10 +205,10 @@ These overrides cover CI and development only. LNbits does not install
 extension dependencies, so a production host runs its own resolution.
 Operators get those fixes by upgrading the host, not this extension.
 
-`starlette~=0.48.0` is unchanged at v1.7.1 and resolves 0.48.0 in both
-locks. Its 6 alerts stay dismissed as `tolerable_risk`:
+Two host-pinned packages keep alerts that are dismissed as `tolerable_risk`
+rather than overridden, so CI keeps qualifying the versions the host ships:
 
-- **starlette 0.48.0** (GHSA-7f5h, wqp7, 82w8, 86qp, jp82, x746):
+- **starlette 0.48.0** (unchanged at v1.7.1; GHSA-7f5h, wqp7, 82w8, 86qp, jp82, x746):
   - FileResponse Range-header DoS (GHSA-7f5h).
   - StaticFiles UNC/NTLM on Windows (GHSA-wqp7). N/A: the pins claim
     Linux/macOS only.
@@ -223,6 +223,14 @@ locks. Its 6 alerts stay dismissed as `tolerable_risk`:
   (no `HTTPEndpoint` subclassing, which is also the LNbits convention),
   and never derives security decisions or absolute URLs from
   `request.url`/Host.
+
+- **pydantic-settings 2.12.0** (GHSA-4xgf): the host pins
+  `pydantic-settings~=2.12.0`. The flaw is in
+  `NestedSecretsSettingsSource`, which follows symlinks out of
+  `secrets_dir` when `secrets_nested_subdir=True`. LNbits `Settings` is
+  configured with `env_file=".env"` only, with no `secrets_dir`
+  (`lnbits/settings.py:1393` at `4fa70f3`). infinitemarkets does not use
+  pydantic-settings, so the vulnerable path is unreachable.
 
 If a future host pin resolves patched versions, these alerts re-dispatch
 against the new lock naturally.
