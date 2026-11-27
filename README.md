@@ -77,7 +77,7 @@ Screenshots are captured on a seeded demo instance; the Messages view shows a fi
 
 ## Requirements
 
-- LNbits ≥ **1.6.0** (developed and conformance-tested against `v1.6.2-rc1`, host pin `e336fe14`)
+- LNbits ≥ **1.7.1** (developed and conformance-tested against `v1.7.1`, host pin `4fa70f33`)
 - Python extension support enabled on the host (standard LNbits extension loader)
 - A bound merchant wallet (Lightning funding source) for invoice creation
 - For Nostr flows: outbound websocket access to buyer/merchant declared relays; a recipient-gated relay (e.g. the LNbits `nostrrelay` extension) is the reference inbox deployment but is **not** a runtime dependency

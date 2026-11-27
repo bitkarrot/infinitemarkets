@@ -15,7 +15,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, Request, Response
 from lnbits.core.models import User
 from lnbits.decorators import check_user_exists
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from starlette.datastructures import UploadFile
 from starlette.formparsers import MultiPartException, MultiPartParser
 
@@ -82,8 +82,7 @@ def problem_boundary(fn):
 
 
 class _Strict(BaseModel):
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class CreateMerchantBody(_Strict):
@@ -131,7 +130,7 @@ class ImportCategoryBody(_Strict):
 
 
 class BulkProductsBody(_Strict):
-    product_ids: list[str] = Field(min_items=1, max_items=100)
+    product_ids: list[str] = Field(min_length=1, max_length=100)
     action: Literal[
         "price-markup",
         "move-collection",
@@ -148,8 +147,8 @@ class BulkProductsBody(_Strict):
 def _patch_dict(body: PatchMerchantBody) -> dict:
     """Only fields explicitly present in the request are patched."""
     return {
-        k: v for k, v in body.dict(exclude_unset=True).items()
-        if v is not None or k in body.__fields_set__
+        k: v for k, v in body.model_dump(exclude_unset=True).items()
+        if v is not None or k in body.model_fields_set
     }
 
 
@@ -513,7 +512,7 @@ async def patch_notifications(
     user: User = Depends(check_user_exists),
 ):
     patch = {
-        k: v for k, v in body.dict(exclude_unset=True).items()
+        k: v for k, v in body.model_dump(exclude_unset=True).items()
     }
     if not patch:
         raise unprocessable(
@@ -1323,7 +1322,7 @@ class ResolveExceptionBody(_Strict):
 
 
 class BulkOrdersBody(_Strict):
-    order_ids: list[str] = Field(min_items=1, max_items=100)
+    order_ids: list[str] = Field(min_length=1, max_length=100)
     action: Literal["archive", "restore"]
 
 

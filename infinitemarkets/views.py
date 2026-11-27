@@ -436,7 +436,7 @@ async def index(request: Request, user: User = Depends(check_user_exists)):
             # base.html does JSON.parse({{ user | tojson }}) — it needs the
             # user as a JSON STRING (host convention, see
             # lnbits/core/views/generic.py), not a dict.
-            "user": user.json(),
+            "user": user.model_dump_json(),
             "asset_revision": _ASSET_REVISION,
             "ext_version": _EXT_VERSION,
         },

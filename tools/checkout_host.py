@@ -27,9 +27,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 LNBITS_REPO_URL = "https://github.com/lnbits/lnbits"
-# LNbits v1.6.2-rc1 -- the qualified host revision (spec section 2).
-LNBITS_COMMIT = "e336fe14b841d6f0c940e75b3d343e3ab5cf8433"
-LNBITS_TAG = "v1.6.2-rc1"
+# LNbits v1.7.1 -- the qualified host revision (spec section 2).
+LNBITS_COMMIT = "4fa70f338d274e14fc82746a83fba5c2c658211f"
+LNBITS_TAG = "v1.7.1"
 
 
 def host_checkout_dir() -> Path:

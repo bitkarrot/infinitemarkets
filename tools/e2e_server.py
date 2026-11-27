@@ -98,6 +98,15 @@ os.environ.update(
         "LNBITS_AUDIT_LOG_REQUEST_BODY": "false",
         "LNBITS_AUDIT_LOG_QUERY_PARAMS": "false",
         "LNBITS_AUDIT_LOG_PATH_PARAMS": "false",
+        # Hermetic boot: no extension autoupdate at startup (app.py:553
+        # gates on lnbits_autoupdate_extensions_on_startup) and interval==0
+        # skips the scheduled pass (core/tasks.py:49-51) — no manifest
+        # fetches, no chance of "updating" the symlinked dev extension.
+        "LNBITS_AUTOUPDATE_EXTENSIONS_ON_STARTUP": "false",
+        "LNBITS_AUTOUPDATE_EXTENSIONS_INTERVAL_HOURS": "0",
+        # v1.7.1 defaults account creation off (settings.py:57); the seed
+        # creates accounts like the host's own test fixtures do.
+        "LNBITS_ALLOW_NEW_ACCOUNTS": "true",
         "FIRST_INSTALL": "true",
     }
 )
@@ -120,7 +129,7 @@ async def _seed(app, seed: dict, relay_url: str) -> None:
 
     # First install gates the auth API — create the superuser through the
     # host's own path (same as the runtime conftest).
-    superuser = f"gqadmin-{uuid.uuid4().hex[:8]}"
+    superuser = f"gqadmin_{uuid.uuid4().hex[:8]}"
     await first_install(
         UpdateSuperuserPassword(
             username=superuser,
@@ -315,7 +324,8 @@ async def _seed(app, seed: dict, relay_url: str) -> None:
         if os.environ["INFINITEMARKETS_RELAY_IO"] == "off":
             async with DomainTransaction() as tx:
                 await tx.execute(
-                    f"UPDATE {tx.table('merchants')} SET state = 'active' WHERE id = :m",
+                    f"UPDATE {tx.table('merchants')} SET state = 'active',"
+                    " inbox_state = 'active' WHERE id = :m",
                     {"m": mid},
                 )
             seed["publication_evidence"] = "not-run-financial-offline-fixture"

@@ -1,7 +1,7 @@
 """Host app fixture for the LNbits host contract probes (P0-03).
 
 Follows the pinned checkout's own tests/conftest.py pattern (verified at
-e336fe1): an isolated tmp data folder for NEW databases, FakeWallet funding
+4fa70f3): an isolated tmp data folder for NEW databases, FakeWallet funding
 (LNBITS_BACKEND_WALLET_CLASS semantics applied to the mutable settings
 singleton), create_app + asgi_lifespan.LifespanManager + first_install
 bootstrap, and wallet/account creation via the host's own crud/services
@@ -19,7 +19,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-DEFAULT_SUPERUSER_PREFIX = "gqadmin"  # + '-' + 8 hex; host caps username at 20 chars
+DEFAULT_SUPERUSER_PREFIX = "gqadmin"  # + '_' + 8 hex; host caps username at 20 chars
 DEFAULT_PASSWORD = "secret1234"
 
 _HOST_SETTINGS_KEYS = (
@@ -28,6 +28,9 @@ _HOST_SETTINGS_KEYS = (
     "lnbits_extensions_deactivate_all",
     "lnbits_admin_ui",
     "first_install",
+    "lnbits_autoupdate_extensions_on_startup",
+    "lnbits_autoupdate_extensions_interval_hours",
+    "lnbits_allow_new_accounts",
 )
 
 
@@ -39,7 +42,7 @@ async def host_app(data_folder: Path | str):
     mutated settings and the process cwd on exit.
 
     The host resolves several runtime paths relative to the process cwd
-    (verified at e336fe1: ``app.mount("/static",
+    (verified at 4fa70f3: ``app.mount("/static",
     StaticFiles(directory=Path("lnbits", "static")))`` and the extensions
     directory), and the host's own tests therefore run from the checkout
     root. This fixture reproduces that environment by chdir-ing into the
@@ -65,6 +68,14 @@ async def host_app(data_folder: Path | str):
     settings.lnbits_extensions_deactivate_all = True
     settings.lnbits_admin_ui = True
     settings.first_install = True
+    # Hermetic boot: no extension autoupdate at startup (app.py:553 gates
+    # on lnbits_autoupdate_extensions_on_startup) and interval==0 skips the
+    # scheduled pass (core/tasks.py:49-51).
+    settings.lnbits_autoupdate_extensions_on_startup = False
+    settings.lnbits_autoupdate_extensions_interval_hours = 0
+    # v1.7.1 defaults account creation off (settings.py:57); the host's own
+    # tests/conftest.py:397 enables it for fixtures the same way.
+    settings.lnbits_allow_new_accounts = True
 
     os.chdir(host_checkout_dir())
     try:
@@ -73,7 +84,23 @@ async def host_app(data_folder: Path | str):
             # Unique superuser per boot: the module-level core database is
             # shared across boots (and pytest runs), so a fixed username
             # would collide on the second boot.
-            superuser = f"{DEFAULT_SUPERUSER_PREFIX}-{uuid.uuid4().hex[:8]}"
+            # The shared core DB carries an admin-settings row across boots,
+            # and check_admin_settings (core/services/users.py:172-188)
+            # overwrites in-memory settings from it at startup — re-assert
+            # the boot posture into both the row and the live object.
+            from lnbits.core.crud import update_admin_settings
+            from lnbits.core.services.settings import update_cached_settings
+            from lnbits.settings import EditableSettings
+
+            boot_overrides = {
+                "lnbits_allow_new_accounts": True,
+                "lnbits_autoupdate_extensions_on_startup": False,
+                "lnbits_autoupdate_extensions_interval_hours": 0,
+            }
+            await update_admin_settings(EditableSettings(**boot_overrides))
+            update_cached_settings(boot_overrides)
+
+            superuser = f"{DEFAULT_SUPERUSER_PREFIX}_{uuid.uuid4().hex[:8]}"
             await first_install(
                 UpdateSuperuserPassword(
                     username=superuser,
@@ -99,10 +126,16 @@ async def create_test_wallet(wallet_name: str = "gamma-qual"):
     create_user_account + create_wallet + update_wallet_balance funding, so
     probes can settle FakeWallet invoices through pay_invoice.
     """
+    import uuid
+
     from lnbits.core.crud import create_wallet
+    from lnbits.core.models.users import Account
     from lnbits.core.services import create_user_account, update_wallet_balance
 
-    user = await create_user_account()
+    # v1.7.1: account=None requires the user-id-only auth method
+    # (services/users.py:44-60), which the default posture disables —
+    # pass an explicit Account, matching the host's own conftest.
+    user = await create_user_account(Account(id=uuid.uuid4().hex))
     wallet = await create_wallet(user_id=user.id, wallet_name=wallet_name)
     await update_wallet_balance(wallet=wallet, amount=9999999)
     return user, wallet

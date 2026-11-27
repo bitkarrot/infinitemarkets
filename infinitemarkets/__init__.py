@@ -1,7 +1,7 @@
 """Infinitemarkets — LNbits extension.
 
 NIP-99 catalog publication and Lightning checkout over one authoritative
-inventory. Host integration contract (pinned host v1.6.2-rc1, e336fe1):
+inventory. Host integration contract (pinned host v1.7.1, 4fa70f3):
 
 - ``infinitemarkets_ext`` — APIRouter carrying its own ``/infinitemarkets`` prefix
   (the host adds none).

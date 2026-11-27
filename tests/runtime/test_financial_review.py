@@ -520,7 +520,7 @@ async def test_review_callback_identity_matches_canonical_core(runtime_env, fiel
     svcs = _svcs()
     order, _, _ = await _new_order(runtime_env, scope=uuid.uuid4().hex)
     paid = await _settle_core_payment(order["id"], order["total_sat"])
-    await svcs["settlement"].invoice_listener(paid.copy(update={field: value}))
+    await svcs["settlement"].invoice_listener(paid.model_copy(update={field: value}))
     fresh = await svcs["orders"].get_order(order["id"])
     assert fresh["state"] == "awaiting_payment" and fresh["payment_exception"]
     projection = await _row("SELECT status FROM infinitemarkets.payments WHERE order_id = :o",

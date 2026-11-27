@@ -20,7 +20,7 @@ Video: media/infinite-markets-demo.mp4 | media/demo-poster.jpg | The 2-minute pr
 | | |
 |---|---|
 | **What** | A standard Python LNbits extension (`infinitemarkets`), v1.1.1 |
-| **Requires** | LNbits ≥ 1.6.0 and a bound merchant wallet |
+| **Requires** | LNbits ≥ 1.7.1 and a bound merchant wallet |
 | **Sells through** | Its own web storefront, embeds, and Gamma / NIP-99 Nostr marketplaces |
 | **Payments** | Lightning invoices from the merchant's LNbits wallet |
 | **License** | MIT, by bitkarrot |

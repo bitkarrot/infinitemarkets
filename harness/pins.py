@@ -5,7 +5,7 @@ Everything recorded here flows into the evidence manifest pins block via
 may carry credentials).
 
 Verified facts this module encodes (2026-09-20, against the pinned host
-checkout at e336fe1 and PyPI):
+checkout at 4fa70f3 and PyPI):
 
 - nostr-sdk 0.44.8 is WHEELS-ONLY on PyPI (13 wheels, no sdist), and the
   host ``uv.lock`` correspondingly records wheels only. There is no sdist
@@ -34,8 +34,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # The pinned host revision (spec section 2). tools/checkout_host.py owns the
 # checkout; this module only reads it.
-LNBITS_COMMIT = "e336fe14b841d6f0c940e75b3d343e3ab5cf8433"
-LNBITS_TAG = "v1.6.2-rc1"
+LNBITS_COMMIT = "4fa70f338d274e14fc82746a83fba5c2c658211f"
+LNBITS_TAG = "v1.7.1"
 NOSTR_SDK_VERSION = "0.44.8"
 
 NATIVE_LIBRARY_SUFFIXES = (".so", ".dylib", ".pyd")

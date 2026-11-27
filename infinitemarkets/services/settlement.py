@@ -769,7 +769,7 @@ async def reconcile(now: int | None = None) -> dict:
 
             status = None if core.success else await check_payment_status(core)
             if core.success or status.paid:
-                verified = core if core.success else core.copy(update={"status": "success"})
+                verified = core if core.success else core.model_copy(update={"status": "success"})
                 result = await _handle_core_payment(
                     projection["order_id"], verified, source="reconciliation",
                 )

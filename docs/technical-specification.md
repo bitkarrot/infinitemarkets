@@ -3,7 +3,7 @@
 **Status:** Normative implementation contract; Releases A, B, 03.1, and C are implemented
 **Audience:** Implementers of the `infinitemarkets` LNbits extension
 **Companion document:** `architecture-proposal.md` (architecture and rationale; this document is the normative build contract)
-**Target host baseline:** LNbits `v1.6.2-rc1`, commit `e336fe1`; other versions require CI qualification
+**Target host baseline:** LNbits `v1.7.1`, commit `4fa70f3`; other versions require CI qualification
 **Primary protocol:** Infinitemarkets marketplace protocol, pinned to `market-spec` commit
 `5dc79c5db0d41c0bea774debf445cce041192840` (2025-05-10)
 **Protocol dependencies:** NIP-99, NIP-17, NIP-44 (v2), NIP-59, NIP-89; NIP-15/NIP-04 compatibility projections are legacy/deferred and not a Release C live-publication gate; NIP-37 deferred
@@ -44,7 +44,7 @@ or the Infinitemarkets protocol itself.
 | NIP-15 status | draft/unrecommended — compatibility only |
 | NIP-44 version | v2 payload only |
 | Nostr library | Phase 0 candidate: host-resolved Python `nostr-sdk==0.44.8` from the pinned LNbits `uv.lock`; approval requires the qualification below |
-| LNbits | `v1.6.2-rc1`, commit `e336fe1`, Python ≥3.10,<3.13 |
+| LNbits | `v1.7.1`, commit `4fa70f3`, Python ≥3.10,<3.14 |
 
 Phase 0 MUST copy the immutable protocol and host pins into `PINS.md`. Before
 implementation, `PINS.md` MUST also record the approved Python SDK wheel filename and

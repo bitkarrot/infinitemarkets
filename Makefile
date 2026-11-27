@@ -16,7 +16,7 @@ SUBSET_OK = rc=$$?; if [ $$rc -eq 5 ]; then echo "subset empty: no tests collect
 
 .PHONY: host verify verify-fast verify-sdk verify-db verify-protocol verify-host verify-runtime lint
 
-# Idempotent checkout of the pinned LNbits host at e336fe1 (must run before any
+# Idempotent checkout of the pinned LNbits host at 4fa70f3 (must run before any
 # uv usage: pyproject resolves lnbits from this path source).
 host:
 	$(PYTHON) tools/checkout_host.py

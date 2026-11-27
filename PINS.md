@@ -20,7 +20,7 @@ downgraded.
 | NIP-15 status | draft/unrecommended — compatibility only |
 | NIP-44 version | v2 payload only |
 | Nostr library (Phase 0 candidate) | Python `nostr-sdk==0.44.8` — host-resolved; a candidate, not a safety certification |
-| LNbits host | `v1.6.2-rc1`, commit `e336fe14b841d6f0c940e75b3d343e3ab5cf8433` (Python >=3.10,<3.13) |
+| LNbits host | `v1.7.1`, commit `4fa70f338d274e14fc82746a83fba5c2c658211f` (Python >=3.10,<3.14) |
 
 Version `0.44.8` is a candidate because the pinned host resolves it, not a
 safety certification by version number (spec section 2).
@@ -108,7 +108,7 @@ Absent every one of these, the host-resolved wheel pin remains authoritative
 ## 4. Installation / Lockfile Path (supported, reproducible)
 
 ```text
-tools/checkout_host.py   # idempotent; hard-fails unless HEAD == e336fe14b841d6f0c940e75b3d343e3ab5cf8433
+tools/checkout_host.py   # idempotent; hard-fails unless HEAD == 4fa70f338d274e14fc82746a83fba5c2c658211f
 uv sync                  # resolves lnbits (path source) + nostr-sdk==0.44.8 into uv.lock
 make verify              # canonical verification command (D-07)
 ```
@@ -119,7 +119,7 @@ Lock identities (recorded in the evidence manifest pins block on every
 - **Harness lockfile**: `uv.lock` (repo root), file SHA-256 recorded per run
   by `harness/pins.py`.
 - **Host checkout**: `.cache/lnbits` at commit
-  `e336fe14b841d6f0c940e75b3d343e3ab5cf8433`; its `uv.lock` is the
+  `4fa70f338d274e14fc82746a83fba5c2c658211f`; its `uv.lock` is the
   wheel-hash source of truth for P0-01 parity.
 - The harness's FULL `uv.lock` resolution (every direct and transitive
   package with name, version, and per-artifact hashes) is recorded into the
@@ -195,30 +195,34 @@ single-profile `make verify` regenerating `evidence/` is development-only.
 
 ### Known vulnerabilities in the pinned tree (Dependabot disposition)
 
-GitHub flags 11 advisories on `uv.lock`, all on two packages that enter
-**transitively through `lnbits` itself** (`starlette~=0.48.0`,
-`pyjwt~=2.12.0`). The harness resolves identical versions to the pinned
-host lock (starlette 0.48.0, pyjwt 2.12.1) — that parity is P0-01's
-subject. Upstream (`v1.6.2`, `main`) carries the same constraints, so no
-patch release exists to repin to; forcing a bump here would qualify a
-dependency set that never ships. All 11 alerts are dismissed as
-`tolerable_risk` with this reasoning:
+Host `v1.7.1` (`4fa70f3`) pins `pyjwt~=2.15.1`, which resolves the
+patched 2.15.1. The 13 earlier pyjwt alerts on `uv.lock` are closed as
+fixed. Where the host constraint still admits a vulnerable release, the
+harness forces the patched line through `[tool.uv] override-dependencies`:
+`pillow>=13.0.0,<14` (the host declares `pillow~=12.3.0`),
+`oauthlib>=4.0.1` (the host lock resolves 4.0.0) and `multidict>=6.9.1`.
+These overrides cover CI and development only. LNbits does not install
+extension dependencies, so a production host runs its own resolution.
+Operators get those fixes by upgrading the host, not this extension.
 
-- **pyjwt 2.12.1** (5 alerts: GHSA-xgmm/993g/jq35/w7vc/fhv5) — every
-  advisory is a `PyJWKClient`/`PyJWK`/JWT-decode path. infinitemarkets
-  performs no JWT decoding; auth is Nostr-signed events via nostr-sdk
-  plus host session. Exposure is the host's own token code, which is the
-  host's posture, not this extension's.
-- **starlette 0.48.0** (6 alerts) — FileResponse Range-header DoS
-  (GHSA-7f5h), StaticFiles UNC/NTLM on Windows (GHSA-wqp7; N/A — pins
-  claim Linux/macOS only), `request.form()` limit bypass, Host-header /
-  `request.url` poisoning (GHSA-86qp, jp82), and `HTTPEndpoint` getattr
-  method dispatch (GHSA-x746). The qualification harness serves no HTTP.
-  Phase 2+ mitigations (extension routes run inside the host's
-  starlette): JSON-only request bodies (no `request.form()`), no
-  `FileResponse`/`StaticFiles` in extension code, `APIRouter` only (no
-  `HTTPEndpoint` subclassing — also the LNbits convention), and never
-  derive security decisions or absolute URLs from `request.url`/Host.
+`starlette~=0.48.0` is unchanged at v1.7.1 and resolves 0.48.0 in both
+locks. Its 6 alerts stay dismissed as `tolerable_risk`:
+
+- **starlette 0.48.0** (GHSA-7f5h, wqp7, 82w8, 86qp, jp82, x746):
+  - FileResponse Range-header DoS (GHSA-7f5h).
+  - StaticFiles UNC/NTLM on Windows (GHSA-wqp7). N/A: the pins claim
+    Linux/macOS only.
+  - `request.form()` limit bypass (GHSA-82w8).
+  - Host-header / `request.url` poisoning (GHSA-86qp, jp82).
+  - `HTTPEndpoint` getattr method dispatch (GHSA-x746).
+
+  The qualification harness serves no HTTP. Extension routes run inside
+  the host's starlette, and the extension mitigates each advisory: it
+  accepts JSON-only request bodies (no `request.form()`), uses no
+  `FileResponse`/`StaticFiles` in extension code, uses `APIRouter` only
+  (no `HTTPEndpoint` subclassing, which is also the LNbits convention),
+  and never derives security decisions or absolute URLs from
+  `request.url`/Host.
 
 If a future host pin resolves patched versions, these alerts re-dispatch
 against the new lock naturally.
@@ -242,7 +246,7 @@ against the new lock naturally.
 
 | Field | Value |
 |---|---|
-| Approved pins | nostr-sdk 0.44.8 (release-source `a600c2a7`, wheel sha256 per §1), LNbits `v1.6.2-rc1` @ `e336fe14b841`, Python 3.12, SQLite + PostgreSQL dialects, Linux x86_64/aarch64 blocking matrix |
+| Approved pins | nostr-sdk 0.44.8 (release-source `a600c2a7`, wheel sha256 per §1), LNbits `v1.7.1` @ `4fa70f338d27`, Python 3.12, SQLite + PostgreSQL dialects, Linux x86_64/aarch64 blocking matrix |
 | Approved evidence bundle | canonical CI run `35535526249` (linux-x86_64 + postgres, 220/221 passed, 1 optional-relay skip) committed at `2abeb30`; all P0-01..P0-14 green |
 | Owner / date | bitkarrot / 2026-09-20 |
 
